@@ -25,7 +25,7 @@ jobs:
       - run: node --test tests/registration-feedback.test.cjs tests/family-roster-checkin.test.cjs tests/community-quick-registration-cloud.test.cjs tests/public-pages-artifact.test.cjs
       - run: npm install --prefix /tmp/registration-v2-deps --no-save --ignore-scripts firebase-tools@13.35.1 firebase-admin@14.4.0 firebase-functions@7.3.2
       - name: Recovery, actual frontend functions, and 50/100/150 acceptance waves
-        run: /tmp/registration-v2-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-registration-v2 --config registration-flow-v2/emulator.json 'node --test registration-flow-v2/tests/recovery.test.cjs && node registration-flow-v2/tests/frontend-waves.cjs && node registration-flow-v2/tests/waves.cjs'
+        run: /tmp/registration-v2-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-registration-v2 --config registration-flow-v2/emulator.json 'node --test registration-flow-v2/tests/recovery.test.cjs registration-flow-v2/tests/roster-receipt.test.cjs && node registration-flow-v2/tests/frontend-waves.cjs && node registration-flow-v2/tests/waves.cjs'
         env:
           NODE_PATH: /tmp/registration-v2-deps/node_modules
           GCLOUD_PROJECT: demo-bxh-registration-v2

@@ -3047,11 +3047,15 @@
       const options=arguments[1]||{};
       try{
         const ref=fx.doc(dbHandle,"tournaments",String(code).toUpperCase());
-        // An explicit roster recovery must not silently fall back to cached data.
-        if(options.serverOnly===true&&!fx.getDocFromServer)return {ok:false,reason:"network"};
-        const snap = options.serverOnly===true?await fx.getDocFromServer(ref):await fx.getDoc(ref);
-        if(!snap.exists()) return { ok:false, reason:"not-found" };
-        const d = snap.data();
+        let d=options.rosterReceipt;
+        let snap;
+        if(!d){
+          // An explicit roster recovery must not silently fall back to cached data.
+          if(options.serverOnly===true&&!fx.getDocFromServer)return {ok:false,reason:"network"};
+          snap=options.serverOnly===true?await fx.getDocFromServer(ref):await fx.getDoc(ref);
+          if(!snap.exists())return {ok:false,reason:"not-found"};
+          d=snap.data();
+        }
         if(Object.hasOwn(d,'scoreStorage')){
           const confirmed=options.serverOnly===true?snap:await fx.getDocFromServer(ref);
           if(!confirmed.exists()||!Object.hasOwn(confirmed.data(),'scoreStorage'))return {ok:false,reason:'not-synchronized'};
@@ -3073,6 +3077,7 @@
         if(d.testCreatedAt) parsed.testCreatedAt=d.testCreatedAt;
         if(d.testExpiresAt&&typeof d.testExpiresAt.toMillis==="function") parsed.testExpiresAtMs=d.testExpiresAt.toMillis();
         if(d.expiresAt&&typeof d.expiresAt.toMillis==="function") parsed.expiresAtMs=d.expiresAt.toMillis();
+        if(options.rosterReceipt&&Number.isFinite(d.expiresAtMs))parsed.expiresAtMs=d.expiresAtMs;
         parsed.meta=parsed.meta||{};
         if(d.refereeSeatsV1?.version===1){parsed.meta.refereeSeatsV1=d.refereeSeatsV1;parsed.meta.refereeSeatNames=d.refereeSeatNames||{};}
         if(d.createdByRole==='partner_organizer')parsed.meta.refereeSeatActivityAssignment=d.eventStaffAssignments?.[currentUserUidForWrites()]||null;
@@ -3224,14 +3229,21 @@
       }
     },
 
-    async syncCommunityRegistrationSummary(code){
+    async syncCommunityRegistrationSummary(code,{includeRoster=false}={}){
       const normalized=String(code||"").toUpperCase();
       window.__BXH_COMMUNITY_SUMMARY_STATUS=window.__BXH_COMMUNITY_SUMMARY_STATUS||{};
       try{
         if(!window.engagementService?.familyRegistration)throw new Error("summary-service-unavailable");
-        const result=await window.engagementService.familyRegistration({action:"syncSummary",code:normalized,operationId:crypto.randomUUID()});
+        const startedAt=Date.now();
+        const result=await window.engagementService.familyRegistration({action:"syncSummary",code:normalized,operationId:crypto.randomUUID(),...(includeRoster?{includeRoster:true}:{})});
         if(result?.ok!==true||!Number.isSafeInteger(result.communityParticipantCount)||result.communityParticipantCount<0)throw new Error("invalid-summary-result");
         window.__BXH_COMMUNITY_SUMMARY_STATUS[normalized]={ok:true,communityParticipantCount:result.communityParticipantCount};
+        if(includeRoster){
+          const receipt=result.rosterReceipt;
+          const rosterReceipt=receipt?.code===normalized&&typeof receipt.room?.data==="string"&&!Object.hasOwn(receipt.room,"scoreStorage")?receipt.room:null;
+          console.info?.("[quick roster sync timing]",{requestMs:Date.now()-startedAt,usedReceipt:!!rosterReceipt,server:receipt?.timing});
+          return {...window.__BXH_COMMUNITY_SUMMARY_STATUS[normalized],rosterReceipt};
+        }
         return window.__BXH_COMMUNITY_SUMMARY_STATUS[normalized];
       }catch(e){window.__BXH_COMMUNITY_SUMMARY_STATUS[normalized]={ok:false};throw e;}
     },

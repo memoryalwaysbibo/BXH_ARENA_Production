@@ -463,6 +463,26 @@ test('invalid participant-summary responses are rejected without a false success
   }
 });
 
+test('summary can hydrate the confirmed owner room without another Firestore read', async () => {
+  const h=harness(), data=state();
+  await h.api.createCommunityRoom(data);
+  const saved=h.docs.get('tournaments/LOCAL');
+  const room={data:saved.data,createdBy:saved.createdBy,ownerUid:saved.ownerUid,eventAuthority:'community',
+    communityQuickRegistration:true,communityParticipantCount:1,expiresAtMs:NOW+60000};
+  h.ctx.window.engagementService.familyRegistration=async payload=>{
+    assert.equal(payload.includeRoster,true);
+    return {ok:true,communityParticipantCount:1,rosterReceipt:{code:'LOCAL',room,timing:{transactionMs:2}}};
+  };
+  const summary=await h.api.syncCommunityRegistrationSummary('LOCAL',{includeRoster:true});
+  h.ctx.fx.getDoc=async()=>assert.fail('Unexpected follow-up Firestore read');
+  const joined=await h.api.joinRoom('LOCAL',{rosterReceipt:summary.rosterReceipt});
+  assert.equal(joined.ok,true);
+  assert.equal(joined.data.ownerUid,'local-host');
+  assert.equal(joined.data.communityParticipantCount,1);
+  assert.equal(joined.data.expiresAtMs,NOW+60000);
+  assert.equal(h.ctx.window.__BXH_COMMUNITY_SUMMARY_STATUS.LOCAL.rosterReceipt,undefined);
+});
+
 test('summary refresh is scoped to quick COMMUNITY and post-start saves do not auto-refresh', async () => {
   for (const variant of [
     { eventAuthority: 'official', communityQuickRegistration: true },

@@ -16592,14 +16592,16 @@ function requireRegistrationRosterContext(context){
 }
 async function refreshBackendRegistrationRoster(context,catchup=false){
   requireRegistrationRosterContext(context);
+  let rosterReceipt=null;
   if(catchup){
     // Quick COMMUNITY rosters are projected by the owner-only callable. Never
     // rebuild them from a client snapshot, including legacy rooms without a marker.
     if(!isCommunityQuickRegistration(state)||!isCommunityRoomOwner()) throw new Error("permission-denied");
-    await window.cloudSync.syncCommunityRegistrationSummary(context.code);
+    const summary=await window.cloudSync.syncCommunityRegistrationSummary(context.code,{includeRoster:true});
+    rosterReceipt=summary?.rosterReceipt;
     requireRegistrationRosterContext(context);
   }
-  const result=await window.cloudSync.joinRoom(context.code);
+  const result=await window.cloudSync.joinRoom(context.code,rosterReceipt?{rosterReceipt}:undefined);
   requireRegistrationRosterContext(context);
   if(result?.ok!==true||result.data?.id!==context.roomId) throw new Error(result?.reason||"roster-readback-failed");
   if(isCommunityRoomOwner() && (result.data.ownerUid!==firebaseUser.uid||result.data.createdBy!==firebaseUser.uid)) throw new Error("permission-denied");
