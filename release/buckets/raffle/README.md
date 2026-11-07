@@ -198,3 +198,35 @@ Do not deploy helpers alone or automatically migrate old raffle generations.
 ```sh
 node tests/four-court-buckets/raffle/writer-probe.cjs
 ```
+
+
+## Assembled callable review archive
+
+The offline builder accepts the pinned private source-set-05.json transfer.
+Its SHA256 and all 107 member lengths and SHA256 digests must match. It replaces
+the three raffle exports at the tail of the captured operations.js with the
+preview/draw/update transaction services. The original index.js still exports
+them through require("./operations"). The review ZIP preserves 106 members
+byte for byte, changes operations.js and adds seven dependency files. Original
+onCall region/CORS/invoker options and the package manifest are preserved.
+
+```sh
+python3 -B scripts/build-bucket-raffle-review.py \
+  --source-transfer /private/path/source-set-05.json \
+  --output /private/path/raffle-review
+```
+
+The private build yielded 114 files and ZIP SHA256
+38aec32a71b5eec7c507543eed2f013c61e9d31b504b2ffe76d635b0d4be2550.
+The source transfer and candidate ZIP stay in the private review workspace.
+The builder reconstructs the ZIP container around verified member bytes.
+
+The browser regression builds the exact operations overlay and dependency
+closure from the pinned public fixture, loads the Firebase SDK onCall exports
+with fixture Firestore and drives the shipped tournament operations UI in
+Chromium. It exercises shared-UID same-name preview, a lost response after
+commit and same-operation retry, forfeiture, replacement and claim, including
+quote/HTML-character round trips in data-winner and name escaping. It runs with a fixture Auth context and Firestore. Runtime IAM,
+App Check, staged rollout and version-aware rollback still need release review.
+After participant-version receipts exist, rolling back to UID-only writers
+would invalidate exclusion semantics and needs a compatible rollback plan.

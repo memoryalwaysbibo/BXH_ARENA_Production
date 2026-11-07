@@ -1712,7 +1712,7 @@
     },
     ".github/workflows/bucket-integrated-candidate.yml": {
       "components": [],
-      "blob": "c5091a309b5b39efdfa4071eca5bbd31649005d8"
+      "blob": "2dae023e24416f683d6797c3cd2a657abae76570"
     },
     "release/buckets/my-events/patch-bootstrap.cjs": {
       "components": [],
@@ -1830,7 +1830,7 @@
     },
     "release/buckets/raffle/README.md": {
       "components": [],
-      "blob": "b71dfc7a90988f0869865f5d49d7706268642a9e"
+      "blob": "53086fde5fbf25dc1f5884cd756257451e79d8f0"
     },
     "release/buckets/raffle/input.cjs": {
       "components": [],
@@ -1929,6 +1929,18 @@
         718
       ],
       "blob": "e8b8b101d3eb5532e88e6fc0a8be8d73ec1daf7c"
+    },
+    "scripts/build-bucket-raffle-review.py": {
+      "components": [
+        718
+      ],
+      "blob": "936ec5edce611402649934840419bf25a5c42eae"
+    },
+    "tests/four-court-buckets/raffle/operations.browser.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "5e1855dde27d08516b89982d281bf9d34dd862f9"
     }
   },
   "mainScriptQueryParameters": {
@@ -2405,6 +2417,7 @@
     ".github/workflows/bucket-raffle-input.yml": "Validate source-only raffle reader against Admin SDK14.4.0, demo-only Emulator snapshots, physical root replacement and deterministic ABORTED callback retry; no callable wiring or deployment.",
     "release/buckets/raffle/identity.cjs": "Source-only server-selected participant-v1 identity: canonical account/playerId tuples preserve captured eligibility without uid-only family collapse; reject legacy exclusions, missing/conflicting IDs and excluded-account reassignment. Existing generations retain legacy mode until separately reviewed migration.",
     "release/buckets/raffle/preview.cjs": "Unwired transactional preview service: same-transaction actor/root/ledger/bucket reads, authorization on every callback, ledger birth/version checks, existing legacy-ledger preservation and server-selected new participant identity; zero writes. Must ship with future matching draw/update receipt versioning, never preview alone.",
-    "release/buckets/raffle/writers.cjs": "Unwired transaction bodies for draw/claim/forfeit/replacement; shared authorization and immutable room/version seals, preview hash, frozen saved pools, legacy ledger preservation, no-write replay and per-operation conflicts. Runtime exports/deployment remain unchanged."
+    "release/buckets/raffle/writers.cjs": "Unwired transaction bodies for draw/claim/forfeit/replacement; shared authorization and immutable room/version seals, preview hash, frozen saved pools, legacy ledger preservation, no-write replay and per-operation conflicts. Runtime exports/deployment remain unchanged.",
+    "scripts/build-bucket-raffle-review.py": "Private pinned source-set5 transfer validation and deterministic review ZIP; three callable bodies bound through normal operations exports; only operations.js replaced and seven candidate dependencies added."
   }
 }

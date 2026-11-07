@@ -5,6 +5,7 @@ on:
       - 'release/buckets/**'
       - 'scripts/bucket-writer-discovery*'
       - 'scripts/bucket-writer-followup.py'
+      - 'scripts/build-bucket-raffle-review.py'
       - 'tests/four-court-buckets/**'
       - 'tests/e2e/lobby-stable-updates.spec.cjs'
       - 'modules/main-app/core.js'
@@ -58,7 +59,7 @@ jobs:
           node tests/four-court-buckets/activity/backend-bridge.cjs
       - name: Install isolated browser dependencies
         run: |
-          npm install --prefix /tmp/bucket-integrated --no-save --ignore-scripts playwright@1.56.1 @playwright/test@1.56.1
+          npm install --prefix /tmp/bucket-integrated --no-save --ignore-scripts playwright@1.56.1 @playwright/test@1.56.1 firebase-admin@14.4.0 firebase-functions@7.3.2
           /tmp/bucket-integrated/node_modules/.bin/playwright install --with-deps chromium
       - name: Integrated full-host deletion, settlement handoff and main offline recovery
         env:
@@ -70,6 +71,7 @@ jobs:
           node tests/four-court-buckets/settlement-ui/backend-bridge.cjs
           node tests/offline-confirmation.browser.cjs
           node tests/offline-resilience-v2-wiring.test.cjs
+          node tests/four-court-buckets/raffle/operations.browser.cjs
       - name: Snapshot burst coalescing after native gesture release
         env:
           NODE_PATH: /tmp/bucket-integrated/node_modules
