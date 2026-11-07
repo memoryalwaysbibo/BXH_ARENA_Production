@@ -41,7 +41,7 @@ jobs:
         env:
           NODE_PATH: /tmp/bucket-raffle-input/node_modules
           GCLOUD_PROJECT: demo-bxh-bucket-raffle
-        run: /tmp/bucket-raffle-input/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-bucket-raffle --config tests/four-court-buckets/raffle/native.firebase.json 'node tests/four-court-buckets/raffle/native-input.cjs && node tests/four-court-buckets/raffle/native-writers.cjs'
+        run: /tmp/bucket-raffle-input/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-bucket-raffle --config tests/four-court-buckets/raffle/native.firebase.json 'node tests/four-court-buckets/raffle/native-input.cjs && node tests/four-court-buckets/raffle/native-writers.cjs && node tests/four-court-buckets/raffle/native-rollback.cjs'
       - name: Preserve emulator diagnostics
         if: always()
         uses: actions/upload-artifact@v4
