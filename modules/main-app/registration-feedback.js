@@ -10,16 +10,32 @@
   const identifier=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
   const valid=r=>r&&r.version===1&&identifier(r.uid)&&/^BXH-[A-Z0-9]{4,16}$/.test(r.code)
     &&Array.isArray(r.ids)&&r.ids.length>0&&r.ids.length<=21&&r.ids.every(identifier)
-    &&new Set(r.ids).size===r.ids.length&&Number.isFinite(r.createdAt);
+    &&new Set(r.ids).size===r.ids.length&&Number.isFinite(r.createdAt)
+    &&(r.action===undefined||r.action==='cancel'&&r.ids.length===1);
   const key=(uid,code)=>PREFIX+encodeURIComponent(uid)+':'+code;
   const clone=r=>JSON.parse(JSON.stringify(r));
   function originalRequest(record,request){
-    if(!request||request.action!=='join'||request.code!==record.code||!identifier(request.operationId)||request.operationId.length<8||request.operationId.length>100
-      ||typeof request.childEligibilityConfirmed!=='boolean'||!Array.isArray(request.childIds)
+    if(!request||request.action!==(record.action||'join')||request.code!==record.code||!identifier(request.operationId)||request.operationId.length<8||request.operationId.length>100)return null;
+    if(record.action==='cancel'){
+      if(record.ids.length!==1||request.registrationId!==record.ids[0]||request.intent!=='player'||request.localId!==''
+        ||Object.keys(request).some(k=>!['action','code','operationId','registrationId','intent','localId'].includes(k)))return null;
+      return clone(request);
+    }
+    if(typeof request.childEligibilityConfirmed!=='boolean'||!Array.isArray(request.childIds)
       ||JSON.stringify(request.childIds.map(id=>id===null?record.uid:'family_'+id))!==JSON.stringify(record.ids)
       ||Object.keys(request).some(k=>!['action','code','operationId','childIds','allocation','childEligibilityConfirmed'].includes(k)))return null;
     if(request.allocation!==undefined&&(!Array.isArray(request.allocation)||request.allocation.length!==record.ids.length||request.allocation.some((r,i)=>r.registrationId!==record.ids[i]||!['confirmed','waitlist'].includes(r.status)||Object.keys(r).some(k=>!['registrationId','status'].includes(k)))))return null;
     return clone(request);
+  }
+  function cancellationOutcome(entry,response){
+    const operation=response?.operation;
+    if(response?.ok!==true||!entry.retry||operation?.operationId!==entry.retry.operationId)return null;
+    if(operation.state==='rejected'&&typeof operation.reason==='string')return {error:Error(operation.reason)};
+    const result=operation.result;
+    if(operation.state==='completed'&&result?.ok===true&&result.status==='cancelled'&&result.registrationId===entry.ids[0]){
+      return {result:{ok:true,status:'cancelled',registrationId:result.registrationId,autoPromoted:result.autoPromoted===true}};
+    }
+    return null;
   }
   function definitive(error){
     // Only explicit backend rejections prove that this request did not commit.
@@ -45,6 +61,7 @@
     function later(e,fn,ms){const timer=schedule(()=>{e.timers.delete(timer);if(current(e))fn();},ms);e.timers.add(timer);return timer;}
     function persist(e){
       const r={version:1,uid:e.uid,code:e.code,ids:e.ids,createdAt:e.createdAt};
+      if(e.action==='cancel')r.action='cancel';
       if(e.retry)r.retry=e.retry;
       if(!valid(r))throw Error('feedback-invalid-submission');
       try{storage?.setItem(key(e.uid,e.code),JSON.stringify(r));e.durable=!!storage&&storage.getItem(key(e.uid,e.code))===JSON.stringify(r);}
@@ -67,7 +84,7 @@
         }
       }catch{/* Storage is optional; in-page tracking continues. */}
     }
-    function snapshot(sync=true){if(sync)restore();return [...entries.values()].map(e=>({code:e.code,state:e.state,durable:e.durable,
+    function snapshot(sync=true){if(sync)restore();return [...entries.values()].map(e=>({code:e.code,action:e.action,state:e.state,durable:e.durable,
       statuses:e.result?.rows?.map(r=>r.status)||(e.result?[e.result.status]:[]),createdAt:e.createdAt,submitted:!!e.ids,lastCheckAt:e.lastCheckAt,
       canRetry:!!e.retry&&typeof retry==='function'&&!e.flight&&e.state==='unconfirmed',message:e.message||null,
       autoPaused:e.autoPaused===true,deadlineReached:e.deadlineReached===true,hidden:e.hidden===true,queueState:e.queueState||null}));}
@@ -75,6 +92,9 @@
       if(!current(e)||!ACTIVE.includes(e.state))return;
       clearTimers(e);e.result=result;e.state='confirmed';remove(e);e.settle?.(result);
       if(recovered)onRecovered({code:e.code,result});emit();
+    }
+    function fail(e,error){
+      clearTimers(e);remove(e);e.state='failed';e.message=e.message||(e.action==='cancel'?'本次取消報名未完成。':failureMessage(error));e.settle?.(null,error);emit();
     }
     function queueCheck(e){
       if(!current(e)||!ACTIVE.includes(e.state)||!e.ids||e.hidden)return;
@@ -97,7 +117,8 @@
           // Reuse that transport until it settles, instead of stacking another
           // 60-second cloud request on each automatic recheck.
           if(!e.transport){
-            const transport=Promise.resolve().then(()=>read(code,e.retry?{operationId:e.retry.operationId}:undefined));
+            const query=e.retry?{operationId:e.retry.operationId,...(e.action==='cancel'?{action:'cancel'}:{})}:undefined;
+            const transport=Promise.resolve().then(()=>query||e.action!=='cancel'?read(code,query):null);
             e.transport=transport;
             const clear=()=>{if(e.transport===transport)e.transport=null;};
             void transport.then(clear,clear);
@@ -106,6 +127,12 @@
           if(!current(e)||!ACTIVE.includes(e.state))return null;
           e.lastCheckAt=now();
           e.queueState=response?.operation?.state||null;
+          if(e.action==='cancel'){
+            const outcome=cancellationOutcome(e,response);
+            if(outcome?.error){fail(e,outcome.error);return null;}
+            if(outcome?.result){const result={...outcome.result,recovered:true};complete(e,result,true);return result;}
+            e.state='unconfirmed';return null;
+          }
           // Require every selected identity, never another family member or an empty read.
           const rows=Array.isArray(response?.rows)?response.rows:[];
           const selected=e.ids.map(id=>rows.find(r=>r.registrationId===id&&STATUS.includes(r.status)));
@@ -123,25 +150,37 @@
       })();
       return e.query;
     }
-    function run(code,send){
+    function run(code,send,action='join'){
       restore();const uid=getUid();if(!uid||disposed)return Promise.reject(Error('auth-required'));
       if(!/^BXH-[A-Z0-9]{4,16}$/.test(code))return Promise.reject(Error('invalid-code'));
       const existing=entries.get(code);
       if(existing&&ACTIVE.includes(existing.state)){
         existing.hidden=false;emit();
-        if(existing.flight)return existing.flight;
-        void recheck(code);return Promise.reject(Error('registration-result-pending'));
+        if(action==='join'&&existing.action!=='cancel'&&existing.flight)return existing.flight;
+        void recheck(code);return Promise.reject(Error(existing.action==='cancel'?'registration-cancellation-pending':'registration-result-pending'));
       }
-      const e=entry({uid,code,createdAt:now()},'preparing');entries.set(code,e);
+      const e=entry({uid,code,createdAt:now(),...(action==='cancel'?{action}:{})},'preparing');entries.set(code,e);
+      const pendingReason=action==='cancel'?'registration-cancellation-pending':'registration-result-pending';
       e.flight=new Promise((resolve,reject)=>{let settled=false;e.settle=(result,error)=>{if(settled)return;settled=true;error?reject(error):resolve(result);};});
       // Start asynchronously so duplicate clicks always see the same in-flight promise.
       Promise.resolve().then(async()=>{
         const assertCurrent=()=>{if(!current(e)||e.state==='failed')throw Error('stale-session');};
-        const submitting=(ids,request)=>{assertCurrent();e.ids=[...ids];e.retry=originalRequest(e,request);persist(e);e.state='submitting';emit();};
+        const submitting=(ids,request)=>{
+          assertCurrent();const selected=[...ids],original=originalRequest({...e,ids:selected},request);
+          if(action==='cancel'&&!original)throw Error('invalid-operation');
+          e.ids=selected;e.retry=original;persist(e);e.state='submitting';emit();
+        };
         later(e,()=>{if(e.ids)void recheck(code);else{e.slow=true;emit();}},slowMs);
-        later(e,()=>{e.deadlineReached=true;e.state=e.ids?'unconfirmed':'failed';if(!e.ids)e.message='前置確認逾時，尚未送出報名。';emit();e.settle(null,Error(e.ids?'registration-result-pending':'registration-preparation-timeout'));if(!e.ids)clearTimers(e);},deadlineMs);
+        later(e,()=>{e.deadlineReached=true;e.state=e.ids?'unconfirmed':'failed';if(!e.ids)e.message=action==='cancel'?'前置確認逾時，尚未送出取消。':'前置確認逾時，尚未送出報名。';emit();e.settle(null,Error(e.ids?pendingReason:'registration-preparation-timeout'));if(!e.ids)clearTimers(e);},deadlineMs);
         try{
           assertCurrent();const result=await send({submitting,assertCurrent});assertCurrent();
+          if(!ACTIVE.includes(e.state))return;
+          if(action==='cancel'){
+            const outcome=cancellationOutcome(e,result);
+            if(outcome?.error){fail(e,outcome.error);return;}
+            if(outcome?.result){complete(e,outcome.result);return;}
+            e.queueState=result?.operation?.state||null;e.state='unconfirmed';emit();void recheck(code);return;
+          }
           if(result?.ok===true&&['queued','running','attention'].includes(result.operation?.state)){
             e.queueState=result.operation.state;e.state='unconfirmed';emit();void recheck(code);return;
           }
@@ -149,12 +188,12 @@
           complete(e,result);
         }catch(error){
           if(!current(e))return;
-          if(e.state==='confirmed')return; // A delayed transport error cannot undo server confirmation.
+          if(!ACTIVE.includes(e.state))return; // A delayed transport cannot undo a terminal outcome.
           if(!e.ids||definitive(error)){
-            clearTimers(e);remove(e);e.state='failed';e.message=e.message||failureMessage(error);e.settle(null,error);emit();
+            fail(e,error);
           }else{
             e.state='unconfirmed';emit();const recovered=await recheck(code);
-            if(current(e)&&!recovered&&e.state!=='confirmed')e.settle(null,Error('registration-result-pending'));
+            if(current(e)&&!recovered&&e.state!=='confirmed')e.settle(null,Error(pendingReason));
           }
         }
       });
@@ -167,6 +206,7 @@
       const request=clone(previous.retry),ids=[...previous.ids];clearTimers(previous);previous.state='failed';
       return run(code,async progress=>{
         progress.submitting(ids,request);const accepted=await retry(request);progress.assertCurrent();
+        if(previous.action==='cancel')return accepted;
         // An idempotent receipt may predate cancellation. Confirm CURRENT rows,
         // never show an old successful receipt as a fresh active registration.
         const response=await read(code,{operationId:request.operationId});progress.assertCurrent();
@@ -176,7 +216,7 @@
         const rows=ids.map(id=>response.rows.find(r=>r.registrationId===id&&STATUS.includes(r.status)));
         if(!rows.every(Boolean))throw Error('registration-no-longer-active');
         return {ok:true,status:rows[0].status,rows:rows.map(r=>({registrationId:r.registrationId,status:r.status})),recovered:true};
-      }).then(result=>{if(getUid()===previous.uid&&entries.get(code)?.state==='confirmed')onRecovered({code,result});return result;});
+      },previous.action).then(result=>{if((previous.action!=='cancel'||!result.recovered)&&getUid()===previous.uid&&entries.get(code)?.state==='confirmed')onRecovered({code,result});return result;});
     }
     function dismiss(code){const e=entries.get(code);if(!e)return;if(e.state==='unconfirmed'&&!e.flight){clearTimers(e);e.hidden=true;emit();return;}if(!ACTIVE.includes(e.state)){clearTimers(e);entries.delete(code);emit();}}
     function refresh(force=false){restore(force);emit();}
@@ -193,13 +233,15 @@
       panel.replaceChildren();panel.hidden=!rows.length;
       for(const row of rows){
         const box=document.createElement('div');box.className='registration-feedback-item';
-        const title=document.createElement('strong');title.textContent=row.state==='confirmed'?'報名狀態已確認':row.state==='failed'?'本次報名未完成':row.autoPaused||row.deadlineReached?'報名結果待確認':row.state==='preparing'?'正在確認報名資格':row.state==='submitting'?'報名送出中':row.state==='checking'?'正在查詢報名結果':row.queueState==='queued'?'報名已受理，等待處理':row.queueState==='running'?'正在處理報名':'報名結果確認中';
+        const cancelling=row.action==='cancel',operation=cancelling?'取消報名':'報名';
+        const title=document.createElement('strong');title.textContent=row.state==='confirmed'?operation+'狀態已確認':row.state==='failed'?'本次'+operation+'未完成':row.autoPaused||row.deadlineReached?operation+'結果待確認':row.state==='preparing'?(cancelling?'正在準備取消報名':'正在確認報名資格'):row.state==='submitting'?operation+'送出中':row.state==='checking'?'正在查詢'+operation+'結果':row.queueState==='queued'?operation+'已受理，等待處理':row.queueState==='running'?'正在處理'+operation:operation+'結果確認中';
         const detail=document.createElement('p');detail.setAttribute('role','status');detail.setAttribute('aria-live','polite');
-        const statuses=row.statuses.map(s=>({confirmed:'正取',waitlist:'備取',pending_draw:'等待抽籤'}[s]));
-        detail.textContent=row.code+'｜'+(row.state==='confirmed'?statuses.join('、'):row.state==='failed'?row.message:row.autoPaused||row.deadlineReached?'目前尚未確認結果，可離開此提示，稍後查詢；離開不會取消報名。':row.state==='preparing'?'尚未取得名額，請稍候。':row.state==='submitting'?'請勿重複點擊；送出不代表已取得名額。':'尚在確認是否已取得名額，請稍候。');
+        const statuses=row.statuses.map(s=>({confirmed:'正取',waitlist:'備取',pending_draw:'等待抽籤',cancelled:'已取消報名'}[s]));
+        const pendingText=cancelling?'正在確認取消結果，請稍候。':row.state==='preparing'?'尚未取得名額，請稍候。':row.state==='submitting'?'請勿重複點擊；送出不代表已取得名額。':'尚在確認是否已取得名額，請稍候。';
+        detail.textContent=row.code+'｜'+(row.state==='confirmed'?statuses.join('、'):row.state==='failed'?row.message:row.autoPaused||row.deadlineReached?(cancelling?'目前尚未確認取消結果，可離開此提示，稍後查詢。':'目前尚未確認結果，可離開此提示，稍後查詢；離開不會取消報名。'):pendingText);
         box.append(title,detail);
-        if(ACTIVE.includes(row.state)&&row.submitted){const button=document.createElement('button');button.type='button';button.className='btn btn-sm';button.textContent='查詢報名結果';button.disabled=row.state==='checking';button.onclick=()=>void controller.recheck(row.code);box.appendChild(button);}
-        if(row.canRetry){const button=document.createElement('button');button.type='button';button.className='btn btn-sm';button.textContent='重送原報名';button.onclick=()=>{void controller.retryOriginal(row.code).catch(()=>{});};box.appendChild(button);const hint=document.createElement('p');hint.textContent='沿用同一筆報名確認結果，不會另建新請求；名額仍依伺服器判定。';box.appendChild(hint);}
+        if(ACTIVE.includes(row.state)&&row.submitted){const button=document.createElement('button');button.type='button';button.className='btn btn-sm';button.textContent='查詢'+operation+'結果';button.disabled=row.state==='checking';button.onclick=()=>void controller.recheck(row.code);box.appendChild(button);}
+        if(row.canRetry){const button=document.createElement('button');button.type='button';button.className='btn btn-sm';button.textContent=cancelling?'重送原取消請求':'重送原報名';button.onclick=()=>{void controller.retryOriginal(row.code).catch(()=>{});};box.appendChild(button);const hint=document.createElement('p');hint.textContent=cancelling?'重試會沿用原本的取消請求。':'沿用同一筆報名確認結果，不會另建新請求；名額仍依伺服器判定。';box.appendChild(hint);}
         if(row.state==='unconfirmed'&&(row.autoPaused||row.deadlineReached)){const button=document.createElement('button');button.type='button';button.className='btn btn-sm';button.textContent='稍後查詢';button.onclick=()=>controller.dismiss(row.code);box.appendChild(button);}
         if(!ACTIVE.includes(row.state)){const button=document.createElement('button');button.type='button';button.className='btn btn-sm';button.textContent='關閉提示';button.onclick=()=>controller.dismiss(row.code);box.appendChild(button);}
         if(row.submitted&&!row.durable&&ACTIVE.includes(row.state)){const warning=document.createElement('p');warning.textContent='此瀏覽器無法保存進度，請留在此頁確認結果。';box.appendChild(warning);}

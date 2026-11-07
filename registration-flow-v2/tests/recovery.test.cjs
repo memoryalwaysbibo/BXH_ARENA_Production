@@ -2,6 +2,7 @@
 const {test,after}=require('node:test'),assert=require('node:assert/strict');
 const {db,FieldValue,handlers,service,seed,request,audit,drainAll}=require('./harness.cjs');
 const {createApi}=require('../backend/api.cjs');
+const {create: createFeedback}=require('../../modules/main-app/registration-feedback.js');
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return {resolve,promise};};
 after(()=>db.terminate());
@@ -36,22 +37,36 @@ test('rechecks account and close time after acceptance, before allocation',async
  const a=await audit(code,0);assert.equal(a.summary.rejected,2);
  assert.deepEqual(a.jobs.map(j=>j.reason).sort(),['auth-required','closed']);
 });
-test('player cancellation through the V2 API and automatic fill share the join queue',async()=>{
+test('player cancellation waits for its queue receipt and automatic fill shares the join queue',async t=>{
  const {code,ids:[one,two,three]}=await seed(3,1,2),services=Array.from({length:5},()=>service());
  for(const uid of [one,two])await services[0].enqueue(uid,request(code,uid));
  await drainAll(services,code);let a=await audit(code,2);assert.equal(a.summary.confirmed,1);assert.equal(a.summary.waitlist,1);
- const cancel={code,route:'roster',operationId:'cancel-first-user',payload:{action:'cancel',code,intent:'player',registrationId:one,operationId:'cancel-first-user'}};
+ const cancel={code,route:'roster',operationId:'cancel-first-user',payload:{action:'cancel',code,intent:'player',registrationId:one,localId:'',operationId:'cancel-first-user'}};
  const api=createApi({queue:services[1],family:handlers.family(db),enabled:async c=>c===code});
  const call=(uid,data)=>api({auth:{uid},data:{...data,code}});
- const accepted=await call(one,{action:'submit',operation:cancel});
- assert.equal(accepted.operation.state,'queued');
- assert.equal(accepted.operation.result,undefined);
+ const checked=deferred();let clock=Date.now();
+ const feedback=createFeedback({getUid:()=>one,now:()=>clock,
+  read:(room,operation)=>{assert.equal(room,code);assert.equal(operation.action,'cancel');return call(one,{action:'status',operationId:operation.operationId});},
+  onChange:rows=>{if(rows[0]?.state==='unconfirmed'&&rows[0].lastCheckAt!==null)checked.resolve();}
+ });
+ t.after(()=>feedback.dispose());
+ const cancellation=feedback.run(code,async progress=>{
+  progress.submitting([one],cancel.payload);
+  const accepted=await call(one,{action:'submit',operation:cancel});
+  assert.equal(accepted.operation.state,'queued');assert.equal(accepted.operation.result,undefined);
+  return accepted;
+ },'cancel');
+ await Promise.race([checked.promise,cancellation.then(()=>assert.fail('queue acceptance is not a cancellation'))]);
+ assert.equal(feedback.snapshot()[0].state,'unconfirmed');
  await delay(2);await services[2].enqueue(three,request(code,three));
  await drainAll(services,code);a=await audit(code,2);
  assert.equal(a.rows.find(r=>r.id===one).status,'cancelled');
  assert.equal(a.rows.find(r=>r.id===two).status,'confirmed');
  assert.equal(a.rows.find(r=>r.id===three).status,'waitlist');
  assert.equal(a.summary.jobs,4);assert.equal(a.summary.completed,4);
+ clock+=3001;
+ await feedback.recheck(code);
+ assert.deepEqual(await cancellation,{ok:true,status:'cancelled',registrationId:one,autoPromoted:true,recovered:true});
  const status={action:'status',operationId:cancel.operationId};
  const receipt=(await call(one,status)).operation;
  assert.equal(receipt.state,'completed');

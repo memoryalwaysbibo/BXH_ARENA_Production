@@ -9,7 +9,7 @@ function memory(){const data=new Map();return {data,get length(){return data.siz
 function fixture(options={}){
  let clock=0,uid='user1',counter=0;const timers=new Map(),storage=options.storage||memory(),queries=[],changes=[],recoveries=[];
  const read=options.read||(async()=>({ok:true,rows:[]}));
- const api=create({...options,getUid:()=>uid,storage,now:()=>clock,schedule:(fn,ms)=>{const id=++counter;timers.set(id,{at:clock+ms,fn});return id;},unschedule:id=>timers.delete(id),onChange:r=>changes.push(r),onRecovered:r=>recoveries.push(r),read:async code=>{queries.push(code);return read(code);}});
+ const api=create({...options,getUid:()=>uid,storage,now:()=>clock,schedule:(fn,ms)=>{const id=++counter;timers.set(id,{at:clock+ms,fn});return id;},unschedule:id=>timers.delete(id),onChange:r=>changes.push(r),onRecovered:r=>recoveries.push(r),read:async (code,operation)=>{queries.push(code);return read(code,operation);}});
  async function advance(ms){const end=clock+ms;for(let safety=0;safety<1000;safety++){const next=[...timers].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!next)break;clock=next[1].at;timers.delete(next[0]);next[1].fn();await flush();}clock=end;await flush();}
  return {api,storage,queries,changes,recoveries,timers,advance,setUid:value=>{uid=value;api.restore();}};
 }
@@ -117,4 +117,38 @@ test('retry acceptance is not misreported as registration-no-longer-active while
  let committed=false;const f=fixture({storage,read:async()=>({ok:true,rows:committed?[{registrationId:'user1',status:'confirmed'}]:[],operation:{state:committed?'completed':'queued'}}),retry:async()=>({ok:true,operation:{state:'queued'}})});
  f.api.restore();await f.advance(0);const retried=f.api.retryOriginal(CODE);await flush();assert.notEqual(f.api.snapshot()[0].state,'failed');
  committed=true;await f.advance(8000);assert.equal((await retried).status,'confirmed');f.api.dispose();
+});
+const cancelRequest={action:'cancel',code:CODE,operationId:'cancel-operation-01',registrationId:'family_child1',intent:'player',localId:''};
+const cancelReceipt=(result={},operation={})=>({ok:true,operation:{state:'completed',operationId:cancelRequest.operationId,result:{ok:true,status:'cancelled',registrationId:cancelRequest.registrationId,autoPromoted:true,...result},...operation}});
+test('cancellation ignores roster rows and mismatched receipts until its own transaction completes',async()=>{
+ let response={ok:true,rows:[{registrationId:cancelRequest.registrationId,status:'cancelled'}]};
+ const pending=deferred(),f=fixture({read:async (code,query)=>{
+  assert.equal(code,CODE);assert.deepEqual(query,{action:'cancel',operationId:cancelRequest.operationId});return response;
+ }});
+ const flight=f.api.run(CODE,p=>{p.submitting([cancelRequest.registrationId],cancelRequest);return pending.promise;},'cancel');
+ await flush();await f.advance(8000);assert.equal(f.api.snapshot()[0].state,'unconfirmed');
+ await assert.rejects(f.api.run(CODE,()=>assert.fail('must not submit a new join')),/cancellation-pending/);
+ response=cancelReceipt({registrationId:'different-child'});await f.advance(3001);await f.api.recheck(CODE);
+ assert.equal(f.api.snapshot()[0].state,'unconfirmed');
+ response=cancelReceipt({}, {operationId:'different-operation'});await f.advance(3001);await f.api.recheck(CODE);
+ assert.equal(f.api.snapshot()[0].state,'unconfirmed');
+ response=cancelReceipt({privateRoomState:'ignore'});await f.advance(3001);await f.api.recheck(CODE);
+ assert.deepEqual(await flight,{ok:true,status:'cancelled',registrationId:cancelRequest.registrationId,autoPromoted:true,recovered:true});
+ pending.resolve({ok:true,operation:{state:'queued'}});await flush();
+ assert.equal(f.api.snapshot()[0].state,'confirmed');assert.equal(f.storage.length,0);assert.equal(f.recoveries.length,1);f.api.dispose();
+});
+test('reload restores cancellation and retries only the original operation',async()=>{
+ const storage=memory(),first=fixture({storage});
+ await assert.rejects(first.api.run(CODE,p=>{p.submitting([cancelRequest.registrationId],cancelRequest);throw Error('functions/unavailable');},'cancel'),/cancellation-pending/);
+ first.api.dispose();let retried=false;
+ const second=fixture({storage,read:async()=>null,retry:async request=>{assert.deepEqual(request,cancelRequest);retried=true;return cancelReceipt();}});
+ second.api.restore();await second.advance(0);
+ assert.equal(second.api.snapshot()[0].action,'cancel');assert.equal(retried,false);
+ assert.equal((await second.api.retryOriginal(CODE)).status,'cancelled');assert.equal(retried,true);
+ assert.equal(second.recoveries.length,1);assert.equal(storage.length,0);second.api.dispose();
+});
+test('a cancellation rejection ends waiting only for the matching operation',async()=>{
+ const f=fixture({read:async()=>cancelReceipt({}, {state:'rejected',reason:'cancel-deadline-passed'})});
+ await assert.rejects(f.api.run(CODE,p=>{p.submitting([cancelRequest.registrationId],cancelRequest);return {ok:true,operation:{state:'queued'}};},'cancel'),/cancel-deadline-passed/);
+ assert.equal(f.api.snapshot()[0].state,'failed');assert.equal(f.storage.length,0);f.api.dispose();
 });
