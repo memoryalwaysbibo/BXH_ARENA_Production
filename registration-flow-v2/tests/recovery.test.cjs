@@ -66,7 +66,7 @@ test('player cancellation waits for its queue receipt and automatic fill shares 
  assert.equal(a.summary.jobs,4);assert.equal(a.summary.completed,4);
  clock+=3001;
  await feedback.recheck(code);
- assert.deepEqual(await cancellation,{ok:true,status:'cancelled',registrationId:one,autoPromoted:true,recovered:true});
+ assert.deepEqual(await cancellation,{ok:true,status:'cancelled',registrationId:one,autoPromoted:true,queueCancellation:true,recovered:true});
  const status={action:'status',operationId:cancel.operationId};
  const receipt=(await call(one,status)).operation;
  assert.equal(receipt.state,'completed');
@@ -75,6 +75,8 @@ test('player cancellation waits for its queue receipt and automatic fill shares 
  assert.equal(receipt.result.promotedRegistrationId,undefined);
  assert.equal(receipt.result.state,undefined);
  assert.equal((await call(two,status)).operation.state,'not-found');
+ const disabled=createApi({queue:services[1],family:handlers.family(db)});
+ assert.deepEqual((await disabled({auth:{uid:one},data:{...status,code}})).operation,receipt);
 });
 test('the player API refuses administrative mutations and the queue rejects another player’s cancellation',async()=>{
  const {code,ids:[owner,other]}=await seed(2),s=service();

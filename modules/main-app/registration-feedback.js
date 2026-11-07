@@ -33,7 +33,7 @@
     if(operation.state==='rejected'&&typeof operation.reason==='string')return {error:Error(operation.reason)};
     const result=operation.result;
     if(operation.state==='completed'&&result?.ok===true&&result.status==='cancelled'&&result.registrationId===entry.ids[0]){
-      return {result:{ok:true,status:'cancelled',registrationId:result.registrationId,autoPromoted:result.autoPromoted===true}};
+      return {result:{ok:true,status:'cancelled',registrationId:result.registrationId,autoPromoted:result.autoPromoted===true,queueCancellation:true}};
     }
     return null;
   }
@@ -90,8 +90,9 @@
       autoPaused:e.autoPaused===true,deadlineReached:e.deadlineReached===true,hidden:e.hidden===true,queueState:e.queueState||null}));}
     function complete(e,result,recovered=false){
       if(!current(e)||!ACTIVE.includes(e.state))return;
-      clearTimers(e);e.result=result;e.state='confirmed';remove(e);e.settle?.(result);
-      if(recovered)onRecovered({code:e.code,result});emit();
+      clearTimers(e);e.result=result;e.state='confirmed';remove(e);
+      const delivered=e.settle?.(result)===true;
+      if(e.action==='cancel'?!delivered:recovered)onRecovered({code:e.code,result});emit();
     }
     function fail(e,error){
       clearTimers(e);remove(e);e.state='failed';e.message=e.message||(e.action==='cancel'?'本次取消報名未完成。':failureMessage(error));e.settle?.(null,error);emit();
@@ -161,7 +162,7 @@
       }
       const e=entry({uid,code,createdAt:now(),...(action==='cancel'?{action}:{})},'preparing');entries.set(code,e);
       const pendingReason=action==='cancel'?'registration-cancellation-pending':'registration-result-pending';
-      e.flight=new Promise((resolve,reject)=>{let settled=false;e.settle=(result,error)=>{if(settled)return;settled=true;error?reject(error):resolve(result);};});
+      e.flight=new Promise((resolve,reject)=>{let settled=false;e.settle=(result,error)=>{if(settled)return false;settled=true;error?reject(error):resolve(result);return true;};});
       // Start asynchronously so duplicate clicks always see the same in-flight promise.
       Promise.resolve().then(async()=>{
         const assertCurrent=()=>{if(!current(e)||e.state==='failed')throw Error('stale-session');};
@@ -216,13 +217,14 @@
         const rows=ids.map(id=>response.rows.find(r=>r.registrationId===id&&STATUS.includes(r.status)));
         if(!rows.every(Boolean))throw Error('registration-no-longer-active');
         return {ok:true,status:rows[0].status,rows:rows.map(r=>({registrationId:r.registrationId,status:r.status})),recovered:true};
-      },previous.action).then(result=>{if((previous.action!=='cancel'||!result.recovered)&&getUid()===previous.uid&&entries.get(code)?.state==='confirmed')onRecovered({code,result});return result;});
+      },previous.action).then(result=>{if(getUid()===previous.uid&&entries.get(code)?.state==='confirmed')onRecovered({code,result});return result;});
     }
     function dismiss(code){const e=entries.get(code);if(!e)return;if(e.state==='unconfirmed'&&!e.flight){clearTimers(e);e.hidden=true;emit();return;}if(!ACTIVE.includes(e.state)){clearTimers(e);entries.delete(code);emit();}}
     function refresh(force=false){restore(force);emit();}
     function resume(){restore();for(const e of entries.values())if(!e.hidden&&e.ids&&ACTIVE.includes(e.state)&&e.attempts<=delays.length)void recheck(e.code);emit();}
     function dispose(){disposed=true;for(const e of entries.values()){clearTimers(e);e.settle?.(null,Error('stale-session'));}entries.clear();}
-    return {run,recheck,retryOriginal,snapshot,restore:refresh,resume,dismiss,dispose};
+    function cancellationPending(code){restore();const e=entries.get(code);return e?.action==='cancel'&&ACTIVE.includes(e.state);}
+    return {run,recheck,retryOriginal,snapshot,restore:refresh,resume,dismiss,dispose,cancellationPending};
   }
   function mount(controller,document){
     let panel=null,last='';

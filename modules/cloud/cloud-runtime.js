@@ -907,6 +907,10 @@
     }
   }
   let playerRegistrationFeedback=null;
+  function submitRegistrationCancellation(payload){
+    const {code,operationId}=payload;
+    return callEngagementFunction('registrationQueueV2',{action:'submit',code,operation:{code,route:'roster',operationId,payload}},20000);
+  }
   function getPlayerRegistrationFeedback(){
     if(!window.BXHRegistrationFeedback)return null;
     if(!playerRegistrationFeedback){
@@ -915,10 +919,12 @@
       playerRegistrationFeedback=window.BXHRegistrationFeedback.create({
         getUid:()=>authReady&&authHandle?.currentUser?.uid===firebaseUser?.uid?firebaseUser?.uid:null,
         storage,visible:()=>!document.hidden,
-        read:(code,operation)=>window.engagementService.familyRegistration({action:'mine',code,...operation}),
-        retry:request=>window.engagementService.familyRegistration(request),
+        read:(code,operation)=>operation?.action==='cancel'
+          ?callEngagementFunction('registrationQueueV2',{action:'status',code,operationId:operation.operationId},20000)
+          :window.engagementService.familyRegistration({action:'mine',code,...operation}),
+        retry:request=>request.action==='cancel'?submitRegistrationCancellation(request):window.engagementService.familyRegistration(request),
         onChange:rows=>draw(rows),
-        onRecovered:({code})=>window.dispatchEvent(new CustomEvent('bxh-registration-recovered',{detail:{code}}))
+        onRecovered:({code,result})=>window.dispatchEvent(new CustomEvent('bxh-registration-recovered',{detail:{code,queueCancellation:result?.queueCancellation===true}}))
       });
       draw=window.BXHRegistrationFeedback.mount(playerRegistrationFeedback,document);
       document.addEventListener('visibilitychange',()=>{if(!document.hidden)playerRegistrationFeedback.resume();});
@@ -1431,10 +1437,13 @@
     },
 
     restoreRegistrationFeedback(){getPlayerRegistrationFeedback()?.restore();},
+    hasPendingRegistrationCancellation(code){return getPlayerRegistrationFeedback()?.cancellationPending(code)===true;},
 
     async cancelRegistrationAsPlayer(code){
       const uid = (authReady && authHandle && authHandle.currentUser) ? authHandle.currentUser.uid : null;
       if(!uid) throw { code: "auth-required" };
+      const feedback=getPlayerRegistrationFeedback();
+      if(feedback?.cancellationPending(code)){void feedback.recheck(code);throw Error('registration-cancellation-pending');}
       const selectionDoc=await fx.getDoc(fx.doc(dbHandle,"publicTournaments",code));
       if(selectionDoc.exists()&&selectionDoc.data().registrationSelection)return window.engagementService.lotteryRegistration({code,action:'cancel'});
       const mine=await window.engagementService.familyRegistration({action:'mine',code});
@@ -1463,6 +1472,15 @@
     async cancelRoster(code,registrationId="",localId="",intent="admin"){
       const request={action:"cancel",code,registrationId,localId,intent};
       if(intent!=="player")return callEngagementFunction("registrationRosterService",{...request,operationId:crypto.randomUUID()},60000);
+      if(Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code)){
+        const feedback=getPlayerRegistrationFeedback();
+        if(!feedback)throw Error('registration-feedback-unavailable');
+        return feedback.run(code,progress=>{
+          const payload={...request,operationId:crypto.randomUUID()};
+          progress.submitting([registrationId],payload);
+          return submitRegistrationCancellation(payload);
+        },'cancel');
+      }
       return runMyEventsPlayerOperation('roster',code,operationId=>callEngagementFunction("registrationRosterService",{...request,operationId},60000));
     },
     async configureAutoFill(code,enabled){

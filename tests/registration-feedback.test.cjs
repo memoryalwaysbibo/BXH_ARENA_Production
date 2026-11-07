@@ -1,6 +1,7 @@
 'use strict';
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
+const fs=require('node:fs'),vm=require('node:vm');
 const {create,PREFIX}=require('../modules/main-app/registration-feedback.js');
 const CODE='BXH-FEED01';
 const flush=async()=>{for(let i=0;i<15;i++)await Promise.resolve();};
@@ -133,9 +134,9 @@ test('cancellation ignores roster rows and mismatched receipts until its own tra
  response=cancelReceipt({}, {operationId:'different-operation'});await f.advance(3001);await f.api.recheck(CODE);
  assert.equal(f.api.snapshot()[0].state,'unconfirmed');
  response=cancelReceipt({privateRoomState:'ignore'});await f.advance(3001);await f.api.recheck(CODE);
- assert.deepEqual(await flight,{ok:true,status:'cancelled',registrationId:cancelRequest.registrationId,autoPromoted:true,recovered:true});
+ assert.deepEqual(await flight,{ok:true,status:'cancelled',registrationId:cancelRequest.registrationId,autoPromoted:true,queueCancellation:true,recovered:true});
  pending.resolve({ok:true,operation:{state:'queued'}});await flush();
- assert.equal(f.api.snapshot()[0].state,'confirmed');assert.equal(f.storage.length,0);assert.equal(f.recoveries.length,1);f.api.dispose();
+ assert.equal(f.api.snapshot()[0].state,'confirmed');assert.equal(f.storage.length,0);assert.equal(f.recoveries.length,0);f.api.dispose();
 });
 test('reload restores cancellation and retries only the original operation',async()=>{
  const storage=memory(),first=fixture({storage});
@@ -151,4 +152,46 @@ test('a cancellation rejection ends waiting only for the matching operation',asy
  const f=fixture({read:async()=>cancelReceipt({}, {state:'rejected',reason:'cancel-deadline-passed'})});
  await assert.rejects(f.api.run(CODE,p=>{p.submitting([cancelRequest.registrationId],cancelRequest);return {ok:true,operation:{state:'queued'}};},'cancel'),/cancel-deadline-passed/);
  assert.equal(f.api.snapshot()[0].state,'failed');assert.equal(f.storage.length,0);f.api.dispose();
+});
+test('the shipped cancellation action uses the V2 queue and avoids a legacy resend after rollback',async()=>{
+ let response=null;
+ const f=fixture({read:async()=>response}),requests=[];
+ const cloud=fs.readFileSync(require.resolve('../modules/cloud/cloud-runtime.js'),'utf8');
+ function source(marker,end){const start=cloud.indexOf(marker),stop=cloud.indexOf(end,start);assert(start>=0&&stop>start);return cloud.slice(start,stop+end.length);}
+ const submit=source('  function submitRegistrationCancellation(','\n  }');
+ const cancel=source('    async cancelRoster(','\n    },');
+ const playerCancel=source('    async cancelRegistrationAsPlayer(','\n    },');
+ const context=vm.createContext({window:{BXH_REGISTRATION_FLOW_V2_ROOMS:[CODE],engagementService:{familyRegistration:async()=>({ok:true,rows:[{registrationId:cancelRequest.registrationId,status:'confirmed'}]})}},
+  authReady:true,authHandle:{currentUser:{uid:'user1'}},dbHandle:{},fx:{doc:()=>null,getDoc:async()=>({exists:()=>true,data:()=>({battleMode:'individual'})})},
+  chooseFamilyRegistrationToCancel:async rows=>rows[0].registrationId,getPlayerRegistrationFeedback:()=>f.api,
+  crypto:{randomUUID:()=>cancelRequest.operationId},runMyEventsPlayerOperation:()=>assert.fail('legacy mutation'),
+  callEngagementFunction:async(name,payload)=>{requests.push({name,payload});return {ok:true,operation:{state:'queued'}};}
+ });
+ const cloudSync=vm.runInContext(`${submit}\n({${cancel}${playerCancel}})`,context);
+ const flight=cloudSync.cancelRegistrationAsPlayer(CODE);await flush();
+ assert.equal(requests.length,1);
+ assert.deepEqual(JSON.parse(JSON.stringify(requests[0])),{name:'registrationQueueV2',payload:{action:'submit',code:CODE,operation:{code:CODE,route:'roster',operationId:cancelRequest.operationId,payload:cancelRequest}}});
+ context.window.BXH_REGISTRATION_FLOW_V2_ROOMS=[];
+ await assert.rejects(cloudSync.cancelRegistrationAsPlayer(CODE),/cancellation-pending/);
+ assert.equal(requests.length,1);
+ response=cancelReceipt();await f.advance(8000);
+ assert.equal((await flight).queueCancellation,true);assert.equal(f.api.cancellationPending(CODE),false);f.api.dispose();
+});
+test('My Events blocks a pending room and refreshes from the verified cancellation without an untracked warning',async()=>{
+ const browser={setTimeout,clearTimeout,queueMicrotask};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../my-events-player-slice.js'),'utf8'),browser);
+ let cancelled=false,pending=false,lists=0;
+ const stamp={seconds:1,nanoseconds:0},scope='individual-family';
+ const slice=browser.BXHMyEventsPlayerSlice.create({storage:memory(),queryStatus:async()=>assert.fail('unexpected legacy operation query'),
+  cancellationPending:code=>code===CODE&&pending,summary:async()=>({code:CODE,eventAuthority:'official',cancellationDeadline:Date.now()+60000}),
+  call:async name=>{
+   if(name==='queryMyActiveEvents'){lists++;return {schemaVersion:24,scope,status:'ready',notices:[],complete:true,confirmedEmpty:cancelled,nextCursor:null,cards:cancelled?[]:[{code:CODE,phase:'waiting',participantKinds:['self'],registrationStatuses:['confirmed']}]};}
+   return {schemaVersion:1,scope,status:'ready',notices:[],hasMore:false,nextCursor:null,roomIncarnation:stamp,roomUpdateTime:stamp,rows:[{tournamentCode:CODE,uid:'user1',registrationId:'user1',displayName:'Fixture',status:'confirmed'}]};
+  },cooldown:async()=>{}
+ });
+ slice.bind('user1',1);await slice.ensure();assert.ok(slice.cancellationContext(CODE));
+ pending=true;assert.equal(slice.cancellationContext(CODE),null);assert.equal(lists,1);
+ cancelled=true;pending=false;slice.invalidateConfirmedCancellation();assert.equal(slice.cancellationContext(CODE),null);
+ await slice.ensure();assert.equal(lists,2);assert.equal(slice.registration(CODE),null);
+ assert.match(slice.render(),/沒有進行中的賽事/);assert.doesNotMatch(slice.render(),/缺少可追蹤憑證/);slice.reset();
 });

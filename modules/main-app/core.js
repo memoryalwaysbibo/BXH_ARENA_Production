@@ -5248,6 +5248,7 @@ const PUBLIC_TOURNAMENTS_ERROR_MESSAGES = {
 // 不再籠統翻譯成單一句話。
 const REGISTRATION_ERROR_MESSAGES = {
   "registration-result-pending":"報名結果尚未確認，請使用畫面上的「查詢報名結果」，不要重新送出。",
+  "registration-cancellation-pending":"取消結果尚未確認，請使用畫面上的「查詢取消報名結果」。",
   "registration-preparation-timeout":"報名前置確認等候過久，尚未送出報名，請稍後重試。",
   "registration-state-conflict": "報名設定或人數尚未同步，請聯絡主辦重新儲存設定。",
   "invalid-registration-capacity": "報名人數上限設定無效，請聯絡主辦修正。",
@@ -5305,7 +5306,7 @@ function mapRegistrationError(e){
 }
 window.addEventListener('bxh-registration-recovered',event=>{
   const code=event.detail?.code;
-  publicTournamentsCache=null;invalidateMyRegistrationsCache();
+  publicTournamentsCache=null;invalidateMyRegistrationsCache(event.detail?.queueCancellation?{queueCancellation:true}:undefined);
   if(appPhase==='tournament-detail'&&tournamentDetailCode===code)void loadTournamentDetail(code);
   else requestLobbyRender();
 });
@@ -5411,7 +5412,10 @@ function markLobbySourceUnknown(){
   if(publicTournamentsFreshness!=="unknown"){publicTournamentsFreshness="unknown";requestLobbyRender();}
 }
 function invalidateMyRegistrationsCache(result){
-  if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true)myEventsPlayerSlice?.invalidate(result);
+  if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true){
+    if(result?.queueCancellation===true)myEventsPlayerSlice?.invalidateConfirmedCancellation();
+    else myEventsPlayerSlice?.invalidate(result);
+  }
   myRegistrationsRequest++;myRegistrationsCache=null;myRegistrationsLoading=false;
 }
 function shouldBindLobbyInput(element,key){
@@ -17121,6 +17125,7 @@ function currentMyEventsPlayerSlice(){
       storage:(()=>{try{return window.localStorage;}catch{return null;}})(),
       queryStatus:payload=>window.engagementService.myEventOperationStatus(payload),
       renderCard:(row,info,options)=>renderPlayerRegistrationCard(row,info,options),
+      cancellationPending:code=>window.cloudSync?.hasPendingRegistrationCancellation(code)===true,
       ledgerOptions:{visible:()=>!document.hidden},
       changed:()=>{if(appPhase==='player-center'&&playerActiveTab==='registered')renderPreservingScroll();else if(isTournamentLobbyVisible())requestLobbyRender();}
     });
