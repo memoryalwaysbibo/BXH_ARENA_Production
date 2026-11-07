@@ -3593,6 +3593,7 @@ if(testerSession){
       }catch(e){
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = (e&&e.code)||(e&&e.message)||"unknown";
         console.warn("雲端同步寫入失敗", e);
+        if(options.bracketCommit&&['permission-denied','firestore/permission-denied'].includes(e?.code))throw e;
         return false;
       }
     },

@@ -164,6 +164,12 @@ test('actual cloud transaction and server-only private/public readback enforce v
  const candidate={...clone(old),drawnAt:1,bracketSize:2,matches:[{id:'new',bracket:'SE',round:0,indexInRound:0,a:{playerId:'a'},b:{playerId:'b'}}],bracketDraw:{id:'draw-one'}};
  assert.equal(await h.api.pushUpdate('ROOM',candidate,{bracketCommit:{baseSignature:api.signature(old)}}),true);
  const read=await h.api.readBracketFromServer('ROOM');assert.equal(read.ok,true);assert(read.data.updatedAt>future);assert.equal(api.signature(read.data),api.signature(read.publicData));assert.deepEqual(Array.from(h.reads).slice(-2),['tournaments/ROOM','publicTournaments/ROOM']);
+ const transact=h.context.fx.runTransaction;
+ h.context.fx.runTransaction=async()=>{throw Object.assign(Error('Missing or insufficient permissions.'),{code:'permission-denied'});};
+ const redraw={...clone(candidate),bracketDraw:{id:'draw-two'}};
+ await assert.rejects(h.api.pushUpdate('ROOM',redraw,{bracketCommit:{baseSignature:api.signature(candidate)}}),{code:'permission-denied'});
+ assert.equal(await h.api.pushUpdate('ROOM',candidate),false);
+ h.context.fx.runTransaction=transact;
  assert.equal(await h.api.pushUpdate('ROOM',old),false);assert.equal(JSON.parse(h.docs.get('tournaments/ROOM').data).bracketDraw.id,'draw-one');
  assert.equal(await h.api.pushUpdate('ROOM',{...clone(candidate),startedAt:2},{bracketStartSignature:api.signature(old)}),false);
  assert.equal(await h.api.pushUpdate('ROOM',{...clone(candidate),startedAt:2},{bracketStartSignature:api.signature(candidate)}),true);
@@ -234,6 +240,38 @@ test('one click retries a rejected transient write with the identical operation 
 test('permission denial does not cause an automatic second write',async()=>{
  const h=fixture();let writes=0;h.ctx.write=async()=>{writes++;return false;};h.ctx.writeFailureCode=()=> 'permission-denied';
  const c=h.make();assert.equal(await c.submit(),false);assert.equal(writes,1);assert.equal(h.success,0);assert(c.blocked());
+});
+test('a rejected redraw reports permission denial before readback and retains the pending pairing',async()=>{
+ const h=fixture(),controller=h.make(),read=h.ctx.read;
+ assert.equal(await controller.begin(),true);
+ const confirmed=clone(h.local);
+ let reads=0,writes=0;
+ h.ctx.read=async()=>{reads++;return read();};
+ h.ctx.write=async()=>{writes++;throw Object.assign(Error('Missing or insufficient permissions.'),{code:'permission-denied'});};
+ assert.equal(await controller.begin(),false);
+ assert.equal(controller.status().error,'permission-denied');
+ assert.equal(controller.status().phase,'writing');
+ assert.equal(reads,1);
+ assert.equal(writes,1);
+ assert.deepEqual(h.local,confirmed);
+ assert.notEqual(JSON.parse([...h.storage.values()][0]).snapshot.bracketDraw.id,confirmed.bracketDraw.id);
+});
+test('community bracket submission returns failure without waiting for the legacy diagnostic',async()=>{
+ const source=fs.readFileSync('family-ui.js','utf8');
+ const start=source.indexOf('(function installTesterGeneralRoomHotfix()'),end=source.indexOf('\n})();',start);
+ assert(start>=0&&end>start);
+ let diagnostics=0;
+ const cloudSync={pushUpdate:async()=>false};
+ vm.runInNewContext(source.slice(start,end+6),{
+  window:{cloudSync,cloudAuth:{getCurrentUser:()=>({uid:'u'})},addEventListener(){}},
+  setTimeout:fn=>fn(),
+  alert:()=>{diagnostics++;},
+ });
+ const room={ownerUid:'u',createdBy:'u',meta:{eventAuthority:'community'}};
+ assert.equal(await cloudSync.pushUpdate('ROOM',room,{bracketCommit:{}}),false);
+ assert.equal(diagnostics,0);
+ assert.equal(await cloudSync.pushUpdate('ROOM',room),false);
+ assert.equal(diagnostics,1);
 });
 test('persistent unconfirmed public readback never rewrites a committed draw',async()=>{
  const h=fixture(),write=h.ctx.write;let reads=0;h.ctx.read=async()=>{reads++;return {ok:true,data:clone(h.remote),publicData:room()};};h.ctx.write=write;

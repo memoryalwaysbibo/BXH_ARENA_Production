@@ -251,7 +251,13 @@ async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode
     api.__testerGeneralRoomHotfix=true;
     if(typeof api.pushUpdate==='function'){
       const push=api.pushUpdate.bind(api);
-      api.pushUpdate=async(code,data,options)=>{if(!ownCommunity(data))return push(code,data,options);const result=await asCommunityOwner(()=>push(code,data,options));if(result===false)await communityDiagnostic(code,'雲端同步');return result};
+      api.pushUpdate=async(code,data,options)=>{
+        if(!ownCommunity(data))return push(code,data,options);
+        const result=await asCommunityOwner(()=>push(code,data,options));
+        // The bracket controller owns progress and errors for this submission.
+        if(result===false&&!options?.bracketCommit)await communityDiagnostic(code,'雲端同步');
+        return result;
+      };
     }
     if(typeof api.deleteCommunityRoom==='function'){
       api.deleteCommunityRoom=async code=>asCommunityOwner(async()=>{

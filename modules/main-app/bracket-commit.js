@@ -109,6 +109,9 @@ function create(ctx){
        lateWrite=promise;return promise;
       });
      }catch(e){writeError=e;}
+     // A Firestore rejection is definitive for this transaction. Only
+     // acknowledged or ambiguous writes need post-submit reconciliation.
+     if(['permission-denied','firestore/permission-denied'].includes(writeError?.code))throw Error('permission-denied');
      const failureCode=ctx.writeFailureCode?.()||writeError?.code||writeError?.message||'';
      keep();if(cancelled||!ctx.current())return false;
      // Never flash failure while a committed private/public readback is settling.
