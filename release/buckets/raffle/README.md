@@ -255,3 +255,19 @@ participant keys, and the candidate still recognizes those winners when
 read back. These checks cover the assembled code and saved data, with fixture
 auth and Firestore. Keep both ZIPs in private review and validate the target
 runtime, authentication and revision switch before any release.
+
+## Authenticated Callable protocol
+
+The native workflow stages the three assembled exports in the Functions
+Emulator and runs them against the Firestore and Auth emulators. Its
+`demo-bxh-bucket-raffle` project and all three endpoints are local. The test
+signs in with three synthetic email/password accounts and sends their Auth
+Emulator ID tokens to the actual Callable HTTP endpoints. It checks manager
+preview/draw/replay/forfeit/replace/claim, and rejects missing or invalid Auth,
+an active player, and an inactive administrator. Supplying a manager UID in
+the request body grants no authority.
+
+The candidate preserves the captured onCall options, which omit
+`enforceAppCheck`. The test exercises the authenticated flow without an App
+Check header. Production App Check tokens, live IAM, and the deployed revision
+switch still require separate acceptance.

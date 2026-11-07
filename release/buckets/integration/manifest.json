@@ -1830,7 +1830,7 @@
     },
     "release/buckets/raffle/README.md": {
       "components": [],
-      "blob": "cdfec13bf51c017f80167b5139c26b2a16e11aff"
+      "blob": "61bbfa8b5de50ccda8f355f29714dce861503d32"
     },
     "release/buckets/raffle/input.cjs": {
       "components": [],
@@ -1859,13 +1859,13 @@
       ]
     },
     "tests/four-court-buckets/raffle/native.firebase.json": {
-      "blob": "8ac30a58da9c41843d09956f58068fe121a79881",
+      "blob": "c11f0a20450f18b25eaa0c4a870bb52880ecd37c",
       "components": [
         718
       ]
     },
     ".github/workflows/bucket-raffle-input.yml": {
-      "blob": "3d4616d10a18ffa006d6614148c80d59b1829c61",
+      "blob": "1c8dba166aa59b9036c3650826b3eaaa9139ca37",
       "components": [
         718
       ]
@@ -1941,6 +1941,12 @@
         718
       ],
       "blob": "07db0877ab33a85be68cd29bd741eff8f037405d"
+    },
+    "tests/four-court-buckets/raffle/native-callable.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "514903d9c6125d837358a48c71070780f7f9c44e"
     }
   },
   "mainScriptQueryParameters": {

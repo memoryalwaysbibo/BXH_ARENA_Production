@@ -10,6 +10,7 @@ on:
       - 'tests/four-court-buckets/operations/fixtures/5/**'
       - 'tests/four-court-buckets/operations/fixture-sha256.json'
       - 'release/buckets/operations/patch-manifest.json'
+      - 'scripts/build-bucket-raffle-review.py'
       - '.github/workflows/bucket-raffle-input.yml'
 permissions:
   contents: read
@@ -36,12 +37,32 @@ jobs:
           node tests/four-court-buckets/raffle/writer-probe.cjs
           python3 -B tests/four-court-buckets/raffle/verify-provenance.py
       - name: Install isolated SDK and emulator
-        run: npm install --prefix /tmp/bucket-raffle-input --no-save --ignore-scripts firebase-tools@14 firebase-admin@14.4.0
-      - name: Verify native snapshots and retry binding
+        run: npm install --prefix /tmp/bucket-raffle-input --no-save --ignore-scripts firebase-tools@14 firebase-admin@14.4.0 firebase-functions@7.3.2
+      - name: Verify native snapshots, transactions and authenticated Callable endpoints
         env:
           NODE_PATH: /tmp/bucket-raffle-input/node_modules
           GCLOUD_PROJECT: demo-bxh-bucket-raffle
-        run: /tmp/bucket-raffle-input/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-bucket-raffle --config tests/four-court-buckets/raffle/native.firebase.json 'node tests/four-court-buckets/raffle/native-input.cjs && node tests/four-court-buckets/raffle/native-writers.cjs'
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8198
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9197
+        run: |
+          lab="$(mktemp -d "${RUNNER_TEMP}/raffle-native.XXXXXX")"
+          cp tests/four-court-buckets/raffle/native.firebase.json "$lab/firebase.json"
+          python3 -B scripts/build-bucket-raffle-review.py --fixture-tree --output "$lab/functions"
+          ln -s "$NODE_PATH" "$lab/functions/node_modules"
+          printf '%s\n' '{"name":"raffle-demo","private":true,"main":"index.cjs","engines":{"node":"22"},"dependencies":{"firebase-admin":"14.4.0","firebase-functions":"7.3.2"}}' > "$lab/functions/package.json"
+          cat > "$lab/functions/index.cjs" <<'JS'
+          if (process.env.GCLOUD_PROJECT !== 'demo-bxh-bucket-raffle' ||
+              process.env.FIRESTORE_EMULATOR_HOST !== '127.0.0.1:8198' ||
+              process.env.FIREBASE_AUTH_EMULATOR_HOST !== '127.0.0.1:9197') {
+            throw Error('Isolated raffle emulators required');
+          }
+          require('firebase-admin/app').initializeApp({projectId: process.env.GCLOUD_PROJECT});
+          const {previewTournamentRaffle, drawTournamentRaffle, updateTournamentRaffleWinner} = require('./operations.js');
+          module.exports = {previewTournamentRaffle, drawTournamentRaffle, updateTournamentRaffleWinner};
+          JS
+          /tmp/bucket-raffle-input/node_modules/.bin/firebase emulators:exec --only firestore,auth,functions \
+            --project "$GCLOUD_PROJECT" --config "$lab/firebase.json" \
+            'node tests/four-court-buckets/raffle/native-input.cjs && node tests/four-court-buckets/raffle/native-writers.cjs && node tests/four-court-buckets/raffle/native-callable.cjs'
       - name: Preserve emulator diagnostics
         if: always()
         uses: actions/upload-artifact@v4
