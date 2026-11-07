@@ -21,7 +21,7 @@ function loadAssembledOperations(directory, db) {
     '--fixture-tree', '--output', directory]);
   const originalLoad = Module._load;
   Module._load = function (name, parent, isMain) {
-    if (name === 'firebase-admin/firestore' && parent?.filename === path.join(directory, 'operations.js')) {
+    if (name === 'firebase-admin/firestore' && parent?.filename?.startsWith(directory + path.sep)) {
       return { getFirestore: () => db };
     }
     return originalLoad.call(this, name, parent, isMain);
