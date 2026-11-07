@@ -1712,7 +1712,7 @@
     },
     ".github/workflows/bucket-integrated-candidate.yml": {
       "components": [],
-      "blob": "cd25d8103acbd4017a50b7a95f864098aa7cd89c"
+      "blob": "2dae023e24416f683d6797c3cd2a657abae76570"
     },
     "release/buckets/my-events/patch-bootstrap.cjs": {
       "components": [],
@@ -1827,6 +1827,120 @@
     "release/buckets/integration/live-priority-writers-20261105.json": {
       "components": [],
       "blob": "77a652551b523f3fce6656d1217a93b114c709eb"
+    },
+    "release/buckets/raffle/README.md": {
+      "components": [],
+      "blob": "cdfec13bf51c017f80167b5139c26b2a16e11aff"
+    },
+    "release/buckets/raffle/input.cjs": {
+      "components": [],
+      "blob": "52cb960a27e6edf44629e35577aba68ac3dff059"
+    },
+    "scripts/bucket-raffle-readonly.md": {
+      "components": [],
+      "blob": "9a90792b286b7510598943a70bb0937a25802577"
+    },
+    "scripts/bucket-raffle-readonly.py": {
+      "components": [],
+      "blob": "fb48fcf7c7df58fd9fc3df9b3be26fb2b43c7292"
+    },
+    "tests/four-court-buckets/raffle-readonly.py": {
+      "components": [],
+      "blob": "d15377f0d5d41e41f30f247de64a7b5ec8cf227d"
+    },
+    "tests/four-court-buckets/raffle/input-probe.cjs": {
+      "components": [],
+      "blob": "ad8d3801b23a7bc8b971e043c8131c684b30afd4"
+    },
+    "tests/four-court-buckets/raffle/native-input.cjs": {
+      "blob": "c35739b48f2e42b9ed52db350365a6880584f1b3",
+      "components": [
+        718
+      ]
+    },
+    "tests/four-court-buckets/raffle/native.firebase.json": {
+      "blob": "8ac30a58da9c41843d09956f58068fe121a79881",
+      "components": [
+        718
+      ]
+    },
+    ".github/workflows/bucket-raffle-input.yml": {
+      "blob": "3d4616d10a18ffa006d6614148c80d59b1829c61",
+      "components": [
+        718
+      ]
+    },
+    "release/buckets/raffle/identity.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "64acb18aea170fc480d16982d59e05a70f9c3118"
+    },
+    "tests/four-court-buckets/raffle/identity-probe.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "b559fafd923a4054c0f3e831ed045a409a208e0a"
+    },
+    "release/buckets/raffle/preview.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "5420609ce69e0d4db554c6db17941e22806791f3"
+    },
+    "release/buckets/raffle/live-provenance-20261107.json": {
+      "components": [
+        718
+      ],
+      "blob": "8262c8382aa698bb3b2e64919eb1eaeccad70277"
+    },
+    "tests/four-court-buckets/raffle/preview-probe.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "3d580d81dc979aeca285c252bdf83aef9d244c61"
+    },
+    "tests/four-court-buckets/raffle/verify-provenance.py": {
+      "components": [
+        718
+      ],
+      "blob": "98c97138be8d814295e33c71b7d6a69d3f02a20a"
+    },
+    "release/buckets/raffle/context.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "6d4ff2feaf34188ac5b3bc87fcc11b49e0c26db8"
+    },
+    "release/buckets/raffle/writers.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "2ff16fa6b013ace51b3e2b92ad72e6a5ff2e1a22"
+    },
+    "tests/four-court-buckets/raffle/writer-probe.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "668b3c1ae2e6eefee536540d37eb2f45ba9351e7"
+    },
+    "tests/four-court-buckets/raffle/native-writers.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "e8b8b101d3eb5532e88e6fc0a8be8d73ec1daf7c"
+    },
+    "scripts/build-bucket-raffle-review.py": {
+      "components": [
+        718
+      ],
+      "blob": "e9b5f5fb98e9080c07a93021a7585a9fa9cf25d2"
+    },
+    "tests/four-court-buckets/raffle/operations.browser.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "07db0877ab33a85be68cd29bd741eff8f037405d"
     }
   },
   "mainScriptQueryParameters": {
@@ -2286,7 +2400,7 @@
     "modules/cloud/cloud-runtime.js": "Clean three-way merge preserving main V2 opt-in dispatch/recovery operation binding and candidate certified settlement/deletion methods; exact combined blob verified.",
     "tests/four-court-buckets/completion/native-emulator.cjs": "Preserve all prior checks and default single-round workload; permit bounded fresh count/sync/sync contention rounds (1-50) without retrying failures, with QR/round labels and native read diagnostics.",
     "tests/four-court-buckets/deletion/rules-emulator.py": "Select a fresh OS-assigned loopback port for each private demo Emulator invocation; preserve baseline/candidate permissions and deletion assertions.",
-    ".github/workflows/bucket-integrated-candidate.yml": "Run inherited registration-feedback recovery and ranked-name policy tests on the same merged checkout, in addition to existing component integration checks.",
+    ".github/workflows/bucket-integrated-candidate.yml": "Run inherited registration-feedback/ranked-name checks plus verified raffle input and read-only source capture checks on the merged checkout.",
     "release/buckets/deletion/manifest.json": "Refresh only restore/access deployed archive and source-closure provenance against the uploaded 2026-11-05 read-only capture; runtime candidate files retain their accepted hashes.",
     "tests/four-court-buckets/deletion/verify-package.py": "Derive lease guards from the exact deployed two-marker fences and verify captured closure hashes; retain all selector/deletion checks.",
     "scripts/build-bucket-restore-access-review.py": "Offline review-only packaging of two exact captured archives; replace one pinned source member per target, preserve all other source bytes and reject source/configuration drift. No deployment or cloud calls.",
@@ -2299,6 +2413,11 @@
     "release/buckets/integration/writer-discovery-20261105.md": "Record the received cross-region discovery snapshot, both unresolved regional errors, 157 matched Run services and the newer referee/registration source baselines; do not claim metadata/source completeness.",
     "release/buckets/interactions/candidate/9/family-registration.js": "Reapply the original single bucket-ownership guard to the exact 2026-11-05 deployed familyRegistration source, preserving PR730 admission/coalescing, deadline revalidation, getAll and read-only previews.",
     "tests/four-court-buckets/interactions/probe.cjs": "Use native timer globals for the deployed admission module; verify coalescing, conflicting operation rejection, same-room serialization and read-only/marked previews, in addition to all original 363 checks.",
-    "release/buckets/integration/live-followup-20261105.json": "Pin the received four-function follow-up, policy-blocked regional reads, 16-file referee match, exact family source closure/review archive and unresolved GET trigger digest difference."
+    "release/buckets/integration/live-followup-20261105.json": "Pin the received four-function follow-up, policy-blocked regional reads, 16-file referee match, exact family source closure/review archive and unresolved GET trigger digest difference.",
+    ".github/workflows/bucket-raffle-input.yml": "Validate source-only raffle reader against Admin SDK14.4.0, demo-only Emulator snapshots, physical root replacement and deterministic ABORTED callback retry; no callable wiring or deployment.",
+    "release/buckets/raffle/identity.cjs": "Source-only server-selected participant-v1 identity: canonical account/playerId tuples preserve captured eligibility without uid-only family collapse; reject legacy exclusions, missing/conflicting IDs and excluded-account reassignment. Existing generations retain legacy mode until separately reviewed migration.",
+    "release/buckets/raffle/preview.cjs": "Unwired transactional preview service: same-transaction actor/root/ledger/bucket reads, authorization on every callback, ledger birth/version checks, existing legacy-ledger preservation and server-selected new participant identity; zero writes. Must ship with future matching draw/update receipt versioning, never preview alone.",
+    "release/buckets/raffle/writers.cjs": "Unwired transaction bodies for draw/claim/forfeit/replacement; shared authorization and immutable room/version seals, preview hash, frozen saved pools, legacy ledger preservation, no-write replay and per-operation conflicts. Runtime exports/deployment remain unchanged.",
+    "scripts/build-bucket-raffle-review.py": "Private pinned source-set5 transfer validation and deterministic review ZIP; three callable bodies bound through normal operations exports; only operations.js replaced and seven candidate dependencies added."
   }
 }
