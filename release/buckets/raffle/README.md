@@ -271,3 +271,22 @@ The candidate preserves the captured onCall options, which omit
 `enforceAppCheck`. The test exercises the authenticated flow without an App
 Check header. Production App Check tokens, live IAM, and the deployed revision
 switch still require separate acceptance.
+
+## Read-only release baseline check
+
+Run the [raffle provenance workflow](https://github.com/memoryalwaysbibo/BXH_ARENA_Functions_Production/actions/workflows/bucket-cloud-readonly.yml)
+on its main branch with `confirm_project=bxh-arena`. Use the filtered
+`bucket-readonly-report.json` from that new run.
+
+```sh
+python3 -B tests/four-court-buckets/raffle/verify-provenance.py \
+  --capture-report /path/to/bucket-readonly-report.json
+```
+
+The comparison requires a complete, stable capture for all three functions.
+It checks each function's source archive, full metadata, build configuration
+and service configuration hashes against the reviewed baseline.
+`BASELINE_DRIFT` lists the affected functions and fields and exits nonzero.
+Resolve drift against the latest deployed sources before using either review
+archive. The workflow run time establishes freshness. A matching hash report
+alone establishes baseline parity.
