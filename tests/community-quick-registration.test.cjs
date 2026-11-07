@@ -1020,16 +1020,21 @@ test('team host settings explain required schedule and team capacity without pro
 
 test('family hotfix wrapper forwards cloud options unchanged for owned community and other events', async () => {
   const family = read('family-ui.js');
-  const wrapper = family.match(/^\s*api\.pushUpdate=async\(code,data,options\)=>.*$/m)?.[0];
-  assert(wrapper, 'Family wrapper accepts the new options argument');
+  const start = family.indexOf('(function installTesterGeneralRoomHotfix()');
+  const end = family.indexOf('\n})();', start);
+  assert(start >= 0 && end > start, 'Family wrapper installer is present');
   const calls = [];
-  const ctx = vm.createContext({ api: {}, ownCommunity: data => data.owned === true,
-    push: async (...args) => { calls.push(args); return true; }, asCommunityOwner: fn => fn(),
-    communityDiagnostic: () => { throw Error('Unexpected diagnostic'); } });
-  vm.runInContext(wrapper, ctx);
+  const receipt = { ok: true, committed: true };
+  const api = { pushUpdate: async (...args) => { calls.push(args); return receipt; } };
+  vm.runInNewContext(family.slice(start, end + '\n})();'.length), {
+    window: { cloudSync: api, cloudAuth: { getCurrentUser: () => ({ uid: 'host' }) }, addEventListener() {} },
+    setTimeout: fn => fn(),
+    alert: () => { throw Error('Unexpected diagnostic'); },
+  });
   const options = { syncCommunitySummary: true, additionalOption: 'preserved' };
   for (const owned of [false, true]) {
-    assert.equal(await ctx.api.pushUpdate('LOCAL', { owned }, options), true);
+    const data = { ownerUid: 'host', createdBy: 'host', meta: { eventAuthority: owned ? 'community' : 'official' } };
+    assert.equal(await api.pushUpdate('LOCAL', data, options), receipt);
     assert.equal(calls.at(-1)[2], options);
   }
 });
