@@ -15,7 +15,7 @@ function harness(overrides={}){
  const state={id:'room-a',cloudCode:'ROOM-A',createdBy:'host',ownerUid:'host',updatedAt:1,registrationRosterRevision:0,communityQuickRegistration:true,meta:{eventAuthority:'community',battleMode:'individual',registrationEnabled:true,communityQuickRegistration:true},players:[{id:'host-player',name:'Host',source:'host'}],waitlistPlayers:[],matches:[]};
  const ctx=vm.createContext({console:{warn(){}},Date,JSON,window:{},isTournamentFullyDecided:()=>false,finishTournament:async()=>false,bracketCommitBlocked:()=>false,bracketCommitStatusHtml:()=>'',firebaseUser:{uid:'host'},userProfile:{role:'player',active:true},currentRole:'player',appPhase:'community-room',communityRoomActiveTab:'people',activeTab:'live',state,peopleRosterBusy:false,peopleRosterSyncStatus:null,adminRegistrationsCache:null,adminRegistrationsError:null,adminRegistrationsLoading:false,publicTournamentsCache:[],myRegistrationsCache:[],remoteAppliedRoomId:null,remoteAppliedAt:0,courtSwapDraft:null,refereeAssignmentDraftEnabled:null,cloudLastSyncAt:0,
  currentAuthUid:()=>ctx.firebaseUser?.uid||'',cloudAvailable:()=>true,isOwnTestTournament:()=>ctx.state.meta.eventAuthority==='test'&&ctx.state.ownerUid===ctx.firebaseUser?.uid&&ctx.state.createdBy===ctx.firebaseUser?.uid,
- resetAdminRegistrationsCache:()=>{ctx.adminRegistrationsCache=null;ctx.adminRegistrationsError=null;},defaultState:id=>({id}),saveRecord:async()=>true,saveState:async()=>{calls.save++;return true;},mapRegistrationError:error=>String(error.message||error.code),showToast:(message,error)=>calls.toasts.push({message,error}),bracketRosterIsCurrent:()=>true,
+ resetAdminRegistrationsCache:()=>{ctx.adminRegistrationsCache=null;ctx.adminRegistrationsError=null;},defaultState:id=>({id}),saveRecord:async()=>true,saveState:async()=>{calls.save++;return true;},mapRegistrationError:error=>String(error.message||error.code),showToast:(message,error)=>calls.toasts.push({message,error}),bracketRosterIsCurrent:()=>true,currentAdminOperationalFailure:()=>null,
  render:()=>{calls.render++;ctx.reconcileRegistrationRosterContext();},renderPreservingScroll:()=>{calls.render++;ctx.reconcileRegistrationRosterContext();},
  ...overrides});
  ctx.window.cloudSync={connect:async()=>true,subscribeRegistrationsForAdmin:(code,next,error)=>{calls.subscribe.push({code,next,error});return ()=>{calls.unsub++;};},syncCommunityRegistrationSummary:async()=>{calls.catchup++;return {ok:true,communityParticipantCount:2};},joinRoom:async()=>{calls.read++;return {ok:true,data:clone(ctx.remote)};},getPublicTournamentFull:async()=>{calls.publicRead++;return {};},listRegistrationsForAdmin:async()=>{calls.list++;return [];}};
@@ -133,8 +133,29 @@ test('manual repeated clicks issue one catchup and stale completion cannot toast
 
 test('backend-managed official rosters are read back without browser reconstruction',async()=>{
  const {ctx,calls}=harness();ctx.currentRole='admin';ctx.userProfile.role='admin';ctx.state.meta.eventAuthority='official';ctx.remote.meta.eventAuthority='official';ctx.appPhase='app';ctx.activeTab='people';
+ ctx.window.cloudSync.listRegistrationsForAdmin=async()=>{calls.list++;return [{registrationId:'r',status:'confirmed'}];};
  ctx.window.cloudSync.getPublicTournamentFull=async()=>({registrationRosterSyncBackendEnabled:true});await ctx.syncLatestOnlineRosterBeforeLock();
- assert.equal(calls.catchup,0);assert.equal(calls.list,0);assert.equal(calls.save,0);assert.equal(ctx.state.players.length,2);
+ assert.equal(calls.catchup,0);assert.equal(calls.list,1);assert.equal(calls.save,0);assert.equal(ctx.state.players.length,2);
+});
+
+test('explicit pre-start sync refuses a backend roster missing a confirmed family entrant',async()=>{
+ const {ctx,calls}=harness();ctx.currentRole='admin';ctx.userProfile.role='admin';ctx.state.meta.eventAuthority='official';ctx.remote.meta.eventAuthority='official';ctx.appPhase='app';ctx.activeTab='people';
+ ctx.window.cloudSync.getPublicTournamentFull=async()=>({registrationRosterSyncBackendEnabled:true});
+ ctx.window.cloudSync.listRegistrationsForAdmin=async()=>{calls.list++;return [{registrationId:'r',status:'confirmed'},{registrationId:'family_child1',status:'confirmed',familyPlayerId:'child1',guardianUid:'host'}];};
+ const before=clone(ctx.state);
+ await assert.rejects(ctx.syncLatestOnlineRosterBeforeLock(),/roster-projection-pending/);
+ assert.deepEqual(clone(ctx.state),before,'a stale backend readback cannot replace the on-screen roster');
+ assert.equal(calls.save,0);assert.equal(calls.list,1);
+ ctx.remote.players.push({id:'family_child1',source:'online',registrationId:'family_child1',guardianUid:'host',familyPlayerId:'child1',checkedIn:false});
+ await ctx.syncLatestOnlineRosterBeforeLock();assert.equal(ctx.state.players.length,3);
+});
+
+test('explicit pre-start sync refuses a stale cancelled online player',async()=>{
+ const {ctx,calls}=harness();ctx.currentRole='admin';ctx.userProfile.role='admin';ctx.state.meta.eventAuthority='official';ctx.remote.meta.eventAuthority='official';ctx.appPhase='app';ctx.activeTab='people';
+ ctx.window.cloudSync.getPublicTournamentFull=async()=>({registrationRosterSyncBackendEnabled:true});
+ ctx.window.cloudSync.listRegistrationsForAdmin=async()=>{calls.list++;return [{registrationId:'r',status:'cancelled'}];};
+ await assert.rejects(ctx.syncLatestOnlineRosterBeforeLock(),/roster-projection-pending/);
+ assert.equal(ctx.state.players.length,1);assert.equal(calls.save,0);
 });
 
 test('owner action allowlist and rendered error retry stay connected to production controls',()=>{

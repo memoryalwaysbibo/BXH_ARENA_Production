@@ -83,6 +83,21 @@ test('UI offers an explicit confirmation and a revoked role cannot execute it',a
  assert.equal(s.offerAdminOperationalOverride('draw-bracket','名單未確認'),false);
 });
 
+test('known missing registration cannot offer or revive a force start until roster catch-up',()=>{
+ const source=fs.readFileSync('modules/main-app/core.js','utf8');
+ const a=source.indexOf('let adminOperationalOverrideBusy=false;'),b=source.indexOf('let bracketCommitContext=null;',a);
+ let dialogs=0;
+ const state={id:'room',cloudCode:'BXH-X',meta:{battleMode:'individual'},players:[{id:'a'},{id:'b'}],matches:[],bracketSize:2};
+ const s={state,userProfile:{...actor},currentAuthUid:()=> 'admin',eligiblePlayers:()=>state.players,currentBracketParticipantIds:()=>new Set(['a','b']),
+  window:{BXHAdminOverride:override,BXHBracketCommit:bracket},bracketCommitBlocked:()=>false,bracketCommitController:()=>({blocked:()=>false}),
+  openModal:()=>{dialogs++;},showToast(){},console};
+ vm.createContext(s);vm.runInContext(source.slice(a,b),s);
+ assert.equal(s.offerAdminOperationalOverride('start-tournament','roster-projection-pending'),false);
+ assert.equal(s.adminOverrideButtonsHtml(),'');
+ assert.equal(s.offerAdminOperationalOverride('start-tournament','管理員要求略過一般名單同步檢查'),false);
+ assert.equal(dialogs,0);
+});
+
 test('forced start retries a stale public confirmation without repeating the write',async()=>{
  const source=fs.readFileSync('modules/main-app/core.js','utf8');
  const a=source.indexOf('let adminOperationalOverrideBusy=false;'),b=source.indexOf('let bracketCommitContext=null;',a);
