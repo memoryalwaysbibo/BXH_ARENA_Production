@@ -91,7 +91,8 @@ async function syncOnsiteCommunitySummary({method,url,authorization,body}, fetch
   if (method !== 'POST' || url !== CALLABLE_PATH) throw Error('unsupported-callable');
   if (!object(body) || Object.keys(body).some(key => key !== 'data') || !object(body.data)) throw Error('invalid-operation');
   const data = body.data;
-  if (Object.keys(data).some(key => !['action','code','operationId'].includes(key)) || data.action !== 'syncSummary' ||
+  if (Object.keys(data).some(key => !['action','code','operationId','includeRoster'].includes(key)) ||
+    (data.includeRoster !== undefined && data.includeRoster !== true) || data.action !== 'syncSummary' ||
     !/^BXH-[A-Z0-9]{4,16}$/.test(data.code || '') || !/^[a-zA-Z0-9_-]{8,100}$/.test(data.operationId || '')) throw Error('invalid-operation');
   const token = /^Bearer (\S+)$/.exec(authorization || '')?.[1];
   if (!token) throw Error('auth-required');

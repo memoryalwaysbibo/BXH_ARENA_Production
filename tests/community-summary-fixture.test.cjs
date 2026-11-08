@@ -103,11 +103,14 @@ test('unsupported registrations roll back without any commit or mutation',async(
 
 test('actual cloud summary wrapper rejects the former stub and accepts the fixture response',async()=>{
   const source=fs.readFileSync(path.join(__dirname,'../modules/cloud/cloud-runtime.js'),'utf8');
-  const begin=source.indexOf('    async syncCommunityRegistrationSummary(code){'),end=source.indexOf('\n    async pushUpdate(',begin);
+  const begin=source.indexOf('    async syncCommunityRegistrationSummary(code,'),end=source.indexOf('\n    async adminRecoverOnsiteWaitlist(',begin);
   assert(begin>=0&&end>begin);const method=source.slice(begin,end).trim().replace(/,$/,'');
   const ctx=vm.createContext({window:{engagementService:{familyRegistration:async()=>({ok:false,error:'e2e-function-stub'})}},crypto:{randomUUID:()=> 'fixture-operation-1'}});
   vm.runInContext('globalThis.cloud={'+method+'}',ctx);
   await assert.rejects(ctx.cloud.syncCommunityRegistrationSummary('BXH-ABCDEF'),/invalid-summary-result/);
   const io=transport();ctx.window.engagementService.familyRegistration=data=>syncOnsiteCommunitySummary({...request(),body:{data}},io.fetch);
   assert.equal((await ctx.cloud.syncCommunityRegistrationSummary('BXH-ABCDEF')).communityParticipantCount,4);
+  const legacy=await ctx.cloud.syncCommunityRegistrationSummary('BXH-ABCDEF',{includeRoster:true});
+  assert.equal(legacy.communityParticipantCount,4);
+  assert.equal(legacy.rosterReceipt,null);
 });

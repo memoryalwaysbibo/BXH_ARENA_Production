@@ -10,6 +10,7 @@ const root = path.join(__dirname, '..');
 const cloud = fs.readFileSync(path.join(root, 'modules/cloud/cloud-runtime.js'), 'utf8');
 const domain = fs.readFileSync(path.join(root, 'modules/main-app/domain-utils.js'), 'utf8');
 const registration = fs.readFileSync(path.join(root, 'modules/main-app/registration-utils.js'), 'utf8');
+const { reconcileQuickRoster } = require('../qr-checkin/backend/overlays/community-registration-roster.js');
 const clone = value => JSON.parse(JSON.stringify(value));
 const firestoreData = value => {
   if (value instanceof Date) return { $timestamp: value.toISOString() };
@@ -398,6 +399,33 @@ test('public participant count exposes a scalar without leaking private particip
   const pub = h.docs.get('publicTournaments/LOCAL');
   assert.equal(pub.communityParticipantCount, 2);
   assert.doesNotMatch(JSON.stringify(pub), /PRIVATE_ACCOUNT_ONE|PRIVATE_FAMILY_ID|PRIVATE_GUARDIAN|participantAliases/);
+});
+
+test('a redraw keeps the quick roster version when the participant list is unchanged', async () => {
+  const h = harness(), data = state();
+  data.players = [{ id: 'onsite-1', name: 'Onsite One', source: 'manual', checkedIn: false }];
+  data.communityParticipantCount = 1;
+  data.registrationRosterRevision = 26;
+  data.drawnAt = NOW;
+  data.bracketSize = 2;
+  assert.equal(await h.api.pushUpdate('LOCAL', data), true);
+  const saved = JSON.parse(h.docs.get('tournaments/LOCAL').data);
+  const mirror = JSON.parse(h.docs.get('publicTournaments/LOCAL').bracketView);
+  assert.equal(mirror.communityParticipantCount, 1);
+  assert.equal(mirror.registrationRosterRevision, 26);
+  const same = reconcileQuickRoster(saved, mirror, [], { allowPendingBracketChanges: true, roomCode: 'LOCAL' });
+  assert.equal(same.changed, false);
+  assert.equal(same.state.registrationRosterRevision, 26);
+  const added = reconcileQuickRoster(saved, mirror, [{ registrationId: 'REG', uid: 'new-player', displayName: 'New Player', status: 'confirmed' }], { allowPendingBracketChanges: true, roomCode: 'LOCAL' });
+  assert.equal(added.changed, true);
+  assert.equal(added.state.registrationRosterRevision, 27);
+  assert.equal(added.communityParticipantCount, 2);
+});
+
+test('official and ranked public brackets do not expose a quick-registration count', () => {
+  const h = harness(), data = state({ eventAuthority: 'official', ladderMode: 'ranked' });
+  data.communityParticipantCount = 7;
+  assert.equal(Object.hasOwn(h.ctx.buildPublicMirrorFields(data), 'communityParticipantCount'), false);
 });
 
 test('settings push asks the server to refresh participants after committing while leaving scalar server-owned', async () => {
