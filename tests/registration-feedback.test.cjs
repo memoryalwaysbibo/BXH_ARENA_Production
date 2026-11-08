@@ -271,3 +271,31 @@ test('self signup previews a populated or unreadable public roster in a finite V
  }
  assert.deepEqual(requests.map(x=>x.action),['preview','preview','preview']);
 });
+
+test('onsite batch recovery reuses the submitted operation without storing guest names in its key',async()=>{
+ const cloud=fs.readFileSync(require.resolve('../modules/cloud/cloud-runtime.js'),'utf8');
+ const helper=cloud.slice(cloud.indexOf('  const managementQueueOperations='),cloud.indexOf('  let playerRegistrationFeedback='));
+ const sessionStorage=memory(),requests=[];
+ function open(){
+  const context={
+   window:{sessionStorage,BXH_REGISTRATION_FLOW_V2_ROOMS:[CODE]},
+   authReady:true,authHandle:{currentUser:{uid:'host'}},
+   TextEncoder,crypto:require('node:crypto').webcrypto,
+   callEngagementFunction:async(name,request)=>{
+    assert.equal(name,'registrationRosterQueueV2');
+    requests.push(request);
+    if(request.action==='addLocal')throw Object.assign(Error('lost response'),{code:'functions/unavailable'});
+    return {operation:{operationId:request.operationId,state:'completed',result:{ok:true,status:'added',addedCount:2,checkedIn:false}}};
+   }
+  };
+  return vm.runInNewContext(helper+'\nregistrationManagementOperation;',context);
+ }
+ const payload={code:CODE,action:'addLocal',names:['Guest A','Guest B']};
+ await assert.rejects(open()(payload,'original-onsite-batch'),/registration-management-pending/);
+ assert.equal(sessionStorage.length,1);
+ assert.doesNotMatch(sessionStorage.key(0),/Guest/);
+ const result=await open()(payload,'unneeded-retry-id');
+ assert.equal(result.addedCount,2);assert.equal(result.checkedIn,false);
+ assert.deepEqual(requests.map(({action,operationId})=>[action,operationId]),[['addLocal','original-onsite-batch'],['status','original-onsite-batch']]);
+ assert.equal(sessionStorage.length,0);
+});

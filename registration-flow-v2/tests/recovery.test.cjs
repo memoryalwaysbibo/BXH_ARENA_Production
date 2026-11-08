@@ -316,3 +316,61 @@ for(const firstAction of ['promoteLocal','join']){
   }
  });
 }
+
+test('onsite batch and online signup share seats and an oversized batch leaves no partial write',async()=>{
+ const {createManagementApi,createManagementAuthorizer,createQueuedPromotion}=require('../backend/management.cjs');
+ const {manager,promotionManager}=require('../../qr-checkin/backend/overlays/roster-service.js');
+ const {createPromotionHandler,authorized}=require('../../registration-promotion/functions/service.cjs');
+ const {code,ids:[player,admin]}=await seed(2,2,2);
+ const tr=db.doc('tournaments/'+code),pr=db.doc('publicTournaments/'+code);
+ await Promise.all([tr.update({eventAuthority:'official'}),pr.update({eventAuthority:'official'}),db.doc('users/'+admin).update({role:'admin'})]);
+ const options={handlers:{...handlers,promotion:createQueuedPromotion({
+  roster:handlers.roster,promote:store=>createPromotionHandler(store,{timestamp:()=>FieldValue.serverTimestamp(),allowUnseatedOfficial:true})
+ })}};
+ const first=service(options),second=service(options);
+ const authorize=createManagementAuthorizer({db,canCancel:manager,canPromote:authorized,canPromoteUnlimited:promotionManager});
+ const api=createManagementApi({queue:first,authorize,enabled:async c=>c===code});
+ const batch={action:'addLocal',code,operationId:'onsite-batch-oversize',names:['Guest A','Guest B','Guest C']};
+ const send=data=>api({auth:{uid:admin},data});
+ await assert.rejects(api({auth:{uid:player},data:batch}),/permission-denied/);
+ await send(batch);await drainAll([first,second],code);
+ assert.equal((await first.status(admin,code,batch.operationId)).operation.reason,'capacity-full');
+ assert.equal(JSON.parse((await tr.get()).data().data).players.length,0);
+ assert.equal(JSON.parse((await pr.get()).data().bracketView).players.length,0);
+
+ const exact={...batch,operationId:'onsite-batch-accepted',names:['Guest A','Guest B']};
+ const signup=request(code,player);
+ await send(exact);
+ await Promise.all([send(exact),second.enqueue(player,signup)]);
+ await drainAll([first,second],code);
+ const receipt=(await first.status(admin,code,exact.operationId)).operation;
+ assert.deepEqual([receipt.result.status,receipt.result.addedCount,receipt.result.checkedIn],['added',2,true]);
+ assert.equal(receipt.result.state,undefined);
+ assert.equal((await first.status(player,code,signup.operationId)).operation.result.status,'waitlist');
+ const runtime=JSON.parse((await tr.get()).data().data);
+ const publicPlayers=JSON.parse((await pr.get()).data().bracketView).players;
+ assert.equal(runtime.players.length,2);
+ assert.equal(new Set(runtime.players.map(p=>p.id)).size,2);
+ assert.ok(runtime.players.every(p=>p.source==='onsite'&&!p.ladderEligible&&!p.accountLinked));
+ assert.ok(publicPlayers.every(p=>!('accountLinked' in p)));
+ assert.deepEqual((await audit(code,1)).summary,{confirmed:0,waitlist:1,registrations:1,jobs:3,completed:2,rejected:1});
+});
+
+test('server ownership switches legacy callable writes to the queue without blocking previews',async()=>{
+ const {createGuardedLegacyWriter}=require('../backend/legacy-writer.cjs');
+ const {code,ids:[player]}=await seed(1);
+ const tr=db.doc('tournaments/'+code);
+ const queued=service({requireRoomOwnership:true});
+ const guarded=createGuardedLegacyWriter({db,makeHandler:handlers.family,isMutation:action=>['join','cancel','syncSummary'].includes(action)});
+ const signup=request(code,player);
+ const call=data=>guarded({auth:{uid:player},data});
+ await assert.rejects(queued.enqueue(player,signup),/registration-queue-disabled/);
+ await tr.update({registrationQueueVersion:2});
+ await assert.rejects(call(signup.payload),/registration-queue-required/);
+ assert.equal((await call({action:'preview',code,childIds:[null]})).allocation[0].status,'confirmed');
+ assert.equal((await audit(code,0)).summary.jobs,0);
+ await queued.enqueue(player,signup);await queued.drain(code);
+ assert.equal((await queued.status(player,code,signup.operationId)).operation.result.status,'confirmed');
+ const {code:old,ids:[legacyPlayer]}=await seed(1);
+ assert.equal((await guarded({auth:{uid:legacyPlayer},data:request(old,legacyPlayer).payload})).status,'confirmed');
+});

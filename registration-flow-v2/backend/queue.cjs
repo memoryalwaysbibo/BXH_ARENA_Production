@@ -1,5 +1,6 @@
 'use strict';
 const {createHash, randomUUID}=require('node:crypto');
+const {registrationQueueOwnsRoom}=require('./legacy-writer.cjs');
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const canonical=value=>JSON.stringify(value===null||typeof value!=='object'?value:Array.isArray(value)?value.map(x=>JSON.parse(canonical(x))):Object.fromEntries(Object.keys(value).sort().map(k=>[k,JSON.parse(canonical(value[k]))])));
 const active=u=>u?.active===true&&!u.deleted&&!['deleted','disabled','frozen'].includes(u.accountStatus);
@@ -13,6 +14,10 @@ function safeResult(result,job){
   out.localId=result.localId;
   if(result.expanded!==undefined)out.expanded=result.expanded;
  }
+ if(job?.payload.action==='addLocal'&&job.payload.intent==='admin'){
+  out.addedCount=result.addedCount;
+  out.checkedIn=result.checkedIn;
+ }
  if(Array.isArray(result?.rows))out.rows=result.rows.map(row=>Object.fromEntries(['registrationId','childId','status','participantName'].filter(k=>row[k]!==undefined).map(k=>[k,row[k]])));
  return out;
 }
@@ -21,7 +26,7 @@ function validate(uid,input){
  const code=String(input?.code||'').toUpperCase();
  if(!/^BXH-[A-Z0-9]{4,16}$/.test(code)||!['family','roster','promotion'].includes(input?.route)||!/^[A-Za-z0-9_-]{8,100}$/.test(input?.operationId||''))throw fail('invalid-operation');
  const d=JSON.parse(JSON.stringify(input.payload||{}));
- const allowed={family:['join','cancel','syncSummary'],roster:['cancel','promote','configure'],promotion:['promote','demote','promoteLocal']}[input.route];
+ const allowed={family:['join','cancel','syncSummary'],roster:['cancel','promote','configure'],promotion:['promote','demote','promoteLocal','addLocal']}[input.route];
  if(!allowed.includes(d.action)||d.code!==code||d.operationId!==input.operationId)throw fail('invalid-operation');
  if(Buffer.byteLength(JSON.stringify(d))>12000)throw fail('invalid-operation');
  return {uid,code,route:input.route,operationId:input.operationId,payload:d};
@@ -30,7 +35,7 @@ function validate(uid,input){
 // Private server-only operation journal. This is a candidate, not an installed
 // Cloud Tasks deployment. onCreate + a scheduled sweep must both be wired before
 // rollout. Queue acceptance is NOT a reservation or proof of registration.
-function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAttempts=5,workerId=randomUUID(),beforeExecute=async()=>{}}={}){
+function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAttempts=5,requireRoomOwnership=false,workerId=randomUUID(),beforeExecute=async()=>{}}={}){
  if(!handlers?.family||!handlers?.roster||!FieldValue)throw Error('queue-dependencies-required');
  const rooms=db.collection('_registrationQueueV2');
  const roomRef=code=>rooms.doc(code);
@@ -40,10 +45,13 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
  async function enqueue(uid,input,authorize){
   const value=validate(uid,input),ref=jobRef(value.code,uid,value.operationId),hash=digest(canonical({route:value.route,payload:value.payload}));
   await db.runTransaction(async tx=>{
-   const [user,existing]=await tx.getAll(db.doc('users/'+uid),ref);
+   const roomReads=requireRoomOwnership?[db.doc('tournaments/'+value.code)]:[];
+   const [user,existing,room]=await tx.getAll(db.doc('users/'+uid),ref,...roomReads);
    if(!active(user.data()))throw fail('auth-required');
    if(existing.exists){if(existing.data().requestHash!==hash)throw fail('operation-conflict');return;}
-   if(authorize)await authorize(tx,user.data(),value);
+   const roomData=room?.data();
+   if(requireRoomOwnership&&!registrationQueueOwnsRoom(roomData))throw fail('registration-queue-disabled');
+   if(authorize)await authorize(tx,user.data(),value,roomData);
    tx.create(ref,{...value,requestHash:hash,state:'queued',attempts:0,acceptedAt:FieldValue.serverTimestamp(),updatedAt:clock()});
   });
   return status(uid,value.code,value.operationId);

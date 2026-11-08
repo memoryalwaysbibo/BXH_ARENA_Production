@@ -12,7 +12,7 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
  const {onCall,HttpsError}=require('firebase-functions/v2/https');
  const {onDocumentCreated}=require('firebase-functions/v2/firestore');
  const {onSchedule}=require('firebase-functions/v2/scheduler');
- const queue=createQueue(db,{FieldValue,handlers:{family:familyFactory,roster:rosterFactory,promotion:promotionFactory}});
+ const queue=createQueue(db,{FieldValue,requireRoomOwnership:true,handlers:{family:familyFactory,roster:rosterFactory,promotion:promotionFactory}});
  const api=createApi({queue,family:familyFactory(db),enabled});
  const managementApi=createManagementApi({queue,enabled,authorize:authorizeManagement});
  const bind=handler=>onCall({region:'asia-east1',cors:true,timeoutSeconds:30,maxInstances:5},async req=>{

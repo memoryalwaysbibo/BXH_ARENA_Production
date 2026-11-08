@@ -908,12 +908,23 @@
   }
   const managementQueueOperations=new Map();
   async function registrationManagementOperation(payload,requestedId){
-    const {code,action,registrationId,localId,expandBy,enabled:requestedEnabled}=payload;
+    const {code,action,registrationId,localId,expandBy,enabled:requestedEnabled,names}=payload;
     const actor=authHandle?.currentUser?.uid;
-    const key='bxh.registrationManagement.'+[actor,code,action,registrationId||localId,expandBy??0,...(action==="configure"?[requestedEnabled]:[])].join('.');
+    const enabled=Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code);
+    let targetKey=registrationId||localId;
+    if(action==='addLocal'){
+      if(!globalThis.crypto?.subtle){
+        if(!enabled)return null;
+        throw Error('registration-operation-id-unavailable');
+      }
+      const bytes=new TextEncoder().encode(JSON.stringify(names));
+      const digest=await crypto.subtle.digest('SHA-256',bytes);
+      targetKey=Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
+      if(actor!==authHandle?.currentUser?.uid)throw Error('stale-session');
+    }
+    const key='bxh.registrationManagement.'+[actor,code,action,targetKey,expandBy??0,...(action==="configure"?[requestedEnabled]:[])].join('.');
     let storedId=managementQueueOperations.get(key);
     if(!storedId){try{storedId=window.sessionStorage.getItem(key);}catch{}}
-    const enabled=Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code);
     if(!enabled&&!storedId)return null;
     if(!authReady||!actor)throw Error('auth-required');
     const operationId=storedId||requestedId||crypto.randomUUID();
@@ -944,7 +955,8 @@
         const result=operation.result;
         const target=registrationId||localId;
         const expectedStatus={cancel:'cancelled',promote:'confirmed',promoteLocal:'confirmed',demote:'waitlist'}[action];
-        const matches=action==='configure'?result?.enabled===requestedEnabled:
+        const matches=action==='addLocal'?result?.status==='added'&&result.addedCount===names.length&&typeof result.checkedIn==='boolean':
+          action==='configure'?result?.enabled===requestedEnabled:
           result?.status===expectedStatus&&(registrationId?result?.registrationId:result?.localId)===target;
         if(operation.state==='completed'&&result?.ok===true&&matches){
           finish();
@@ -1590,6 +1602,13 @@
           ["individual","team"].includes(pub.battleMode||"individual")&&
           ["standard","enchantment"].includes(pub.playMode||"standard")
       };
+    },
+
+    async addLocalRosterPlayers(code,names){
+      const queued=await window.engagementService.registrationManagementOperation({action:"addLocal",code,names});
+      if(!queued)return null;
+      const latest=await this.joinRoom(code,{serverOnly:true});
+      return latest.ok?{...queued,state:latest.data}:queued;
     },
 
     async promoteLocalWaitlistRoster(code,waitId,options={}){

@@ -13336,8 +13336,22 @@ async function peopleQuickAddPlayers(lines,guestConfirmed=false,expectedRoom=sta
     return false;
   }
   const room=state,code=state.cloudCode,addedIds=new Set(),defaultChecked=!state.meta.checkinRequired;
+  const names=lines.map(name=>name.replace(/（現場）$/,""));
+  const context={roomId:room.id,code,uid:typeof currentAuthUid==="function"?currentAuthUid():""};
   peopleRosterBusy=true;
   try{
+    if(code&&window.cloudSync?.addLocalRosterPlayers){
+      const result=await window.cloudSync.addLocalRosterPlayers(code,names);
+      if(!peoplePromotionContextCurrent(context))return false;
+      if(result){
+        await peopleApplyCloudRosterResult(result,"已新增 "+result.addedCount+" 位選手"+(result.checkedIn?"，已完成報到":"，尚未報到"));
+        if(peoplePromotionContextCurrent(context)){
+          const input=document.getElementById("quick-add-textarea");if(input)input.value="";
+        }
+        return true;
+      }
+      if(state!==room)return false;
+    }
     lines.forEach(name=>{const id=uid("guest");addedIds.add(id);room.players.push({id,name:name.replace(/（現場）$/,""),checkedIn:defaultChecked,source:"onsite",participantType:"onsite_guest",accountLinked:false,playerUid:null,playerId:null,ladderEligible:false,activityEligible:false});});
     room.testDataDismissed=true;
     render();
@@ -13355,7 +13369,13 @@ async function peopleQuickAddPlayers(lines,guestConfirmed=false,expectedRoom=sta
     const input=document.getElementById("quick-add-textarea");if(input)input.value="";
     showToast("已新增 "+lines.length+" 位選手"+(defaultChecked?"，已完成報到":"，尚未報到"));
     return true;
-  }catch(e){showToast("現場新增未完成，請同步名單確認。",true);return false;}
+  }catch(e){
+    if(state!==room)return false;
+    const reason=String(e?.code||e?.message||"");
+    const message=reason.includes("capacity-full")?"剩餘正取名額不足，這一批現場選手未新增。":
+      reason.includes("registration-management-pending")?"現場新增尚待確認。請保留原名單，重試同一筆以查詢結果。":"現場新增未完成，請同步名單確認。";
+    showToast(message,true);return false;
+  }
   finally{peopleRosterBusy=false;render();}
 }
 async function peopleDemoteOnline(player){
