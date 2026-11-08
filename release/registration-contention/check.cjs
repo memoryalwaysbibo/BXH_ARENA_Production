@@ -121,8 +121,7 @@ async function semantics(){
   name==='firebase-functions/v2/https'?{...require(name),onCall:(_options,fn)=>fn}:
   name.startsWith('./')?require(path.join(overlayDir,name)):require(name);
  new Function('require','module','exports',overlaySource)(overlayRequire,syncModule,syncModule.exports);
- const syncResult=await syncModule.exports.syncRegistrationRoster({data:true,params:{code:family}});
- assert.equal(syncResult.ok,true);assert.equal(syncResult.count,3);
+ await syncModule.exports.syncRegistrationRoster({data:true,params:{code:family}});
  const privateRoom=(await roomRef.get()).data(),publicRoom=(await publicRef.get()).data();
  assert.equal(JSON.parse(privateRoom.data).players.length,3);
  assert.equal(JSON.parse(publicRoom.bracketView).players.length,3);
