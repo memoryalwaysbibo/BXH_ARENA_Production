@@ -1712,7 +1712,7 @@
     },
     ".github/workflows/bucket-integrated-candidate.yml": {
       "components": [],
-      "blob": "5a9f86b4c4a5625c71bafc0e8afc6794f45c56b0"
+      "blob": "467bcde43df32bb4141e63cda9fff7d13d9126be"
     },
     "release/buckets/my-events/patch-bootstrap.cjs": {
       "components": [],
@@ -1959,6 +1959,18 @@
         718
       ],
       "blob": "42e40b9cbe80693ed44c24ac903228de7cef2aad"
+    },
+    "scripts/deploy-bucket-raffle.py": {
+      "components": [
+        718
+      ],
+      "blob": "8f8870c6ff770a02fcd00800aa533891ce52eb4f"
+    },
+    "tests/four-court-buckets/raffle/deploy-probe.py": {
+      "components": [
+        718
+      ],
+      "blob": "d64241cbc0f92aa20816c0299801c2b088263841"
     }
   },
   "mainScriptQueryParameters": {

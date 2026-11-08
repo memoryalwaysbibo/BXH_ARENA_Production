@@ -106,3 +106,33 @@ Fresh Node 22 run passed: input 39, writer 30, expanded rollback 248 checks
 112, builder 12 and provenance checks passed unchanged; 329 integration pins and
 whitespace checks passed. No runtime service changes, upload, deployment or live
 reads/writes occurred. The remaining release gates are unchanged.
+
+## Latest-base integration, 2026-11-08
+
+Integrated #734 `70a73cabb7eb3e1d17944288cd3edc5d7c0b2c83` into #743
+`9b5ccb78c0895d2e9e96d6564df211f2ea989bc7` in a fresh isolated checkout.
+The combined workflow retains both review-builder and offline deployment-probe
+checks. Its manifest pin was recomputed; all 332 component pins pass. The diff
+against #734 remains the eight approved test/workflow/manifest/documentation
+paths. The inherited deployment script and its probe are byte-identical to #734;
+no production deployment command was executed.
+
+Fresh Node 22.23.3 / Playwright 1.56.1 / Chromium 141 checks passed:
+
+- 112 raffle fixture, 12 review-builder and 6 offline cutover checks.
+- 317 native SDK checks: input 39, writer 30, rollback 248.
+- All other integrated-workflow fixture, package, boundary, recovery, My Events,
+  activity/settlement bridge and derived-event checks.
+- Full-host deletion browser 20, settlement browser bridge 24, offline browser
+  11, offline wiring, assembled raffle rollback/authority/recreated-room flow,
+  and the targeted lobby snapshot-coalescing browser check.
+- Workflow YAML parsing, changed JavaScript syntax and whitespace checks.
+
+The combined native command reached the final authenticated HTTP Callable test,
+but the Functions Emulator could not bind its local Unix socket (`listen EPERM`).
+A supported elevated execution retry of that test encountered the same restriction.
+The test therefore remains locally blocked; the successful SDK checks do not
+establish an HTTP endpoint pass. No assertions or emulator runtime were modified
+to bypass the restriction. Fresh remote CI is still required for this integration.
+These fixture/emulator results are not real Auth, App Check, production revision
+switch or live-room acceptance. No merge, deployment or live-data write occurred.
