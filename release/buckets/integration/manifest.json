@@ -1810,7 +1810,7 @@
     },
     "release/buckets/integration/writer-discovery-20261105.md": {
       "components": [],
-      "blob": "d327abffef31c762966f456635646a44b5c47611"
+      "blob": "801e7cfb320bd29cc25130e69530603840291e09"
     },
     "tests/four-court-buckets/interactions/fixtures/9/registration-admission.cjs": {
       "components": [],
@@ -1836,6 +1836,12 @@
     },
     "tests/four-court-buckets/deletion/close-idle-fence.test.cjs": {
       "blob": "0ee2dc35ac84bded57a372fa4e46da9dfc16170c",
+      "components": [
+        707
+      ]
+    },
+    "release/buckets/integration/close-idle-production-lease-fence.patch": {
+      "blob": "0dc80db06363518dbc47bab0590a8f2e056bb244",
       "components": [
         707
       ]
@@ -2315,11 +2321,12 @@
     "release/buckets/completion/hosting-guard.cjs": "Move rebuild's hostStats conflict read after room/ledger/bucket validation and before all writes, avoiding the early-stats/ledger lock inversion observed during count/sync/sync contention; retain transaction conflict detection, authorization and SDK retry behavior.",
     "tests/four-court-buckets/completion/hosting-probe.cjs": "Regress final stats conflict-barrier ordering with existing/missing ledgers and both QR modes; inject concurrent stats changes and require transaction retry; previous early-read implementation fails.",
     "scripts/bucket-writer-followup.py": "Target only me-central2 failed service/job reads and four Function GETs; capture current immutable manageRefereeSeats/familyRegistration sources with before/after config checks; retain safe HTTP error codes without raw environment values/messages.",
-    "release/buckets/integration/writer-discovery-20261105.md": "Record the selected historical archive review and the distinct scheduler source readback gate. Record the independent production scheduler hash and preserve the exact-source review gate.",
+    "release/buckets/integration/writer-discovery-20261105.md": "Record the selected historical archive review and the distinct scheduler source readback gate. Record the independent production scheduler hash and preserve the exact-source review gate. Verify exact background writer source and record remaining idle-close and ranked settlement gaps.",
     "release/buckets/interactions/candidate/9/family-registration.js": "Reapply the original single bucket-ownership guard to the exact 2026-11-05 deployed familyRegistration source, preserving PR730 admission/coalescing, deadline revalidation, getAll and read-only previews.",
     "tests/four-court-buckets/interactions/probe.cjs": "Use native timer globals for the deployed admission module; verify coalescing, conflicting operation rejection, same-room serialization and read-only/marked previews, in addition to all original 363 checks.",
     "release/buckets/integration/live-followup-20261105.json": "Pin the received four-function follow-up, policy-blocked regional reads, 16-file referee match, exact family source closure/review archive and unresolved GET trigger digest difference.",
     "release/buckets/integration/close-idle-fence.patch": "Review-only patch against the shared historical restore archive source. Verify the scheduler's independently deployed source before release.",
-    "tests/four-court-buckets/deletion/close-idle-fence.test.cjs": "Reproduce the historical idle close on a marked room; verify both roots, four marker types, and legacy close parity."
+    "tests/four-court-buckets/deletion/close-idle-fence.test.cjs": "Reproduce the historical idle close on a marked room; verify both roots, four marker types, and legacy close parity.",
+    "release/buckets/integration/close-idle-production-lease-fence.patch": "Extend the deployed scheduler's existing score ownership guard with migration and deletion markers. Review-only patch."
   }
 }

@@ -121,3 +121,39 @@ candidates. The report did not classify the deployed close path. Review the
 exact deployed closure before rebasing the historical candidate or deciding
 whether the scheduler already fences bucket rooms. The run recorded zero
 production writes.
+
+### Deployed background writer code review
+
+The selected background readback bundle
+`cada094a2988fe7d8fdf431225bf802bab38dfaa8442c64a8e6557ef1022bc54`
+identifies the same idle-close revision and source generation as the Actions
+readback. Its `operations.js` hash matches the Actions report exactly.
+The deployed transaction already skips either room root when
+`scoreStorage` or `scoreBucketProjection` exists. It can still close an
+otherwise eligible room with only `bucketMigration` or `deletionStatus`
+present. Nine in-memory tests covered those cases and ordinary rooms.
+
+Keep `close-idle-fence.patch` as a historical reproduction. The current
+source candidate is `close-idle-production-lease-fence.patch`. It extends
+the existing guard only in `checkAndClose` and applies to the exact
+`operations.js` hash above. Candidate SHA-256 is
+`8517bd8e237ef6442d6eaaa8aef0d523156eadff114999d4805d9339ca1dfba8`.
+Nine additional in-memory tests verified both roots, all four markers,
+ordinary closure parity, and scan progress.
+
+The same bundle identifies `ladderAutoSettlement` revision
+`ladderautosettlement-00003-kuf`, generation `1793906143803503`, with
+`ladder-auto-settlement.js` SHA-256
+`334106be168bcb3c3991c88fc42e282c5a1524b39293f6d50fa05d092c660ead`.
+This matches the supplied writer release-check candidate baseline and differs
+from the historical fixture behind the integrated settlement adapter.
+The selected-file bundle does not establish the full deployed archive hash.
+In isolated tests the deployed service archived an already-awarded ranked
+room through either the private score marker or the public projection marker.
+The narrow candidate in the release-check bundle deferred both transactions
+without room writes and preserved the unmarked archive path. This candidate
+only fences the legacy path. The canonical bucket settlement adapter needs
+a separate rebase and verification against the current closure.
+
+The tests used in-memory Firestore fixtures. No production configuration,
+room, or deployment was changed.
