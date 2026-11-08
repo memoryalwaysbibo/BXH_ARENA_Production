@@ -9737,7 +9737,8 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
   if(!window.cloudSync||!window.cloudSync.listRegistrationsForAdmin) throw new Error("registration api unavailable");
   const publicRoom=await window.cloudSync.getPublicTournamentFull(context.code);
   requireRegistrationRosterContext(context);
-  if(publicRoom?.registrationRosterSyncBackendEnabled===true) return refreshBackendRegistrationRoster(context);
+  if(publicRoom?.registrationRosterSyncBackendEnabled===true)
+    return refreshBackendRegistrationRoster(context,false,!Array.isArray(registrationRows));
   const regs=Array.isArray(registrationRows)?registrationRows:await window.cloudSync.listRegistrationsForAdmin(context.code);
   requireRegistrationRosterContext(context);
   if(Array.isArray(registrationRows) && (registrationRows!==adminRegistrationsCache || peopleRosterBusy))
@@ -16573,7 +16574,7 @@ function registrationRosterContextIsCurrent(context){
 function requireRegistrationRosterContext(context){
   if(!registrationRosterContextIsCurrent(context)) throw new Error("room-context-changed");
 }
-async function refreshBackendRegistrationRoster(context,catchup=false){
+async function refreshBackendRegistrationRoster(context,catchup=false,verifyConfirmed=false){
   requireRegistrationRosterContext(context);
   if(catchup){
     // Quick COMMUNITY rosters are projected by the owner-only callable. Never
@@ -16586,6 +16587,19 @@ async function refreshBackendRegistrationRoster(context,catchup=false){
   requireRegistrationRosterContext(context);
   if(result?.ok!==true||result.data?.id!==context.roomId) throw new Error(result?.reason||"roster-readback-failed");
   if(isCommunityRoomOwner() && (result.data.ownerUid!==firebaseUser.uid||result.data.createdBy!==firebaseUser.uid)) throw new Error("permission-denied");
+  // Explicit preparation, draw and start actions must not accept a room
+  // snapshot while the backend registration trigger is still catching up.
+  // The subscription path already has registration rows and does not add a
+  // second read for each burst of incoming registrations.
+  if(verifyConfirmed){
+    const registrations=await window.cloudSync.listRegistrationsForAdmin(context.code);
+    requireRegistrationRosterContext(context);
+    if(!Array.isArray(registrations)) throw new Error("roster-readback-failed");
+    const confirmed=new Set(registrations.filter(row=>row?.status==="confirmed").map(row=>String(row.registrationId||"")));
+    const projected=new Set((result.data.players||[]).filter(row=>row?.source==="online"&&row.registrationId).map(row=>String(row.registrationId)));
+    if(confirmed.has("")||[...confirmed].some(id=>!projected.has(id))||[...projected].some(id=>!confirmed.has(id)))
+      throw new Error("roster-readback-failed");
+  }
   const before=JSON.stringify(state.players||[]);
   applyRemoteState(result.data);
   requireRegistrationRosterContext(context);

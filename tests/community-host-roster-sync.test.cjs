@@ -133,8 +133,29 @@ test('manual repeated clicks issue one catchup and stale completion cannot toast
 
 test('backend-managed official rosters are read back without browser reconstruction',async()=>{
  const {ctx,calls}=harness();ctx.currentRole='admin';ctx.userProfile.role='admin';ctx.state.meta.eventAuthority='official';ctx.remote.meta.eventAuthority='official';ctx.appPhase='app';ctx.activeTab='people';
+ ctx.window.cloudSync.listRegistrationsForAdmin=async()=>{calls.list++;return [{registrationId:'r',status:'confirmed'}];};
  ctx.window.cloudSync.getPublicTournamentFull=async()=>({registrationRosterSyncBackendEnabled:true});await ctx.syncLatestOnlineRosterBeforeLock();
- assert.equal(calls.catchup,0);assert.equal(calls.list,0);assert.equal(calls.save,0);assert.equal(ctx.state.players.length,2);
+ assert.equal(calls.catchup,0);assert.equal(calls.list,1);assert.equal(calls.save,0);assert.equal(ctx.state.players.length,2);
+});
+
+test('explicit pre-start sync refuses a backend roster missing a confirmed family entrant',async()=>{
+ const {ctx,calls}=harness();ctx.currentRole='admin';ctx.userProfile.role='admin';ctx.state.meta.eventAuthority='official';ctx.remote.meta.eventAuthority='official';ctx.appPhase='app';ctx.activeTab='people';
+ ctx.window.cloudSync.getPublicTournamentFull=async()=>({registrationRosterSyncBackendEnabled:true});
+ ctx.window.cloudSync.listRegistrationsForAdmin=async()=>{calls.list++;return [{registrationId:'r',status:'confirmed'},{registrationId:'family_child1',status:'confirmed',familyPlayerId:'child1',guardianUid:'host'}];};
+ const before=clone(ctx.state);
+ await assert.rejects(ctx.syncLatestOnlineRosterBeforeLock(),/roster-readback-failed/);
+ assert.deepEqual(clone(ctx.state),before,'a stale backend readback cannot replace the on-screen roster');
+ assert.equal(calls.save,0);assert.equal(calls.list,1);
+ ctx.remote.players.push({id:'family_child1',source:'online',registrationId:'family_child1',guardianUid:'host',familyPlayerId:'child1',checkedIn:false});
+ await ctx.syncLatestOnlineRosterBeforeLock();assert.equal(ctx.state.players.length,3);
+});
+
+test('explicit pre-start sync refuses a stale cancelled online player',async()=>{
+ const {ctx,calls}=harness();ctx.currentRole='admin';ctx.userProfile.role='admin';ctx.state.meta.eventAuthority='official';ctx.remote.meta.eventAuthority='official';ctx.appPhase='app';ctx.activeTab='people';
+ ctx.window.cloudSync.getPublicTournamentFull=async()=>({registrationRosterSyncBackendEnabled:true});
+ ctx.window.cloudSync.listRegistrationsForAdmin=async()=>{calls.list++;return [{registrationId:'r',status:'cancelled'}];};
+ await assert.rejects(ctx.syncLatestOnlineRosterBeforeLock(),/roster-readback-failed/);
+ assert.equal(ctx.state.players.length,1);assert.equal(calls.save,0);
 });
 
 test('owner action allowlist and rendered error retry stay connected to production controls',()=>{
