@@ -51,4 +51,4 @@ async function drainAll(services,code){
  }
  throw Error('queue-did-not-drain');
 }
-module.exports={db,FieldValue,handlers,service,seed,request,audit,drainAll};
+module.exports={db,FieldValue,handlers,service,seed,request,audit,drainAll,load};

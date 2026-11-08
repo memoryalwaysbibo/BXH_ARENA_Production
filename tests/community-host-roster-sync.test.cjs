@@ -39,6 +39,22 @@ test('ordinary player owner watches the COMMUNITY people tab even when app activ
  assert.equal(calls.catchup,1,'one catchup per listener, not a write on every snapshot');assert.equal(ctx.state.players.length,2);assert.equal(calls.save,0);
 });
 
+test('quick room catch-up uses the returned roster in the same room context',async()=>{
+ const {ctx}=harness(),rosterReceipt={data:JSON.stringify(ctx.remote),ownerUid:'host',createdBy:'host'};
+ ctx.window.cloudSync.syncCommunityRegistrationSummary=async(code,options)=>{
+  assert.equal(code,'ROOM-A');assert.equal(options.includeRoster,true);
+  return {ok:true,communityParticipantCount:2,rosterReceipt};
+ };
+ ctx.window.cloudSync.joinRoom=async(code,options)=>{
+  assert.equal(code,'ROOM-A');assert.equal(options.rosterReceipt,rosterReceipt);
+  return {ok:true,data:JSON.parse(options.rosterReceipt.data)};
+ };
+ const result=await ctx.syncLatestOnlineRosterBeforeLock();
+ assert.equal(result.changed,true);
+ assert.equal(ctx.state.registrationRosterRevision,1);
+ assert.equal(ctx.state.players.length,2);
+});
+
 for(const [label,change] of [
  ['other owner',c=>{c.state.ownerUid='other';}],['creator mismatch',c=>{c.state.createdBy='other';}],
  ['guest',c=>{c.currentRole='guest';}],['staff mode',c=>{c.currentRole='staff';c.userProfile.role='staff';}],
