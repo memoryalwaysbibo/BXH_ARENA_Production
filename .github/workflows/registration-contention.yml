@@ -21,6 +21,8 @@ jobs:
           distribution: temurin
           java-version: 17
       - run: node --test release/registration-contention/admission.test.cjs
+      - name: Keep preparation roster and check-in lookups intact
+        run: node --test tests/family-roster-checkin.test.cjs tests/admin-checkin.test.cjs tests/admin-roster.test.cjs tests/roster-sync-race.test.cjs qr-checkin/ui.test.cjs staff-roster/service.test.cjs
       - run: python3 -m unittest discover -s release/registration-contention -p collector_test.py
       - run: npm install --prefix /tmp/registration40-deps --no-save --ignore-scripts firebase-tools@13.35.1 firebase-admin@14.4.0 firebase-functions@7.3.2
       - run: /tmp/registration40-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-registration40 --config release/registration-contention/emulator.json 'node release/registration-contention/verify.cjs'
