@@ -40,6 +40,7 @@ jobs:
           node tests/four-court-buckets/raffle/preview-probe.cjs
           node tests/four-court-buckets/raffle/writer-probe.cjs
           python3 -B tests/four-court-buckets/raffle/verify-provenance.py
+          python3 -B tests/four-court-buckets/raffle/build-review.test.py
           python3 -B tests/four-court-buckets/raffle/deploy-probe.py
           python3 -B tests/four-court-buckets/raffle-readonly.py
       - name: Verify independently captured backend overlays

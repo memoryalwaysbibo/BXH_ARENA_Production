@@ -1712,7 +1712,7 @@
     },
     ".github/workflows/bucket-integrated-candidate.yml": {
       "components": [],
-      "blob": "63ffc2982d1be28d5089356c1df1af00ffc4453f"
+      "blob": "467bcde43df32bb4141e63cda9fff7d13d9126be"
     },
     "release/buckets/my-events/patch-bootstrap.cjs": {
       "components": [],
@@ -1865,7 +1865,7 @@
       ]
     },
     ".github/workflows/bucket-raffle-input.yml": {
-      "blob": "1c8dba166aa59b9036c3650826b3eaaa9139ca37",
+      "blob": "2741a942570c3d34e49ae55094efdfc4caa616c6",
       "components": [
         718
       ]
@@ -1940,7 +1940,19 @@
       "components": [
         718
       ],
-      "blob": "07db0877ab33a85be68cd29bd741eff8f037405d"
+      "blob": "97b1781c3cdd8cbd91691174a0ac6774ce979fd0"
+    },
+    "tests/four-court-buckets/raffle/native-rollback.cjs": {
+      "blob": "fece2d72148934e1e9232800a0811c1a00c3d6d0",
+      "components": [
+        718
+      ]
+    },
+    "tests/four-court-buckets/raffle/build-review.test.py": {
+      "components": [
+        718
+      ],
+      "blob": "a19c2c39444f629f3f9d72eb6fa1e44da8449263"
     },
     "tests/four-court-buckets/raffle/native-callable.cjs": {
       "components": [

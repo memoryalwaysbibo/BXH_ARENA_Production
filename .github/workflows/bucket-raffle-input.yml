@@ -62,7 +62,7 @@ jobs:
           JS
           /tmp/bucket-raffle-input/node_modules/.bin/firebase emulators:exec --only firestore,auth,functions \
             --project "$GCLOUD_PROJECT" --config "$lab/firebase.json" \
-            'node tests/four-court-buckets/raffle/native-input.cjs && node tests/four-court-buckets/raffle/native-writers.cjs && node tests/four-court-buckets/raffle/native-callable.cjs'
+            'node tests/four-court-buckets/raffle/native-input.cjs && node tests/four-court-buckets/raffle/native-writers.cjs && node tests/four-court-buckets/raffle/native-rollback.cjs && node tests/four-court-buckets/raffle/native-callable.cjs'
       - name: Preserve emulator diagnostics
         if: always()
         uses: actions/upload-artifact@v4

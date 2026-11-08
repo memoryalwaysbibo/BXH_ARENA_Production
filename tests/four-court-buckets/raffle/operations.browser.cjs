@@ -154,9 +154,35 @@ async function main() {
     assert.equal(restoredPreview.count, 0, 'the candidate still excludes wins recorded during compatibility mode');
     assert.equal(room.m.rows.get(roomPath + '/raffleControl/current').identityVersion, 'participant-v1');
     assert.equal(room.m.writes.filter(write => write.kind === 'create' && write.path === recordPath).length, 1);
+    // A stale management screen must not bypass current server authorization.
+    room.m.put('users/admin', { active: true, role: 'player' });
+    const deniedBefore = JSON.stringify([...room.m.rows]);
+    const deniedWrites = room.m.writes.length;
+    await page.locator('[data-action="ops-claim"]').first().click();
+    await page.getByText('目前帳號沒有管理此場賽事的權限。', { exact: true }).waitFor();
+    assert.equal(JSON.stringify([...room.m.rows]), deniedBefore);
+    assert.equal(room.m.writes.length, deniedWrites);
+    // Old receipts do not grant authority, even after the fallback switch.
+    await assert.rejects(compatibility.drawTournamentRaffle.run({ auth, data: drawCalls[0].data }),
+      error => error.code === 'permission-denied');
+    await assert.rejects(compatibility.updateTournamentRaffleWinner.run({ auth, data: winnerCalls.at(-1).data }),
+      error => error.code === 'permission-denied');
+    assert.equal(JSON.stringify([...room.m.rows]), deniedBefore);
+    assert.equal(room.m.writes.length, deniedWrites);
+    room.m.put('users/admin', { active: true, role: 'super_admin' });
+    // Same code after public-room recreation cannot replay the earlier receipts.
+    const publicPath = `publicTournaments/${code}`, publicData = room.m.rows.get(publicPath);
+    room.m.remove(publicPath); room.m.put(publicPath, publicData);
+    const replacedBefore = JSON.stringify([...room.m.rows]);
+    await assert.rejects(compatibility.drawTournamentRaffle.run({ auth, data: drawCalls[0].data }),
+      /room-generation-changed/);
+    await assert.rejects(compatibility.updateTournamentRaffleWinner.run({ auth, data: winnerCalls.at(-1).data }),
+      /room-generation-changed/);
+    assert.equal(JSON.stringify([...room.m.rows]), replacedBefore);
+    assert.equal(room.m.writes.length, deniedWrites);
     assert.deepEqual(failures, []);
     console.log(JSON.stringify({ assembledCallableExports: 3, browserRaffleFlow: 'passed',
-      sameOperationReplay: true, exactWinnerKeyRoundTrip: true, versionAwareRollback: true,
+      sameOperationReplay: true, exactWinnerKeyRoundTrip: true, versionAwareRollback: true, staleScreenPermissionDenied: true, replacedRoomReplayDenied: true,
       productionRequests: 0, productionWrites: 0 }));
   } finally {
     if (browser) await browser.close();
