@@ -73,3 +73,34 @@ manageRefereeSeats archive SHA-256 581406375e1833a4768302d931371549b52f24337a9ca
 familyRegistration archive SHA-256 db015fb8fa78db14fab41e1f5cc18d8aa9ac8e3a9bcadcf17b425171db64a55d contains the deployed admission scheduler. The interaction guard is now reapplied to that exact source, retaining the scheduler and other 11 closure files. A review-only archive changes one member and preserves the other 103 members. Exact captures and hashes are in live-followup-20261105.json.
 
 The fresh trackTournamentRegistrationActivity GET trigger digest still differs from the older GET digest despite an unchanged update time and matching build/service hashes. Its cause remains unresolved; trigger-field/readback and delivery acceptance are required before treating its configuration as reconciled. No trigger or routing change was made by this review.
+
+## Selected writer archive review (2026-11-09 Taiwan)
+
+The private source bundle SHA-256 is
+`5fa730a29294063a7176482ac05759fd557855b3819da29136be087656a0afb7`.
+All 16 member hashes match the bundle report. The revision, generation, archive
+hash and six reviewed source member hashes for each of
+`restoreIdleTournament` and `roomAccess` match the existing deletion manifest.
+This compares pinned historical archives. It is not a new live metadata read.
+
+- `commitRefereeCommand` revision `commitrefereecommand-00006-neg` rejects
+  the private-root `scoreStorage` marker inside the score transaction.
+- `restoreIdleTournament` revision `restoreidletournament-00009-zej` rejects
+  either score marker on either root before restoring the room.
+- `roomAccess` revision `roomaccess-00034-red` rejects either score marker
+  on either root for access configuration. Password verification and access
+  grants use separate records.
+
+The pinned restore archive also contains the shared `closeIdleTournaments`
+scheduler source. Its `checkAndClose` path can rewrite the private room and
+public mirror without a bucket marker check. The existing fixture reproduces
+this with an idle marked room. A separate review-only patch skips score,
+migration and deletion markers on either root, while unmarked room closure
+and scan progress retain their behavior. Ten isolated tests cover the
+historical behavior and the candidate. The scheduled Function's own deployed
+revision, immutable source generation and schedule still need a separate
+readback before drawing conclusions about production or preparing its package.
+
+The region policy gap and wider writer inventory remain open. The bundle
+reported zero production writes. No deployment or room activation is part of
+this review.

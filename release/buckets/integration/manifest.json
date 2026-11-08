@@ -1712,7 +1712,7 @@
     },
     ".github/workflows/bucket-integrated-candidate.yml": {
       "components": [],
-      "blob": "cd25d8103acbd4017a50b7a95f864098aa7cd89c"
+      "blob": "d86a2785f486805fca87062b4720e1e639c8fe57"
     },
     "release/buckets/my-events/patch-bootstrap.cjs": {
       "components": [],
@@ -1810,7 +1810,7 @@
     },
     "release/buckets/integration/writer-discovery-20261105.md": {
       "components": [],
-      "blob": "966ff8e90a95ced2f7727df3e0607d0338d07094"
+      "blob": "961a9d17dc249cd487f16d90c0577a63fdf0c667"
     },
     "tests/four-court-buckets/interactions/fixtures/9/registration-admission.cjs": {
       "components": [],
@@ -1827,6 +1827,18 @@
     "release/buckets/integration/live-priority-writers-20261105.json": {
       "components": [],
       "blob": "77a652551b523f3fce6656d1217a93b114c709eb"
+    },
+    "release/buckets/integration/close-idle-fence.patch": {
+      "blob": "f647a852b3cb733644ae22eb6bb64ad99e54aa46",
+      "components": [
+        707
+      ]
+    },
+    "tests/four-court-buckets/deletion/close-idle-fence.test.cjs": {
+      "blob": "0ee2dc35ac84bded57a372fa4e46da9dfc16170c",
+      "components": [
+        707
+      ]
     }
   },
   "mainScriptQueryParameters": {
@@ -2293,7 +2305,7 @@
     "modules/cloud/cloud-runtime.js": "Combine main roster/mirror and bracket receipt behavior with the bucket draft. Both patch orders reconstruct the same blob.",
     "tests/four-court-buckets/completion/native-emulator.cjs": "Preserve all prior checks and default single-round workload; permit bounded fresh count/sync/sync contention rounds (1-50) without retrying failures, with QR/round labels and native read diagnostics.",
     "tests/four-court-buckets/deletion/rules-emulator.py": "Select a fresh OS-assigned loopback port for each private demo Emulator invocation; preserve baseline/candidate permissions and deletion assertions.",
-    ".github/workflows/bucket-integrated-candidate.yml": "Run inherited registration-feedback recovery and ranked-name policy tests on the same merged checkout, in addition to existing component integration checks.",
+    ".github/workflows/bucket-integrated-candidate.yml": "Run inherited registration-feedback recovery and ranked-name policy tests on the same merged checkout, in addition to existing component integration checks. Run the isolated scheduler write fence probe.",
     "release/buckets/deletion/manifest.json": "Refresh only restore/access deployed archive and source-closure provenance against the uploaded 2026-11-05 read-only capture; runtime candidate files retain their accepted hashes.",
     "tests/four-court-buckets/deletion/verify-package.py": "Derive lease guards from the exact deployed two-marker fences and verify captured closure hashes; retain all selector/deletion checks.",
     "scripts/build-bucket-restore-access-review.py": "Offline review-only packaging of two exact captured archives; replace one pinned source member per target, preserve all other source bytes and reject source/configuration drift. No deployment or cloud calls.",
@@ -2303,9 +2315,11 @@
     "release/buckets/completion/hosting-guard.cjs": "Move rebuild's hostStats conflict read after room/ledger/bucket validation and before all writes, avoiding the early-stats/ledger lock inversion observed during count/sync/sync contention; retain transaction conflict detection, authorization and SDK retry behavior.",
     "tests/four-court-buckets/completion/hosting-probe.cjs": "Regress final stats conflict-barrier ordering with existing/missing ledgers and both QR modes; inject concurrent stats changes and require transaction retry; previous early-read implementation fails.",
     "scripts/bucket-writer-followup.py": "Target only me-central2 failed service/job reads and four Function GETs; capture current immutable manageRefereeSeats/familyRegistration sources with before/after config checks; retain safe HTTP error codes without raw environment values/messages.",
-    "release/buckets/integration/writer-discovery-20261105.md": "Record the received cross-region discovery snapshot, both unresolved regional errors, 157 matched Run services and the newer referee/registration source baselines; do not claim metadata/source completeness.",
+    "release/buckets/integration/writer-discovery-20261105.md": "Record the selected historical archive review and the distinct scheduler source readback gate.",
     "release/buckets/interactions/candidate/9/family-registration.js": "Reapply the original single bucket-ownership guard to the exact 2026-11-05 deployed familyRegistration source, preserving PR730 admission/coalescing, deadline revalidation, getAll and read-only previews.",
     "tests/four-court-buckets/interactions/probe.cjs": "Use native timer globals for the deployed admission module; verify coalescing, conflicting operation rejection, same-room serialization and read-only/marked previews, in addition to all original 363 checks.",
-    "release/buckets/integration/live-followup-20261105.json": "Pin the received four-function follow-up, policy-blocked regional reads, 16-file referee match, exact family source closure/review archive and unresolved GET trigger digest difference."
+    "release/buckets/integration/live-followup-20261105.json": "Pin the received four-function follow-up, policy-blocked regional reads, 16-file referee match, exact family source closure/review archive and unresolved GET trigger digest difference.",
+    "release/buckets/integration/close-idle-fence.patch": "Review-only patch against the shared historical restore archive source. Verify the scheduler's independently deployed source before release.",
+    "tests/four-court-buckets/deletion/close-idle-fence.test.cjs": "Reproduce the historical idle close on a marked room; verify both roots, four marker types, and legacy close parity."
   }
 }

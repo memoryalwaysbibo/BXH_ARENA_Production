@@ -31,6 +31,8 @@ jobs:
         run: |
           python3 -B tests/four-court-buckets/writer-discovery.py
           python3 -B tests/four-court-buckets/writer-followup.py
+      - name: Reproduce idle close and verify the candidate fence
+        run: node --test tests/four-court-buckets/deletion/close-idle-fence.test.cjs
       - name: Verify independently captured backend overlays
         run: |
           for family in deletion interactions admissions operations settlement completion poster activity derived; do
