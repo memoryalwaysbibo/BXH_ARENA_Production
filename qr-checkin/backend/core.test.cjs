@@ -96,6 +96,15 @@ test('candidates include self and only verified confirmed family children withou
  assert.deepEqual(r.result.players.map(p=>[p.id,p.family]),[['p1',false],['child-row',true]]);
  assert.equal(r.receipt,undefined);assert.equal(r.audit,undefined);
 });
+test('V2 child document UID is accepted only with matching guardian and participant',()=>{
+ const x=familyInput();x.registrations['child-reg'].uid='child-reg';x.d.action='candidates';
+ assert.deepEqual(transition(x).result.players.map(p=>p.id),['p1','child-row']);
+ x.d.action='scan';x.d.playerId='child-row';x.registration=x.registrations['child-reg'];
+ assert.equal(transition(x).result.checkedIn,true);
+ for(const patch of [{uid:'other-child'},{guardianUid:'stranger'},{familyPlayerId:'other-child'},{status:'waitlist'}]){
+  const denied=familyInput();denied.registration={...denied.registrations['child-reg'],uid:'child-reg',...patch};denied.d.playerId='child-row';rejects(denied,'not-confirmed');
+ }
+});
 test('explicit child scan records guardian operator and leaves self and siblings untouched',()=>{
  const x=familyInput();x.d.playerId='child-row';x.registration=x.registrations['child-reg'];
  x.state.players.push({...x.state.players[1],id:'sibling',familyPlayerId:'child2'});

@@ -7,6 +7,7 @@ This directory is an **offline source candidate**, not the active Functions impl
 ## Change
 
 - Registration mutations now use the existing transactional user snapshot for account validation instead of making an additional user read before admission. `mine` and `history` keep their pre-transaction account checks. No registration document, public/private count, roster projection, QR check-in, or start-of-match writer changes are part of this patch.
+- The cross-flow gate exposed a QR eligibility mismatch: V2 child registration documents use the child's registration ID as `uid`, while older QR fixtures used the guardian UID. QR now accepts either form only when the live guardian, child profile, confirmed registration, and exact participant document ID agree. This is a separate check-in fix; production behavior remains unverified until cloud acceptance.
 - Preserve the captured live read-only preview; this optimization already exists in generation 1793592677411039.
 - Preserve the live initial getAll and reuse of the self-registration snapshot; selected child reads and the QR adapter remain unchanged.
 - The module shares a bounded admission scheduler for join/cancel/syncSummary per room in one process. Only one mutation per room enters its database work at a time. Auth, time, capacity, operation receipts and allocations are evaluated after admission.

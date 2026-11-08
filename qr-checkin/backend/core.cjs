@@ -35,7 +35,12 @@ function eligiblePlayer(player,uid,registration,profiles=[]) {
     if(matches.length!==1)return false;
     const child=matches[0];
     if(child.guardianUid!==uid||child.archived||child.deleted||child.testMode||child.accountUid||child.transferStatus||child.pendingAccountUid)return false;
-    return registration?.status==='confirmed'&&registration.uid===uid&&registration.guardianUid===uid&&registration.familyPlayerId===player.familyPlayerId;
+    // V2 stores a child's registration under its participant document ID;
+    // older registrations used the guardian UID. Both still require the live
+    // guardian, profile, participant ID and confirmed document to agree.
+    return registration?.status==='confirmed'&&
+      (registration.uid===uid||registration.uid===player.registrationId)&&
+      registration.guardianUid===uid&&registration.familyPlayerId===player.familyPlayerId;
   }
   if(![player.registrationUid,player.uid,player.accountUid].includes(uid))return false;
   return !player.registrationId||(registration?.status==='confirmed'&&registration.uid===uid&&!registration.familyPlayerId&&!registration.guardianUid);
