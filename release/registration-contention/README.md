@@ -39,7 +39,7 @@ The emulator must run locally on that exact port and demo project; the harness r
 ## Release gates
 
 Before considering this additional read optimization for release, run the roster/check-in regression suites and verify a newly confirmed self/child registration is present in the authoritative room roster and manual/QR check-in lookup. An empty or stale player list blocks release even if admission latency improves.
-The candidate workflow runs the preparation roster and check-in suites on every PR update, then the Firestore Emulator scenario reads the official staff roster after the three participant registrations commit.
+The candidate workflow runs the preparation roster and check-in suites on every PR update. Its Firestore Emulator scenario verifies three committed registrations (account and two children) appear in the official staff preparation list. It then exercises the backend registration-roster sync, confirms the private/public room rosters and the guardian's QR candidates agree, scans one child, and verifies the staff list records attendance. Before the sync, QR candidates are empty even though all three registrations exist; production release therefore requires the sync to be enabled and caught up before QR check-in opens.
 
 1. Recapture the **live** familyRegistration archive and full service configuration. Require the pinned handler/dependencies or rebase/revalidate the patch; do not deploy the old fixture as a whole Functions source tree.
 2. Compose only candidate handler + admission module into that freshly captured archive, retaining current dependencies, entrypoint, QR adapter, environment variables, runtime options and My Events proof configuration. Source review and CI do not satisfy this gate.
