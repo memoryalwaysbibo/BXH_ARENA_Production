@@ -182,8 +182,6 @@ test('four-player community event reaches first confirmed referee result', async
     guestReadOnlyMode: true,
     cloudCode: watchCode
   });
-  expect(watchExternalFirebaseRequests).toEqual([]);
-  await watchContext.close();
 
   await page.locator('[data-action="community-switch-room-tab"][data-tab="referee"]').click();
 
@@ -227,6 +225,15 @@ test('four-player community event reaches first confirmed referee result', async
 
   // Semi-final 1.
   await winCurrentMatchForA(1);
+  // The startup cloud wiring must keep the guest on the public listener.
+  // Verify the result arrives after initial page load without refreshing.
+  await watchPage.waitForFunction(
+    () => state.matches.some(match => !match.isBye && match.completed && match.scoreA === 4),
+    null,
+    { timeout: 30000 }
+  );
+  expect(watchExternalFirebaseRequests).toEqual([]);
+  await watchContext.close();
   await expect(page.getByText(/已完成 1 場/).first()).toBeVisible({ timeout: 30000 });
   await expect(page.getByText('目前場次｜第2場', { exact: true })).toBeVisible({ timeout: 30000 });
 

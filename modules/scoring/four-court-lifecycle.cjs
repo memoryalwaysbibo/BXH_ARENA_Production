@@ -7,7 +7,17 @@
  function create({enabled=false,auth,authApi,sessionOptions={},ensureAppCheck=async()=>{},onStatus=()=>{},sessionFactory=options=>Session.create(options),timeoutMs=8000}){
   const markers=new Map(),listeners=new Set();let active=null,generation=0,disposed=false,resumeContext=null;
   const current=entry=>!disposed&&active===entry&&entry.generation===generation&&auth.currentUser?.uid===entry.uid;
-  function status(entry,view){if(active!==entry)return;entry.view=view;onStatus({code:entry.code,uid:entry.uid,status:view.status,reason:view.reason||null,clear:view.state===null});for(const check of [...entry.waiters])check();}
+  function status(entry,view){
+   if(active!==entry)return;
+   entry.view=view;
+   const detail={code:entry.code,uid:entry.uid,status:view.status,reason:view.reason||null,clear:view.state===null};
+   const signature=JSON.stringify([detail.status,detail.reason,detail.clear,view.pending||[],view.retryable||[]]);
+   if(signature!==entry.statusSignature){
+    entry.statusSignature=signature;
+    onStatus(detail);
+   }
+   for(const check of [...entry.waiters])check();
+  }
   function stop(){const entry=active;if(!entry)return;active=null;generation++;clearTimeout(entry.idle);entry.session?.stop();for(const check of [...entry.waiters])check();}
   function fail(entry,reason){if(active!==entry)return;entry.session?.stop();entry.session=null;status(entry,{status:'error',reason,state:null});}
   function observe(code,manifest){

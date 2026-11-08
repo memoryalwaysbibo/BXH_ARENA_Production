@@ -26222,7 +26222,9 @@ async function init(){
         if(state.cloudCode && cloudAvailable()){
           cloudStatus = "connecting"; render();
           if(cloudUnsub){ try{ cloudUnsub(); }catch(e){} }
-          cloudUnsub = window.cloudSync.subscribe(state.cloudCode, applyRemoteState);
+          cloudUnsub = isGuestReadOnlyContext()
+            ? window.cloudSync.subscribePublic(state.cloudCode, applyRemoteState)
+            : window.cloudSync.subscribe(state.cloudCode, applyRemoteState);
           cloudStatus = "connected"; cloudLastSyncAt = Date.now();
           render();
         } else if(state.cloudCode && !cloudAvailable()){

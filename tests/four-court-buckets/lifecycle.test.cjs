@@ -39,3 +39,22 @@ test('recovery reads cannot replace a failed session with unresolved commands; e
  const h=harness(),stop=h.controller.subscribe('BXH-LIFE6',()=>{});h.controller.observe('BXH-LIFE6',marker());await tick();h.ready();h.sessions[0].pending=['score:m1'];h.sessions[0].options.onView({status:'error',state:{},pending:['score:m1']});
  assert.equal((await h.controller.read('BXH-LIFE6',marker())).reason,'bucket-operation-unresolved');assert.equal(h.sessions.length,1);assert.equal(h.sessions[0].stopped,false);assert.equal(h.controller.reconnect('BXH-LIFE6').ok,true);assert.deepEqual(h.sessions[0].pending,['score:m1']);stop();h.controller.dispose();
 });
+
+test('score updates skip duplicate status events but preserve recovery and dispatch changes',async()=>{
+ const h=harness(),states=[];
+ const stop=h.controller.subscribe('BXH-LIFE6',state=>states.push(state));
+ h.controller.observe('BXH-LIFE6',marker());await tick();h.ready();
+ const session=h.sessions[0],start=h.statuses.length;
+ const ready={status:'ready',state:{}};
+ session.options.onView({...ready,state:{score:1}});
+ session.options.onState({id:'room-BXH-LIFE6',cloudCode:'BXH-LIFE6',meta:{},matches:[{id:'m1',scoreA:2}]});
+ assert.equal(h.statuses.length,start);
+ assert.equal(states.at(-1).matches[0].scoreA,2);
+ session.options.onView({...ready,pending:['score:m1']});
+ session.options.onView({...ready,pending:['score:m1'],retryable:['score:m1']});
+ session.options.onView({...ready,pending:['dispatch'],retryable:['dispatch']});
+ session.options.onView(ready);
+ assert.equal(h.statuses.length,start+4);
+ assert.deepEqual(h.controller.view('BXH-LIFE6'),ready);
+ stop();h.controller.dispose();
+});
