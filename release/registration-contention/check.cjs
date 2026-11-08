@@ -100,10 +100,41 @@ async function semantics(){
  assert.equal(roster.rows.length,3);
  assert.deepEqual(roster.rows.map(row=>row.name).sort(),['Synthetic '+parent,'Synthetic child 1','Synthetic child 2'].sort());
  assert(roster.rows.every(row=>row.status==='confirmed'&&row.source==='online'));
+ // QR resolves identities from the room roster, not directly from the newly
+ // committed registration documents. The backend sync must catch up before
+ // opening check-in, including guardian-owned child identities.
+ const roomRef=db.doc('tournaments/'+family),publicRef=db.doc('publicTournaments/'+family);
+ const roomBefore=(await roomRef.get()).data(),roomState=JSON.parse(roomBefore.data);
+ roomState.meta.checkinRequired=true;
+ await roomRef.update({data:JSON.stringify(roomState),registrationEnabled:true,qrCheckin:{enabled:true,session:'ready'}});
+ await publicRef.update({registrationEnabled:true,registrationRosterSyncBackendEnabled:true,bracketView:JSON.stringify({players:[]})});
+ await db.doc('systemConfig/registrationRosterSync').set({enabled:true,roomCodes:[family]});
+ await db.doc('systemConfig/qrCheckin').set({enabled:true,writerGuardsVerified:true,roomCodes:[family]});
+ const {createCheckinHandler}=require('../../qr-checkin/backend/firebase-callable.cjs');
+ const {signToken}=require('../../qr-checkin/backend/core.cjs');
+ const secret='synthetic-registration-checkin-secret',checkin=createCheckinHandler(db,()=>secret);
+ const token=signToken(family,'ready',Date.now(),secret),candidates=()=>checkin({auth:{uid:parent},data:{action:'candidates',code:family,token}});
+ assert.equal((await candidates()).players.length,0,'QR must not claim a name before the room roster is synchronized');
+ const syncModule={exports:{}},overlayDir=path.join(__dirname,'../../qr-checkin/backend/overlays');
+ const overlaySource=fs.readFileSync(path.join(overlayDir,'registration-roster-sync.js'),'utf8');
+ const overlayRequire=name=>name==='firebase-functions/v2/firestore'?{onDocumentWritten:(_options,fn)=>fn}:
+  name==='firebase-functions/v2/https'?{...require(name),onCall:(_options,fn)=>fn}:
+  name.startsWith('./')?require(path.join(overlayDir,name)):require(name);
+ new Function('require','module','exports',overlaySource)(overlayRequire,syncModule,syncModule.exports);
+ await syncModule.exports.syncRegistrationRoster({data:true,params:{code:family}});
+ const privateRoom=(await roomRef.get()).data(),publicRoom=(await publicRef.get()).data();
+ assert.equal(JSON.parse(privateRoom.data).players.length,3);
+ assert.equal(JSON.parse(publicRoom.bracketView).players.length,3);
+ const ready=await candidates();assert.equal(ready.players.length,3);
+ assert.deepEqual(ready.players.map(row=>row.name).sort(),['Synthetic '+parent,'Synthetic child 1','Synthetic child 2'].sort());
+ const child=ready.players.find(row=>row.family&&row.name==='Synthetic child 1');assert(child);
+ assert.equal((await checkin({auth:{uid:parent},data:{action:'scan',code:family,token,playerId:child.id}})).checkedIn,true);
+ const checked=await createStaffRosterHandler(db)({auth:{uid:staff},data:{code:family}});
+ assert.equal(checked.rows.find(row=>row.name==='Synthetic child 1').checkedIn,true);
  for(const id of ['family_kid1','family_kid2']){
   const row=(await db.doc('tournaments/'+family+'/registrations/'+id).get()).data();assert.equal(row.guardianUid,parent);assert.equal(row.ladderEligible,false);assert.equal(row.activityEligible,false);
  }
- console.log(JSON.stringify({semantics:'PASS',sameOperationUnique:true,currentCancellationPreserved:true,inactiveDenied:true}));
+ console.log(JSON.stringify({semantics:'PASS',sameOperationUnique:true,currentCancellationPreserved:true,inactiveDenied:true,staffRosterQrSyncAndChildCheckin:true}));
 }
 module.exports={wave,semantics,handler,seed,audit,sourceGeneration:fixture.sourceGeneration};
 if(require.main===module)(async()=>{

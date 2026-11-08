@@ -7,6 +7,7 @@ This directory is an **offline source candidate**, not the active Functions impl
 ## Change
 
 - Registration mutations now use the existing transactional user snapshot for account validation instead of making an additional user read before admission. `mine` and `history` keep their pre-transaction account checks. No registration document, public/private count, roster projection, QR check-in, or start-of-match writer changes are part of this patch.
+- The cross-flow gate exposed a QR eligibility mismatch: V2 child registration documents use the child's registration ID as `uid`, while older QR fixtures used the guardian UID. QR now accepts either form only when the live guardian, child profile, confirmed registration, and exact participant document ID agree. This is a separate check-in fix; production behavior remains unverified until cloud acceptance.
 - Preserve the captured live read-only preview; this optimization already exists in generation 1793592677411039.
 - Preserve the live initial getAll and reuse of the self-registration snapshot; selected child reads and the QR adapter remain unchanged.
 - The module shares a bounded admission scheduler for join/cancel/syncSummary per room in one process. Only one mutation per room enters its database work at a time. Auth, time, capacity, operation receipts and allocations are evaluated after admission.
@@ -39,7 +40,7 @@ The emulator must run locally on that exact port and demo project; the harness r
 ## Release gates
 
 Before considering this additional read optimization for release, run the roster/check-in regression suites and verify a newly confirmed self/child registration is present in the authoritative room roster and manual/QR check-in lookup. An empty or stale player list blocks release even if admission latency improves.
-The candidate workflow runs the preparation roster and check-in suites on every PR update, then the Firestore Emulator scenario reads the official staff roster after the three participant registrations commit.
+The candidate workflow runs the preparation roster and check-in suites on every PR update. Its Firestore Emulator scenario verifies three committed registrations (account and two children) appear in the official staff preparation list. It then exercises the backend registration-roster sync, confirms the private/public room rosters and the guardian's QR candidates agree, scans one child, and verifies the staff list records attendance. Before the sync, QR candidates are empty even though all three registrations exist; production release therefore requires the sync to be enabled and caught up before QR check-in opens.
 
 1. Recapture the **live** familyRegistration archive and full service configuration. Require the pinned handler/dependencies or rebase/revalidate the patch; do not deploy the old fixture as a whole Functions source tree.
 2. Compose only candidate handler + admission module into that freshly captured archive, retaining current dependencies, entrypoint, QR adapter, environment variables, runtime options and My Events proof configuration. Source review and CI do not satisfy this gate.
