@@ -63,6 +63,40 @@ test('family registration keeps all selected identities atomic and preserves all
  assert.equal(a.rows.find(r=>r.id==='family_kid1').guardianUid,parent);assert.equal(a.rows.find(r=>r.id==='family_kid1').ladderEligible,false);
  assert.equal((await s.status(parent,code,req.operationId)).operation.state,'completed');
 });
+test('V2 queue family admission reaches staff preparation and guardian QR check-in after roster sync',async()=>{
+ const {code,ids:[parent]}=await seed(1,3),s=service();
+ const room=db.doc('tournaments/'+code),publicRoom=db.doc('publicTournaments/'+code);
+ const state=JSON.parse((await room.get()).data().data);state.meta.checkinRequired=true;
+ await room.update({data:JSON.stringify(state),eventAuthority:'official',qrCheckin:{enabled:true,session:'ready'}});
+ await publicRoom.update({registrationRosterSyncBackendEnabled:true});
+ await db.doc('familyPlayers/'+parent).set({profiles:[{id:'kid1',guardianUid:parent,name:'Synthetic child',nickname:'',displayCode:'P001C1',playerId:'CHILD001'}]});
+ const staff='staff-'+code;await db.doc('users/'+staff).set({active:true,role:'staff'});
+ const req=request(code,parent);req.payload.childIds=[null,'kid1'];await s.enqueue(parent,req);await s.drain(code);
+ const {createStaffRosterHandler}=require('../../staff-roster/functions/service.cjs');
+ const roster=()=>createStaffRosterHandler(db)({auth:{uid:staff},data:{code}});
+ assert.deepEqual((await roster()).rows.map(row=>row.name).sort(),['Synthetic','Synthetic child'].sort());
+ await db.doc('systemConfig/registrationRosterSync').set({enabled:true,roomCodes:[code]});
+ await db.doc('systemConfig/qrCheckin').set({enabled:true,writerGuardsVerified:true,roomCodes:[code]});
+ const {createCheckinHandler}=require('../../qr-checkin/backend/firebase-callable.cjs');
+ const {signToken}=require('../../qr-checkin/backend/core.cjs');
+ const secret='synthetic-v2-checkin-key',checkin=createCheckinHandler(db,()=>secret);
+ const token=signToken(code,'ready',Date.now(),secret);
+ const candidates=()=>checkin({auth:{uid:parent},data:{action:'candidates',code,token}});
+ assert.equal((await candidates()).players.length,0,'QR needs the backend room projection before it can find the registrations');
+ const fs=require('node:fs'),path=require('node:path'),overlayDir=path.join(__dirname,'../../qr-checkin/backend/overlays');
+ const source=fs.readFileSync(path.join(overlayDir,'registration-roster-sync.js'),'utf8'),module={exports:{}};
+ const load=name=>name==='firebase-functions/v2/firestore'?{onDocumentWritten:(_options,fn)=>fn}:
+  name==='firebase-functions/v2/https'?{...require(name),onCall:(_options,fn)=>fn}:
+  name.startsWith('./')?require(path.join(overlayDir,name)):require(name);
+ new Function('require','module','exports',source)(load,module,module.exports);
+ await module.exports.syncRegistrationRoster({data:true,params:{code}});
+ assert.equal(JSON.parse((await room.get()).data().data).players.length,2);
+ assert.equal(JSON.parse((await publicRoom.get()).data().bracketView).players.length,2);
+ const rows=(await candidates()).players;assert.equal(rows.length,2);
+ const child=rows.find(row=>row.family&&row.name==='Synthetic child');assert(child);
+ assert.equal((await checkin({auth:{uid:parent},data:{action:'scan',code,token,playerId:child.id}})).checkedIn,true);
+ assert.equal((await roster()).rows.find(row=>row.name==='Synthetic child').checkedIn,true);
+});
 test('status is actor-scoped and never returns a manager runtime snapshot',async()=>{
  const {code,ids:[uid,other]}=await seed(2),s=service(),req=request(code,uid);await s.enqueue(uid,req);await s.drain(code);
  assert.equal((await s.status(other,code,req.operationId)).operation.state,'not-found');
