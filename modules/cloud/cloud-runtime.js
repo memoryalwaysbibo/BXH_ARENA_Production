@@ -943,7 +943,7 @@
       if(operation?.operationId===operationId){
         const result=operation.result;
         const target=registrationId||localId;
-        const expectedStatus={cancel:'cancelled',promote:'confirmed',demote:'waitlist'}[action];
+        const expectedStatus={cancel:'cancelled',promote:'confirmed',promoteLocal:'confirmed',demote:'waitlist'}[action];
         const matches=action==='configure'?result?.enabled===requestedEnabled:
           result?.status===expectedStatus&&(registrationId?result?.registrationId:result?.localId)===target;
         if(operation.state==='completed'&&result?.ok===true&&matches){
@@ -1598,6 +1598,12 @@
       if(!authReady||!authHandle?.currentUser)throw Object.assign(new Error("auth-required"),{code:"auth-required"});
       const expandBy=Number(options.expandBy||0);
       if(expandBy!==0&&expandBy!==8)throw Object.assign(new Error("invalid-capacity-step"),{code:"invalid-capacity-step"});
+      const runQueued=typeof window!=='undefined'&&window.engagementService?.registrationManagementOperation;
+      const queued=runQueued&&await runQueued({action:"promoteLocal",code:eventCode,localId:candidateId,expandBy},options.operationId);
+      if(queued){
+        const latest=await this.joinRoom(eventCode,{serverOnly:true});
+        return latest.ok?{...queued,state:latest.data}:queued;
+      }
       const tourRef=fx.doc(dbHandle,"tournaments",eventCode);
       const pubRef=fx.doc(dbHandle,"publicTournaments",eventCode);
       const result=await fx.runTransaction(dbHandle,async tx=>{

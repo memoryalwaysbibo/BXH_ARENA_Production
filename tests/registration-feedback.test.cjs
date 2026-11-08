@@ -246,3 +246,28 @@ test('management queue matches the requested auto-fill value and the demotion re
  assert.equal(sessionStorage.length,1);
  assert.deepEqual(requests.map(x=>x.operationId),['enable-original','disable-original','demote-original']);
 });
+
+test('self signup previews a populated or unreadable public roster in a finite V2 room',async()=>{
+ const family=fs.readFileSync(require.resolve('../family-ui.js'),'utf8');
+ const start=family.indexOf('async function chooseFamilyParticipant(');
+ const end=family.indexOf('// v13.40.0',start);
+ const requests=[];
+ const context={
+  currentAuthUid:()=> 'player',
+  engagementSessionEpoch:1,
+  window:{BXH_REGISTRATION_FLOW_V2_ROOMS:[CODE],engagementService:{
+   familyRegistration:async data=>{
+    requests.push(data);
+    return {ok:true,allocation:[{registrationId:'player',status:'waitlist'}]};
+   }
+  }}
+ };
+ const choose=vm.runInNewContext(family.slice(start,end)+'\nchooseFamilyParticipant;',context);
+ const event={capacity:2,confirmedCount:1};
+ assert.equal((await choose({...event,bracketView:'{"players":[]}'},CODE,true)).allocation[0].status,'confirmed');
+ assert.equal(requests.length,0);
+ for(const bracketView of ['{"players":[{"id":"onsite"}]}','invalid',undefined]){
+  assert.equal((await choose({...event,bracketView},CODE,true)).allocation[0].status,'waitlist');
+ }
+ assert.deepEqual(requests.map(x=>x.action),['preview','preview','preview']);
+});

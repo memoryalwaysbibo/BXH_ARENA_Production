@@ -248,3 +248,71 @@ test('a bounded batch retries the triggering job if its turn has not arrived',as
  await worker.drainCreatedJob(code,ref.id,{limit:1});
  assert.equal((await audit(code,2)).summary.completed,2);
 });
+
+for(const firstAction of ['promoteLocal','join']){
+ test(firstAction+' wins the last seat shared by onsite and online players',async()=>{
+  const {createManagementApi,createManagementAuthorizer,createQueuedPromotion}=require('../backend/management.cjs');
+  const {manager,promotionManager}=require('../../qr-checkin/backend/overlays/roster-service.js');
+  const {createPromotionHandler,authorized}=require('../../registration-promotion/functions/service.cjs');
+  const {code,ids:[player,staff]}=await seed(2,1,2);
+  await db.doc('users/'+staff).update({role:'staff'});
+  await db.doc('systemConfig/staffPromotion').set({enabled:true});
+  const privateRef=db.doc('tournaments/'+code),publicRef=db.doc('publicTournaments/'+code);
+  const guest={id:'onsite-last-seat',name:'Onsite fixture',source:'onsite',waitRank:1,checkedIn:true};
+  const state=JSON.parse((await privateRef.get()).data().data);
+  state.waitlistPlayers=[guest];
+  await privateRef.update({eventAuthority:'official',assignedStaffUids:[staff],data:JSON.stringify(state)});
+  await publicRef.update({eventAuthority:'official'});
+  const options={handlers:{...handlers,promotion:createQueuedPromotion({
+   roster:handlers.roster,promote:store=>createPromotionHandler(store,{timestamp:()=>FieldValue.serverTimestamp(),allowUnseatedOfficial:true})
+  })}};
+  const entered=deferred(),resume=deferred();
+  const first=service({...options,beforeExecute:async job=>{
+   if(job.payload.action===firstAction){entered.resolve();await resume.promise;}
+  }});
+  const second=service(options);
+  const authorize=createManagementAuthorizer({db,canCancel:manager,canPromote:authorized,canPromoteUnlimited:promotionManager});
+  const manage=createManagementApi({queue:second,authorize,enabled:async c=>c===code});
+  const local={action:'promoteLocal',code,localId:guest.id,expandBy:0,operationId:'onsite-last-place'};
+  const signup=request(code,player);
+  const submitLocal=()=>manage({auth:{uid:staff},data:local});
+  const submitJoin=()=>second.enqueue(player,signup);
+  await assert.rejects(manage({auth:{uid:player},data:local}),/permission-denied/);
+  const localFirst=firstAction==='promoteLocal';
+  await (localFirst?submitLocal:submitJoin)();
+  const started=first.drain(code);
+  await entered.promise;
+  try{
+   await (localFirst?submitJoin:submitLocal)();
+   assert.equal((await second.drain(code)).busy,true);
+  }finally{resume.resolve();await started;}
+  await drainAll([first,second],code);
+
+  const localReceipt=(await second.status(staff,code,local.operationId)).operation;
+  const onlineReceipt=(await second.status(player,code,signup.operationId)).operation;
+  const currentPrivate=(await privateRef.get()).data(),currentPublic=(await publicRef.get()).data();
+  const roster=JSON.parse(currentPrivate.data),mirror=JSON.parse(currentPublic.bracketView);
+  assert.equal(onlineReceipt.result.status,localFirst?'waitlist':'confirmed');
+  assert.equal(currentPrivate.confirmedCount,localFirst?0:1);
+  assert.equal(currentPublic.confirmedCount,currentPrivate.confirmedCount);
+  assert.equal(currentPublic.waitlistCount,localFirst?1:0);
+  assert.equal(roster.players.some(row=>row.id===guest.id),localFirst);
+  assert.equal(mirror.players.some(row=>row.id===guest.id),localFirst);
+  assert.equal(currentPrivate.confirmedCount+roster.players.filter(row=>row.source==='onsite').length,1);
+  assert.equal((await audit(code,1)).summary.jobs,2);
+  if(localFirst){
+   assert.equal(localReceipt.result.localId,guest.id);
+   assert.equal(localReceipt.result.expanded,false);
+   assert.equal(localReceipt.result.state,undefined);
+   assert.equal(roster.players[0].checkedIn,true);
+   assert.equal(roster.players[0].waitRank,undefined);
+   const preview=await handlers.family(db)({auth:{uid:staff},data:{action:'preview',code,childIds:[null]}});
+   assert.equal(preview.allocation[0].status,'waitlist');
+  }else{
+   assert.equal(localReceipt.reason,'capacity-full');
+   const expansion={...local,operationId:'onsite-expand-denied',expandBy:8};
+   await manage({auth:{uid:staff},data:expansion});await drainAll([first,second],code);
+   assert.equal((await second.status(staff,code,expansion.operationId)).operation.reason,'permission-denied');
+  }
+ });
+}

@@ -13416,20 +13416,23 @@ async function peoplePromoteLocal(waitId,name,expandCapacity){
   }
   if(state.cloudCode){
     if(peopleRosterBusy)return;
+    const context={roomId:state.id,code:state.cloudCode,uid:typeof currentAuthUid==="function"?currentAuthUid():""};
     peopleRosterBusy=true;render();
     try{
       if(!window.cloudSync?.promoteLocalWaitlistRoster)throw Object.assign(new Error("network"),{code:"network"});
       const result=await window.cloudSync.promoteLocalWaitlistRoster(state.cloudCode,waitId,{expandBy:expandCapacity?8:0});
+      if(!peoplePromotionContextCurrent(context)){peopleRosterBusy=false;return;}
       await peopleApplyCloudRosterResult(result,(result.expanded?"已加開至 "+result.capacity+" 人；":"")+name+" 已升為正取");
     }catch(e){
       peopleRosterBusy=false;
+      if(!peoplePromotionContextCurrent(context))return;
       if(String(e?.code||e?.message||"").includes("capacity-full")&&!expandCapacity){
         const cap=Number(e.capacity||state.meta.registrationCapacity||0);
         openModal({
           type:"generic",title:"正取名額已滿",
           message:"目前正取上限為 "+cap+" 人。\n\n是否增加 8 個名額，並將「"+name+"」升為正取？\n調整後上限："+(cap+8)+" 人。\n\n每次固定增加 8 人，可重複加開。",
           confirmLabel:"增加 8 名並升正取",
-          onConfirm:()=>peoplePromoteLocal(waitId,name,true)
+          onConfirm:()=>peoplePromotionContextCurrent(context)&&peoplePromoteLocal(waitId,name,true)
         });
         render();return;
       }
@@ -16499,7 +16502,8 @@ async function staffRosterPromote(target){
     staffPromotionBusy=true;render();
     try{
       const request={code:context.code,...(registrationId?{registrationId}:{playerId}),expandBy:0};
-      const queued=registrationId&&await window.engagementService.registrationManagementOperation?.({action:'promote',...request},operationId);
+      const queueRequest=registrationId?{action:'promote',...request}:{action:'promoteLocal',code:context.code,localId:playerId,expandBy:0};
+      const queued=await window.engagementService.registrationManagementOperation?.(queueRequest,operationId);
       const result=queued||await window.engagementService.tournamentOperation('promoteSeatedRegistration',{...request,operationId});
       if(!current())return;
       if(result?.ok!==true||result.verified!==true)throw Error('promotion-unconfirmed');
@@ -16514,7 +16518,7 @@ async function staffRosterPromote(target){
       adminRegistrationsError=null;showToast('已升為正取');
     }catch(error){if(current()){
       const reason=[error?.message,error?.code,error?.details].map(String).join(' ');
-      if(/not-waitlist|operation-outdated|bracket-locked|promotion-state-changed|capacity-full/.test(reason)){
+      if(/not-waitlist|operation-outdated|bracket-locked|promotion-state-changed|capacity-full|permission-denied/.test(reason)){
        staffPromotionOperations.delete(intent);try{sessionStorage.removeItem('bxh.staffPromotion.'+intent);}catch{}
       }
       adminRegistrationsError=reason.includes('capacity-full')?'正取名額已滿，請由房主調整名額後重新同步。':

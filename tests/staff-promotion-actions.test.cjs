@@ -39,3 +39,19 @@ test('network uncertainty reuses operation ID; stale readback retires it for nex
  await h.c.staffRosterPromote(h.target('local-1'));await h.modals.pop().onConfirm();
  assert.notEqual(h.payloads.at(-1).operationId,h.payloads[2].operationId);
 });
+
+test('the staff roster uses the queued onsite target and confirms through staff readback',async()=>{
+ const h=harness();
+ h.c.window.engagementService.registrationManagementOperation=async(payload,operationId)=>{
+  h.payloads.push({name:'queue',...payload,operationId});
+  return {ok:true,verified:true};
+ };
+ await h.c.staffRosterPromote(h.target('local-1'));
+ await h.modals[0].onConfirm();
+ assert.equal(h.payloads.length,1);
+ assert.equal(h.payloads[0].name,'queue');
+ assert.equal(h.payloads[0].action,'promoteLocal');
+ assert.equal(h.payloads[0].localId,'local-1');
+ assert.equal(h.payloads[0].expandBy,0);
+ assert.equal(h.toasts[0][0],'已升為正取');
+});

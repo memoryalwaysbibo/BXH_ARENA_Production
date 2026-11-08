@@ -15,6 +15,9 @@ function managementOperation(data){
  if(action==='configure'&&typeof enabled==='boolean'&&Object.keys(data).every(key=>['action','code','operationId','enabled'].includes(key))){
   return {...operation,route:'roster',payload:{...payload,enabled}};
  }
+ if(action==='promoteLocal'&&matchesId(/^[A-Za-z0-9_-]{1,200}$/,localId)&&Object.keys(data).every(key=>['action','code','operationId','localId','expandBy'].includes(key))&&[0,8].includes(expandBy??0)){
+  return {...operation,route:'promotion',payload:{...payload,localId,expandBy:expandBy??0}};
+ }
  if(action==='demote'&&matchesId(registrationIdPattern,registrationId)&&Object.keys(data).every(key=>['action','code','operationId','registrationId'].includes(key))){
   return {...operation,route:'promotion',payload:{...payload,registrationId}};
  }
@@ -56,13 +59,14 @@ const isUnlimitedRoom=room=>room?.eventAuthority==='community'&&room.communityQu
 // fields through to it. It must execute its mutation through the fenced store.
 function createQueuedPromotion({promote,roster}){
  return db=>async req=>{
-  const {code,operationId,registrationId,action,expandBy}=req.data;
+  const {code,operationId,registrationId,localId,action,expandBy}=req.data;
   const [room,mirror]=await db.getAll(db.doc('tournaments/'+code),db.doc('publicTournaments/'+code));
   if(isUnlimitedRoom(room.data())&&isUnlimitedRoom(mirror.data())){
    if(action!=='promote'||expandBy!==0)throw Error('promotion-route-not-supported');
    return roster(db)(req);
   }
-  return promote(db)({auth:req.auth,data:{code,operationId,registrationId,...(action==='demote'?{action}:{expandBy})}});
+  const target=action==='promoteLocal'?{localId,expandBy}:{registrationId,...(action==='demote'?{action}:{expandBy})};
+  return promote(db)({auth:req.auth,data:{code,operationId,...target}});
  };
 }
 

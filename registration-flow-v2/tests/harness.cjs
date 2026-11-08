@@ -6,13 +6,14 @@ const {initializeApp}=require('firebase-admin/app');
 initializeApp({projectId:process.env.GCLOUD_PROJECT});
 const {getFirestore,FieldValue}=require('firebase-admin/firestore');
 const db=getFirestore();
+const {prepareFamilySource}=require('../backend/prepare-family.cjs');
 const fixture=require('./captured-family-source.json'),cache=new Map();
 function load(file){
  if(cache.has(file))return cache.get(file).exports;
  const digest=fixture.files[file],source=fixture.blobs[digest];assert(source,file);
  assert.equal(crypto.createHash('sha256').update(source).digest('hex'),digest,file);
  const module={exports:{}};cache.set(file,module);
- new Function('require','module','exports',source)(name=>name.startsWith('.')?load(path.posix.normalize(path.posix.join(path.posix.dirname(file),name))+(/\.(?:js|cjs)$/.test(name)?'':'.js')):require(name),module,module.exports);
+ new Function('require','module','exports',file==='family-registration.js'?prepareFamilySource(source):source)(name=>name.startsWith('.')?load(path.posix.normalize(path.posix.join(path.posix.dirname(file),name))+(/\.(?:js|cjs)$/.test(name)?'':'.js')):require(name),module,module.exports);
  return module.exports;
 }
 const familyFactory=load('family-registration.js').createFamilyRegistration;

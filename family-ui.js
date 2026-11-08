@@ -124,8 +124,15 @@ async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode
   if(queued&&Number.isSafeInteger(event.confirmedCount)&&event.confirmedCount>=0){
    const unlimited=window.BXHDomainUtils?.isUnlimitedCommunityRegistration(event)===true;
    const capacity=event.capacity;
-   if(unlimited||Number.isSafeInteger(capacity)&&capacity>0&&event.confirmedCount<capacity)return {childIds:[null],allocation:[{registrationId:owner,status:'confirmed'}]};
-   if(Number.isSafeInteger(capacity)&&capacity>0&&event.confirmedCount>=capacity&&event.waitlistEnabled===true&&Number.isSafeInteger(event.waitlistCount)&&event.waitlistCount>=0&&event.waitlistCount<event.waitlistCapacity)return {childIds:[null],allocation:[{registrationId:owner,status:'waitlist'}]};
+   // The public roster omits player provenance. A populated or unreadable
+   // projection needs the authoritative mixed-capacity preview.
+   let noRoster=false;
+   try{
+    const mirror=typeof event.bracketView==='string'?JSON.parse(event.bracketView):event.bracketView;
+    noRoster=Array.isArray(mirror?.players)&&mirror.players.length===0;
+   }catch{}
+   if(unlimited||noRoster&&Number.isSafeInteger(capacity)&&capacity>0&&event.confirmedCount<capacity)return {childIds:[null],allocation:[{registrationId:owner,status:'confirmed'}]};
+   if(noRoster&&Number.isSafeInteger(capacity)&&capacity>0&&event.confirmedCount>=capacity&&event.waitlistEnabled===true&&Number.isSafeInteger(event.waitlistCount)&&event.waitlistCount>=0&&event.waitlistCount<event.waitlistCapacity)return {childIds:[null],allocation:[{registrationId:owner,status:'waitlist'}]};
   }
   const preview=await window.engagementService.familyRegistration({action:'preview',code,childIds:[null],childEligibilityConfirmed:childEligibilityConfirmed===true});
   if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)throw Error('auth-required');

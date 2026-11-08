@@ -5,7 +5,9 @@
 const {createQueue}=require('./queue.cjs');
 const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
-function createBindings({db,FieldValue,familyFactory,rosterFactory,promotionFactory,authorizeManagement,enabled=async()=>false}){
+function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,enabled=async()=>false}){
+ if(createFamilyRegistration?.v2CapacityAware!==true)throw Error('queue-family-capacity-source-required');
+ const familyFactory=store=>createFamilyRegistration(store,Date.now,{myEventsProofEnabled:true});
  if(typeof promotionFactory!=='function')throw Error('queue-promotion-factory-required');
  const {onCall,HttpsError}=require('firebase-functions/v2/https');
  const {onDocumentCreated}=require('firebase-functions/v2/firestore');
