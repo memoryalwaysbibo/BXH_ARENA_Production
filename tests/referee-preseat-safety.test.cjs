@@ -79,3 +79,19 @@ test('waiting and live scoring share the same layout, with inert placeholders on
  const idle=c.renderRefereeScorePanel(null,1);for(const b of idle.matchAll(/<button\b[^>]*>/g))assert.match(b[0],/disabled/);
  c.canOperateStation=()=>false;const other=c.renderRefereeScorePanel(m,1);assert.match(other,/<button data-action="score"[^>]*disabled/);
 });
+
+test('unchanged referee seat projections do not redraw the scoring screen',()=>{
+ const room={cloudCode:'BXH-TEST',meta:{refereeSeatsV1:{revision:1},refereeStationNames:{1:['Ref']}}};
+ let receive,draws=0;
+ const sandbox={setTimeout:()=>0,clearTimeout:()=>{},cloudSync:{subscribeRefereeSeats(_code,callback){receive=callback;return ()=>{};}}};
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../modules/main-app/referee-seats.js'),'utf8'),sandbox);
+ sandbox.BXHRefereeSeats.bind({state:()=>room,uid:()=> 'ref',operator:()=>true,render:()=>draws++});
+ receive({model:{revision:1},projection:{refereeStationNames:{1:['Ref']}}});
+ assert.equal(draws,0);
+ receive({model:{revision:2},projection:{refereeStationNames:{1:['Other']}}});
+ assert.equal(draws,1);
+ assert.equal(room.meta.refereeStationNames[1][0],'Other');
+ receive({accessRevoked:true});
+ assert.equal(draws,2);
+ assert.equal(room.meta.refereeSeatAccessRevoked,true);
+});
