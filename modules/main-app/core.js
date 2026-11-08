@@ -9802,8 +9802,11 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
     if(ok!==true)throw new Error(window.__BXH_LAST_CLOUD_ERROR_CODE||'roster-cloud-write-failed');
   }
   if(needsWrite||base!==state){
-    const expectedQrRevision=Number(candidate.qrCheckinManaged===true?candidate.qrCheckinRevision||0:0);
-    const verified=await readVerifiedOnlineRoster(context,expectedQrRevision);
+    const expectedQrRevision=Math.max(Number(state.qrCheckinRevision||0),Number(candidate.qrCheckinManaged===true?candidate.qrCheckinRevision||0:0));
+    // No roster write occurred. The validated server-only QR snapshot is
+    // already authoritative unless a newer revision reached this client.
+    const reuseServerRead=!needsWrite&&base.qrCheckinManaged===true&&Number.isSafeInteger(base.qrCheckinRevision)&&base.qrCheckinRevision>=expectedQrRevision;
+    const verified=reuseServerRead?base:await readVerifiedOnlineRoster(context,expectedQrRevision);
     applyRemoteState(verified,true);
     if(Number(state.qrCheckinRevision||0)<Number(verified.qrCheckinRevision||0))throw new Error('roster-readback-failed');
   }

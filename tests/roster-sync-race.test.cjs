@@ -188,7 +188,11 @@ test('68 to 80 sync waits for commit, preserves check-ins and exposes only canon
  const result=await pending;assert.equal(result.changed,true);assert.equal(h.s.state.players.length,80);assert.equal(h.s.state.qrCheckinRevision,8);
  assert.equal(h.s.state.players.filter(p=>p.checkedIn).length,40);assert.equal(h.s.state.players[71].name,'江佳恩');
  assert.equal(h.s.state.players[71].id,h.remote().players[71].id);assert.equal(h.s.state.players[0].id,'canonical-0');
- const ids=h.s.state.players.map(p=>p.id);await h.s.syncLatestOnlineRosterBeforeLock();assert.deepEqual(h.s.state.players.map(p=>p.id),ids);assert.equal(h.stats().writes,1,'an unchanged retry does not create another version');
+ const ids=h.s.state.players.map(p=>p.id),before=h.stats();
+ await h.s.syncLatestOnlineRosterBeforeLock();
+ assert.deepEqual(h.s.state.players.map(p=>p.id),ids);
+ assert.equal(h.stats().writes,1,'an unchanged retry does not create another version');
+ assert.equal(h.stats().reads-before.reads,1,'reuse the verified server snapshot when no roster write occurred');
 });
 test('fresh canonical QR state recovers a stale local revision before late roster sync',async()=>{
  const h=lateRosterHarness();h.s.state.qrCheckinRevision=3;

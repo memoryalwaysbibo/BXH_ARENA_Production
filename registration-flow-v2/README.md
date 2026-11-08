@@ -30,6 +30,8 @@
 
 `evidence/frontend-waves.json`：另以三種人數執行實際前端 `joinTournamentAsPlayer`、本人選擇器、`familyRegistration` 路由和進度控制器，再接真 Firestore Emulator 與擷取的後端 handler，共 300 筆。這些是無 DOM 的獨立 JS context，**不是實體瀏覽器或手機測試**。前端結果經讀回目前有效報名確認，並稽核本地待確認紀錄清空。
 
+`tests/start-320.cjs` 以 320 位選手和 12 台設定演練開賽。執行實際名單核對、抽籤、開賽前驗證與開賽按鈕流程。Firestore Emulator 注入佇列重試和晚報到，並量測各讀寫階段及切到裁判分頁狀態的時間。報到寫入、開賽交易接線及畫面渲染由測試環境替代，裁判台實際計分可用時間仍須瀏覽器驗收。CI 將報告收錄在隔離壓測產物。
+
 工作者模擬是同一 Node 程序中的五個獨立 service 物件，共用真正的本機 Firestore Emulator；不是五台實體 Cloud Run。測試使用合成 Auth，沒有驗證正式 Auth／App Check、行動網路、跨區延遲或正式觸發器／排程器交付。
 
 前端模擬完成交易後會主動讀回，將測試時鐘前移 4 秒以越過手動查詢限頻；報告時間是這個隔離測試的實際牆鐘時間，不代表正式站自動輪詢的延遲上限。
@@ -40,7 +42,7 @@
 NODE_PATH=/path/to/test-deps/node_modules GCLOUD_PROJECT=demo-bxh-registration-v2 \
   /path/to/test-deps/node_modules/.bin/firebase emulators:exec --only firestore \
   --project demo-bxh-registration-v2 --config registration-flow-v2/emulator.json \
-  'node --test registration-flow-v2/tests/recovery.test.cjs && node registration-flow-v2/tests/frontend-waves.cjs && node registration-flow-v2/tests/waves.cjs'
+  'node --test registration-flow-v2/tests/recovery.test.cjs && node registration-flow-v2/tests/frontend-waves.cjs && node registration-flow-v2/tests/waves.cjs && node registration-flow-v2/tests/start-320.cjs'
 node --test tests/registration-feedback.test.cjs tests/family-roster-checkin.test.cjs tests/community-quick-registration-cloud.test.cjs tests/public-pages-artifact.test.cjs
 node scripts/verify-production-frontend.cjs
 ```
