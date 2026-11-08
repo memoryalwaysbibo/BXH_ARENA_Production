@@ -48,13 +48,14 @@ test('self registration proceeds from the first click without a dialog', async (
   await setup(page);
   await expect.poll(() => page.evaluate(() => fixture.sent.length)).toBe(1);
   await expect(page.locator('dialog')).toHaveCount(0);
-  expect(await page.evaluate(() => fixture.sent)).toEqual([{ childIds:[null], allocation:[{ participantId:null, status:'confirmed' }] }]);
+  expect(await page.evaluate(() => fixture.sent)).toEqual([{ childIds:[null] }]);
+  expect(await page.evaluate(() => fixture.calls)).toEqual([]);
 });
 
-test('failed self preflight reports an error without submitting', async ({ page }) => {
+test('self submission never runs a capacity preview, even if previews fail', async ({ page }) => {
   await setup(page, 'self', { fail:true });
-  await expect.poll(() => page.evaluate(() => fixture.error)).toBe('full');
-  expect(await page.evaluate(() => fixture.sent.length)).toBe(0);
+  await expect.poll(() => page.evaluate(() => fixture.sent.length)).toBe(1);
+  expect(await page.evaluate(() => fixture.calls)).toEqual([]);
   await expect(page.locator('dialog')).toHaveCount(0);
 });
 
