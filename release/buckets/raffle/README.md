@@ -255,3 +255,38 @@ participant keys, and the candidate still recognizes those winners when
 read back. These checks cover the assembled code and saved data, with fixture
 auth and Firestore. Keep both ZIPs in private review and validate the target
 runtime, authentication and revision switch before any release.
+
+## Authenticated Callable protocol
+
+The native workflow stages the three assembled exports in the Functions
+Emulator and runs them against the Firestore and Auth emulators. Its
+`demo-bxh-bucket-raffle` project and all three endpoints are local. The test
+signs in with three synthetic email/password accounts and sends their Auth
+Emulator ID tokens to the actual Callable HTTP endpoints. It checks manager
+preview/draw/replay/forfeit/replace/claim, and rejects missing or invalid Auth,
+an active player, and an inactive administrator. Supplying a manager UID in
+the request body grants no authority.
+
+The candidate preserves the captured onCall options, which omit
+`enforceAppCheck`. The test exercises the authenticated flow without an App
+Check header. Production App Check tokens, live IAM, and the deployed revision
+switch still require separate acceptance.
+
+## Read-only release baseline check
+
+Run the [raffle provenance workflow](https://github.com/memoryalwaysbibo/BXH_ARENA_Functions_Production/actions/workflows/bucket-cloud-readonly.yml)
+on its main branch with `confirm_project=bxh-arena`. Use the filtered
+`bucket-readonly-report.json` from that new run.
+
+```sh
+python3 -B tests/four-court-buckets/raffle/verify-provenance.py \
+  --capture-report /path/to/bucket-readonly-report.json
+```
+
+The comparison requires a complete, stable capture for all three functions.
+It checks each function's source archive, full metadata, build configuration
+and service configuration hashes against the reviewed baseline.
+`BASELINE_DRIFT` lists the affected functions and fields and exits nonzero.
+Resolve drift against the latest deployed sources before using either review
+archive. The workflow run time establishes freshness. A matching hash report
+alone establishes baseline parity.

@@ -1830,7 +1830,7 @@
     },
     "release/buckets/raffle/README.md": {
       "components": [],
-      "blob": "cdfec13bf51c017f80167b5139c26b2a16e11aff"
+      "blob": "6c1bb9358095a90e408b6b0855bacbae8cf9ec40"
     },
     "release/buckets/raffle/input.cjs": {
       "components": [],
@@ -1859,13 +1859,13 @@
       ]
     },
     "tests/four-court-buckets/raffle/native.firebase.json": {
-      "blob": "8ac30a58da9c41843d09956f58068fe121a79881",
+      "blob": "c11f0a20450f18b25eaa0c4a870bb52880ecd37c",
       "components": [
         718
       ]
     },
     ".github/workflows/bucket-raffle-input.yml": {
-      "blob": "c8be96f2c61aaf6d086941cad68f011af776721c",
+      "blob": "2741a942570c3d34e49ae55094efdfc4caa616c6",
       "components": [
         718
       ]
@@ -1904,7 +1904,7 @@
       "components": [
         718
       ],
-      "blob": "98c97138be8d814295e33c71b7d6a69d3f02a20a"
+      "blob": "892d4eab4807457e66d3431baac7813b6d69b5ec"
     },
     "release/buckets/raffle/context.cjs": {
       "components": [
@@ -1953,6 +1953,12 @@
         718
       ],
       "blob": "a19c2c39444f629f3f9d72eb6fa1e44da8449263"
+    },
+    "tests/four-court-buckets/raffle/native-callable.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "42e40b9cbe80693ed44c24ac903228de7cef2aad"
     }
   },
   "mainScriptQueryParameters": {
