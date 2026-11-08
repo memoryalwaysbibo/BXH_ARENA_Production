@@ -29,7 +29,9 @@ async function fixture(t,options={}){
    familyRegistration:async request=>{
      if(request.action==='preview')return {ok:true,rows:request.childIds.map(id=>({participantName:id||'本人',status:'confirmed'})),allocation:request.childIds.map(id=>({registrationId:id===null?firebaseUser.uid:'family_'+id,status:'confirmed'}))};
      const response=await fetch('/fixture/'+(request.action==='mine'?'mine':'join'),{method:'POST',headers:{'Content-Type':'application/json','X-Fixture-Page':fixturePageId},body:JSON.stringify({...request,fixtureUid:firebaseUser.uid})});
-     return response.json();
+     const result=await response.json();
+     if(result.error)throw Error(result.error);
+     return result;
    }
  };
  ${helper('getPlayerRegistrationFeedback')}
@@ -46,6 +48,7 @@ async function fixture(t,options={}){
   const url=new URL(route.request().url());if(url.hostname!=='127.0.0.1')return route.abort();
   if(url.pathname==='/fixture/join'){
    const req=route.request().postDataJSON();server.joins.push(req);
+   if(server.mode==='full')return route.fulfill({json:{error:'full'}});
    if(server.mode==='hold'){server.hold.push(route);return;}
    if(server.mode==='empty-drop')return route.abort();
    const ids=req.childIds.map(id=>id===null?req.fixtureUid:'family_'+id);
@@ -70,6 +73,16 @@ test('desktop lobby and detail clicks coalesce and pending feedback is immediate
 test('a dropped successful HTTP response recovers automatically without a second write',async t=>{
  const {page,server}=await fixture(t,{mode:'commit-drop'});await page.click('#lobby');await waitFor(page,()=>submissions.length===1);
  assert.equal(server.joins.length,1);assert.equal(server.committed.size,1);assert(server.reads>=1);assert.equal(await page.evaluate(()=>submissions[0].recovered),true);
+});
+test('self registration sends one join without capacity preview or allocation',async t=>{
+ const {page,server}=await fixture(t,{mode:'commit',status:'waitlist'});await page.click('#lobby');await waitFor(page,()=>submissions.length===1);
+ assert.equal(server.joins.length,1);assert.deepEqual(server.joins[0].childIds,[null]);assert.equal('allocation' in server.joins[0],false);
+ assert.match(await page.locator('.registration-feedback-panel').innerText(),/備取/);
+});
+test('full backend rejects the one direct submission and shows the reason',async t=>{
+ const {page,server}=await fixture(t,{mode:'full'});await page.click('#lobby');await waitFor(page,()=>failures.length===1);
+ assert.equal(server.joins.length,1);assert.equal('allocation' in server.joins[0],false);
+ assert.match(await page.locator('.registration-feedback-panel').innerText(),/正取與備取皆已額滿/);
 });
 test('reload restores a pending request and only reads the result',async t=>{
  const {page,server}=await fixture(t);await page.click('#lobby');await waitFor(page,()=>localStorage.length===1);server.ignoreReadsFrom=await page.evaluate(()=>fixturePageId);server.rows=[{registrationId:'user1',status:'waitlist'}];await page.reload();

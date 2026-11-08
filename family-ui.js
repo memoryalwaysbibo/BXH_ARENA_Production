@@ -114,23 +114,10 @@ async function chooseFamilyRegistrationToCancel(rows){
 
 async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode='self'){
  const owner=currentAuthUid(),epoch=engagementSessionEpoch;
- // Clicking self registration is the user's submission; preserve the server
- // allocation preflight without opening a second confirmation dialog.
+ // Clicking self registration submits once. The join transaction decides the
+ // current confirmed/waitlist slot and returns a definitive full error.
  if(mode!=='children'){
-  const queued=Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code)&&event.battleMode!=='team';
-  // Use the already-read display allocation as consent; the authoritative
-  // queued transaction still rejects any allocation change. Do not silently
-  // convert a confirmed expectation to waitlist or weaken capacity checks.
-  if(queued&&Number.isSafeInteger(event.confirmedCount)&&event.confirmedCount>=0){
-   const unlimited=window.BXHDomainUtils?.isUnlimitedCommunityRegistration(event)===true;
-   const capacity=event.capacity;
-   if(unlimited||Number.isSafeInteger(capacity)&&capacity>0&&event.confirmedCount<capacity)return {childIds:[null],allocation:[{registrationId:owner,status:'confirmed'}]};
-   if(Number.isSafeInteger(capacity)&&capacity>0&&event.confirmedCount>=capacity&&event.waitlistEnabled===true&&Number.isSafeInteger(event.waitlistCount)&&event.waitlistCount>=0&&event.waitlistCount<event.waitlistCapacity)return {childIds:[null],allocation:[{registrationId:owner,status:'waitlist'}]};
-  }
-  const preview=await window.engagementService.familyRegistration({action:'preview',code,childIds:[null],childEligibilityConfirmed:childEligibilityConfirmed===true});
-  if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)throw Error('auth-required');
-  if(!preview?.ok)throw Error('preview-failed');
-  return {childIds:[null],allocation:preview.allocation||[]};
+  return {childIds:[null]};
  }
  const r=await window.engagementService.family({action:'list'});
  if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)throw Error('auth-required');
@@ -251,7 +238,13 @@ async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode
     api.__testerGeneralRoomHotfix=true;
     if(typeof api.pushUpdate==='function'){
       const push=api.pushUpdate.bind(api);
-      api.pushUpdate=async(code,data,options)=>{if(!ownCommunity(data))return push(code,data,options);const result=await asCommunityOwner(()=>push(code,data,options));if(result===false)await communityDiagnostic(code,'雲端同步');return result};
+      api.pushUpdate=async(code,data,options)=>{
+        if(!ownCommunity(data))return push(code,data,options);
+        const result=await asCommunityOwner(()=>push(code,data,options));
+        // The bracket controller owns progress and errors for this submission.
+        if(result===false&&!options?.bracketCommit)await communityDiagnostic(code,'雲端同步');
+        return result;
+      };
     }
     if(typeof api.deleteCommunityRoom==='function'){
       api.deleteCommunityRoom=async code=>asCommunityOwner(async()=>{

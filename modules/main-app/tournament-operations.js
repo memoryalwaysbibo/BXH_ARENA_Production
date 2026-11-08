@@ -76,7 +76,14 @@ async function handleTournamentOperationsAction(action,target){
    method='drawTournamentRaffle';payload=readOperationsPending(code);
    if(!payload){if(action==='ops-retry')return;const prizes=operationsDraftPrizes(o.draft).map(p=>({name:String(p.name||'').trim(),description:String(p.description||'').trim(),quantity:Number(p.quantity)})),total=prizes.reduce((sum,p)=>sum+(Number.isInteger(p.quantity)?p.quantity:0),0);if(!o.preview||prizes.some(p=>!p.name||!Number.isInteger(p.quantity)||p.quantity<1||p.quantity>100)){showToast('請完成所有獎品品項並預覽候選名單',true);return;}if(total>100){showToast('同一次抽獎合計最多 100 位得獎者',true);return;}if(total>o.preview.count){showToast(`符合資格只有 ${o.preview.count} 人，本次共設定 ${total} 位得獎者`,true);return;}const summary=prizes.map((p,i)=>`${i+1}. ${p.name} × ${p.quantity}`).join('\n');if(!confirm(`從 ${o.preview.count} 人中抽 ${prizes.length} 個品項，共 ${total} 位得獎者？\n\n${summary}`))return;payload={code,mode:o.draft.mode,excludePrevious:o.draft.excludePrevious,prizes,operationId:crypto.randomUUID(),candidateHash:o.preview.candidateHash};try{sessionStorage.setItem(operationsPendingKey(code),JSON.stringify(payload));}catch(e){throw Error('pending-storage-unavailable');}}
   }else if(['ops-claim','ops-forfeit','ops-replace'].includes(action)){
-   const a=action.slice(4),reason=a==='claim'?'':prompt(a==='forfeit'?'請填寫棄領原因':'請填寫補抽原因');if(a!=='claim'&&(!reason||reason.trim().length<2))return;if(a==='claim'&&!confirm('確認此玩家已領取獎品？'))return;
+   const a=action.slice(4);
+   let reason='';
+   if(a==='forfeit'){
+    reason=prompt('請填寫棄領原因');
+    if(!reason||reason.trim().length<2)return;
+   }else if(a==='replace'){
+    reason='原得主已棄領，補抽原獎項';
+   }else if(!confirm('確認此玩家已領取獎品？'))return;
    method='updateTournamentRaffleWinner';payload={code,raffleId:target.getAttribute('data-raffle'),winnerKey:target.getAttribute('data-winner'),action:a,reason,operationId:crypto.randomUUID()};
   }
   o.busy=true;o.error='';render();if(!service?.tournamentOperation)throw Error('service-unavailable');

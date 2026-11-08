@@ -2,7 +2,7 @@
 
 This branch assembles reviewed candidates #707, #709, #711, #712, #713,
 #714, #715, #717 and #718 on selected main
-`0471069df5a09a433c4c945aed119004043d82b6`. The exact component heads,
+`c2b19a8450510d18f144d705178127bbc6488518`. The exact component heads,
 merge bases and resulting component-file Git blob hashes are recorded in
 `manifest.json`. This is an integration review, not a deployment archive or a
 replacement for the component source/configuration provenance requirements.
@@ -72,3 +72,12 @@ validation in CI; it was not run locally without a loopback Emulator. Its client
 opt-in and server rollout gates remain as main defines them. This source merge
 does not perform a deployment, turn on V2/bucket room gates or satisfy fresh
 production source/configuration and operator acceptance.
+
+## 2026-11-09 main reconciliation
+
+The draft incorporates seven main commits, including direct raffle replacement,
+self-registration without a separate capacity preview, referee invitations,
+public score updates and bracket submission changes. Eighteen paths use the
+exact main blobs. The three overlapping files retain the bucket deletion and
+settlement changes, and preserve all 92 main script query mappings and the
+candidate settlement script order. Candidate CI is required for this checkout.

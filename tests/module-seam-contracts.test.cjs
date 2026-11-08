@@ -236,6 +236,46 @@ test('feature modules read the shared Core room state', () => {
   assert.match(render(), /新房間共用狀態/);
 });
 
+test('raffle replacement records a reason without prompting again', async () => {
+  const calls = [];
+  const prompts = [];
+  let input = null;
+  const context = moduleContext({
+    state: { cloudCode: 'ROOM-RAFFLE' },
+    currentRole: 'admin',
+    engagementSessionEpoch: 0,
+    currentAuthUid: () => 'seam-test-user',
+    hasAdminAccess: () => true,
+    sessionStorage: { getItem: () => null },
+    crypto: { randomUUID: () => 'request-id' },
+    render() {},
+    prompt(message) { prompts.push(message); return input; },
+    confirm() { assert.fail('replacement should not need a confirmation dialog'); },
+    window: { engagementService: {
+      async tournamentOperation(method, payload) {
+        calls.push({ method, ...payload });
+        return { ok: true, raffles: [] };
+      },
+    } },
+  });
+  vm.runInContext(read('modules/main-app/tournament-operations.js'), context);
+  const handle = context.window.BXHTournamentOperations.handleTournamentOperationsAction;
+  const attrs = { 'data-raffle': 'raffle-1', 'data-winner': 'winner-1' };
+  const target = { getAttribute: name => attrs[name] };
+  await handle('ops-forfeit', target);
+  assert.deepEqual(calls, []);
+  input = '測試棄領';
+  await handle('ops-forfeit', target);
+  await handle('ops-replace', target);
+  assert.deepEqual(prompts, ['請填寫棄領原因', '請填寫棄領原因']);
+  assert.deepEqual(calls.filter(call => call.method === 'updateTournamentRaffleWinner').map(
+    ({ action, reason, raffleId, winnerKey }) => [action, reason, raffleId, winnerKey]
+  ), [
+    ['forfeit', '測試棄領', 'raffle-1', 'winner-1'],
+    ['replace', '原得主已棄領，補抽原獎項', 'raffle-1', 'winner-1'],
+  ]);
+});
+
 test('a delayed login result cannot restore an account after logout', async () => {
   const pendingProfile = deferred();
   const context = authHarness(() => pendingProfile.promise);

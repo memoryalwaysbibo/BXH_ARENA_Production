@@ -1,6 +1,6 @@
 {
   "status": "integrated-candidate-not-deployed",
-  "baseMain": "0471069df5a09a433c4c945aed119004043d82b6",
+  "baseMain": "c2b19a8450510d18f144d705178127bbc6488518",
   "components": [
     {
       "pr": 707,
@@ -64,21 +64,21 @@
       ]
     },
     "index.html": {
-      "blob": "8a526703de1ee3e2dadca65c78901ef499ca577c",
+      "blob": "a7734078335f6be8f9a1b1aa75cafa93aeb4bbe8",
       "components": [
         707,
         714
       ]
     },
     "modules/cloud/cloud-runtime.js": {
-      "blob": "a1a14dcaf0e32b51b26a681b833c1a8741016a4b",
+      "blob": "19e3e0426680ddb803f754419d99f8605955e9de",
       "components": [
         707,
         714
       ]
     },
     "modules/main-app/core.js": {
-      "blob": "db58928852321b0bc4ae1123d2f7cfad2b2aa6c1",
+      "blob": "32b0519c5ddf66b24232a42f71c4009d77c5029c",
       "components": [
         707,
         714
@@ -1798,7 +1798,7 @@
     },
     "release/buckets/integration/README.md": {
       "components": [],
-      "blob": "f2486a685a594fe38e90ac220c786b6740669421"
+      "blob": "8ef144475071b5fbccece09119dbf6771e137b65"
     },
     "scripts/bucket-writer-followup.py": {
       "components": [],
@@ -1883,7 +1883,9 @@
       "registration-flow-v2": "20261106.1",
       "quick-registration": "20261006.6",
       "direct-registration": "20261014.1",
-      "checkin-audit": "20261031.1"
+      "checkin-audit": "20261031.1",
+      "bracket-write-error": "20261108.1",
+      "self-direct": "20261109.1"
     },
     "raffle-ui.js": {
       "v": "14.0.12"
@@ -1949,13 +1951,14 @@
       "number-identity": "20261029-date-only"
     },
     "modules/main-app/tournament-operations.js": {
-      "v": "20261002-p2a-1"
+      "v": "20261002-p2a-1",
+      "raffle-replace": "20261109.1"
     },
     "modules/main-app/share-feature.js": {
       "v": "20261002-p2a-1"
     },
     "modules/main-app/bracket-commit.js": {
-      "v": "20261104.2"
+      "v": "20261108.2"
     },
     "modules/main-app/roster-view.js": {
       "v": "20261018.1"
@@ -2046,10 +2049,11 @@
       "v": "20261106-recovery-2"
     },
     "modules/main-app/community-referee-invite.js": {
-      "v": "20261105-invite-1"
+      "v": "20261109-management-hint-1"
     },
     "modules/main-app/referee-seats.js": {
-      "v": "20261105-invite-1"
+      "v": "20261105-invite-1",
+      "bucket-ui": "20261109.1"
     },
     "modules/referee-license/domain.js": {
       "v": "20261029.1"
@@ -2067,7 +2071,8 @@
       "v": "20261101.1"
     },
     "modules/scoring/four-court-browser.js": {
-      "v": "20261102-bucket-dispatch-2"
+      "v": "20261102-bucket-dispatch-2",
+      "bucket-ui": "20261109.1"
     },
     "modules/main-app/profile-reminder.js": {
       "v": "20261102.1"
@@ -2174,7 +2179,8 @@
       "offline-confirmation": "20261103.1",
       "archive-status-hint": "20261103.1",
       "community-referee": "20261105-qr.1",
-      "ranked-real-name-only": "20261106.1"
+      "ranked-real-name-only": "20261106.1",
+      "public-watch-sync": "20261108.1"
     },
     "modules/main-app/public-watch-isolation.js": {
       "v": "20261005-captain-isolation-1"
@@ -2216,7 +2222,8 @@
       "bucket-lifecycle": "20261102.2",
       "new-room-idle": "20261102.1",
       "staff-ranked-create": "20261102.1",
-      "offline-confirmation": "20261103.1"
+      "offline-confirmation": "20261103.1",
+      "bracket-write-error": "20261108.2"
     },
     "team-foundation/team-admin-preview.js": {
       "v": "20261028-full-bridge-1"
@@ -2279,11 +2286,11 @@
       "v": "20261001-ui-v2"
     }
   },
-  "mainCoreBlob": "83e89e6784d09b92c629e96dc9505daa615632d3",
+  "mainCoreBlob": "b85ae896220e25a8c6c1b65db000998ba509a12c",
   "resolutions": {
-    "index.html": "Three-way merge with main0471069d: preserve registration V2/recovery/ranked-name query tokens, all92 main script mappings and settlement module order; append both candidate delete-intent and bucket-settlement tokens.",
-    "modules/main-app/core.js": "Clean three-way merge of current main ranked-name restriction with existing bucket deletion/settlement changes; complete added/removed lines from both branches independently verified.",
-    "modules/cloud/cloud-runtime.js": "Clean three-way merge preserving main V2 opt-in dispatch/recovery operation binding and candidate certified settlement/deletion methods; exact combined blob verified.",
+    "index.html": "Reconcile seven main commits. Preserve all 92 main script query mappings, both bucket cache tokens, and the settlement script order.",
+    "modules/main-app/core.js": "Combine main public-watch subscription routing with the bucket draft. Both patch orders reconstruct the same blob.",
+    "modules/cloud/cloud-runtime.js": "Combine main roster/mirror and bracket receipt behavior with the bucket draft. Both patch orders reconstruct the same blob.",
     "tests/four-court-buckets/completion/native-emulator.cjs": "Preserve all prior checks and default single-round workload; permit bounded fresh count/sync/sync contention rounds (1-50) without retrying failures, with QR/round labels and native read diagnostics.",
     "tests/four-court-buckets/deletion/rules-emulator.py": "Select a fresh OS-assigned loopback port for each private demo Emulator invocation; preserve baseline/candidate permissions and deletion assertions.",
     ".github/workflows/bucket-integrated-candidate.yml": "Run inherited registration-feedback recovery and ranked-name policy tests on the same merged checkout, in addition to existing component integration checks.",
@@ -2292,7 +2299,7 @@
     "scripts/build-bucket-restore-access-review.py": "Offline review-only packaging of two exact captured archives; replace one pinned source member per target, preserve all other source bytes and reject source/configuration drift. No deployment or cloud calls.",
     ".github/workflows/bucket-general-completion.yml": "Run captured SDK14 with 20 fresh count/sync/sync rounds per QR mode, preserve SDK13 baseline and both debug artifacts, print failure debug tail; no continue-on-error or blanket rerun.",
     "scripts/bucket-writer-discovery.py": "Read-only cross-region v1/v2 Function and per-region Cloud Run service/job metadata discovery; hashed configurations, no raw environment values, fail-closed pagination/identity/gap checks; source/IAM review and release acceptance remain incomplete.",
-    "release/buckets/integration/README.md": "Correct the selected main baseline and avoid stale component counts; document metadata discovery limits.",
+    "release/buckets/integration/README.md": "Record the current selected main and three overlapping files. Existing review and rollout limits remain documented.",
     "release/buckets/completion/hosting-guard.cjs": "Move rebuild's hostStats conflict read after room/ledger/bucket validation and before all writes, avoiding the early-stats/ledger lock inversion observed during count/sync/sync contention; retain transaction conflict detection, authorization and SDK retry behavior.",
     "tests/four-court-buckets/completion/hosting-probe.cjs": "Regress final stats conflict-barrier ordering with existing/missing ledgers and both QR modes; inject concurrent stats changes and require transaction retry; previous early-read implementation fails.",
     "scripts/bucket-writer-followup.py": "Target only me-central2 failed service/job reads and four Function GETs; capture current immutable manageRefereeSeats/familyRegistration sources with before/after config checks; retain safe HTTP error codes without raw environment values/messages.",
