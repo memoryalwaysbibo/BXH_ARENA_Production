@@ -5,6 +5,8 @@ on:
       - 'release/buckets/**'
       - 'scripts/bucket-writer-discovery*'
       - 'scripts/bucket-writer-followup.py'
+      - 'scripts/build-bucket-raffle-review.py'
+      - 'scripts/deploy-bucket-raffle.py'
       - 'tests/four-court-buckets/**'
       - 'tests/e2e/lobby-stable-updates.spec.cjs'
       - 'modules/main-app/core.js'
@@ -31,6 +33,15 @@ jobs:
         run: |
           python3 -B tests/four-court-buckets/writer-discovery.py
           python3 -B tests/four-court-buckets/writer-followup.py
+      - name: Verify canonical raffle input and read-only capture boundaries
+        run: |
+          node tests/four-court-buckets/raffle/input-probe.cjs
+          node tests/four-court-buckets/raffle/identity-probe.cjs
+          node tests/four-court-buckets/raffle/preview-probe.cjs
+          node tests/four-court-buckets/raffle/writer-probe.cjs
+          python3 -B tests/four-court-buckets/raffle/verify-provenance.py
+          python3 -B tests/four-court-buckets/raffle/deploy-probe.py
+          python3 -B tests/four-court-buckets/raffle-readonly.py
       - name: Verify independently captured backend overlays
         run: |
           for family in deletion interactions admissions operations settlement completion poster activity derived; do
@@ -50,7 +61,7 @@ jobs:
           node tests/four-court-buckets/activity/backend-bridge.cjs
       - name: Install isolated browser dependencies
         run: |
-          npm install --prefix /tmp/bucket-integrated --no-save --ignore-scripts playwright@1.56.1 @playwright/test@1.56.1
+          npm install --prefix /tmp/bucket-integrated --no-save --ignore-scripts playwright@1.56.1 @playwright/test@1.56.1 firebase-admin@14.4.0 firebase-functions@7.3.2
           /tmp/bucket-integrated/node_modules/.bin/playwright install --with-deps chromium
       - name: Integrated full-host deletion, settlement handoff and main offline recovery
         env:
@@ -62,6 +73,7 @@ jobs:
           node tests/four-court-buckets/settlement-ui/backend-bridge.cjs
           node tests/offline-confirmation.browser.cjs
           node tests/offline-resilience-v2-wiring.test.cjs
+          node tests/four-court-buckets/raffle/operations.browser.cjs
       - name: Snapshot burst coalescing after native gesture release
         env:
           NODE_PATH: /tmp/bucket-integrated/node_modules
