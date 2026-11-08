@@ -1,0 +1,9 @@
+--- a/operations.js
++++ b/operations.js
+@@ -34,5 +34,5 @@
+   const [t,p,a,c]=await Promise.all([tx.get(ref),tx.get(pub),tx.get(activity),tx.get(configRef)]);
+   if(!t.exists||!c.exists||c.data().enabled!==true)return;
+-  if([t.data(), p.data()].some(x=>x&&['scoreStorage','scoreBucketProjection'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))return;
++  if([t.data(), p.data()].some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))return;
+   const d=t.data(),tracker=a.exists?a.data():{},now=Date.now(),hash=C.fingerprint(d);
+   // Poll fallback covers missing/delayed triggers; first observation always grants 24h.

@@ -1,0 +1,54 @@
+{
+  "status": "review-only-not-deployed",
+  "project": "bxh-arena",
+  "observedAt": "2026-11-05T01:14:50.542869+00:00",
+  "captureBundleSha256": "e0adc784b05bde9a83960a1bfacf724d6097fb47b6598d9fc34b5cdd1b6e8274",
+  "cloudRequests": 0,
+  "productionWrites": 0,
+  "deploymentPerformed": false,
+  "runtimeActivationPerformed": false,
+  "requiresFreshLiveReadback": true,
+  "releaseAcceptanceCompleted": false,
+  "candidates": [
+    {
+      "function": "restoreIdleTournament",
+      "file": "restoreIdleTournament.review-source.zip",
+      "baselineRevision": "restoreidletournament-00009-zej",
+      "baselineSource": {
+        "bucket": "gcf-v2-sources-87261141693-asia-east1",
+        "object": "restoreIdleTournament/function-source.zip",
+        "generation": "1793643027059972"
+      },
+      "baselineArchiveSha256": "68189e07f6dd2c04ec81addcea766f6ea3acd479808e9b5620bb27aead082341",
+      "baselineServiceConfigSha256": "1dcff56d9d52229f3143f6d77d14ea77a264f27518fad8975bdd88bc644caa22",
+      "baselineBuildConfigSha256": "7d12dc29b1b2e9c2b5c8308ed3b23a10e76df1126df951f7a634a1a6dd66d740",
+      "baselineEventTriggerSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "changedFiles": [
+        "operations.js"
+      ],
+      "unchangedMemberCount": 75,
+      "candidateFileSha256": "e06723e7366281d707938f8df2b19c576c18b0d5d97b818c0c7e44bb4a5ab224",
+      "candidateArchiveSha256": "1969e66c290ee46b00cf762a4a87b37a4fe01e555aa8363931789f441db48217"
+    },
+    {
+      "function": "roomAccess",
+      "file": "roomAccess.review-source.zip",
+      "baselineRevision": "roomaccess-00034-red",
+      "baselineSource": {
+        "bucket": "gcf-v2-sources-87261141693-asia-east1",
+        "object": "roomAccess/function-source.zip",
+        "generation": "1793640708321542"
+      },
+      "baselineArchiveSha256": "701844d42ead366305b59527622c0c3abfca587b4b3c108eeb4f5f1eb27e3dc1",
+      "baselineServiceConfigSha256": "96912bd879efdad6b1d14b8107e55af9ba41022491ff633e93dd606f49b802e5",
+      "baselineBuildConfigSha256": "1331eae628ec93663371d512b0b7791a3c84ddf19074a60cae4b8ff487a00ada",
+      "baselineEventTriggerSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "changedFiles": [
+        "room-access-service.js"
+      ],
+      "unchangedMemberCount": 96,
+      "candidateFileSha256": "79cfc71d52290610fd5a7e82a1d2ec569ed618cff9782221d5360233b29b0a62",
+      "candidateArchiveSha256": "df5e915e8ed5019a002038532f19a8db9d492f2cc6035f35736053fcf16a4c45"
+    }
+  ]
+}

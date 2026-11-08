@@ -1,0 +1,160 @@
+{
+  "status": "candidate-not-deployed",
+  "bucketSettlementEnabled": false,
+  "productionWrites": 0,
+  "patches": [
+    {
+      "function": "ladderAutoSettlement",
+      "sourceSet": 10,
+      "path": "ladder-auto-settlement.js",
+      "archiveSha256": null,
+      "baselineFileSha256": "334106be168bcb3c3991c88fc42e282c5a1524b39293f6d50fa05d092c660ead",
+      "patchedFileSha256": "4c55957cf3c749cd4135f7d4be5f0966db738a404d3ac71c2ebe5dc80ecc3ccd",
+      "edits": [
+        {
+          "before": "const core=require('./ladder-settlement-core');",
+          "after": "const core=require('./ladder-settlement-core');\nconst A=require('./bucket-settlement/input.cjs');"
+        },
+        {
+          "before": "clock=()=>Date.now()}={})",
+          "after": "clock=()=>Date.now(),bucketRuntime='production',bucketEnv=process.env}={})"
+        },
+        {
+          "before": "    return db.runTransaction(async tx=>{",
+          "after": "    const observed={};\n    return db.runTransaction(async tx=>{"
+        },
+        {
+          "before": "      const top=tourSnap.data()||{},st=parseState(top);",
+          "after": "      let input;try{input=await A.load({tx,db,root:tourSnap,pub:publicSnap,observed,runtime:bucketRuntime,env:bucketEnv});}catch(e){if(e.bucketSettlement)return {ok:false,reason:e.message,permanent:true};throw e;}\n      const top=tourSnap.data()||{},st=input.bucket?input.state:parseState(top);"
+        },
+        {
+          "before": "      const results=[];",
+          "after": "      if(input.bucket&&priorTxSnaps.some(s=>s.exists))return {ok:false,reason:'bucket-settlement-requires-review',permanent:true};\n      const results=[];"
+        },
+        {
+          "before": "          type:'event',actorUid:SYSTEM_ACTOR",
+          "after": "          ...(input.bucket?{sourceCreatedAt:input.sourceCreatedAt,bucketEpoch:input.m.epoch}:{}),type:'event',actorUid:SYSTEM_ACTOR"
+        },
+        {
+          "before": "      tx.set(tourRef,topPatch,{merge:true});\n      const pubPatch=publicFinalPatch(publicSnap,now);if(pubPatch)tx.set(publicRef,pubPatch,{merge:true});",
+          "after": "      if(input.bucket){const patches=A.finalPatches(input,completed,{now,seasonId:plan.seasonId,results,skipped:plan.skipped,actorUid:SYSTEM_ACTOR});tx.set(tourRef,{...topPatch,...patches.privatePatch},{merge:true});tx.set(publicRef,patches.publicPatch,{merge:true});}\n      else{tx.set(tourRef,topPatch,{merge:true});const pubPatch=publicFinalPatch(publicSnap,now);if(pubPatch)tx.set(publicRef,pubPatch,{merge:true});}"
+        },
+        {
+          "before": "    });\n  }\n  return {settle};",
+          "after": "    }).catch(e=>{if(e.bucketSettlement)return {ok:false,reason:e.message,permanent:true};throw e;});\n  }\n  return {settle};"
+        },
+        {
+          "before": "const top=after.data()||{},st=parseState(top),eligible=core.tournamentEligible(top,st);",
+          "after": "const top=after.data()||{},st=parseState(top),eligible=A.ownership(top)?{ok:true}:core.tournamentEligible(top,st);"
+        },
+        {
+          "before": "if(PERMANENT.has(result.reason))",
+          "after": "if(result.permanent===true||PERMANENT.has(result.reason))"
+        },
+        {
+          "before": "scored.players.map(x=>core.candidateUid(x.player))",
+          "after": "scored.players.map(x=>input.bucket?A.playerUid(x.player):core.candidateUid(x.player))"
+        },
+        {
+          "before": "if(snap.exists)profiles[candidates[i]]=snap.data()||{};",
+          "after": "if(snap.exists&&(!input.bucket||A.validProfile(snap.data())))profiles[candidates[i]]=snap.data()||{};"
+        },
+        {
+          "before": "      const results=[];",
+          "after": "      if(input.bucket){const registrations=await Promise.all(plan.rows.map(row=>row.player.source==='online'?tx.get(tourRef.collection('registrations').doc(row.uid)):null));if(registrations.some((s,i)=>plan.rows[i].player.source==='online'&&(!s?.exists||s.data().status!=='confirmed')))return {ok:false,reason:'bucket-cancelled-players',permanent:true};}\n      const results=[];"
+        },
+        {
+          "before": "      const control=controlSnap.data()||{};",
+          "after": "      const control=controlSnap.data()||{};if(input.bucket)A.checkSeason(control,now);"
+        },
+        {
+          "before": "if(input.bucket){const registrations=await Promise.all(plan.rows.map(row=>row.player.source==='online'?tx.get(tourRef.collection('registrations').doc(row.uid)):null));if(registrations.some((s,i)=>plan.rows[i].player.source==='online'&&(!s?.exists||s.data().status!=='confirmed')))return {ok:false,reason:'bucket-cancelled-players',permanent:true};}",
+          "after": "if(input.bucket){const registrations=await Promise.all(scored.players.map(row=>row.player.source==='online'&&A.playerUid(row.player)?tx.get(tourRef.collection('registrations').doc(A.playerUid(row.player))):null));if(registrations.some((s,i)=>scored.players[i].player.source==='online'&&A.playerUid(scored.players[i].player)&&(!s?.exists||s.data().status!=='confirmed')))return {ok:false,reason:'bucket-cancelled-players',permanent:true};}"
+        },
+        {
+          "before": "      if(input.bucket&&priorTxSnaps.some(s=>s.exists))",
+          "after": "      if(input.bucket&&playerSnaps.some(s=>s.exists&&s.data().currentSeason&&s.data().currentSeason!==plan.seasonId))return {ok:false,reason:'player-season-mismatch',permanent:true};\n      if(input.bucket&&priorTxSnaps.some(s=>s.exists))"
+        }
+      ],
+      "deployedSourceReadback": {
+        "revision": "ladderautosettlement-00003-kuf",
+        "generation": "1793906143803503",
+        "selectedFiles": {
+          "ladder-auto-settlement.js": "334106be168bcb3c3991c88fc42e282c5a1524b39293f6d50fa05d092c660ead",
+          "ladder-settlement-core.js": "9ba05fa0548bd6cb52225c18f8e52d078c70e10be3e6ef7c28a2e676abbf32a6"
+        },
+        "readbackBundleSha256": "cada094a2988fe7d8fdf431225bf802bab38dfaa8442c64a8e6557ef1022bc54",
+        "historicalArchiveSha256": "81063c0fc575378a75639e625f93c74e7e0daaf3aebf4baf1f4b9c2645d1c5c9",
+        "fullArchiveVerified": false
+      }
+    },
+    {
+      "function": "settleLadderTournament",
+      "sourceSet": 21,
+      "path": "ladder-settlement.js",
+      "archiveSha256": "920c82c930ff1771a4593d67f3ebe7b5e1bfb8594fa69ae1a707dac1c65d837e",
+      "baselineFileSha256": "1aa2c25e7c74a5d8b4f131343e15b50d2519a97ec6bbcaaebb972ce43393d348",
+      "patchedFileSha256": "be92f25c1a96697ac8b74a61d741d4d615af49363ecc57b4ebd022f74c694d01",
+      "edits": [
+        {
+          "before": "\"use strict\";\n\nconst V1 = require(\"./ladder-v1\");\n\nfunction timestampMillis(value) {\n  if (!value) return 0;\n  if (typeof value.toMillis === \"function\") return value.toMillis();\n",
+          "after": "\"use strict\";\n\nconst V1 = require(\"./ladder-v1\");\nconst A = require(\"./bucket-settlement/input.cjs\");\n\nfunction timestampMillis(value) {\n  if (!value) return 0;\n  if (typeof value.toMillis === \"function\") return value.toMillis();\n"
+        },
+        {
+          "before": "function result(ok, reason, message, extra = {}) {\n  return Object.assign({ok, reason, message}, extra);\n}\n\nfunction createLadderSettlement({db, FieldValue, now = () => Date.now()}) {\n  async function resolvePlayers(payload) {\n    const resolved = [];\n    const skipped = [];\n    for (const item of payload.participants) {\n      if ([\"family\", \"test\"].includes(item.source) || item.participantType === \"onsite_guest\" || item.ladderEligible === false) {\n        skipped.push(item.playerName);\n        continue;\n      }\n      let uid = item.playerUid || null;\n      if (!uid) {\n        const matches = await db.collection(\"users\").where(\"realName\", \"==\", item.playerName).limit(2).get();\n        const active = matches.docs.filter((doc) => doc.data()?.active === true && ![\"tester\"].includes(doc.data()?.role) && doc.data()?.isTestAccount !== true);\n        if (active.length === 1) uid = active[0].id;\n      }\n",
+          "after": "function result(ok, reason, message, extra = {}) {\n  return Object.assign({ok, reason, message}, extra);\n}\n\nfunction createLadderSettlement({db, FieldValue, now = () => Date.now(), bucketRuntime = 'production', bucketEnv = process.env}) {\n  async function resolvePlayers(payload, {allowNameLookup=true}={}) {\n    const resolved = [];\n    const skipped = [];\n    for (const item of payload.participants) {\n      if ([\"family\", \"test\"].includes(item.source) || item.participantType === \"onsite_guest\" || item.ladderEligible === false) {\n        skipped.push(item.playerName);\n        continue;\n      }\n      let uid = item.playerUid || null;\n      if (!uid && allowNameLookup) {\n        const matches = await db.collection(\"users\").where(\"realName\", \"==\", item.playerName).limit(2).get();\n        const active = matches.docs.filter((doc) => doc.data()?.active === true && ![\"tester\"].includes(doc.data()?.role) && doc.data()?.isTestAccount !== true);\n        if (active.length === 1) uid = active[0].id;\n      }\n"
+        },
+        {
+          "before": "    }\n    return {resolved, skipped};\n  }\n\n  return async function settle({code, actor}) {\n    const normalized = String(code || \"\").trim().toUpperCase();\n    if (!/^BXH-[A-Z0-9]{5,12}$/.test(normalized)) return result(false, \"invalid-code\", \"賽事代碼格式錯誤\");\n    const tournamentRef = db.doc(`tournaments/${normalized}`);\n    const sourceSnapshot = await tournamentRef.get();\n    if (!sourceSnapshot.exists) return result(false, \"not-found\", \"找不到這場賽事\");\n    const source = sourceSnapshot.data() || {};\n    if (source.ladderPointsAwarded === true) {\n      return {ok: true, alreadyAwarded: true, seasonId: source.ladderSeasonId || null, results: source.ladderResults || [], skippedPlayers: source.ladderSkippedPlayers || []};\n    }\n    if (source.testMode === true || source.eventAuthority !== \"official\" || source.ladderMode !== \"ranked\") {\n      return result(false, \"not-ranked\", \"只有正式積分賽可以結算天梯積分\");\n    }\n    let state;\n    let payload;\n    try {\n      state = typeof source.data === \"string\" ? JSON.parse(source.data) : source.data;\n      if (!state?.matches?.length || state.matches.some((match) => !match.isBye && !match.completed)) throw new Error(\"仍有未完成對戰，不能結算積分\");\n      payload = buildLadderSettlementPayload(state);\n      const topCount = payload.participants.filter((item) => item.placement >= 1 && item.placement <= 4).length;\n      if (topCount < Math.min(4, payload.participants.length)) throw new Error(\"前四名尚未完整，請先完成名次判定\");\n    } catch (error) {\n      return result(false, \"v1-invalid-results\", error.message || \"V1 積分資料不完整\");\n    }\n    const sourceFingerprint = typeof source.data === \"string\" ? source.data : JSON.stringify(source.data);\n    const {resolved, skipped} = await resolvePlayers(payload);\n    const seen = new Set();\n    for (const item of resolved) {\n      if (seen.has(item.playerUid)) return result(false, \"duplicate-player-account\", \"同一玩家帳號在本場名單中出現超過一次\");\n      seen.add(item.playerUid);\n    }\n\n    const controlRef = db.doc(\"ladderSystem/current\");\n    return db.runTransaction(async (transaction) => {\n      const [tournamentSnapshot, controlSnapshot] = await Promise.all([transaction.get(tournamentRef), transaction.get(controlRef)]);\n      if (!tournamentSnapshot.exists) return result(false, \"not-found\", \"找不到這場賽事\");\n      const tournament = tournamentSnapshot.data() || {};\n      if (tournament.ladderPointsAwarded === true) {\n        return {ok: true, alreadyAwarded: true, seasonId: tournament.ladderSeasonId || null, results: tournament.ladderResults || [], skippedPlayers: tournament.ladderSkippedPlayers || []};\n      }\n      const currentFingerprint = typeof tournament.data === \"string\" ? tournament.data : JSON.stringify(tournament.data);\n      if (currentFingerprint !== sourceFingerprint) return result(false, \"v1-state-changed\", \"賽事資料已更新，請重新讀取後再結算\");\n      if (tournament.systemClosed === true) return result(false, \"system-closed\", \"系統關閉的賽事不能結算積分\");\n      if (tournament.testMode === true || tournament.eventAuthority !== \"official\" || tournament.ladderMode !== \"ranked\") return result(false, \"not-ranked\", \"只有正式積分賽可以結算天梯積分\");\n      if (!controlSnapshot.exists) return result(false, \"season-not-initialized\", \"目前天梯賽季尚未初始化\");\n      const control = controlSnapshot.data() || {};\n      if (control.rolloverInProgress === true) return result(false, \"season-rollover-in-progress\", \"賽季切換進行中，請稍後再完成賽事\");\n      const currentTime = now();\n      if (timestampMillis(control.startAt) && currentTime < timestampMillis(control.startAt)) return result(false, \"season-not-started\", \"本季天梯尚未開始\");\n      if (timestampMillis(control.endAt) && currentTime > timestampMillis(control.endAt)) return result(false, \"season-ended\", \"本季天梯已結束，請先完成新賽季切換\");\n      const seasonId = String(control.currentSeason || \"S1\");\n      const trial = seasonId.toUpperCase() === \"S0\" || control.isTrialSeason === true;\n\n      const playerRefs = resolved.map((item) => db.doc(`ladderPlayers/${item.playerUid}`));\n      const profileRefs = resolved.map((item) => db.doc(`users/${item.playerUid}`));\n      const logRefs = resolved.map((item) => db.doc(`ladderTransactions/${normalized}_${item.playerUid}`));\n",
+          "after": "    }\n    return {resolved, skipped};\n  }\n\n  return async function settle({code, actor, expectedRoom}) {\n    const normalized = String(code || \"\").trim().toUpperCase();\n    if (!/^BXH-[A-Z0-9]{5,12}$/.test(normalized)) return result(false, \"invalid-code\", \"賽事代碼格式錯誤\");\n    const tournamentRef = db.doc(`tournaments/${normalized}`);\n    let sourceSnapshot = await tournamentRef.get();\n    if (!sourceSnapshot.exists) return result(false, \"not-found\", \"找不到這場賽事\");\n    let source = sourceSnapshot.data() || {};\n    const publicRef=db.doc(`publicTournaments/${normalized}`),sourcePublic=await publicRef.get(),observed={};\n    let sourceInput=null;\n    if(A.ownership(source,sourcePublic.data())){\n      if(!expectedRoom||typeof expectedRoom.roomId!=='string'||!expectedRoom.roomId||typeof expectedRoom.epoch!=='string'||!expectedRoom.epoch||JSON.stringify(expectedRoom).length>2000||Object.keys(expectedRoom).some(k=>!['roomId','epoch'].includes(k)))return result(false,'bucket-expected-room-required','請重新載入分桶房間後再結算');\n      try{\n        const initial=await db.runTransaction(async tx=>{const [r,p,user]=await Promise.all([tx.get(tournamentRef),tx.get(publicRef),tx.get(db.doc('users/'+actor.uid))]);if(!r.exists)A.fail('bucket-room-changed');if(!A.validProfile(user.data())||!['admin','super_admin'].includes(user.data().role))A.fail('admin-required');const input=await A.load({tx,db,root:r,pub:p,observed,runtime:bucketRuntime,env:bucketEnv});if(!input.bucket)A.fail('bucket-mode-changed');if(input.m.roomId!==expectedRoom.roomId||input.m.epoch!==expectedRoom.epoch)A.fail('bucket-room-changed');return {r,input};});\n        sourceSnapshot=initial.r;source=initial.r.data();sourceInput=initial.input;\n      }catch(e){if(e.bucketSettlement)return result(false,e.message,'分桶結算資料尚未符合驗收條件');throw e;}\n    }else if(expectedRoom!==undefined)return result(false,'bucket-mode-changed','房間儲存模式已變更，請重新讀取');\n    if (source.ladderPointsAwarded === true) {\n      return {ok: true, alreadyAwarded: true, seasonId: source.ladderSeasonId || null, results: source.ladderResults || [], skippedPlayers: source.ladderSkippedPlayers || [],...(sourceInput?A.publicReceipt(sourceInput):{})};\n    }\n    if (source.testMode === true || source.eventAuthority !== \"official\" || source.ladderMode !== \"ranked\") {\n      return result(false, \"not-ranked\", \"只有正式積分賽可以結算天梯積分\");\n    }\n    let state;\n    let payload;\n    try {\n      state = sourceInput?sourceInput.state:(typeof source.data === \"string\" ? JSON.parse(source.data) : source.data);\n      if (!state?.matches?.length || state.matches.some((match) => !match.isBye && !match.completed)) throw new Error(\"仍有未完成對戰，不能結算積分\");\n      payload = buildLadderSettlementPayload(state);\n      if(sourceInput)for(const row of payload.participants)row.playerUid=A.playerUid(state.players.find(p=>p.id===row.localPlayerId))||null;\n      const topCount = payload.participants.filter((item) => item.placement >= 1 && item.placement <= 4).length;\n      if (topCount < Math.min(4, payload.participants.length)) throw new Error(\"前四名尚未完整，請先完成名次判定\");\n    } catch (error) {\n      return result(false, \"v1-invalid-results\", error.message || \"V1 積分資料不完整\");\n    }\n    const sourceFingerprint = sourceInput?sourceInput.fingerprint:(typeof source.data === \"string\" ? source.data : JSON.stringify(source.data));\n    const {resolved, skipped} = await resolvePlayers(payload,{allowNameLookup:!sourceInput});\n    const seen = new Set();\n    for (const item of resolved) {\n      if (seen.has(item.playerUid)) return result(false, \"duplicate-player-account\", \"同一玩家帳號在本場名單中出現超過一次\");\n      seen.add(item.playerUid);\n    }\n\n    const controlRef = db.doc(\"ladderSystem/current\");\n    return db.runTransaction(async (transaction) => {\n      const [tournamentSnapshot, controlSnapshot,publicSnapshot] = await Promise.all([transaction.get(tournamentRef), transaction.get(controlRef),transaction.get(publicRef)]);\n      if (!tournamentSnapshot.exists) return result(false, \"not-found\", \"找不到這場賽事\");\n      const tournament = tournamentSnapshot.data() || {};\n      const currentInput=await A.load({tx:transaction,db,root:tournamentSnapshot,pub:publicSnapshot,observed,runtime:bucketRuntime,env:bucketEnv});\n      if(currentInput.bucket!==!!sourceInput)return result(false,'bucket-mode-changed','房間儲存模式已變更，請重新讀取');\n      if(currentInput.bucket){const currentActor=await transaction.get(db.doc('users/'+actor.uid));const p=currentActor.data();if(!A.validProfile(p)||!['admin','super_admin'].includes(p.role))return result(false,'admin-required','管理權限已變更');}\n      if (tournament.ladderPointsAwarded === true) {\n        return {ok: true, alreadyAwarded: true, seasonId: tournament.ladderSeasonId || null, results: tournament.ladderResults || [], skippedPlayers: tournament.ladderSkippedPlayers || [],...(currentInput.bucket?A.publicReceipt(currentInput):{})};\n      }\n      const currentFingerprint = currentInput.bucket?currentInput.fingerprint:(typeof tournament.data === \"string\" ? tournament.data : JSON.stringify(tournament.data));\n      if (currentFingerprint !== sourceFingerprint) return result(false, \"v1-state-changed\", \"賽事資料已更新，請重新讀取後再結算\");\n      if (tournament.systemClosed === true) return result(false, \"system-closed\", \"系統關閉的賽事不能結算積分\");\n      if (tournament.testMode === true || tournament.eventAuthority !== \"official\" || tournament.ladderMode !== \"ranked\") return result(false, \"not-ranked\", \"只有正式積分賽可以結算天梯積分\");\n      if (!controlSnapshot.exists) return result(false, \"season-not-initialized\", \"目前天梯賽季尚未初始化\");\n      const control = controlSnapshot.data() || {};\n      if(currentInput.bucket&&control.status!=='active')return result(false,'season-unavailable','賽季尚未開放');\n\n      if (control.rolloverInProgress === true) return result(false, \"season-rollover-in-progress\", \"賽季切換進行中，請稍後再完成賽事\");\n      const currentTime = now();\n      if (timestampMillis(control.startAt) && currentTime < timestampMillis(control.startAt)) return result(false, \"season-not-started\", \"本季天梯尚未開始\");\n      if (timestampMillis(control.endAt) && currentTime > timestampMillis(control.endAt)) return result(false, \"season-ended\", \"本季天梯已結束，請先完成新賽季切換\");\n      const seasonId = String(control.currentSeason || \"S1\");\n      const trial = seasonId.toUpperCase() === \"S0\" || control.isTrialSeason === true;\n      const countsTowardCareer=currentInput.bucket?(control.countsTowardCareer===undefined?!trial:control.countsTowardCareer===true):!trial;\n\n      const playerRefs = resolved.map((item) => db.doc(`ladderPlayers/${item.playerUid}`));\n      const profileRefs = resolved.map((item) => db.doc(`users/${item.playerUid}`));\n      const logRefs = resolved.map((item) => db.doc(`ladderTransactions/${normalized}_${item.playerUid}`));\n"
+        },
+        {
+          "before": "      if (playerSnapshots.some((snapshot) => snapshot.exists && snapshot.data()?.currentSeason && snapshot.data().currentSeason !== seasonId)) {\n        return result(false, \"player-season-mismatch\", \"玩家賽季資料尚未完成切換\");\n      }\n\n      const results = [];\n      const skippedPlayers = [...skipped];\n      for (let index = 0; index < resolved.length; index += 1) {\n        const item = resolved[index];\n        const profile = profileSnapshots[index].exists ? profileSnapshots[index].data() : null;\n        if (!profile || profile.active !== true || profile.role === \"tester\" || profile.isTestAccount === true) {\n          if (!skippedPlayers.includes(item.playerName)) skippedPlayers.push(item.playerName);\n          continue;\n        }\n        const playerName = typeof profile.realName === \"string\" ? profile.realName.trim() || \"—\" : \"—\";\n",
+          "after": "      if (playerSnapshots.some((snapshot) => snapshot.exists && snapshot.data()?.currentSeason && snapshot.data().currentSeason !== seasonId)) {\n        return result(false, \"player-season-mismatch\", \"玩家賽季資料尚未完成切換\");\n      }\n\n      if(currentInput.bucket&&profileSnapshots.filter(s=>s.exists&&A.validProfile(s.data())).length>240)return result(false,'eligible-player-limit','本場超過可一次結算的有效帳號上限');\n      const results = [];\n      const skippedPlayers = [...skipped];\n      for (let index = 0; index < resolved.length; index += 1) {\n        const item = resolved[index];\n        const profile = profileSnapshots[index].exists ? profileSnapshots[index].data() : null;\n        if (!profile || profile.active !== true || profile.role === \"tester\" || profile.isTestAccount === true || currentInput.bucket&&!A.validProfile(profile)) {\n          if (!skippedPlayers.includes(item.playerName)) skippedPlayers.push(item.playerName);\n          continue;\n        }\n        const playerName = typeof profile.realName === \"string\" ? profile.realName.trim() || \"—\" : \"—\";\n"
+        },
+        {
+          "before": "        const oldSeason = Number(old.seasonPoints || 0);\n        const oldCareer = Number(old.careerPoints || 0);\n        const points = Number(item.pointsEarned || 0);\n        const seasonPoints = oldSeason + points;\n        const careerPoints = trial ? oldCareer : oldCareer + points;\n        const rankTier = V1.tier(seasonPoints);\n        const oldHighest = old.highestRankTier || \"未定級\";\n        const tierIndex = (name) => Math.max(0, V1.tiers.findIndex((tier) => tier.name === name));\n        const highestRankTier = trial ? oldHighest : (tierIndex(rankTier) > tierIndex(oldHighest) ? rankTier : oldHighest);\n        const placement = Number(item.placement || 0) || null;\n        transaction.set(playerRefs[index], {\n          uid: item.playerUid,\n          playerName,\n",
+          "after": "        const oldSeason = Number(old.seasonPoints || 0);\n        const oldCareer = Number(old.careerPoints || 0);\n        const points = Number(item.pointsEarned || 0);\n        const seasonPoints = oldSeason + points;\n        const careerPoints = countsTowardCareer ? oldCareer + points : oldCareer;\n        const rankTier = V1.tier(seasonPoints);\n        const oldHighest = old.highestRankTier || \"未定級\";\n        const tierIndex = (name) => Math.max(0, V1.tiers.findIndex((tier) => tier.name === name));\n        const highestRankTier = !countsTowardCareer ? oldHighest : (tierIndex(rankTier) > tierIndex(oldHighest) ? rankTier : oldHighest);\n        const placement = Number(item.placement || 0) || null;\n        transaction.set(playerRefs[index], {\n          uid: item.playerUid,\n          playerName,\n"
+        },
+        {
+          "before": "          lastPointsUpdatedAt: FieldValue.serverTimestamp(),\n          seasonHistory: old.seasonHistory || {},\n        }, {merge: true});\n        transaction.create(logRefs[index], {\n          type: \"event\",\n          eventCode: normalized,\n          eventName: payload.eventName || tournament.name || \"\",\n          eventDate: payload.eventDate || tournament.eventDate || \"\",\n          formatType: payload.formatType || tournament.formatType || \"single\",\n",
+          "after": "          lastPointsUpdatedAt: FieldValue.serverTimestamp(),\n          seasonHistory: old.seasonHistory || {},\n        }, {merge: true});\n        transaction.create(logRefs[index], {\n          ...(currentInput.bucket?{sourceCreatedAt:currentInput.sourceCreatedAt,bucketEpoch:currentInput.m.epoch}:{}),type: \"event\",\n          eventCode: normalized,\n          eventName: payload.eventName || tournament.name || \"\",\n          eventDate: payload.eventDate || tournament.eventDate || \"\",\n          formatType: payload.formatType || tournament.formatType || \"single\",\n"
+        },
+        {
+          "before": "          scoring: item.scoring,\n          delta: points,\n          seasonId,\n          isTrialSeason: trial,\n          countsTowardCareer: !trial,\n          beforeSeasonPoints: oldSeason,\n          afterSeasonPoints: seasonPoints,\n          beforeCareerPoints: oldCareer,\n          afterCareerPoints: careerPoints,\n",
+          "after": "          scoring: item.scoring,\n          delta: points,\n          seasonId,\n          isTrialSeason: trial,\n          countsTowardCareer,\n          beforeSeasonPoints: oldSeason,\n          afterSeasonPoints: seasonPoints,\n          beforeCareerPoints: oldCareer,\n          afterCareerPoints: careerPoints,\n"
+        },
+        {
+          "before": "          createdAt: FieldValue.serverTimestamp(),\n        });\n        results.push({playerId: item.playerUid, playerName, placement, pointsEarned: points, scoring: item.scoring});\n      }\n      transaction.update(tournamentRef, {\n        ladderPointsAwarded: true,\n        ladderSeasonId: seasonId,\n        ladderTrialSeason: trial,\n        ladderCountsTowardCareer: !trial,\n        ladderResults: results,\n        ladderSkippedPlayers: skippedPlayers,\n        ladderAwardedAt: FieldValue.serverTimestamp(),\n        ladderAwardedBy: actor.uid,\n      });\n      return {ok: true, alreadyAwarded: false, seasonId, results, skippedPlayers, awardedAt: currentTime};\n    });\n  };\n}\n\nmodule.exports = {createLadderSettlement, buildLadderSettlementPayload, computeRoundRobinStandings, deriveDoubleElimPlacements};\n",
+          "after": "          createdAt: FieldValue.serverTimestamp(),\n        });\n        results.push({playerId: item.playerUid, playerName, placement, pointsEarned: points, scoring: item.scoring});\n      }\n      if(currentInput.bucket&&results.length<2)A.fail(\"bucket-insufficient-eligible-players\");\n      transaction.update(tournamentRef, {\n        ladderPointsAwarded: true,\n        ladderSeasonId: seasonId,\n        ladderTrialSeason: trial,\n        ladderCountsTowardCareer: countsTowardCareer,\n        ladderResults: results,\n        ladderSkippedPlayers: skippedPlayers,\n        ladderAwardedAt: FieldValue.serverTimestamp(),\n        ladderAwardedBy: actor.uid,\n      });\n      if(currentInput.bucket){const patches=A.finalPatches(currentInput,currentInput.state,{now:currentTime,seasonId,results,skipped:skippedPlayers,actorUid:actor.uid});transaction.set(tournamentRef,patches.privatePatch,{merge:true});transaction.set(publicRef,patches.publicPatch,{merge:true});}\n      return {ok: true, alreadyAwarded: false, seasonId, results, skippedPlayers, awardedAt: currentTime,...(currentInput.bucket?A.publicReceipt(currentInput,currentTime):{})};\n    }).catch(e=>{if(e.bucketSettlement)return result(false,e.message,\"分桶結算資料已變更或需要人工核對\");throw e;});\n  };\n}\n\nmodule.exports = {createLadderSettlement, buildLadderSettlementPayload, computeRoundRobinStandings, deriveDoubleElimPlacements};\n"
+        }
+      ]
+    }
+  ],
+  "helperFiles": {
+    "bucket-settlement/public-view.cjs": "0bda68eb58adf93c53f29bfb2d726d7d10cf6486b711de840a6526a177359499",
+    "bucket-settlement/state.cjs": "e9fa3ae6cd379a94fda711070e4dc36bc311b62ff67e12e810f0db1caa407c3a",
+    "bucket-settlement/input.cjs": "bfa2edc4461ccf87f4d4ceb9af7c4fcf2ca3f95118513cba7708370694c06849",
+    "bucket-settlement/runtime.cjs": "b84daf88c3b5a4c93bc40d9a85c0eb6079d2f6cd46308e587dc4f9291d6e0df0",
+    "_qr_checkin/qr-checkin-fence.cjs": "556270ff967f083182c39b6ed6a331d06909ac66891fa9e3f7cd03356a257aab"
+  },
+  "protocolSource": {
+    "commit": "b82e8d393ab14c6146575ebf28ccedb0c02b3ed9",
+    "projectionSourceSha256": "b88a284308980512707d179a7b755d9e85026c9abb6bd4901f667530ce9ecd36",
+    "stateGitBlob": "da457b44c6694293470efa3ce71699ada100b8b1"
+  },
+  "wrapperPatch": {
+    "sourceSet": 21,
+    "function": "settleLadderTournament",
+    "path": "index.js",
+    "baselineFileSha256": "0be6d1f4c3032f5e582543201e9ddc4c75ed104c13ab9b126333644429a94394",
+    "patchedFileSha256": "addb486dc276a3b7c58ac08a9a8cb4e1c5c685948b6c29223a6d1513a8df7d13",
+    "edits": [
+      {
+        "before": "  return settleOfficialLadder({\n    code,\n    actor: {uid: actor.uid, name: actor.data.realName || actor.data.displayName || actor.uid},\n  });\n",
+        "after": "  return settleOfficialLadder({\n    code,\n    expectedRoom: request.data?.expectedRoom,\n    actor: {uid: actor.uid, name: actor.data.realName || actor.data.displayName || actor.uid},\n  });\n"
+      }
+    ],
+    "scope": "forward optional expectedRoom to factory; preserve original requireAdminTier and all unrelated exports; deploy only settleLadderTournament"
+  }
+}

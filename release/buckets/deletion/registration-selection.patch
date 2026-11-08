@@ -1,0 +1,89 @@
+--- a/registration-selection.js
++++ b/registration-selection.js
+@@ -3,7 +3,22 @@
+ const {getFirestore,FieldValue,FieldPath}=require("./_qr_checkin/admin-firestore.cjs");
+ const {randomInt,randomUUID}=require('node:crypto');
+ const C=require('./operations-core');
+-const {assertLegacyRosterWritable}=require('./onsite-waitlist-writer-guards');
++const {assertLegacyRosterWritable:assertOnsiteRosterWritable}=require('./onsite-waitlist-writer-guards');
++const {createDeletionService}=require('./tournament-delete');
++function assertLegacyRosterWritable(t,p){
++ if([t,p].some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');
++ assertOnsiteRosterWritable(t,p,C.parseState(t));
++}
++const deletion=createDeletionService({
++ allowOrphanCleanup:false,validOperation:/^[A-Za-z0-9_-]{1,100}$/,
++ normalize:code=>{if(typeof code!=='string'||! /^[A-Za-z0-9_-]{1,100}$/.test(code))throw Error('invalid-request');return code;},
++ authorize:(actor,uid,t,now,p)=>{
++  if(!C.canManage(actor,uid,t,now))return false;
++  if(!t.registrationSelection)throw Error('lottery-not-enabled');
++  if(t.registrationSelection.status==='drawing')throw Error('draw-processing');
++  assertOnsiteRosterWritable(t,p,C.parseState(t));return true;
++ }
++});
+ const db=getFirestore();
+ const valid=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(v);
+ const ms=v=>v?.toMillis?v.toMillis():Number(v)||0;
+@@ -15,7 +30,7 @@
+  const selected=chosen.slice(0,capacity),ids=new Set(selected.map(r=>r.uid));return {selected,waiting:pool.filter(r=>!ids.has(r.uid))};
+ }
+ function unlocked(t){const s=C.parseState(t);if(t.systemClosed||s.startedAt||s.bracketSize||s.matches.length||s.meta.eventCancelled||['live','settling','done','cancelled'].includes(t.tournamentPhase)||s.archiveStatus==='completed')throw Error('entry-selection-locked');return s;}
+-async function manager(tx,uid,code){const [p,t,pub]=await Promise.all([tx.get(db.doc(`users/${uid}`)),tx.get(db.doc(`tournaments/${code}`)),tx.get(db.doc(`publicTournaments/${code}`))]);if(!t.exists||!p.exists||!C.canManage(p.data(),uid,t.data(),Date.now()))throw Error('tournament-access-denied');assertLegacyRosterWritable(t.data(),pub.data(),C.parseState(t.data()));return t.data();}
++async function manager(tx,uid,code){const [p,t,pub]=await Promise.all([tx.get(db.doc(`users/${uid}`)),tx.get(db.doc(`tournaments/${code}`)),tx.get(db.doc(`publicTournaments/${code}`))]);if(!t.exists||!p.exists||!C.canManage(p.data(),uid,t.data(),Date.now()))throw Error('tournament-access-denied');assertLegacyRosterWritable(t.data(),pub.data());return t.data();}
+ function projection(r){return {uid:r.uid,key:r.uid,playerId:'online_'+r.uid,name:r.displayName||r.publicName||r.realName||r.uid};}
+ async function allRegistrations(code){let last;const out=[];do{let q=db.collection(`tournaments/${code}/registrations`).orderBy(FieldPath.documentId()).limit(250);if(last)q=q.startAfter(last);const snap=await q.get();out.push(...snap.docs.map(d=>({...d.data(),uid:d.id})));last=snap.size===250?snap.docs.at(-1):null;}while(last);return out;}
+ // Registration count is not capped. Each signup is one serialized transaction.
+@@ -27,7 +42,7 @@
+   const [ts,ps,rs,us]=await Promise.all([tx.get(tr),tx.get(pr),tx.get(rr),tx.get(db.doc(`users/${uid}`))]);
+   if(!ts.exists||!ps.exists||!us.exists||us.data().active!==true)throw Error('inactive-account');
+   const t=ts.data(),p=ps.data(),u=us.data(),mode=t.registrationSelection,now=Date.now();
+-  assertLegacyRosterWritable(t,p,C.parseState(t));
++  assertLegacyRosterWritable(t,p);
+   if(!mode)throw Error('lottery-not-enabled');unlocked(t);
+   if(mode.status==='drawing')throw Error('draw-processing');
+   if(d.action==='join'){
+@@ -82,19 +97,19 @@
+  if(!plan){
+   const records=(await allRegistrations(d.code)).filter(r=>r.status!=='cancelled').sort(timeOrder);
+   const hash=C.poolHash(records.map(r=>({uid:r.uid,at:ms(r.createdAt)})));
+-  if(hash!==d.candidateHash||records.length<2){await db.runTransaction(async tx=>{const fresh=await tx.get(tr),pub=await tx.get(pr);assertLegacyRosterWritable(fresh.data(),pub.data(),C.parseState(fresh.data()));if(fresh.data().registrationSelection.operationId===d.operationId){const config={status:'open',capacity:t.registrationSelection.capacity,version:2};tx.update(tr,{registrationSelection:config});tx.update(pr,{registrationSelection:publicMode(config)});}});throw Error(records.length<2?'not-enough-registrations':'candidate-list-changed');}
++  if(hash!==d.candidateHash||records.length<2){await db.runTransaction(async tx=>{const fresh=await tx.get(tr),pub=await tx.get(pr);assertLegacyRosterWritable(fresh.data(),pub.data());if(fresh.data().registrationSelection.operationId===d.operationId){const config={status:'open',capacity:t.registrationSelection.capacity,version:2};tx.update(tr,{registrationSelection:config});tx.update(pr,{registrationSelection:publicMode(config)});}});throw Error(records.length<2?'not-enough-registrations':'candidate-list-changed');}
+   const result=selectCandidates(records,t.registrationSelection.capacity);
+   const candidatePlan={selected:result.selected.map(projection),candidateHash:hash,total:records.length,actorUid:uid,operationId:d.operationId};
+   // create is an atomic winner: simultaneous retries reuse the same persisted draw.
+-  try{await db.runTransaction(async tx=>{const [fresh,pub]=await Promise.all([tx.get(tr),tx.get(pr)]);assertLegacyRosterWritable(fresh.data(),pub.data(),C.parseState(fresh.data()));if(fresh.data().registrationSelection?.status!=='drawing'||fresh.data().registrationSelection.operationId!==d.operationId)throw Error('draw-processing');tx.create(runRef,candidatePlan);});plan=candidatePlan;}catch(e){if(e.code!==6&&e.code!=='already-exists')throw e;plan=(await runRef.get()).data();}
++  try{await db.runTransaction(async tx=>{const [fresh,pub]=await Promise.all([tx.get(tr),tx.get(pr)]);assertLegacyRosterWritable(fresh.data(),pub.data());if(fresh.data().registrationSelection?.status!=='drawing'||fresh.data().registrationSelection.operationId!==d.operationId)throw Error('draw-processing');tx.create(runRef,candidatePlan);});plan=candidatePlan;}catch(e){if(e.code!==6&&e.code!=='already-exists')throw e;plan=(await runRef.get()).data();}
+  }
+  const ids=new Set(plan.selected.map(p=>p.uid));const records=(await allRegistrations(d.code)).filter(r=>r.status!=='cancelled').sort(timeOrder);
+  let rank=0;
+  const updates=records.map(r=>({uid:r.uid,patch:{status:ids.has(r.uid)?'confirmed':'waitlist',waitRank:ids.has(r.uid)?null:++rank,drawOperationId:plan.operationId,updatedAt:FieldValue.serverTimestamp()}}));
+  // Every chunk reads the current ownership marker under the same write lock.
+- for(let start=0;start<updates.length;start+=400){const chunk=updates.slice(start,start+400);await db.runTransaction(async tx=>{const [fresh,pub]=await Promise.all([tx.get(tr),tx.get(pr)]);assertLegacyRosterWritable(fresh.data(),pub.data(),C.parseState(fresh.data()));if(fresh.data().registrationSelection?.status!=='drawing'||fresh.data().registrationSelection.operationId!==d.operationId)throw Error('draw-processing');for(const row of chunk)tx.update(db.doc(`tournaments/${d.code}/registrations/${row.uid}`),row.patch);});}
++ for(let start=0;start<updates.length;start+=400){const chunk=updates.slice(start,start+400);await db.runTransaction(async tx=>{const [fresh,pub]=await Promise.all([tx.get(tr),tx.get(pr)]);assertLegacyRosterWritable(fresh.data(),pub.data());if(fresh.data().registrationSelection?.status!=='drawing'||fresh.data().registrationSelection.operationId!==d.operationId)throw Error('draw-processing');for(const row of chunk)tx.update(db.doc(`tournaments/${d.code}/registrations/${row.uid}`),row.patch);});}
+  return db.runTransaction(async tx=>{
+-  const fresh=await tx.get(tr),pub=await tx.get(pr);t=fresh.data();assertLegacyRosterWritable(t,pub.data(),C.parseState(t));if(t.registrationSelection.status==='drawn')return {ok:true,state:C.parseState(t),replayed:true};
++  const fresh=await tx.get(tr),pub=await tx.get(pr);t=fresh.data();assertLegacyRosterWritable(t,pub.data());if(t.registrationSelection.status==='drawn')return {ok:true,state:C.parseState(t),replayed:true};
+   const s=C.parseState(t),revision=Number(t.entrySelectionRevision||0)+1;
+   s.players=plan.selected.map(p=>({id:p.playerId,name:p.name,uid:p.uid,playerUid:p.uid,registrationUid:p.uid,source:'online',checkedIn:false}));
+   s.entrySelection={status:'drawn',mode:'registration',capacity:t.registrationSelection.capacity,selected:plan.selected,waiting:[],waitingCount:rank};s.entrySelectionRevision=revision;s.updatedAt=Date.now();
+@@ -124,11 +139,8 @@
+  const view=JSON.parse(pub.data().bracketView||'{}');view.players=s.players.map(p=>({id:p.id,name:p.name,checkedIn:p.checkedIn===true}));tx.update(pub.ref,{...changes,bracketView:JSON.stringify(view)});
+  tx.create(op,{actorUid:uid,requestHash:C.poolHash(d),removed,promoted:next,reason:d.reason.trim(),createdAt:FieldValue.serverTimestamp()});return {ok:true,state:s};
+ });}
+-async function deleteEvent(uid,d){
+- const tr=db.doc(`tournaments/${d.code}`),pr=db.doc(`publicTournaments/${d.code}`);
+- await db.runTransaction(async tx=>{const t=await manager(tx,uid,d.code);if(!t.registrationSelection)throw Error('lottery-not-enabled');if(t.registrationSelection.status==='drawing')throw Error('draw-processing');tx.update(tr,{registrationSelection:{...t.registrationSelection,status:'deleting'}});tx.update(pr,{registrationSelection:publicMode({...t.registrationSelection,status:'deleting'})});});
+- await db.recursiveDelete(tr);await pr.delete();return {ok:true};
+-}
++async function deleteEvent(uid,d){return deletion.execute({auth:{uid},data:{code:d.code,operationId:d.operationId}});}
++
+ exports.manageRegistrationSelection=onCall({region:'asia-east1',cors:true,timeoutSeconds:540},async req=>{
+  const uid=req.auth?.uid,d=req.data||{};if(!uid)throw new HttpsError('unauthenticated','auth-required');if(!valid(d.code)||!valid(d.operationId)||!['configure','preview','draw','promote','delete'].includes(d.action))throw new HttpsError('invalid-argument','invalid-request');
+  const lease=db.doc(`tournaments/${d.code}/registrationDrawLease/current`),token=randomUUID();let held=false;
+@@ -136,5 +148,5 @@
+   if(d.action==='draw')await db.runTransaction(async tx=>{await manager(tx,uid,d.code);const l=await tx.get(lease);if(l.exists&&l.data().until>Date.now())throw Error('draw-processing');tx.set(lease,{token,until:Date.now()+600000});held=true;});
+   return await ({configure,preview,draw,promote,delete:deleteEvent}[d.action])(uid,d);
+  }catch(e){throw new HttpsError(e.message==='draw-processing'?'unavailable':'failed-precondition',e.message);}
+- finally{if(held)await db.runTransaction(async tx=>{const l=await tx.get(lease);if(l.data()?.token===token)tx.delete(lease);});}
++ finally{if(held)await db.runTransaction(async tx=>{const [l,t,p]=await Promise.all([tx.get(lease),tx.get(db.doc(`tournaments/${d.code}`)),tx.get(db.doc(`publicTournaments/${d.code}`))]);if(!t.exists||[t.data(),p.data()].some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))return;if(l.data()?.token===token)tx.delete(lease);});}
+ });

@@ -1015,6 +1015,7 @@
     async manageEntrySelection(payload){return callEngagementFunction("manageEntrySelection",payload,60000);},
     async deleteTournamentSafely(payload){return callEngagementFunction("deleteTournamentSafely",payload,540000);},
     async settleLadder(payload){return callEngagementFunction("settleLadderTournament",payload,120000);},
+    async completeBucket(payload){return callEngagementFunction("completeBucketTournament",payload,120000);},
     async deleteTitleDefinition(payload){return callEngagementFunction("deleteTitleDefinition",payload);},
     async previewPioneerAwards(){return callEngagementFunction("previewPioneerAwards",{},120000);},
     async executePioneerAwards(payload){return callEngagementFunction("executePioneerAwards",payload,120000);},
@@ -2032,6 +2033,25 @@
       return {ok:true,seasonId:"TEST-S1",awardedAt:Date.now(),alreadyAwarded:newWrites===0,results};
     },
 
+    async settleBucketTournament(expected){
+      const service=window.BXHFourCourtSettlement;
+      if(!cloudEnabled||!service||!fx?.runTransaction||!window.crypto?.subtle)return {ok:false,reason:"bucket-client-disabled"};
+      const binding={code:String(expected.cloudCode||"").toUpperCase(),id:expected.id,epoch:expected.scoreStorage?.epoch,mode:expected.meta?.ladderMode};
+      if(!binding.code||!binding.id||!binding.epoch)return {ok:false,reason:"bucket-room-changed"};
+      return service.settle({expected:binding,getUid:()=>authHandle?.currentUser?.uid,
+        read:()=>fx.runTransaction(dbHandle,async tx=>{
+          const root=fx.doc(dbHandle,"tournaments",binding.code),publicRef=fx.doc(dbHandle,"publicTournaments",binding.code);
+          const [privateSnap,publicSnap]=await Promise.all([tx.get(root),tx.get(publicRef)]);
+          if(!privateSnap.exists()||!publicSnap.exists())throw Error("bucket-room-changed");
+          const top=privateSnap.data(),pub=publicSnap.data(),{m}=service.context(top,pub,binding);
+          const snaps=await Promise.all(Array.from({length:m.bucketCount},(_,i)=>tx.get(fx.doc(dbHandle,"tournaments",binding.code,"matchBuckets","court-"+(i+1)))));
+          return {top,pub,buckets:snaps.map(s=>s.exists()?s.data():null)};
+        }),
+        call:({code,roomId,epoch,mode})=>mode==='general'?window.engagementService.completeBucket({code,roomId,epoch}):window.engagementService.settleLadder({code,expectedRoom:{roomId,epoch}}),
+        hash:async text=>Array.from(new Uint8Array(await window.crypto.subtle.digest("SHA-256",new TextEncoder().encode(text))),b=>b.toString(16).padStart(2,"0")).join("")
+      });
+    },
+
     async settleLadderTournament(code,payload){
       if(!cloudEnabled||!code) return {ok:false,reason:"network"};
       const actorUid=authHandle&&authHandle.currentUser&&authHandle.currentUser.uid;
@@ -2120,17 +2140,61 @@
       return {ok:true,oldSeason:lock.oldSeason,newSeason:lock.newSeason,startAt:now,endAt};
     },
 
-    // v13.14.4：刪除整場雲端賽事。Firestore 刪除父文件不會自動刪除子集合，
-    // 因此先清 registrations / participants，再刪公開鏡像與主賽事文件。
+    // Audited server deletion with a durable, per-account operation intent.
     async deleteTournament(code){
       if(!cloudEnabled || !code) throw new Error("cloud-unavailable");
-      const normalized = String(code).toUpperCase();
-      if(!window.engagementService || !window.engagementService.deleteTournamentSafely) throw new Error("delete-service-unavailable");
-      const result=await window.engagementService.deleteTournamentSafely({code:normalized,operationId:crypto.randomUUID()});
+      const normalized=String(code).trim().toUpperCase();
+      if(!/^BXH-[A-Z0-9_-]{4,24}$/.test(normalized)) throw new Error("invalid-code");
+      if(!window.engagementService?.deleteTournamentSafely) throw new Error("delete-service-unavailable");
+      const uid=currentUserUidForWrites();
+      if(!uid) throw new Error("auth-required");
+      const key="bxh:delete-tournament:v1:"+uid+":"+normalized;
+      const sameActor=()=>{if(currentUserUidForWrites()!==uid) throw new Error("delete-account-changed");};
+      let storage,intent;
+      try{
+        storage=window.localStorage;
+        const saved=storage.getItem(key);
+        if(saved!==null){
+          intent=JSON.parse(saved);
+          if(!intent||intent.version!==1||intent.uid!==uid||intent.code!==normalized||! /^[A-Za-z0-9_-]{8,100}$/.test(intent.operationId||"")||!Number.isSafeInteger(intent.createdAt)||intent.createdAt<=0) throw new Error("invalid-intent");
+        }else{
+          intent={version:1,uid,code:normalized,operationId:crypto.randomUUID(),createdAt:Date.now()};
+          storage.setItem(key,JSON.stringify(intent));
+        }
+        if(storage.getItem(key)!==JSON.stringify(intent)) throw new Error("intent-changed");
+      }catch(e){throw new Error("delete-intent-storage-unavailable");}
+      // Persist before sending; lost responses and page reloads reuse this ID.
+      const clearMatching=()=>{
+        sameActor();
+        const saved=storage.getItem(key);
+        if(saved===JSON.stringify(intent)) storage.removeItem(key);
+      };
+      sameActor();
+      let result;
+      try{
+        result=await window.engagementService.deleteTournamentSafely({code:normalized,operationId:intent.operationId});
+      }catch(error){
+        sameActor();
+        // A recreated room needs a new, explicit delete action, never an automatic retry.
+        if(/(?:^|[^a-z-])deletion-operation-outdated(?:$|[^a-z-])/.test(String(error?.message||""))) clearMatching();
+        throw error;
+      }
+      sameActor();
+      if(result?.pending===true){
+        const canonical=result.operationId;
+        if(typeof canonical!=="string"||! /^[A-Za-z0-9_-]{8,100}$/.test(canonical)) throw new Error("delete-response-invalid");
+        if(canonical!==intent.operationId&&storage.getItem(key)===JSON.stringify(intent)){
+          intent={...intent,operationId:canonical};
+          storage.setItem(key,JSON.stringify(intent));
+        }
+        throw new Error("deletion-in-progress");
+      }
       if(!result || result.ok!==true || result.deleted!==true) throw new Error((result&&result.error)||"delete-failed");
-      // A success toast is allowed only after the public entry point is gone.
+      // Keep the intent until the public entry point has also disappeared.
       const publicAfter=await fx.getDoc(fx.doc(dbHandle,"publicTournaments",normalized));
+      sameActor();
       if(publicAfter.exists()) throw new Error("delete-not-confirmed");
+      clearMatching();
       return true;
     },
 
@@ -4269,6 +4333,8 @@ window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";
   tryInitFirebase().then((ok)=>{
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
+
+
 
 
 

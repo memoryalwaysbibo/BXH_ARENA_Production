@@ -1,0 +1,159 @@
+# Writer discovery readback — partial, rollout closed
+
+Source: user-supplied `bxh-writer-discovery-gljh8z5i.zip`.
+
+- ZIP SHA-256: `0f91a3155b9afcaab30d37d9256e9875bcd92fef8559337bf3de56dca4114eee`
+- Report SHA-256: `88f19f67186a2e68244bcf260c082116d3e8d8473781421c61da397a0c73df5d`
+- Tool SHA-256: `2da9cdb914adbc4707b543dca9666bd7c7c0a8d7c19133415fd3844d2fcaf1ad` (matches pinned c823ffa helper)
+- Observed 2026-11-05 07:06:52–07:08:46 UTC (15:06:52–15:08:46 Taiwan).
+- 43 discovered supported regions; no Functions-list unreachable entries.
+- 158 Functions, all in asia-east1; 157 listed Run services, all in asia-east1.
+- Every listed Run service has a matching Function link. No unlinked service
+  was found in the successful listings; this is not evidence about failed scopes.
+- One Function, `observeNumberAccount`, has v1/v2 views and no Run-service link;
+  the other 157 have v2 views. The targeted GET will retain its environment type.
+- Zero jobs returned in successful lists; this does not establish zero jobs in
+  the failed region.
+
+Both discovery errors are in `me-central2`: services and jobs. The original
+helper deliberately retained only a generic read-failure reason, so the upload
+does not establish an HTTP status, permissions issue or regional policy cause.
+Do not silently remove that region or mark it empty. Overall metadata discovery
+and writer coverage remain incomplete.
+
+Compared with the earlier 2026-11-05 01:14:50 UTC 22-target capture:
+
+- `manageRefereeSeats` has a new update time (04:24:27 UTC), changed source-storage
+  identity and changed build/service configuration hashes. The old source
+  generation was `1793821779109302`. Fresh exact source is required before any
+  candidate overlay can be used; preserve the independently released QR changes.
+- `trackTournamentRegistrationActivity` has a different event-trigger digest but
+  an unchanged update time and matching build/service hashes. The comparison is
+  list metadata versus earlier GET metadata. Confirm with GET before calling it
+  a deployed trigger change.
+- The other 20 target rows' compared build/service/trigger hashes match. These
+  are metadata observations, not new immutable source archive verification.
+- `familyRegistration` reports a 05:00:50 UTC update time. It was outside that
+  22-target capture and was independently updated for registration latency;
+  capture its current source before applying an older interactions overlay.
+
+## Targeted next read
+
+`scripts/bucket-writer-followup.py` repeats only the two failed region lists,
+GETs the four Functions named above, and downloads only the immutable source
+archives for `manageRefereeSeats` and `familyRegistration`. It checks those two
+Functions again after each download and rejects capture drift. It never deploys,
+uploads code, changes IAM, enables APIs, reads/writes room documents or activates
+runtime gates. JSON output omits raw configuration/environment values and raw
+server messages; HTTP status, safe Google status/reason codes and payload hashes
+are retained. Unknown/partial results remain failures, not empty inventories.
+
+Run the fixed reviewed script in authenticated Cloud Shell for `bxh-arena` and
+return its printed `reviewZip`, including partial output if a region remains
+blocked. The script needs no third-party Python dependencies. It saves private
+local files and a ZIP containing the report plus any downloaded source archives.
+Its `followupComplete` does not imply global writer or release acceptance.
+
+Offline verification:
+
+```sh
+python3 -B tests/four-court-buckets/writer-followup.py
+```
+
+Source/dependency classification, IAM/external Admin writers, fresh full release
+source/configuration reconciliation and real cutover acceptance remain open.
+No production writes, deployment or room activation occurred in this review.
+
+## Targeted follow-up received
+
+The follow-up capture at 2026-11-05 07:53:24–07:53:45 UTC confirms HTTP 403 / PERMISSION_DENIED / LOCATION_POLICY_VIOLATED for both me-central2 lists. They remain unverified; no location policy was changed and that region is not declared empty. All four targeted Function GETs completed; observeNumberAccount is GEN_1.
+
+manageRefereeSeats archive SHA-256 581406375e1833a4768302d931371549b52f24337a9ca97c26638fb651a4ba05 matches all 16 current community-referee candidate file hashes. No referee source changes are needed to preserve its deployed QR behavior.
+
+familyRegistration archive SHA-256 db015fb8fa78db14fab41e1f5cc18d8aa9ac8e3a9bcadcf17b425171db64a55d contains the deployed admission scheduler. The interaction guard is now reapplied to that exact source, retaining the scheduler and other 11 closure files. A review-only archive changes one member and preserves the other 103 members. Exact captures and hashes are in live-followup-20261105.json.
+
+The fresh trackTournamentRegistrationActivity GET trigger digest still differs from the older GET digest despite an unchanged update time and matching build/service hashes. Its cause remains unresolved; trigger-field/readback and delivery acceptance are required before treating its configuration as reconciled. No trigger or routing change was made by this review.
+
+## Selected writer archive review (2026-11-09 Taiwan)
+
+The private source bundle SHA-256 is
+`5fa730a29294063a7176482ac05759fd557855b3819da29136be087656a0afb7`.
+All 16 member hashes match the bundle report. The revision, generation, archive
+hash and six reviewed source member hashes for each of
+`restoreIdleTournament` and `roomAccess` match the existing deletion manifest.
+This compares pinned historical archives. It is not a new live metadata read.
+
+- `commitRefereeCommand` revision `commitrefereecommand-00006-neg` rejects
+  the private-root `scoreStorage` marker inside the score transaction.
+- `restoreIdleTournament` revision `restoreidletournament-00009-zej` rejects
+  either score marker on either root before restoring the room.
+- `roomAccess` revision `roomaccess-00034-red` rejects either score marker
+  on either root for access configuration. Password verification and access
+  grants use separate records.
+
+The pinned restore archive also contains the shared `closeIdleTournaments`
+scheduler source. Its `checkAndClose` path can rewrite the private room and
+public mirror without a bucket marker check. The existing fixture reproduces
+this with an idle marked room. A separate review-only patch skips score,
+migration and deletion markers on either root, while unmarked room closure
+and scan progress retain their behavior. Ten isolated tests cover the
+historical behavior and the candidate. The scheduled Function's own deployed
+revision, immutable source generation and schedule still need a separate
+readback before drawing conclusions about production or preparing its package.
+
+The region policy gap and wider writer inventory remain open. The bundle
+reported zero production writes. No deployment or room activation is part of
+this review.
+
+### Formal idle-close source readback
+
+[Functions Actions run 42511565083](https://github.com/memoryalwaysbibo/BXH_ARENA_Functions_Production/actions/runs/42511565083)
+read the independently deployed `closeIdleTournaments` twice and checked its
+immutable source generation. Artifact 13629283848 matched the published ZIP
+digest `e847462ef215d6ad1950a6b4cfdfce82347c91e1648d73932e49959f290d26ac`.
+
+- Revision `closeidletournaments-00010-qum`, generation `1793642920499912`.
+- Source archive SHA-256 `27fde56ae6194daaf31725cf388d5bc15f233b21ffe10b68a863a090ef112223`.
+- `operations.js` SHA-256 `ea120e9b9104d8e96ce367a750adb6dd0e84d495a4c12067df444100f468bd3a`.
+
+The deployed module differs from all inspected operations fixtures and
+candidates. The report did not classify the deployed close path. Review the
+exact deployed closure before rebasing the historical candidate or deciding
+whether the scheduler already fences bucket rooms. The run recorded zero
+production writes.
+
+### Deployed background writer code review
+
+The selected background readback bundle
+`cada094a2988fe7d8fdf431225bf802bab38dfaa8442c64a8e6557ef1022bc54`
+identifies the same idle-close revision and source generation as the Actions
+readback. Its `operations.js` hash matches the Actions report exactly.
+The deployed transaction already skips either room root when
+`scoreStorage` or `scoreBucketProjection` exists. It can still close an
+otherwise eligible room with only `bucketMigration` or `deletionStatus`
+present. Nine in-memory tests covered those cases and ordinary rooms.
+
+Keep `close-idle-fence.patch` as a historical reproduction. The current
+source candidate is `close-idle-production-lease-fence.patch`. It extends
+the existing guard only in `checkAndClose` and applies to the exact
+`operations.js` hash above. Candidate SHA-256 is
+`8517bd8e237ef6442d6eaaa8aef0d523156eadff114999d4805d9339ca1dfba8`.
+Nine additional in-memory tests verified both roots, all four markers,
+ordinary closure parity, and scan progress.
+
+The same bundle identifies `ladderAutoSettlement` revision
+`ladderautosettlement-00003-kuf`, generation `1793906143803503`, with
+`ladder-auto-settlement.js` SHA-256
+`334106be168bcb3c3991c88fc42e282c5a1524b39293f6d50fa05d092c660ead`.
+This matches the supplied writer release-check candidate baseline and differs
+from the historical fixture behind the integrated settlement adapter.
+The selected-file bundle does not establish the full deployed archive hash.
+In isolated tests the deployed service archived an already-awarded ranked
+room through either the private score marker or the public projection marker.
+The narrow candidate in the release-check bundle deferred both transactions
+without room writes and preserved the unmarked archive path. This candidate
+only fences the legacy path. The canonical bucket settlement adapter needs
+a separate rebase and verification against the current closure.
+
+The tests used in-memory Firestore fixtures. No production configuration,
+room, or deployment was changed.

@@ -1,0 +1,36 @@
+name: Bucket canonical settlement candidate
+on:
+  pull_request:
+    paths:
+      - 'release/buckets/settlement/**'
+      - 'tests/four-court-buckets/settlement/**'
+      - '.github/workflows/bucket-settlement.yml'
+permissions:
+  contents: read
+jobs:
+  canonical-settlement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify exact deployed patches and protocol source
+        run: python3 -B tests/four-court-buckets/settlement/verify-package.py
+      - name: Legacy regression, canonical bucket awards and scoring parity
+        run: node tests/four-court-buckets/settlement/probe.cjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install isolated validation dependencies
+        run: npm install --prefix /tmp/bucket-settlement --no-save --ignore-scripts firebase-tools@14 firebase-admin@13.10.0 firebase-functions@6.6.0
+      - name: Real SDK atomic awards, replay, QR and 160-player capacity
+        env:
+          NODE_PATH: /tmp/bucket-settlement/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+          CI: true
+        run: /tmp/bucket-settlement/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config tests/four-court-buckets/settlement/native.firebase.json 'node tests/four-court-buckets/settlement/native-emulator.cjs'

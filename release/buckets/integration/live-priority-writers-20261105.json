@@ -1,0 +1,91 @@
+{
+  "status": "review-only-not-deployed",
+  "captureArchiveSha256": "37b6017285474d756ecd2eb9751ed5145aa8c53a4b978502163811de602ca6ef",
+  "captureReportSha256": "26e05d0f4b148ab4cc956ecda3a2d215207f1540917d2ab03fe731b74b3b0c40",
+  "capturedAt": "2026-11-05T08:51:11.677719+00:00",
+  "toolSha256": "6be516a7d37444ed343dad6f82431ade76f47448fb608a94159e7409635fd206",
+  "project": "bxh-arena",
+  "productionWrites": 0,
+  "deploymentPerformed": false,
+  "roomActivationPerformed": false,
+  "writerInventoryComplete": false,
+  "acceptanceCompleted": false,
+  "sources": [
+    {
+      "name": "syncMyHostingProgress",
+      "revision": "syncmyhostingprogress-00005-fil",
+      "updateTime": "2026-10-17T00:51:33.160518911Z",
+      "source": {
+        "bucket": "gcf-v2-sources-87261141693-asia-east1",
+        "object": "syncMyHostingProgress/function-source.zip",
+        "generation": "1792198207366151"
+      },
+      "sourceArchiveSha256": "4c2a9f7b2dc4f36088e87757dcead0d152f0ef7e6749815beb7c818a869d3398",
+      "metadataSha256": "6e8e24d68586e0546b380084de885968bdc68cf58519988682fb7f60c66ce7b9",
+      "buildConfigSha256": "ebdb2b017c3eb1d718a234941786486ec230231a9521e8371c6c1e6028aadaf2",
+      "serviceConfigSha256": "9bbde1ee22cb8fedeb935e5b6a23756509f0ace3b0d4481484095149ed1c8e93",
+      "stableDuringCapture": true,
+      "reviewedBaselineFile": "hosting.js",
+      "reviewedBaselineFileSha256": "17b908d68524e8637108d1902ff71bae2995ba9287ca73cbdacaf289851e9b6e",
+      "candidateFamily": "completion",
+      "writerClassification": "reviewed-path-only"
+    },
+    {
+      "name": "manageRegistrationSelection",
+      "revision": "manageregistrationselection-00004-mud",
+      "updateTime": "2026-10-16T23:04:35.614287939Z",
+      "source": {
+        "bucket": "gcf-v2-sources-87261141693-asia-east1",
+        "object": "manageRegistrationSelection/function-source.zip",
+        "generation": "1792191807711707"
+      },
+      "sourceArchiveSha256": "93b4e9e1d5c7605b98474ce3d192c0623bc94dd170e977bc1be638e182805014",
+      "metadataSha256": "8bb319ed12d93141a6e7fc7b1d2b8b6eb7782b2d8aead0cc5062d9eb0ae568cf",
+      "buildConfigSha256": "e06cf784df19e9f8651105739688435b4f8f2d51d959d8d8bc194b9c8b1cdc5a",
+      "serviceConfigSha256": "7ff1c131a431c1b9e69d54a117f5b2de89fbe414c08ccd3bc53beb6c6b839565",
+      "stableDuringCapture": true,
+      "reviewedBaselineFile": "registration-selection.js",
+      "reviewedBaselineFileSha256": "026833cc060963c12f475151a2d4c96537c179f1eccafa70d7271d761d0ec02b",
+      "candidateFamily": "deletion",
+      "writerClassification": "reviewed-path-only"
+    },
+    {
+      "name": "lotteryRegistration",
+      "revision": "lotteryregistration-00036-hal",
+      "updateTime": "2026-10-16T23:02:39.138732361Z",
+      "source": {
+        "bucket": "gcf-v2-sources-87261141693-asia-east1",
+        "object": "lotteryRegistration/function-source.zip",
+        "generation": "1792191655449192"
+      },
+      "sourceArchiveSha256": "e3e622316d904f24833b9187d26f702defa95a664f9c848c74d831a7083406d2",
+      "metadataSha256": "cb27d372ed095ef3149ac7115897076fcbe6e0edb5be716ed4f1db5a286f548f",
+      "buildConfigSha256": "8ae18185900915ec4457da45074342f90cc68e4374acfbe87838126e6dfd4f3d",
+      "serviceConfigSha256": "5fe8f74d7433bcf4b00cf8ffc91306375161baae64fd5448a3e6a133ae3c2bd9",
+      "stableDuringCapture": true,
+      "reviewedBaselineFile": "registration-selection.js",
+      "reviewedBaselineFileSha256": "d4fc39819cd27ffa27a97f3d7253737a16d66b672191c376b8ee94ceb15ee17d",
+      "candidateFamily": "admissions",
+      "writerClassification": "reviewed-path-only"
+    },
+    {
+      "name": "settleLadderTournament",
+      "revision": "settleladdertournament-00003-ker",
+      "updateTime": "2026-11-03T18:22:37.975781528Z",
+      "source": {
+        "bucket": "gcf-v2-sources-87261141693-asia-east1",
+        "object": "settleLadderTournament/function-source.zip",
+        "generation": "1793730085149582"
+      },
+      "sourceArchiveSha256": "920c82c930ff1771a4593d67f3ebe7b5e1bfb8594fa69ae1a707dac1c65d837e",
+      "metadataSha256": "6ddf9ce696bc89856572c8b5dfde2accf9ef166021b44d956506a57836b6248c",
+      "buildConfigSha256": "3fadb885b1225e400f559904138f142382d3eb40faf21362834414d933f583e6",
+      "serviceConfigSha256": "bc9564b3d24b7e8f9e4fa8c2688e4e6b4e0f7cb6ee35e88192bbacb9a4d1708b",
+      "stableDuringCapture": true,
+      "reviewedBaselineFile": "ladder-settlement.js",
+      "reviewedBaselineFileSha256": "1aa2c25e7c74a5d8b4f131343e15b50d2519a97ec6bbcaaebb972ce43393d348",
+      "candidateFamily": "settlement",
+      "writerClassification": "reviewed-path-only"
+    }
+  ]
+}

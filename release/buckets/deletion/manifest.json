@@ -1,0 +1,117 @@
+{
+  "status": "candidate-not-deployed",
+  "capturedSourceDate": "2026-11-02",
+  "project": "bxh-arena",
+  "region": "asia-east1",
+  "sourceOnlyUpdateMask": "buildConfig.source,labels",
+  "deletionOriginalArchiveSha256": "e0867763eff8c701fe0acedacb328ae6a2db4383462f48f8ce1d32e07c59ced5",
+  "restoreOriginalArchiveSha256": "68189e07f6dd2c04ec81addcea766f6ea3acd479808e9b5620bb27aead082341",
+  "currentRulesSha256": "580da8c9dbde90e936ff7ddd88543b3370ff2f3cd9c27c749b6aecc11802977e",
+  "candidateRulesSha256": "3b225ddc8121ffdce95062c4ea230f24882887e7768cd445f876e4484d212101",
+  "candidates": {
+    "tournament-delete.js": "e7d7ca76374aa059900858a52c96e3e9a4f6679ca98b742e4bb66540361532a6",
+    "restore-operations.js": "e06723e7366281d707938f8df2b19c576c18b0d5d97b818c0c7e44bb4a5ab224",
+    "room-access-service.js": "79cfc71d52290610fd5a7e82a1d2ec569ed618cff9782221d5360233b29b0a62",
+    "registration-selection.js": "8d1c76303001f9a2ef7c4c656b61b7fabd9f7eafd3bed9dd8923d070e2e40eec",
+    "tournament-delete-core.js": "4188f63a98d9a8adb56d9e3fe84c9e1256e408abb6e524c94883fdb9d8c3ed51",
+    "hosting-core.js": "10be2ab437fa20d0115405eca13fe47f56736a9808a8d6e6812b56b2d4562680",
+    "registration-selection.patch": "a8146df85172206d572bbd269b583d2cb9e029dd86e10a00809f9b79c3dbb5c2"
+  },
+  "testFixtures": {
+    "fixtures/bucket-migration-plan.cjs": "9a564f3780f7326baafae1d463493eb41e89f7bd6d34ed63dd36351e0d012c65",
+    "fixtures/baseline.rules": "580da8c9dbde90e936ff7ddd88543b3370ff2f3cd9c27c749b6aecc11802977e",
+    "fixtures/restore/operations.js": "0c3958dab64801584c84de7c31fe28a4caf33387bce0ad1b9d8c57baceb6d89d",
+    "fixtures/restore/operations-core.js": "c8ba02a5e3ff7edde5f6d0586346400be8bb5e0c9b857432babd49a27cadffc7",
+    "fixtures/restore/release-controls.js": "4cf9d4ed474b9ebf12accbd67f108de3b6b9c7aaad177ceaec13269937311c2a",
+    "fixtures/delete/tournament-delete-core.js": "4188f63a98d9a8adb56d9e3fe84c9e1256e408abb6e524c94883fdb9d8c3ed51",
+    "fixtures/delete/hosting-core.js": "10be2ab437fa20d0115405eca13fe47f56736a9808a8d6e6812b56b2d4562680",
+    "fixtures/access/room-access-core.js": "1f078e3b9a83cfd80176e4a03e1820b1b4576bfafcb95ac9ac96c68044b2ffe2",
+    "fixtures/access/room-access-service.js": "d69699b0c10c4dfaf5849ef14120d36fc1325f193fb7ba4b1125589a85ed76ef",
+    "fixtures/selection/operations-core.js": "87db6a51c6d218ee861b3c5f39a59dbfb58514b401cd253047f6deca43473705",
+    "fixtures/selection/onsite-waitlist-writer-guards.js": "d35d101cab964d9210df2159e93a49d20aed39f0bdf6f6217a3e648db4141dba",
+    "fixtures/selection/registration-selection.js": "026833cc060963c12f475151a2d4c96537c179f1eccafa70d7271d761d0ec02b",
+    "fixtures/selection/onsite-waitlist/owned.js": "649d5b78be40b89b88743b30c9ea4181957be6e1be0c6ef28aed5015e1c60433",
+    "fixtures/selection/_qr_checkin/admin-firestore.cjs": "3c8c2abf2cb2f4142e0e8ec727e232e703d60f0a9a2449867c25464e1d8f850e",
+    "fixtures/selection/_qr_checkin/guard-firestore.cjs": "b0d0027f0b79b845eb118c585bb8104d3590c1c18729737300f6fdf32d97d43b",
+    "fixtures/selection/_qr_checkin/qr-checkin-fence.cjs": "556270ff967f083182c39b6ed6a331d06909ac66891fa9e3f7cd03356a257aab",
+    "fixtures/selection/onsite-waitlist/core.js": "0ddf2d490daf8cd416cf299bdc7acfb3f98dd02e61d3df0dbbf3b3c2f2dfa39c",
+    "fixtures/access/room-access.js": "8f5bf11230a047e1e2185132e7ea71edd478b29c6633bcecd9dfdd92332abe3b"
+  },
+  "roomAccessOriginalArchiveSha256": "701844d42ead366305b59527622c0c3abfca587b4b3c108eeb4f5f1eb27e3dc1",
+  "selectionSourceSet": {
+    "id": 13,
+    "archiveSha256": "93b4e9e1d5c7605b98474ce3d192c0623bc94dd170e977bc1be638e182805014"
+  },
+  "deployedSourceReadback": {
+    "observedAt": "2026-11-05T01:14:50.542869+00:00",
+    "project": "bxh-arena",
+    "region": "asia-east1",
+    "captureBundleSha256": "e0adc784b05bde9a83960a1bfacf724d6097fb47b6598d9fc34b5cdd1b6e8274",
+    "productionWrites": 0,
+    "deploymentPerformed": false,
+    "functions": [
+      {
+        "name": "restoreIdleTournament",
+        "revision": "restoreidletournament-00009-zej",
+        "storageSource": {
+          "bucket": "gcf-v2-sources-87261141693-asia-east1",
+          "object": "restoreIdleTournament/function-source.zip",
+          "generation": "1793643027059972"
+        },
+        "archiveManifestField": "restoreOriginalArchiveSha256",
+        "archiveSha256": "68189e07f6dd2c04ec81addcea766f6ea3acd479808e9b5620bb27aead082341",
+        "serviceConfigSha256": "1dcff56d9d52229f3143f6d77d14ea77a264f27518fad8975bdd88bc644caa22",
+        "buildConfigSha256": "7d12dc29b1b2e9c2b5c8308ed3b23a10e76df1126df951f7a634a1a6dd66d740",
+        "eventTriggerSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "closureFixtures": {
+          "operations.js": "fixtures/restore/operations.js",
+          "operations-core.js": "fixtures/restore/operations-core.js",
+          "release-controls.js": "fixtures/restore/release-controls.js",
+          "_qr_checkin/admin-firestore.cjs": "fixtures/selection/_qr_checkin/admin-firestore.cjs",
+          "_qr_checkin/guard-firestore.cjs": "fixtures/selection/_qr_checkin/guard-firestore.cjs",
+          "_qr_checkin/qr-checkin-fence.cjs": "fixtures/selection/_qr_checkin/qr-checkin-fence.cjs"
+        },
+        "sourceFileSha256": {
+          "operations.js": "0c3958dab64801584c84de7c31fe28a4caf33387bce0ad1b9d8c57baceb6d89d",
+          "operations-core.js": "c8ba02a5e3ff7edde5f6d0586346400be8bb5e0c9b857432babd49a27cadffc7",
+          "release-controls.js": "4cf9d4ed474b9ebf12accbd67f108de3b6b9c7aaad177ceaec13269937311c2a",
+          "_qr_checkin/admin-firestore.cjs": "3c8c2abf2cb2f4142e0e8ec727e232e703d60f0a9a2449867c25464e1d8f850e",
+          "_qr_checkin/guard-firestore.cjs": "b0d0027f0b79b845eb118c585bb8104d3590c1c18729737300f6fdf32d97d43b",
+          "_qr_checkin/qr-checkin-fence.cjs": "556270ff967f083182c39b6ed6a331d06909ac66891fa9e3f7cd03356a257aab"
+        }
+      },
+      {
+        "name": "roomAccess",
+        "revision": "roomaccess-00034-red",
+        "storageSource": {
+          "bucket": "gcf-v2-sources-87261141693-asia-east1",
+          "object": "roomAccess/function-source.zip",
+          "generation": "1793640708321542"
+        },
+        "archiveManifestField": "roomAccessOriginalArchiveSha256",
+        "archiveSha256": "701844d42ead366305b59527622c0c3abfca587b4b3c108eeb4f5f1eb27e3dc1",
+        "serviceConfigSha256": "96912bd879efdad6b1d14b8107e55af9ba41022491ff633e93dd606f49b802e5",
+        "buildConfigSha256": "1331eae628ec93663371d512b0b7791a3c84ddf19074a60cae4b8ff487a00ada",
+        "eventTriggerSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "closureFixtures": {
+          "room-access.js": "fixtures/access/room-access.js",
+          "room-access-service.js": "fixtures/access/room-access-service.js",
+          "room-access-core.js": "fixtures/access/room-access-core.js",
+          "_qr_checkin/admin-firestore.cjs": "fixtures/selection/_qr_checkin/admin-firestore.cjs",
+          "_qr_checkin/guard-firestore.cjs": "fixtures/selection/_qr_checkin/guard-firestore.cjs",
+          "_qr_checkin/qr-checkin-fence.cjs": "fixtures/selection/_qr_checkin/qr-checkin-fence.cjs"
+        },
+        "sourceFileSha256": {
+          "room-access.js": "8f5bf11230a047e1e2185132e7ea71edd478b29c6633bcecd9dfdd92332abe3b",
+          "room-access-service.js": "d69699b0c10c4dfaf5849ef14120d36fc1325f193fb7ba4b1125589a85ed76ef",
+          "room-access-core.js": "1f078e3b9a83cfd80176e4a03e1820b1b4576bfafcb95ac9ac96c68044b2ffe2",
+          "_qr_checkin/admin-firestore.cjs": "3c8c2abf2cb2f4142e0e8ec727e232e703d60f0a9a2449867c25464e1d8f850e",
+          "_qr_checkin/guard-firestore.cjs": "b0d0027f0b79b845eb118c585bb8104d3590c1c18729737300f6fdf32d97d43b",
+          "_qr_checkin/qr-checkin-fence.cjs": "556270ff967f083182c39b6ed6a331d06909ac66891fa9e3f7cd03356a257aab"
+        }
+      }
+    ],
+    "rulesSha256": "dbdb8dc9ba46a110d6f8786cdc7ee4b9badc6bd3120769f4393bf51f31cbc9c3",
+    "reviewedRulesSource": "release/community-referee/firestore.rules"
+  }
+}
