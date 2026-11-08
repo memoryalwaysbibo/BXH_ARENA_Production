@@ -87,6 +87,15 @@ Emulator tests exercise real transactions/QR transforms, late aborts, manual/aut
 contention and six-court 160-player awards, plus the over-limit guard. They do not
 prove real Auth/App Check, Eventarc delivery, browser or production Rules behavior.
 
+The automatic entry uses the selected files read back for revision
+`ladderautosettlement-00003-kuf` and generation `1793906143803503`. Its
+`ladder-settlement-core.js` is byte-identical to the earlier fixture. The entry
+preserves the deployed real-name policy for ranking records. Both settlement
+paths verify that a profile name stays out of the public room data. The
+manifest records the selected-file provenance separately from the historical
+archive. The exact current ZIP and complete dependency and metadata readback
+remain required for deployment.
+
 Before any deployment, reconcile both exact live archives and complete metadata.
 Apply only their reviewed module edits and the shared `bucket-settlement` folder;
 preserve the original QR files and every dependency/configuration byte. Verify the

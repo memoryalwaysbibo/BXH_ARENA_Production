@@ -2,7 +2,7 @@
   "fixtures/21/ladder-v1.js": "acc793297324e78cf1a0363d6c63834690a333c7300e9bba798add6418191d11",
   "fixtures/21/ladder-settlement.js": "1aa2c25e7c74a5d8b4f131343e15b50d2519a97ec6bbcaaebb972ce43393d348",
   "fixtures/10/ladder-settlement-core.js": "9ba05fa0548bd6cb52225c18f8e52d078c70e10be3e6ef7c28a2e676abbf32a6",
-  "fixtures/10/ladder-auto-settlement.js": "4b7944b6c239aff6bedf7cc1ddd16e8be915d7abdbcbd2e1c61ccd5454e0a258",
+  "fixtures/10/ladder-auto-settlement.js": "334106be168bcb3c3991c88fc42e282c5a1524b39293f6d50fa05d092c660ead",
   "fixtures/21/_qr_checkin/admin-firestore.cjs": "3c8c2abf2cb2f4142e0e8ec727e232e703d60f0a9a2449867c25464e1d8f850e",
   "fixtures/21/_qr_checkin/guard-firestore.cjs": "b0d0027f0b79b845eb118c585bb8104d3590c1c18729737300f6fdf32d97d43b",
   "fixtures/21/_qr_checkin/qr-checkin-fence.cjs": "556270ff967f083182c39b6ed6a331d06909ac66891fa9e3f7cd03356a257aab",

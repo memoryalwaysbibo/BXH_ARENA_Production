@@ -79,15 +79,18 @@ function largeFixture(count=160){
 }
 module.exports={memory,load,fixture,specs,NOW,code,bracket,largeFixture};
 if(require.main===module)(async()=>{let checks=0;
- {
-  const f=fixture({courts:6}),spec=specs.find(x=>x.function==='settleLadderTournament');
+ for(const spec of specs){
+  const f=fixture({courts:6});
   const name='PRIVATE_PROFILE_NAME';
   f.m.put('users/u1',{...f.m.rows.get('users/u1'),realName:'  '+name+'  '});
+  f.m.put('users/u2',{...f.m.rows.get('users/u2'),realName:'  ',displayName:'DO_NOT_FALL_BACK'});
   const result=await load(spec,true,f.m).invoke();
   assert(result.ok,result.reason);
   assert.equal(f.m.rows.get('ladderPlayers/u1').playerName,name);
-  assert.equal(result.results.find(x=>x.playerId==='u1').playerName,name);
-  assert(!JSON.stringify(result.bucketSettlement).includes(name));
+  assert.equal(f.m.rows.get('ladderPlayers/u2').playerName,'—');
+  assert.equal(result.results.find(x=>(x.playerId??x.playerUid)==='u1').playerName,name);
+  assert.equal(result.results.find(x=>(x.playerId??x.playerUid)==='u2').playerName,'—');
+  assert(!JSON.stringify(result.bucketSettlement||{}).includes(name));
   assert(!JSON.stringify(f.m.rows.get('publicTournaments/'+code)).includes(name));
   checks++;
  }

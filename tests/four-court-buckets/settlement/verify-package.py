@@ -1,4 +1,4 @@
-"""Pin both live source archives, shared adapter and exact bucket protocol code."""
+"""Pin reviewed source files, the shared adapter and exact bucket protocol code."""
 from pathlib import Path
 import hashlib,json
 TEST=Path(__file__).resolve().parent
@@ -13,6 +13,13 @@ assert {s['function'] for s in m['patches']}=={'ladderAutoSettlement','settleLad
 for s in m['patches']:
     source=TEST/'fixtures'/str(s['sourceSet'])/s['path']
     assert sha(source)==s['baselineFileSha256']
+    if s['function']=='ladderAutoSettlement':
+        readback=s['deployedSourceReadback']
+        assert s['archiveSha256'] is None and readback['fullArchiveVerified'] is False
+        assert readback['selectedFiles']=={
+            s['path']:sha(source),
+            'ladder-settlement-core.js':sha(source.with_name('ladder-settlement-core.js')),
+        }
     text=source.read_text()
     for e in s['edits']:
         assert text.count(e['before'])==1,e['before'][:100]

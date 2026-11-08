@@ -140,7 +140,7 @@ function createSettlementService({db=getFirestore(),serverTimestamp=()=>FieldVal
         const highestRankTier=plan.countsTowardCareer&&core.tierIndex(rankTier)>core.tierIndex(oldHigh)?rankTier:oldHigh;
         const playerPatch={
           uid:row.uid,
-          playerName:String(row.playerName||profile.realName||profile.displayName||profile.nickname||row.uid),
+          playerName:typeof profile.realName==='string'?(profile.realName.trim()||'—'):'—',
           currentSeason:plan.seasonId,
           seasonPoints:afterSeason,
           careerPoints:afterCareer,

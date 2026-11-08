@@ -7,9 +7,9 @@
       "function": "ladderAutoSettlement",
       "sourceSet": 10,
       "path": "ladder-auto-settlement.js",
-      "archiveSha256": "81063c0fc575378a75639e625f93c74e7e0daaf3aebf4baf1f4b9c2645d1c5c9",
-      "baselineFileSha256": "4b7944b6c239aff6bedf7cc1ddd16e8be915d7abdbcbd2e1c61ccd5454e0a258",
-      "patchedFileSha256": "990ba39df0706cbb0c7d958b0b3b0a7b75bf8981f5078fa7c4cf32d907485940",
+      "archiveSha256": null,
+      "baselineFileSha256": "334106be168bcb3c3991c88fc42e282c5a1524b39293f6d50fa05d092c660ead",
+      "patchedFileSha256": "4c55957cf3c749cd4135f7d4be5f0966db738a404d3ac71c2ebe5dc80ecc3ccd",
       "edits": [
         {
           "before": "const core=require('./ladder-settlement-core');",
@@ -75,7 +75,18 @@
           "before": "      if(input.bucket&&priorTxSnaps.some(s=>s.exists))",
           "after": "      if(input.bucket&&playerSnaps.some(s=>s.exists&&s.data().currentSeason&&s.data().currentSeason!==plan.seasonId))return {ok:false,reason:'player-season-mismatch',permanent:true};\n      if(input.bucket&&priorTxSnaps.some(s=>s.exists))"
         }
-      ]
+      ],
+      "deployedSourceReadback": {
+        "revision": "ladderautosettlement-00003-kuf",
+        "generation": "1793906143803503",
+        "selectedFiles": {
+          "ladder-auto-settlement.js": "334106be168bcb3c3991c88fc42e282c5a1524b39293f6d50fa05d092c660ead",
+          "ladder-settlement-core.js": "9ba05fa0548bd6cb52225c18f8e52d078c70e10be3e6ef7c28a2e676abbf32a6"
+        },
+        "readbackBundleSha256": "cada094a2988fe7d8fdf431225bf802bab38dfaa8442c64a8e6557ef1022bc54",
+        "historicalArchiveSha256": "81063c0fc575378a75639e625f93c74e7e0daaf3aebf4baf1f4b9c2645d1c5c9",
+        "fullArchiveVerified": false
+      }
     },
     {
       "function": "settleLadderTournament",

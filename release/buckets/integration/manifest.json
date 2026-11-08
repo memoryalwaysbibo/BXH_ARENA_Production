@@ -961,7 +961,7 @@
       ]
     },
     "release/buckets/settlement/README.md": {
-      "blob": "dddd563943f4997841fb4f729e90d611a8a6bc44",
+      "blob": "7efb9827ecb4879fc527693eda9ba3d18e4a1e20",
       "components": [
         713
       ]
@@ -997,7 +997,7 @@
       ]
     },
     "release/buckets/settlement/candidate/10/ladder-auto-settlement.js": {
-      "blob": "3ecc13207b6146e352b2d19089afe9c7cce66cda",
+      "blob": "85d8a05a6e5042d4fc6eb8f03eed14982616e5ae",
       "components": [
         713
       ]
@@ -1015,13 +1015,13 @@
       ]
     },
     "release/buckets/settlement/patch-manifest.json": {
-      "blob": "f9fac7ee6e8038ab7f8fccbb0311cd9ca08f4b56",
+      "blob": "64f4f972c1239cce8d30545911f12ac2c65b37f7",
       "components": [
         713
       ]
     },
     "tests/four-court-buckets/settlement/fixture-sha256.json": {
-      "blob": "26beeae0a2137b94c4832c8c059e223937ef2222",
+      "blob": "57493303e5dbbff372b9a74d3c8f94c47635fd96",
       "components": [
         713
       ]
@@ -1045,7 +1045,7 @@
       ]
     },
     "tests/four-court-buckets/settlement/fixtures/10/ladder-auto-settlement.js": {
-      "blob": "61ff7a6e021c64d4e6206548f6e440cf92040abf",
+      "blob": "779c018786f721adae8d8ba4e9fc896b26f8dcfa",
       "components": [
         713
       ]
@@ -1105,7 +1105,7 @@
       ]
     },
     "tests/four-court-buckets/settlement/probe.cjs": {
-      "blob": "430e9911c47f5a29287e190bb08df00ec12436df",
+      "blob": "db1e651e3be00453144793329bc690478252e9bd",
       "components": [
         713
       ]
@@ -1117,7 +1117,7 @@
       ]
     },
     "tests/four-court-buckets/settlement/verify-package.py": {
-      "blob": "8c92cd54af6adb6dd047c6aafd18f919265e817a",
+      "blob": "42a4a7434add5963728a0231fd3a7201b6ec36b5",
       "components": [
         713
       ]
@@ -2327,6 +2327,13 @@
     "release/buckets/integration/live-followup-20261105.json": "Pin the received four-function follow-up, policy-blocked regional reads, 16-file referee match, exact family source closure/review archive and unresolved GET trigger digest difference.",
     "release/buckets/integration/close-idle-fence.patch": "Review-only patch against the shared historical restore archive source. Verify the scheduler's independently deployed source before release.",
     "tests/four-court-buckets/deletion/close-idle-fence.test.cjs": "Reproduce the historical idle close on a marked room; verify both roots, four marker types, and legacy close parity.",
-    "release/buckets/integration/close-idle-production-lease-fence.patch": "Extend the deployed scheduler's existing score ownership guard with migration and deletion markers. Review-only patch."
+    "release/buckets/integration/close-idle-production-lease-fence.patch": "Extend the deployed scheduler's existing score ownership guard with migration and deletion markers. Review-only patch.",
+    "release/buckets/settlement/README.md": "Document the selected deployed files, real-name policy, and remaining archive readback.",
+    "release/buckets/settlement/candidate/10/ladder-auto-settlement.js": "Preserve the deployed real-name policy when applying the existing canonical adapter.",
+    "release/buckets/settlement/patch-manifest.json": "Pin the current automatic settlement source files without claiming its full archive is verified.",
+    "tests/four-court-buckets/settlement/fixture-sha256.json": "Pin the newly captured automatic settlement entry point.",
+    "tests/four-court-buckets/settlement/fixtures/10/ladder-auto-settlement.js": "Use the independently read back automatic settlement entry point.",
+    "tests/four-court-buckets/settlement/probe.cjs": "Check the real-name policy and public data boundary for both settlement paths.",
+    "tests/four-court-buckets/settlement/verify-package.py": "Validate selected-file readback independently from full archive provenance."
   }
 }
