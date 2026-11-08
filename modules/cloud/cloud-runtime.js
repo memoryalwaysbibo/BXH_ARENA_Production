@@ -908,9 +908,9 @@
   }
   const managementQueueOperations=new Map();
   async function registrationManagementOperation(payload,requestedId){
-    const {code,action,registrationId,localId,expandBy}=payload;
+    const {code,action,registrationId,localId,expandBy,enabled:requestedEnabled}=payload;
     const actor=authHandle?.currentUser?.uid;
-    const key='bxh.registrationManagement.'+[actor,code,action,registrationId||localId,expandBy??0].join('.');
+    const key='bxh.registrationManagement.'+[actor,code,action,registrationId||localId,expandBy??0,...(action==="configure"?[requestedEnabled]:[])].join('.');
     let storedId=managementQueueOperations.get(key);
     if(!storedId){try{storedId=window.sessionStorage.getItem(key);}catch{}}
     const enabled=Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code);
@@ -943,8 +943,10 @@
       if(operation?.operationId===operationId){
         const result=operation.result;
         const target=registrationId||localId;
-        if(operation.state==='completed'&&result?.ok===true&&result.status===(action==='cancel'?'cancelled':'confirmed')&&
-           (registrationId?result.registrationId:result.localId)===target){
+        const expectedStatus={cancel:'cancelled',promote:'confirmed',demote:'waitlist'}[action];
+        const matches=action==='configure'?result?.enabled===requestedEnabled:
+          result?.status===expectedStatus&&(registrationId?result?.registrationId:result?.localId)===target;
+        if(operation.state==='completed'&&result?.ok===true&&matches){
           finish();
           return {...result,verified:true,registrationChanges:[]};
         }
@@ -1160,6 +1162,7 @@
       courtLifecycleEpoch:Number(state.courtLifecycleEpoch||0),
       callRevision:Number(state.callRevision||0),
       registrationRosterRevision:Number(state.registrationRosterRevision||0),
+      ...(state.meta?.eventAuthority==="community"&&state.meta.communityQuickRegistration===true&&Number.isSafeInteger(state.communityParticipantCount)&&state.communityParticipantCount>=0?{communityParticipantCount:state.communityParticipantCount}:{}),
       ...(state.onsiteWaitlistServerOwned===true?{onsiteWaitlistRuntimeRevision:state.onsiteWaitlistRuntimeRevision}:{}),
       systemClosure:state.systemClosure?{reason:'idle-24h',label:state.systemClosure.label||'',closedAt:state.systemClosure.closedAt||null,lastActivityAt:state.systemClosure.lastActivityAt||null,restoredAt:state.systemClosure.restoredAt||null}:null,
       eventInfo:buildPublicEventInfo(state),
@@ -1545,6 +1548,11 @@
       return runMyEventsPlayerOperation('roster',code,operationId=>callEngagementFunction("registrationRosterService",{...request,operationId},60000));
     },
     async configureAutoFill(code,enabled){
+      const result=await window.engagementService.registrationManagementOperation({action:"configure",code,enabled});
+      if(result){
+        const latest=await this.joinRoom(code,{serverOnly:true});
+        return latest.ok?{...result,state:latest.data}:result;
+      }
       return callEngagementFunction("registrationRosterService",{action:"configure",code,enabled,intent:"admin",operationId:crypto.randomUUID()},60000);
     },
 
@@ -1689,14 +1697,14 @@
       const pubRef=fx.doc(dbHandle,"publicTournaments",eventCode);
       const regRef=fx.doc(dbHandle,"tournaments",eventCode,"registrations",regId);
 
+      const runQueued=typeof window!=='undefined'&&window.engagementService?.registrationManagementOperation;
+      const queued=runQueued&&await runQueued({action,code:eventCode,registrationId:regId,...(action==="promote"?{expandBy}:{})},options.operationId);
+      if(queued){
+        const latest=await this.joinRoom(eventCode,{serverOnly:true});
+        return latest.ok?{...queued,state:latest.data}:queued;
+      }
       let unlimitedPromotion=false;
       if(action==="promote"){
-        const runQueued=typeof window!=='undefined'&&window.engagementService?.registrationManagementOperation;
-        const result=runQueued&&await runQueued({action,code:eventCode,registrationId:regId,expandBy},options.operationId);
-        if(result){
-          const latest=await this.joinRoom(eventCode,{serverOnly:true});
-          return latest.ok?{...result,state:latest.data}:result;
-        }
         const [tourSnap,pubSnap]=await Promise.all([fx.getDoc(tourRef),fx.getDoc(pubRef)]);
         if(tourSnap.exists()&&pubSnap.exists()){
           const tour=tourSnap.data()||{},pub=pubSnap.data()||{};
@@ -3496,8 +3504,9 @@ if(testerSession){
         const normalized=String(code).toUpperCase();
         const quickWaiting=community&&m.communityQuickRegistration===true&&!data.startedAt&&computeTournamentPhase(data)==="waiting";
         let syncSummary=community&&m.communityQuickRegistration===true&&options.syncCommunitySummary===true;
-        await fx.runTransaction(dbHandle,async tx=>{
+        const bracketReceipt=await fx.runTransaction(dbHandle,async tx=>{
           const ref=fx.doc(dbHandle,"tournaments",normalized),snap=await tx.get(ref);
+          if(options.bracketCommit&&!snap.exists())throw new Error('bracket-room-not-found');
           const overrideProfile=options.adminOperationalOverride
             ?await tx.get(fx.doc(dbHandle,USERS_COLLECTION,actorUid)):null;
           if(snap.exists()){
@@ -3505,6 +3514,7 @@ if(testerSession){
             if(Number(remoteDoc.callRevision||0)!==Number(data.callRevision||0)) throw new Error("call-state-stale");
             let remoteState=null;
             try{ remoteState=typeof remoteDoc.data==="string"?JSON.parse(remoteDoc.data):remoteDoc.data; }catch(e){}
+            if(options.bracketCommit&&(!remoteState?.id||remoteState.id!==data.id))throw new Error('bracket-room-changed');
             // Room ownership is established on creation, never by a later editor.
             // Use the server document as the source of truth, not the caller's
             // possibly stale local room or current signed-in user's display name.
@@ -3665,19 +3675,32 @@ if(testerSession){
           Object.assign(privatePayload,onsiteFence,courtLifecycleWritePatch(snap.exists()?snap.data():{},data));
           Object.assign(publicPayload,onsiteFence);
           privatePayload.data=JSON.stringify(data);
-          publicPayload.bracketView=JSON.stringify(buildPublicMirrorFields(data));
+          const publicData=buildPublicMirrorFields(data);
+          publicPayload.bracketView=JSON.stringify(publicData);
           tx.set(ref,privatePayload,{merge:true});
-          tx.set(fx.doc(dbHandle,"publicTournaments",normalized),publicPayload,{merge:true});
+          const publicRef=fx.doc(dbHandle,"publicTournaments",normalized);
+          if(options.bracketCommit){
+            // Require the existing mirror without a separate preflight read.
+            tx.update(publicRef,publicPayload);
+            if(!options.adminOperationalOverride){
+              const committedState=JSON.parse(privatePayload.data);
+              for(const key of ['createdBy','ownerUid','createdByRole'])if(privatePayload[key]||fencedDoc[key])committedState[key]=privatePayload[key]||fencedDoc[key];
+              return {ok:true,committed:true,data:committedState,publicData};
+            }
+            return;
+          }
+          tx.set(publicRef,publicPayload,{merge:true});
         });
         if(syncSummary){
           try{const summary=await this.syncCommunityRegistrationSummary(normalized);data.communityParticipantCount=summary.communityParticipantCount;}
           catch(e){console.warn("[community participant summary pending]",e);}
         }
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = null;
-        return true;
+        return bracketReceipt??true;
       }catch(e){
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = (e&&e.code)||(e&&e.message)||"unknown";
         console.warn("雲端同步寫入失敗", e);
+        if(options.bracketCommit&&['permission-denied','firestore/permission-denied'].includes(e?.code))throw e;
         return false;
       }
     },

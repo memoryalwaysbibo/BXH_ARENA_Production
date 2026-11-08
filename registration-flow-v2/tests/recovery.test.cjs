@@ -196,4 +196,55 @@ test('manager cancellation, manual promotion and new signup share the room lease
  assert.deepEqual([expanded.capacity,expanded.confirmedCount,expanded.waitlistCount],[10,3,0]);
  const expandedAudit=await audit(code,3);
  assert.deepEqual([expandedAudit.summary.confirmed,expandedAudit.summary.waitlist],[3,0]);
+
+ const toggle={action:'configure',enabled:true,operationId:'admin-enable-autofill'};
+ const demote={action:'demote',registrationId:late,operationId:'admin-demote-player'};
+ await assert.rejects(send(late,toggle),/permission-denied/);
+ await assert.rejects(send(late,demote),/permission-denied/);
+ await send(admin,toggle);
+ await send(admin,demote);
+ await drainAll(workers,code);
+ assert.equal((await status(admin,toggle.operationId)).operation.result.enabled,true);
+ assert.equal((await status(admin,demote.operationId)).operation.result.status,'waitlist');
+ const demoted=await audit(code,3);
+ assert.deepEqual([demoted.summary.confirmed,demoted.summary.waitlist],[2,1]);
+ const currentPrivate=JSON.parse((await privateRef.get()).data().data);
+ const currentPublic=JSON.parse((await publicRef.get()).data().bracketView);
+ assert.equal(currentPrivate.meta.registrationAutoFillEnabled,true);
+ assert.equal(currentPublic.meta.registrationAutoFillEnabled,true);
+ assert.equal(currentPrivate.waitlistPlayers.find(p=>p.registrationId===late).waitRank,1);
+ assert.ok(!currentPublic.players.some(p=>p.id==='reg_'+late));
+});
+
+test('a job added after the active batch was read can retry its own event',async()=>{
+ const {code,ids:[first,second]}=await seed(2),entered=deferred(),resume=deferred();
+ const active=service({beforeExecute:async()=>{entered.resolve();await resume.promise;}}),other=service();
+ const firstRequest=request(code,first),secondRequest=request(code,second);
+ const firstRef=active.jobRef(code,first,firstRequest.operationId),secondRef=other.jobRef(code,second,secondRequest.operationId);
+ await active.enqueue(first,firstRequest);
+ const delivery=active.drainCreatedJob(code,firstRef.id);
+ await entered.promise;
+ try{
+  await other.enqueue(second,secondRequest);
+  await assert.rejects(other.drainCreatedJob(code,secondRef.id),/queue-delivery-pending/);
+ }finally{
+  resume.resolve();
+  await delivery;
+ }
+ assert.equal((await secondRef.get()).data().state,'queued');
+ await other.drainCreatedJob(code,secondRef.id);
+ await other.drainCreatedJob(code,secondRef.id);
+ const a=await audit(code,2);
+ assert.equal(a.summary.completed,2);
+ assert.deepEqual(a.jobs.map(job=>job.attempts),[1,1]);
+});
+test('a bounded batch retries the triggering job if its turn has not arrived',async()=>{
+ const {code,ids:[first,second]}=await seed(2),worker=service();
+ await worker.enqueue(first,request(code,first));
+ const later=request(code,second),ref=worker.jobRef(code,second,later.operationId);
+ await worker.enqueue(second,later);
+ await assert.rejects(worker.drainCreatedJob(code,ref.id,{limit:1}),/queue-delivery-pending/);
+ assert.equal((await audit(code,1)).summary.completed,1);
+ await worker.drainCreatedJob(code,ref.id,{limit:1});
+ assert.equal((await audit(code,2)).summary.completed,2);
 });

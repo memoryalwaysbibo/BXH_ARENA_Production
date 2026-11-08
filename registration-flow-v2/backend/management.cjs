@@ -5,12 +5,18 @@ const matchesId=(pattern,value)=>typeof value==='string'&&pattern.test(value);
 const absent=value=>value===undefined||value==='';
 
 function managementOperation(data){
- const {action,code,operationId,registrationId,localId,expandBy}=data;
+ const {action,code,operationId,registrationId,localId,expandBy,enabled}=data;
  const operation={code,operationId};
  const payload={code,operationId,action,intent:'admin'};
  if(action==='cancel'&&Object.keys(data).every(key=>['action','code','operationId','registrationId','localId'].includes(key))){
   if(matchesId(registrationIdPattern,registrationId)&&absent(localId))return {...operation,route:'roster',payload:{...payload,registrationId}};
   if(matchesId(registrationIdPattern,localId)&&absent(registrationId))return {...operation,route:'roster',payload:{...payload,localId}};
+ }
+ if(action==='configure'&&typeof enabled==='boolean'&&Object.keys(data).every(key=>['action','code','operationId','enabled'].includes(key))){
+  return {...operation,route:'roster',payload:{...payload,enabled}};
+ }
+ if(action==='demote'&&matchesId(registrationIdPattern,registrationId)&&Object.keys(data).every(key=>['action','code','operationId','registrationId'].includes(key))){
+  return {...operation,route:'promotion',payload:{...payload,registrationId}};
  }
  if(action==='promote'&&Object.keys(data).every(key=>['action','code','operationId','registrationId','expandBy'].includes(key))&&[0,8].includes(expandBy??0)){
   if(matchesId(registrationIdPattern,registrationId))return {...operation,route:'promotion',payload:{...payload,registrationId,expandBy:expandBy??0}};
@@ -50,13 +56,13 @@ const isUnlimitedRoom=room=>room?.eventAuthority==='community'&&room.communityQu
 // fields through to it. It must execute its mutation through the fenced store.
 function createQueuedPromotion({promote,roster}){
  return db=>async req=>{
-  const {code,operationId,registrationId,expandBy}=req.data;
+  const {code,operationId,registrationId,action,expandBy}=req.data;
   const [room,mirror]=await db.getAll(db.doc('tournaments/'+code),db.doc('publicTournaments/'+code));
   if(isUnlimitedRoom(room.data())&&isUnlimitedRoom(mirror.data())){
-   if(expandBy!==0)throw Error('promotion-route-not-supported');
+   if(action!=='promote'||expandBy!==0)throw Error('promotion-route-not-supported');
    return roster(db)(req);
   }
-  return promote(db)({auth:req.auth,data:{code,operationId,expandBy,registrationId}});
+  return promote(db)({auth:req.auth,data:{code,operationId,registrationId,...(action==='demote'?{action}:{expandBy})}});
  };
 }
 

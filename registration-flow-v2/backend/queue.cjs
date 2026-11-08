@@ -4,7 +4,7 @@ const digest=value=>createHash('sha256').update(value).digest('hex');
 const canonical=value=>JSON.stringify(value===null||typeof value!=='object'?value:Array.isArray(value)?value.map(x=>JSON.parse(canonical(x))):Object.fromEntries(Object.keys(value).sort().map(k=>[k,JSON.parse(canonical(value[k]))])));
 const active=u=>u?.active===true&&!u.deleted&&!['deleted','disabled','frozen'].includes(u.accountStatus);
 const millis=t=>t?.toMillis?t.toMillis():Number(t)||0;
-const businessRejections=new Set(('auth-required not-found room-password-required operation-conflict onsite-waitlist-managed corrupt-state family-lottery-unavailable tournament-started registration-state-conflict permission-denied not-enabled not-open-yet closed profile-incomplete invalid-participants child-not-found roster-locked child-eligibility-required already-registered full allocation-changed invalid-operation cancel-deadline-passed not-registered nothing-to-cancel bracket-locked selection-managed team-roster-managed bucket-scoring-required unlimited-quick-registration-required not-waitlist invalid-registration-capacity invalid-registration-schedule capacity-full invalid-capacity-step promotion-route-not-supported operation-outdated qr-checkin-stale court-lifecycle-stale roster-too-large online-registration-required invalid-request unauthenticated public-mirror-stale').split(' '));
+const businessRejections=new Set(('auth-required not-found room-password-required operation-conflict onsite-waitlist-managed corrupt-state family-lottery-unavailable tournament-started registration-state-conflict permission-denied not-enabled not-open-yet closed profile-incomplete invalid-participants child-not-found roster-locked child-eligibility-required already-registered full allocation-changed invalid-operation cancel-deadline-passed not-registered nothing-to-cancel bracket-locked selection-managed team-roster-managed bucket-scoring-required unlimited-quick-registration-required not-waitlist invalid-registration-capacity invalid-registration-schedule capacity-full invalid-capacity-step promotion-route-not-supported operation-outdated qr-checkin-stale court-lifecycle-stale roster-too-large online-registration-required invalid-request unauthenticated public-mirror-stale not-confirmed').split(' '));
 const fail=reason=>Object.assign(Error(reason),{reason});
 function safeResult(result,job){
  const out={};
@@ -18,7 +18,7 @@ function validate(uid,input){
  const code=String(input?.code||'').toUpperCase();
  if(!/^BXH-[A-Z0-9]{4,16}$/.test(code)||!['family','roster','promotion'].includes(input?.route)||!/^[A-Za-z0-9_-]{8,100}$/.test(input?.operationId||''))throw fail('invalid-operation');
  const d=JSON.parse(JSON.stringify(input.payload||{}));
- const allowed={family:['join','cancel','syncSummary'],roster:['cancel','promote','configure'],promotion:['promote']}[input.route];
+ const allowed={family:['join','cancel','syncSummary'],roster:['cancel','promote','configure'],promotion:['promote','demote']}[input.route];
  if(!allowed.includes(d.action)||d.code!==code||d.operationId!==input.operationId)throw fail('invalid-operation');
  if(Buffer.byteLength(JSON.stringify(d))>12000)throw fail('invalid-operation');
  return {uid,code,route:input.route,operationId:input.operationId,payload:d};
@@ -31,7 +31,8 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
  if(!handlers?.family||!handlers?.roster||!FieldValue)throw Error('queue-dependencies-required');
  const rooms=db.collection('_registrationQueueV2');
  const roomRef=code=>rooms.doc(code);
- const jobRef=(code,uid,operationId)=>roomRef(code).collection('_registrationQueueJobsV2').doc(digest(uid+'|'+operationId));
+ const jobsRef=code=>roomRef(code).collection('_registrationQueueJobsV2');
+ const jobRef=(code,uid,operationId)=>jobsRef(code).doc(digest(uid+'|'+operationId));
  const checkLease=(lease,token)=>{if(lease?.owner!==workerId||lease?.token!==token||millis(lease.until)<=clock())throw fail('queue-lease-lost');};
  async function enqueue(uid,input,authorize){
   const value=validate(uid,input),ref=jobRef(value.code,uid,value.operationId),hash=digest(canonical({route:value.route,payload:value.payload}));
@@ -109,7 +110,7 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
   const token=await acquire(code);if(!token)return {busy:true,processed:0};
   const started=clock();let processed=0;
   try{
-   const snapshots=await roomRef(code).collection('_registrationQueueJobsV2').where('state','in',['queued','running']).orderBy('acceptedAt').limit(limit).get();
+   const snapshots=await jobsRef(code).where('state','in',['queued','running']).orderBy('acceptedAt').limit(limit).get();
    for(const snap of snapshots.docs){
     if(clock()-started>=budgetMs)break;
     const job=await claim(code,snap.ref,token);if(!job)break;
@@ -126,6 +127,15 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
    return {busy:false,processed};
   }finally{await release(code,token);}
  }
+ async function drainCreatedJob(code,jobId,options){
+  const ref=jobsRef(code).doc(jobId);
+  const pending=async()=>['queued','running'].includes((await ref.get()).data()?.state);
+  if(!await pending())return;
+  await drain(code,options);
+  // Another worker may already have read its batch, or this batch may have
+  // stopped early. Leave the event retryable until its own job is settled.
+  if(await pending())throw fail('queue-delivery-pending');
+ }
  async function sweep(){
   // A sweeper is a recovery path, not an unbounded scan of every tournament.
   const pending=await db.collectionGroup('_registrationQueueJobsV2').where('state','in',['queued','running']).limit(200).get();
@@ -133,6 +143,6 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
   for(const code of codes)await drain(code);
   return {rooms:codes.length};
  }
- return {enqueue,status,drain,sweep,jobRef};
+ return {enqueue,status,drain,drainCreatedJob,sweep,jobRef};
 }
 module.exports={createQueue,validate,businessRejections,safeResult};

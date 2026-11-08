@@ -223,3 +223,26 @@ test('management queue restores the same promotion receipt after a lost response
  assert.deepEqual(requests.map(({action,operationId})=>[action,operationId]),[['promote','original-promotion'],['status','original-promotion']]);
  assert.equal(sessionStorage.length,0);
 });
+
+test('management queue matches the requested auto-fill value and the demotion receipt',async()=>{
+ const cloud=fs.readFileSync(require.resolve('../modules/cloud/cloud-runtime.js'),'utf8');
+ const helper=cloud.slice(cloud.indexOf('  const managementQueueOperations='),cloud.indexOf('  let playerRegistrationFeedback='));
+ const sessionStorage=memory(),requests=[];
+ const context={
+  window:{sessionStorage,BXH_REGISTRATION_FLOW_V2_ROOMS:[CODE]},
+  authReady:true,authHandle:{currentUser:{uid:'staff1'}},
+  callEngagementFunction:async(name,request)=>{
+   assert.equal(name,'registrationRosterQueueV2');
+   requests.push(request);
+   const result=request.action==='status'?{ok:true,enabled:false}:
+    request.action==='configure'?{ok:true,enabled:false}:{ok:true,status:'waitlist',registrationId:'candidate'};
+   return {operation:{operationId:request.operationId,state:'completed',result}};
+  }
+ };
+ const run=vm.runInNewContext(helper+'\nregistrationManagementOperation;',context);
+ await assert.rejects(run({code:CODE,action:'configure',enabled:true},'enable-original'),/registration-management-pending/);
+ assert.equal((await run({code:CODE,action:'configure',enabled:false},'disable-original')).enabled,false);
+ assert.equal((await run({code:CODE,action:'demote',registrationId:'candidate'},'demote-original')).status,'waitlist');
+ assert.equal(sessionStorage.length,1);
+ assert.deepEqual(requests.map(x=>x.operationId),['enable-original','disable-original','demote-original']);
+});
