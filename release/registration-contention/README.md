@@ -6,6 +6,7 @@ This directory is an **offline source candidate**, not the active Functions impl
 
 ## Change
 
+- Registration mutations now use the existing transactional user snapshot for account validation instead of making an additional user read before admission. `mine` and `history` keep their pre-transaction account checks. No registration document, public/private count, roster projection, QR check-in, or start-of-match writer changes are part of this patch.
 - Preserve the captured live read-only preview; this optimization already exists in generation 1793592677411039.
 - Preserve the live initial getAll and reuse of the self-registration snapshot; selected child reads and the QR adapter remain unchanged.
 - The module shares a bounded admission scheduler for join/cancel/syncSummary per room in one process. Only one mutation per room enters its database work at a time. Auth, time, capacity, operation receipts and allocations are evaluated after admission.
@@ -36,6 +37,8 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8196 GCLOUD_PROJECT=demo-bxh-registration40 no
 The emulator must run locally on that exact port and demo project; the harness refuses different environment selectors. `CANDIDATE_ONLY=1` skips the slow baseline comparisons. CI uses the full comparison. Baseline contention failures are observations, while under-capacity candidate failures fail the run. Each baseline/candidate uses a newly seeded room. Backend previews start together and each client immediately submits the returned allocation, modeling the two-call frontend sequence.
 
 ## Release gates
+
+Before considering this additional read optimization for release, run the roster/check-in regression suites and verify a newly confirmed self/child registration is present in the authoritative room roster and manual/QR check-in lookup. An empty or stale player list blocks release even if admission latency improves.
 
 1. Recapture the **live** familyRegistration archive and full service configuration. Require the pinned handler/dependencies or rebase/revalidate the patch; do not deploy the old fixture as a whole Functions source tree.
 2. Compose only candidate handler + admission module into that freshly captured archive, retaining current dependencies, entrypoint, QR adapter, environment variables, runtime options and My Events proof configuration. Source review and CI do not satisfy this gate.

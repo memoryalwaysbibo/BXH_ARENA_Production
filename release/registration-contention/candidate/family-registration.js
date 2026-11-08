@@ -17,7 +17,11 @@ const {createAdmission}=require('./registration-admission.cjs');
 const admit=createAdmission();
 function createFamilyRegistration(db,clock=Date.now,{myEventsProofEnabled=false}={}){const handle=async req=>{
  const uid=req.auth?.uid,d=req.data||{},now=clock();if(!uid)throw Error('auth-required');
- const user=await db.doc('users/'+uid).get();if(!active(user.data()))throw Error('auth-required');
+ // History and mine do not enter the transaction below. All other supported
+ // actions read and verify this same user inside the authoritative transaction.
+ if(d.action==='history'||d.action==='mine'){
+  const user=await db.doc('users/'+uid).get();if(!active(user.data()))throw Error('auth-required');
+ }
  const code=String(d.code||'').toUpperCase();
  if(d.action==='history'){
   const fs=await db.doc('familyPlayers/'+uid).get();if(!(fs.data()?.profiles||[]).some(p=>p.id===d.childId))throw Error('child-not-found');

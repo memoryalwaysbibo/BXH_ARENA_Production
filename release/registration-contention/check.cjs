@@ -3,6 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 assert.equal(process.env.FIRESTORE_EMULATOR_HOST,'127.0.0.1:8196');
 assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-registration40');
 const {initializeApp}=require('firebase-admin/app');
+const {createStaffRosterHandler}=require('../../staff-roster/functions/service.cjs');
 initializeApp({projectId:process.env.GCLOUD_PROJECT});
 const fixture=require('./live-source-20261105.json');
 for(const [file,digest]of Object.entries(fixture.files))assert.equal(crypto.createHash('sha256').update(fixture.blobs[digest]).digest('hex'),digest,file);
@@ -73,6 +74,9 @@ async function semantics(){
  const replay=await call(req);assert.equal(replay.replayed,true);const current=await call({auth:{uid},data:{action:'mine',code}});assert.equal(current.rows[0].status,'cancelled');
  const {code:other}=await seed(db,1);await db.doc('users/'+uid).update({active:false});
  await assert.rejects(call({auth:{uid},data:{action:'preview',code:other,childIds:[null]}}),/auth-required/);
+ await assert.rejects(call({auth:{uid},data:{action:'mine',code}}),/auth-required/);
+ await assert.rejects(call({auth:{uid},data:{action:'history',childId:'kid1'}}),/auth-required/);
+ await assert.rejects(call({auth:{uid},data:{action:'join',code:other,childIds:[null],childEligibilityConfirmed:true,operationId:'disabled-user-join'}}),/auth-required/);
  const {code:limited,ids:[one,two,three]}=await seed(db,3,1,1);
  for(const [i,person]of [one,two].entries()){
   const preview=await call({auth:{uid:person},data:{action:'preview',code:limited,childIds:[null],childEligibilityConfirmed:true}});
@@ -87,6 +91,15 @@ async function semantics(){
  const preview=await call({auth:{uid:parent},data:{action:'preview',code:family,childIds:children,childEligibilityConfirmed:true}});await audit(db,family,0);
  assert.equal((await db.collection('familyPlayers/'+parent+'/registrationActions').get()).size,0);
  const joined=await call({auth:{uid:parent},data:{action:'join',code:family,childIds:children,childEligibilityConfirmed:true,allocation:preview.allocation,operationId:'family-all-three'}});assert.equal(joined.rows.length,3);await audit(db,family,3);
+ // Preparation/check-in staff list must read every committed self and child
+ // registration even before a bracket or QR roster sync has run.
+ const staff='staff-'+family;
+ await db.doc('users/'+staff).set({active:true,role:'staff'});
+ await db.doc('tournaments/'+family).update({eventAuthority:'official'});
+ const roster=await createStaffRosterHandler(db)({auth:{uid:staff},data:{code:family}});
+ assert.equal(roster.rows.length,3);
+ assert.deepEqual(roster.rows.map(row=>row.name).sort(),['Synthetic '+parent,'Synthetic child 1','Synthetic child 2'].sort());
+ assert(roster.rows.every(row=>row.status==='confirmed'&&row.source==='online'));
  for(const id of ['family_kid1','family_kid2']){
   const row=(await db.doc('tournaments/'+family+'/registrations/'+id).get()).data();assert.equal(row.guardianUid,parent);assert.equal(row.ladderEligible,false);assert.equal(row.activityEligible,false);
  }
