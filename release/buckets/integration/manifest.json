@@ -1810,7 +1810,7 @@
     },
     "release/buckets/integration/writer-discovery-20261105.md": {
       "components": [],
-      "blob": "961a9d17dc249cd487f16d90c0577a63fdf0c667"
+      "blob": "d327abffef31c762966f456635646a44b5c47611"
     },
     "tests/four-court-buckets/interactions/fixtures/9/registration-admission.cjs": {
       "components": [],
@@ -2315,7 +2315,7 @@
     "release/buckets/completion/hosting-guard.cjs": "Move rebuild's hostStats conflict read after room/ledger/bucket validation and before all writes, avoiding the early-stats/ledger lock inversion observed during count/sync/sync contention; retain transaction conflict detection, authorization and SDK retry behavior.",
     "tests/four-court-buckets/completion/hosting-probe.cjs": "Regress final stats conflict-barrier ordering with existing/missing ledgers and both QR modes; inject concurrent stats changes and require transaction retry; previous early-read implementation fails.",
     "scripts/bucket-writer-followup.py": "Target only me-central2 failed service/job reads and four Function GETs; capture current immutable manageRefereeSeats/familyRegistration sources with before/after config checks; retain safe HTTP error codes without raw environment values/messages.",
-    "release/buckets/integration/writer-discovery-20261105.md": "Record the selected historical archive review and the distinct scheduler source readback gate.",
+    "release/buckets/integration/writer-discovery-20261105.md": "Record the selected historical archive review and the distinct scheduler source readback gate. Record the independent production scheduler hash and preserve the exact-source review gate.",
     "release/buckets/interactions/candidate/9/family-registration.js": "Reapply the original single bucket-ownership guard to the exact 2026-11-05 deployed familyRegistration source, preserving PR730 admission/coalescing, deadline revalidation, getAll and read-only previews.",
     "tests/four-court-buckets/interactions/probe.cjs": "Use native timer globals for the deployed admission module; verify coalescing, conflicting operation rejection, same-room serialization and read-only/marked previews, in addition to all original 363 checks.",
     "release/buckets/integration/live-followup-20261105.json": "Pin the received four-function follow-up, policy-blocked regional reads, 16-file referee match, exact family source closure/review archive and unresolved GET trigger digest difference.",

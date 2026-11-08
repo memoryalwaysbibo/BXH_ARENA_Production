@@ -104,3 +104,20 @@ readback before drawing conclusions about production or preparing its package.
 The region policy gap and wider writer inventory remain open. The bundle
 reported zero production writes. No deployment or room activation is part of
 this review.
+
+### Formal idle-close source readback
+
+[Functions Actions run 42511565083](https://github.com/memoryalwaysbibo/BXH_ARENA_Functions_Production/actions/runs/42511565083)
+read the independently deployed `closeIdleTournaments` twice and checked its
+immutable source generation. Artifact 13629283848 matched the published ZIP
+digest `e847462ef215d6ad1950a6b4cfdfce82347c91e1648d73932e49959f290d26ac`.
+
+- Revision `closeidletournaments-00010-qum`, generation `1793642920499912`.
+- Source archive SHA-256 `27fde56ae6194daaf31725cf388d5bc15f233b21ffe10b68a863a090ef112223`.
+- `operations.js` SHA-256 `ea120e9b9104d8e96ce367a750adb6dd0e84d495a4c12067df444100f468bd3a`.
+
+The deployed module differs from all inspected operations fixtures and
+candidates. The report did not classify the deployed close path. Review the
+exact deployed closure before rebasing the historical candidate or deciding
+whether the scheduler already fences bucket rooms. The run recorded zero
+production writes.
