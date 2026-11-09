@@ -66,6 +66,9 @@ test('one operator action prepares every group bracket while only A opens', asyn
   assert.equal(db.rows.get('groupStagePlans/' + parentCode).groupDrawAll, true);
   const codes = db.rows.get('groupStagePlans/' + parentCode).roomCodes;
   assert.equal(new Set(Object.values(codes)).size, 4);
+  assert.deepEqual(opened.preDrawnRooms, codes);
+  assert.deepEqual((await coordinator.readOperatorStatus(parentCode, actor)).preDrawnRooms, codes);
+  assert.equal(db.rows.get('groupStageRoutes/' + parentCode).preDrawnRooms, undefined);
   for (const [key, code] of Object.entries(codes)) {
     const doc = db.rows.get('tournaments/' + code), state = JSON.parse(doc.data);
     const publicDoc = db.rows.get('publicTournaments/' + code);
@@ -89,6 +92,7 @@ test('one operator action prepares every group bracket while only A opens', asyn
   });
   const collected = await coordinator.collect(parentCode, 'A', aCode, actor);
   assert.equal(collected.next, 'B');
+  assert.deepEqual(collected.preDrawnRooms, codes);
   const next = await coordinator.openNext(parentCode, 'B', actor);
   assert.equal(next.current.code, codes.B);
   assert.equal(db.rows.get('tournaments/' + codes.B).groupStage.key, 'B');
