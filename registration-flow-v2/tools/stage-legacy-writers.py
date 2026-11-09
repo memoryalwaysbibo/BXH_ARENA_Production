@@ -46,6 +46,11 @@ def stage_archive(name, member, original, candidate, scratch):
             if (path.is_absolute() or ".." in path.parts or "\\" in entry.filename
                     or stat.S_ISLNK(entry.external_attr >> 16)):
                 raise ValueError("unsafe-archive-entry")
+        if name in ("familyRegistration", "registrationRosterService"):
+            expected_files = json.loads((ROOT / "release-inputs.json").read_text())[name]["files"]
+            actual_files = {entry.filename: digest(source.read(entry)) for entry in entries if not entry.is_dir()}
+            if actual_files != expected_files:
+                raise ValueError("full-source-baseline-mismatch: " + name)
         package_bytes = source.read("package.json")
         package = json.loads(package_bytes)
         main = PurePosixPath(package.get("main", "index.js"))
