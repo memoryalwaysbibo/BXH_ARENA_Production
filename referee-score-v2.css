@@ -236,12 +236,22 @@
   box-shadow:0 0 18px rgba(225,187,88,.10),inset 0 1px 0 rgba(255,255,255,.08);
 }
 
-/* Recent scoring chip */
+/* A single row keeps the controls below it in place as scores accumulate. */
+.referee-workstation > .score-log{
+  flex-wrap:nowrap;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:none;
+}
+.referee-workstation > .score-log::-webkit-scrollbar{display:none;}
+.referee-workstation > .score-log span{
+  flex:0 0 auto;
+  white-space:nowrap;
+}
 .court-grid:not(.court-grid-4fit) .referee-workstation .score-log{
   margin:11px 14px 0;
   display:flex;
   gap:6px;
-  flex-wrap:wrap;
 }
 .court-grid:not(.court-grid-4fit) .referee-workstation .score-log span{
   display:inline-flex;
@@ -263,6 +273,12 @@
 }
 
 /* Result actions */
+.ref-result-actions .ref-result-label{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
 .court-grid:not(.court-grid-4fit) .referee-workstation .ref-result-actions{
   margin:10px 14px 14px!important;
   display:grid;
@@ -319,12 +335,14 @@
   }
   .court-grid:not(.court-grid-4fit) .referee-workstation .match-status-controls .msc-btns{
     display:grid;
-    grid-template-columns:repeat(2,minmax(0,1fr));
+    grid-template-columns:repeat(3,minmax(0,1fr));
     width:100%;
   }
   .court-grid:not(.court-grid-4fit) .referee-workstation .match-status-controls .msc-btns .btn{
     width:100%;
     min-width:0;
+    min-height:44px;
+    white-space:nowrap;
   }
   .court-grid:not(.court-grid-4fit) .referee-workstation .ref-vs-arena.standard{
     grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);

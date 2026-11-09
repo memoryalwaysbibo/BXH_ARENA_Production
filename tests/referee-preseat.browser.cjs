@@ -12,7 +12,7 @@ const confirmEnd=core.indexOf('// v13.14.2',confirmStart);
 const ackStart=core.indexOf('  const modalConfirmBtn = document.getElementById("modal-confirm-btn");',core.indexOf('function bindDynamicInputs('));
 const ackEnd=core.indexOf('  const ta = document.getElementById("player-textarea");',ackStart);
 assert(confirmStart>0&&confirmEnd>confirmStart&&ackStart>0&&ackEnd>ackStart);
-const productionFunctions=['canUseRefereeSyncRecovery','refereeSyncRecoveryControlsHtml','refereeWorkstationHeader','refereeSwapControl','renderRefereeScorePanel','refereeWaitingControls','renderWaitingRefereeCourt','courtForceExitConfirmation','renderModal','openModal','closeModal'].map(fn).join('\n');
+const productionFunctions=['canUseRefereeSyncRecovery','refereeSyncRecoveryControlsHtml','refereeWorkstationHeader','refereeSwapControl','matchStatusBarHtml','canCourtSwapSource','refereeCourtSwapButton','renderRefereeScorePanel','refereeWaitingControls','renderWaitingRefereeCourt','courtForceExitConfirmation','renderModal','openModal','closeModal'].map(fn).join('\n');
 const courtView=core.slice(core.indexOf('let refereeCourtView='),core.indexOf('/* ==== tab: settings ==== */'));
 const stableView=core.slice(core.indexOf('let refereeTemplates='),core.indexOf('function renderApp()'));
 const selectStart=core.indexOf('  if(action==="referee-select-court"){');
@@ -27,15 +27,18 @@ assert(selectStart>0&&selectEnd>selectStart);
   await page.route('**/*',r=>{external.push(r.request().url());return r.abort();});
   await page.setContent('<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+styles+'</style><div id="app"></div></html>');
   await page.addScriptTag({content:fs.readFileSync(path.join(repo,'modules/main-app/referee-seats.js'),'utf8')});
+  await page.addScriptTag({content:fs.readFileSync(path.join(repo,'modules/main-app/match-utils.js'),'utf8')});
   await page.addScriptTag({content:`
     var appPhase='app',activeTab='referee',communityRoomActiveTab='referee',judgeUid='judge';
-    var focusLab=false,restricted=false,allowed=true;
+    var focusLab=false,restricted=false,allowed=true,faultSaving=false;
     const currentAuthUid=()=>judgeUid;
     var state={id:'fixture',cloudCode:'BXH-TEST',meta:{stations:6,refereeSeatsV1:{version:1,revision:1,courts:{},requests:{}}},matches:[],bracketSize:0};
     var pendingModal=null,courtRetirementBusy=false,executed=[],seatWrites=[],toasts=[];
     const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const refereeStageLabel=()=> '第一輪',canOperateCurrentTournament=()=>false,isCommunityRoomOwner=()=>false,refereeBracketRoundtripNav=()=>'',courtAtmosphereStyle=()=>'',refereeDisplayForStation=()=> '測試裁判',refereeStationStatus=()=>({label:'等待中',cls:'waiting'}),stationCompletedCount=()=>0,refereeStationRestrictionEnabled=()=>true,canForceExitCourt=()=>true,canManageCourtRetirement=()=>true;
-    const POINT_LABELS={spin:'旋轉',knockout:'擊飛',burst:'爆裂',extreme:'極限'},canOperateStation=n=>!restricted||(n===1&&allowed),checkWinnerSide=()=>null,refereeFaultWritePending=()=>false,refereeFaultCount=()=>0,refereeFaultLast=()=>null,refereeViewClass=()=>'',refereeCourtSwapButton=()=>'',matchStatusBarHtml=()=> '準備中';
+    const {matchHasDecisionData}=BXHMatchUtils;
+    const MATCH_STATUS_LABELS={ready:'準備中',in_progress:'進行中'};
+    const POINT_LABELS={spin:'旋轉勝利＋1分',knockout:'擊飛勝利＋2分',burst:'爆裂勝利＋2分',extreme:'極限勝利＋3分'},canOperateStation=n=>!restricted||(n===1&&allowed),checkWinnerSide=()=>null,refereeFaultWritePending=m=>m.id==='m0'&&faultSaving,refereeFaultCount=()=>0,refereeFaultLast=()=>null,refereeViewClass=()=>'',cloudAvailable=()=>true,cloudStatus='connected';
     const playerName=id=>({a:'測試選手甲',b:'測試選手乙'})[id]||id,showToast=m=>toasts.push(m),executeCourtForceAction=change=>executed.push(change),shouldBindLobbyInput=()=>true;
     ${productionFunctions}
     ${courtView}
@@ -180,6 +183,60 @@ assert(selectStart>0&&selectEnd>selectStart);
   assert.equal(await page.locator('#court-card-2 [data-action="score"]:not(:disabled)').count(),0);
   await selector.getByRole('button',{name:'全部台',exact:true}).tap();
   assert.equal(await page.locator('.referee-workstation').count(),12);
+  for(const name of ['全部台','台1']){
+    await selector.getByRole('button',{name,exact:true}).tap();
+    for(const width of [320,390,960]){
+      await page.setViewportSize({width,height:844});
+      const changes=await page.evaluate(()=>{
+        const match=state.matches[0];
+        allowed=true;
+        Object.assign(match,{status:'ready',scoreA:0,scoreB:0,log:[]});
+        render();
+        const card=document.querySelector('#court-card-1');
+        const controls=['.ref-vs-arena','[data-action="score"]','.score-log','.ref-undo-score','.ref-confirm-result','[data-action="court-swap-start"]'];
+        const nodes=()=>controls.map(s=>document.querySelector('#court-card-1 '+s));
+        const originals=nodes();
+        originals[1].focus();
+        const rects=()=>nodes().map(el=>[el.offsetWidth,el.offsetHeight,el.getBoundingClientRect().top-card.getBoundingClientRect().top]);
+        const swap=originals.at(-1);
+        const ready=rects(),canSwapBefore=!swap.disabled;
+        match.status='in_progress';render();
+        const started=rects(),canSwapAfterStart=!swap.disabled;
+        const toolbarButtons=[...card.querySelectorAll('.match-status-controls .msc-btns button')];
+        const toolbar=toolbarButtons.map(el=>({label:el.textContent,top:el.offsetTop,left:el.offsetLeft,width:el.offsetWidth,height:el.offsetHeight}));
+        match.scoreA=3;match.log.push({side:'A',type:'extreme'});render();
+        const first=rects(),swapLocked=swap.disabled;
+        match.scoreA=2;match.scoreB=3;
+        match.log=Array.from({length:5},(_,i)=>({side:i<2?'A':'B',type:'spin'}));
+        render();
+        const more=rects(),log=originals[2],focusKept=document.activeElement===originals[1];
+        const logScrolls=log.scrollWidth>log.clientWidth,latest=log.querySelector('span').textContent;
+        faultSaving=true;render();const saving=rects();faultSaving=false;
+        Object.assign(match,{scoreA:0,scoreB:0,log:[]});render();
+        const sameNodes=nodes().every((el,i)=>el===originals[i]),unlockedAfterUndo=!swap.disabled;
+        match.status='paused';render();
+        const resume=card.querySelector('[data-action="resume-match-status"]')?.textContent;
+        return {ready,started,first,more,saving,toolbar,resume,canSwapBefore,canSwapAfterStart,swapLocked,logScrolls,latest,
+          unlockedAfterUndo,sameNodes,focusKept};
+      });
+      for(const key of ['started','first','more','saving'])assert.deepEqual(changes[key],changes.ready,name+' '+width+' '+key);
+      assert.ok(changes.canSwapBefore&&changes.canSwapAfterStart&&changes.swapLocked&&changes.unlockedAfterUndo);
+      assert.ok(changes.sameNodes,name+' '+width+' retains the score and control nodes');
+      assert.ok(changes.focusKept,name+' '+width+' retains focus while scoring');
+      assert.deepEqual(changes.toolbar.map(button=>button.label),['暫停','跳過','換場']);
+      assert.equal(changes.resume,'恢復');
+      assert.equal(new Set(changes.toolbar.map(button=>button.top)).size,1,name+' '+width+' toolbar stays in one row');
+      assert.ok(changes.toolbar.every((button,i)=>i===0||button.left>=changes.toolbar[i-1].left+changes.toolbar[i-1].width));
+      if(width<=390){
+        assert.ok(changes.logScrolls);
+        assert.ok(changes.toolbar.every(button=>button.height>=44));
+        assert.ok(Math.max(...changes.toolbar.map(button=>button.width))-Math.min(...changes.toolbar.map(button=>button.width))<=1);
+      }
+      assert.match(changes.latest,/測試選手乙/);
+    }
+  }
+  await page.setViewportSize({width:390,height:844});
+  console.log('PASS stable referee controls at match start, first score, multiple scores, fault save and undo in single and all-court views');
   await page.evaluate(()=>{appPhase='community-room';render();});
   await selector.getByRole('button',{name:'台3',exact:true}).tap();
   assert.equal(await page.locator('#court-card-3').count(),1);

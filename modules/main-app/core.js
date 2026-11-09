@@ -12017,10 +12017,12 @@ function courtSwapMatchBadge(m){
   const source=getMatch(courtSwapDraft.sourceMatchId);
   return canCourtSwapTarget(m,source)?'<span class="court-swap-badge">可交換</span>':"";
 }
-function refereeCourtSwapButton(m,stationNum,stationLocked){
-  if(!state.startedAt||stationLocked||!canCourtSwapSource(m)) return "";
+function refereeCourtSwapButton(m,stationNum,stationLocked,keepSlot=false){
+  if(!state.startedAt) return "";
+  const unavailable=stationLocked||!canCourtSwapSource(m);
+  if(unavailable&&!keepSlot) return "";
   const cloudBlocked=!!state.cloudCode&&(!cloudAvailable()||cloudStatus!=="connected");
-  return '<button class="btn btn-ghost btn-sm" data-action="court-swap-start" data-id="'+esc(m.id)+'" data-station="'+stationNum+'" '+(cloudBlocked?"disabled":"")+'>申請換場</button>';
+  return `<button class="btn btn-ghost btn-sm" data-action="court-swap-start" data-id="${esc(m.id)}" data-station="${stationNum}" ${unavailable||cloudBlocked?"disabled":""}>${keepSlot?"換場":"申請換場"}</button>`;
 }
 function renderCourtSwapSelectionBanner(){
   if(!courtSwapDraft) return "";
@@ -12328,20 +12330,21 @@ function renderRefereeScorePanel(match,stationNum){
     ? `撤銷上一筆失誤（${esc(pendingFaultName)}）`
     : (lastLog ? `撤銷上一筆得分（${lastLog.side==='A'?esc(aName):esc(bName)} ${POINT_LABELS[lastLog.type]||'得分'}）` : "撤銷上一筆得分");
   const undoAvailable=!!pendingFault||!!lastLog;
+  const confirmLabel=`確認比賽結果${winSide?`（建議：${winSide==='A'?esc(aName):esc(bName)} 勝）`:""}`;
+  const matchControlsOpen=!waiting&&!preStartLocked&&!m.completed&&m.status!=="completed";
+  const paused=m.status==="paused";
 
   return `
     ${!waiting&&stationLocked?`<div class="banner warn" style="margin:12px 16px 0;"><span>唯讀｜你未被指派 Court ${stationNum}，本台所有比分與判定操作已鎖定。</span></div>`:""}
     ${enchantmentPending?'<div class="banner warn" style="margin:12px 16px 0;"><span>附魔之戰尚在串接選手手機抽卡與裁判計分，此場暫不可送分。</span></div>':""}
     ${warnBanner}
-    ${faultSaving?'<div class="banner warn"><span>失誤判定儲存中，請稍候。</span></div>':""}
     ${!waiting&&preStartLocked?`<div class="banner warn" style="margin:12px 16px 0;"><span>賽事尚未開始。比分、判定與場次控制目前鎖定。</span></div>`:""}
     <div class="match-status-controls ref-match-toolbar">
       <span class="msc-label">場次狀態：${waiting?'等待對戰｜計分尚未開放':matchStatusBarHtml(m, true)}</span>
       <div class="msc-btns">
-        ${!waiting&&state.startedAt&&m.status==="in_progress" ? `<button class="btn btn-ghost btn-sm" data-action="pause-match-status" data-id="${m.id}" ${stationLocked?'disabled':''}>暫停比賽</button>` : ""}
-        ${!waiting&&state.startedAt&&m.status==="paused" ? `<button class="btn btn-ghost btn-sm" data-action="resume-match-status" data-id="${m.id}" ${stationLocked?'disabled':''}>恢復比賽</button>` : ""}
-        ${!waiting&&state.startedAt&&m.status!=="completed" ? `<button class="btn btn-ghost btn-sm" data-action="skip-match" data-id="${m.id}" ${stationLocked?'disabled':''}>跳過</button>` : ""}
-        ${waiting?"":refereeCourtSwapButton(m,stationNum,stationLocked)}
+        ${matchControlsOpen ? `<button class="btn btn-ghost btn-sm" data-action="${paused?'resume-match-status':'pause-match-status'}" data-id="${m.id}" ${stationLocked||(!paused&&m.status!=="in_progress")?'disabled':''}>${paused?'恢復':'暫停'}</button>` : ""}
+        ${matchControlsOpen ? `<button class="btn btn-ghost btn-sm" data-action="skip-match" data-id="${m.id}" ${stationLocked?'disabled':''}>跳過</button>` : ""}
+        ${matchControlsOpen?refereeCourtSwapButton(m,stationNum,stationLocked,true):""}
       </div>
     </div>
     <div class="ref-vs-arena standard${waiting?"":refereeViewClass(m)}">
@@ -12362,12 +12365,15 @@ function renderRefereeScorePanel(match,stationNum){
       </div>
     </div>
 
-    <div class="score-log">${m.log.map(l=>`<span>${l.side==='A'?esc(aName):esc(bName)} ${POINT_LABELS[l.type]}</span>`).join("") || '<span>尚無得分紀錄</span>'}</div>
+    <div class="score-log" role="region" aria-label="得分紀錄，最新在前" ${m.log.length||faultSaving?'tabindex="0"':''}>
+      ${faultSaving?'<span role="status">失誤判定儲存中，請稍候。</span>':""}
+      ${m.log.slice().reverse().map(l=>`<span>${l.side==='A'?esc(aName):esc(bName)} ${POINT_LABELS[l.type]}</span>`).join("") || '<span>尚無得分紀錄</span>'}
+    </div>
 
     <div class="btn-row ref-result-actions" style="margin-top:16px;">
-      <button class="btn btn-ghost ref-undo-score" ${waiting?'':`data-action="undo-score" data-id="${m.id}"`} ${!undoAvailable||locked||faultSaving||stationLocked?'disabled':''}>${undoLabel}</button>
+      <button class="btn btn-ghost ref-undo-score" ${waiting?'':`data-action="undo-score" data-id="${m.id}"`} ${!undoAvailable||locked||faultSaving||stationLocked?'disabled':''} title="${undoLabel}"><span class="ref-result-label">${undoLabel}</span></button>
       <button class="btn btn-ghost ref-rematch" ${waiting?'':`data-action="rematch" data-id="${m.id}"`} ${locked||faultSaving||stationLocked?'disabled':''}>本局重賽</button>
-      <button class="btn btn-primary ref-confirm-result" ${waiting?'':`data-action="confirm-result" data-id="${m.id}"`} ${winSide&&!faultSaving&&!stationLocked?'':'disabled'}>確認比賽結果${winSide?`（建議：${winSide==='A'?esc(aName):esc(bName)} 勝）`:''}</button>
+      <button class="btn btn-primary ref-confirm-result" ${waiting?'':`data-action="confirm-result" data-id="${m.id}"`} ${winSide&&!faultSaving&&!stationLocked?'':'disabled'} title="${confirmLabel}"><span class="ref-result-label">${confirmLabel}</span></button>
     </div>
 
   `;
@@ -12575,8 +12581,8 @@ function refereeTabOpen(){
   return (appPhase==="app"&&activeTab==="referee")||
     (appPhase==="community-room"&&communityRoomActiveTab==="referee");
 }
-function refereeCourtFocusActive(){
-  return refereeTabOpen()&&supportsRefereeCourtSelection()&&refereeCourtSelection()>0;
+function refereeStableRenderActive(){
+  return refereeTabOpen()&&supportsRefereeCourtSelection();
 }
 function renderRefereeCourtSelector(count,selected){
   if(count<2)return "";
@@ -20695,7 +20701,7 @@ function renderStableRefereeScreen(app,html,key){
 
 
 function renderRefereeCourtView(app,html){
-  if(refereeCourtFocusActive()){
+  if(refereeStableRenderActive()){
     renderStableRefereeScreen(app,html,refereeCourtViewKey());
     return true;
   }
@@ -20772,7 +20778,7 @@ function renderApp(){
     ${renderCloudTestResultModal()}
   `;
 
-  const refereeFocus=renderRefereeCourtView(app,appHtml);
+  const retainedRefereeControls=renderRefereeCourtView(app,appHtml);
   bindDynamicInputs();
 
   // Preserve the user's horizontal position during live updates; only center
@@ -20789,7 +20795,7 @@ function renderApp(){
         nav.scrollLeft=Math.min(maxLeft,Math.max(0,mainTabNavScrollLeft));
       }
       mainTabNavCenterRequested=false;
-      if(!refereeFocus||shouldBindLobbyInput(nav,"referee-tab-scroll",true)){
+      if(shouldBindLobbyInput(nav,"referee-tab-scroll",retainedRefereeControls)){
         nav.addEventListener("scroll",()=>{ mainTabNavScrollLeft=nav.scrollLeft; },{passive:true});
       }
     }
@@ -21336,7 +21342,7 @@ function bindDynamicInputs(){
 
   const modalConfirmBtn = document.getElementById("modal-confirm-btn");
   const forceExitAck=document.getElementById('court-force-exit-ack');
-  const retainedRefereeControls=refereeCourtFocusActive();
+  const retainedRefereeControls=refereeStableRenderActive();
   if(forceExitAck&&shouldBindLobbyInput(forceExitAck,"force-exit-ack",retainedRefereeControls))forceExitAck.addEventListener('change',()=>{
     if(pendingModal?.type!=='court-force-exit')return;
     pendingModal.acknowledged=forceExitAck.checked;
