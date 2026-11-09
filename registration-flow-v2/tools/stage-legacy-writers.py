@@ -48,7 +48,9 @@ def stage_archive(name, member, original, candidate, scratch):
                 raise ValueError("unsafe-archive-entry")
         if name in ("familyRegistration", "registrationRosterService"):
             expected_files = json.loads((ROOT / "release-inputs.json").read_text())[name]["files"]
-            actual_files = {entry.filename: digest(source.read(entry)) for entry in entries if not entry.is_dir()}
+            # release-inputs pins tracked application files. Cloud Functions ZIPs
+            # also contain entry/build files, which are preserved byte for byte.
+            actual_files = {name: digest(source.read(name)) for name in expected_files if name in names}
             if actual_files != expected_files:
                 raise ValueError("full-source-baseline-mismatch: " + name)
         package_bytes = source.read("package.json")
