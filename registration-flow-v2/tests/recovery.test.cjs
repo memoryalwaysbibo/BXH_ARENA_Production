@@ -6,6 +6,14 @@ const {create: createFeedback}=require('../../modules/main-app/registration-feed
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return {resolve,promise};};
 after(()=>db.terminate());
+test('queue recovery has collection-group indexing for job state',()=>{
+ const {fieldOverrides}=require('../indexes.json');
+ const state=fieldOverrides.find(field=>field.collectionGroup==='_registrationQueueJobsV2'&&field.fieldPath==='state');
+ assert.ok(state?.indexes.some(index=>index.queryScope==='COLLECTION_GROUP'&&index.order==='ASCENDING'),
+  'the scheduled sweep filters jobs by state across rooms');
+ assert.ok(state.indexes.some(index=>index.queryScope==='COLLECTION'&&index.order==='ASCENDING'),
+  'the lifecycle handler filters jobs by state within the current room');
+});
 test('five independent services accept the same operation once and reject changed payload',async()=>{
  const {code,ids:[uid]}=await seed(1),services=Array.from({length:5},()=>service());
  const req=request(code,uid);
