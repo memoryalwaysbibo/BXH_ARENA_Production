@@ -51,6 +51,7 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
    if(existing.exists){if(existing.data().requestHash!==hash)throw fail('operation-conflict');return;}
    const roomData=room?.data();
    if(requireRoomOwnership&&!registrationQueueOwnsRoom(roomData))throw fail('registration-queue-disabled');
+   if(requireRoomOwnership&&(roomData.startedAt||roomData.tournamentPhase==='live'))throw fail('tournament-started');
    if(authorize)await authorize(tx,user.data(),value,roomData);
    tx.create(ref,{...value,requestHash:hash,state:'queued',attempts:0,acceptedAt:FieldValue.serverTimestamp(),updatedAt:clock()});
   });

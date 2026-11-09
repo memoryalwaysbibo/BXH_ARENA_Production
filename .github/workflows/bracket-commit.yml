@@ -22,6 +22,7 @@ jobs:
       - run: npm install --no-save --ignore-scripts playwright@1.55.0
       - run: npx playwright install --with-deps chromium
       - run: node tests/bracket-commit.browser.cjs
+      - run: node tests/bracket-commit-v2.browser.cjs
       - run: node tests/e2e/community-quick-registration-browser.cjs
       - name: Verify continuous bracket routes and player selection
         env:
