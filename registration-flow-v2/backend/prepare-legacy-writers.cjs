@@ -29,6 +29,21 @@ const writers={
 };
 
 function prepareLegacyWriterSource(name,source){
+ if(name==='registrationInvitations'){
+  const expected='c655efe635e6278bb1060840871f16e32ef78659b7b360f88152480ecf6ba9ef';
+  const invite='  await db.runTransaction(async tx=>{const [prior,reg,ss]';
+  const accept="  const currentActor=(await tx.get(db.doc('users/'+uid))).data();";
+  verifySource(name,source,expected,invite);
+  if(source.split(accept).length!==2)throw Error('legacy-writer-patch-mismatch: '+name);
+  // The send transaction needs a fresh ownership read. Existing replies
+  // and acceptance of an already registered player take the original path.
+  return source.replace(invite,`  await db.runTransaction(async tx=>{
+   const room=await tx.get(tr);
+   if(!room.exists)throw Error('not-found');
+   if(room.data().registrationQueueVersion===2)throw Error('registration-queue-required');
+   const [prior,reg,ss]`).replace(accept,
+    "  if(t.registrationQueueVersion===2)throw Error('registration-queue-required');\n"+accept);
+ }
  if(Object.hasOwn(selectionHashes,name)){
   // Lottery and selection management are outside V2. Every mutating path
   // already reads the private room and calls this guard before its writes.
