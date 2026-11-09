@@ -61,7 +61,7 @@ CI 安裝固定 firebase-tools@13.35.1、firebase-admin@14.4.0、firebase-functi
 - 儲存庫的 `manageOnsiteWaitlist` 候選在同一交易讀取 V2 所有權，保留預覽及舊操作回執，拒絕新的專用備取寫入。此防護須以當前正式來源核對後接入。啟用檢查也必須拒絕由專用備取掌管的房間。
 - 舊瀏覽器可直接更新 JSON 字串 `tournaments.data` 及 `publicTournaments.bracketView`。Firestore Rules 無法逐欄辨識字串內的名單、報到、對戰內容。啟用前需先把允許的狀態寫入移到受信任函式，或隔離成可由 Rules 辨識的欄位，再封鎖瀏覽器對 V2 房的直接名單寫入。只改前端開關無法封鎖舊頁面。
 - `backend/compose-rules.cjs` 對 2026-11-04 已審查快照產出完整隔離候選，來源雜湊不符就停止。候選規則在 `registrationQueueVersion === 2` 時會封鎖私有房與公開鏡像的所有瀏覽器寫入，也封鎖名單子集合。任何仍依賴瀏覽器寫入的報到、抽籤、開賽、計分或房間設定須先改走可信任入口。發布前要重新讀取當前正式 Rules 並審查差異。`queue-rules.fragment` 不能單獨部署，新增 deny 不能推翻其他重疊 allow。
-- `registrationDrawV2` 與 `registrationStartV2` 是預設關閉的 callable 候選，各有獨立房間開關及 App Check，範圍為官方個人單淘汰、最多 320 人與 12 台，限有效管理員。抽籤從後端名單產生配對，請求只提供房間、前一版抽籤識別、名單修訂與操作 ID。開賽另接收提前開賽確認。兩者在交易內核對正取投影、對戰表及排隊中的名額操作，再原子寫入公私房與回執。正式封裝須包含共用對戰表、裁判引擎和 QR 防護依賴，房間開關應在同一交易內讀取。仍須把兩支 callable 接回管理頁，驗證重送、名單讀回與完整生命週期。
+- `registrationDrawV2` 與 `registrationStartV2` 是預設關閉的 callable 候選，各有獨立房間開關及 App Check，範圍為官方個人單淘汰、最多 320 人與 12 台，限有效管理員。抽籤從後端名單產生配對，請求只提供房間、前一版抽籤識別、名單修訂與操作 ID。開賽另接收提前開賽確認。兩者在交易內核對正取投影、對戰表及排隊中的名額操作，再原子寫入公私房與回執。管理頁透過預設未設定的 `BXH_REGISTRATION_LIFECYCLE_V2_ROOMS` 選擇後端路徑，並要求後端名單同步已開啟。當前分頁重新整理後仍能重試原操作。正式封裝須包含共用對戰表、裁判引擎和 QR 防護依賴，房間開關應在同一交易內讀取。尚待正式 App Check、試點房完整生命週期驗收。
 - 檢查 My Events 操作憑證、分桶、現場備取、抽籤與團體模式的相容性。抽籤／團體不在本候選的可啟用範圍。
 - 正式 Auth、App Check、實體瀏覽器及小範圍活動驗收，並準備來源／設定 readback 與 rollback。
 

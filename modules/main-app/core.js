@@ -9756,6 +9756,10 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
   if(!window.cloudSync||!window.cloudSync.listRegistrationsForAdmin) throw new Error("registration api unavailable");
   const publicRoom=await window.cloudSync.getPublicTournamentFull(context.code);
   requireRegistrationRosterContext(context);
+  if(window.BXH_REGISTRATION_LIFECYCLE_V2_ROOMS?.includes(context.code)){
+    if(publicRoom?.registrationRosterSyncBackendEnabled!==true)throw Error('backend-roster-sync-required');
+    return refreshBackendRegistrationRoster(context,false,true);
+  }
   if(publicRoom?.registrationRosterSyncBackendEnabled===true) return refreshBackendRegistrationRoster(context);
   const regs=Array.isArray(registrationRows)?registrationRows:await window.cloudSync.listRegistrationsForAdmin(context.code);
   requireRegistrationRosterContext(context);
@@ -10710,6 +10714,7 @@ function currentAdminOperationalFailure(){
 function adminOverrideCurrent(approval){return window.BXHAdminOverride?.current(approval,adminOverrideContext(),userProfile)===true;}
 function canOfferAdminOperationalOverride(){
  return window.BXHAdminOverride?.allowed(userProfile)===true&&!!currentAuthUid()&&!!state.cloudCode&&
+  !window.BXH_REGISTRATION_LIFECYCLE_V2_ROOMS?.includes(state.cloudCode)&&
   state.meta?.battleMode!=='team'&&!state.startedAt&&state.archiveStatus!=='completed';
 }
 function adminOverrideButtonsHtml(){
@@ -11022,11 +11027,28 @@ function rebaseOrdinaryBracketRosterFence(fresh,snapshot){
 }
 function bracketCommitController(){
  if(!window.BXHBracketCommit)return null;
- const key=String(firebaseUser?.uid||currentRole||'local')+':'+String(state.cloudCode||state.id);
- if(bracketCommitContext?.key===key)return bracketCommitContext.controller;
  const roomId=state.id,code=state.cloudCode,actorUid=firebaseUser?.uid||null;
+ const server=!!code&&Array.isArray(window.BXH_REGISTRATION_LIFECYCLE_V2_ROOMS)&&window.BXH_REGISTRATION_LIFECYCLE_V2_ROOMS.includes(code);
+ const key=String(actorUid||currentRole||'local')+':'+String(code||roomId)+(server?':v2:'+roomId:'');
+ if(bracketCommitContext?.key===key)return bracketCommitContext.controller;
  const current=()=>state.id===roomId&&state.cloudCode===code&&(firebaseUser?.uid||null)===actorUid;
  let storage;try{storage=window.sessionStorage;}catch{}
+ if(server){
+  const controller=window.BXHBracketCommit.createServer({key,code,roomId,storage,current,state:()=>state,
+   operationId:()=>window.crypto.randomUUID(),
+   send:(kind,payload)=>window.cloudSync.commitRegistrationLifecycle(kind,payload),
+   read:()=>window.cloudSync.readBracketFromServer(code),
+   apply:snapshot=>{state=snapshot;void saveRecord(state).catch(e=>console.warn('[bracket local cache]',e));},
+   changed:()=>{if(current())renderPreservingScroll();},
+   success:kind=>{
+    adminOperationalFailure=null;
+    if(state.startedAt){publicTournamentsCache=null;myRegistrationsCache=null;resetAdminRegistrationsCache();}
+    activeTab=state.startedAt?'referee':'people';render();
+    showToast(kind==='start'?'賽事正式開始｜參賽名單與報名功能已鎖定':'上傳成功');
+   }
+  });
+  bracketCommitContext={key,controller};return controller;
+ }
  const controller=window.BXHBracketCommit.create({key,actorUid,storage,current,
   state:()=>state,cloud:()=>!!code,
   operationId:()=>window.crypto.randomUUID(),
@@ -11082,13 +11104,15 @@ function bracketCommitStatusHtml(inRosterOverview=false){
  if(inRosterOverview&&s.pending)return rosterUpdate+'<section class="panel" role="status"><p>本次配對已保留，儲存結果待確認。</p><button class="btn btn-ghost" data-action="bracket-commit-manage" data-section="bracket">查看配對狀態</button></section>';
  const queued=s.error==='queue-wait-timeout',uncertain=s.error==='confirmation-timeout',preflightTimeout=uncertain&&s.phase==='checking';
  const phaseLabels={waiting:'等待前一筆儲存完成…',checking:'核對雲端配對中…',writing:'提交本次配對中…',confirming:'確認雲端儲存結果中…'};
- const title=s.busy?(cloud?(phaseLabels[s.phase]||'資料上傳中…'):'儲存中…'):uploaded?(cloud?'上傳成功':'儲存成功'):queued?'等待儲存，尚未送出':preflightTimeout?'雲端核對逾時，尚未送出':uncertain?'儲存結果尚未確認':(cloud?'上傳失敗':'儲存失敗');
+ const title=s.action==='start'?(uploaded?'開賽已確認':s.busy?'正在確認開賽…':uncertain?'開賽結果尚未確認':'開賽未完成'):
+  s.busy?(cloud?(phaseLabels[s.phase]||'資料上傳中…'):'儲存中…'):uploaded?(cloud?'上傳成功':'儲存成功'):queued?'等待儲存，尚未送出':preflightTimeout?'雲端核對逾時，尚未送出':uncertain?'儲存結果尚未確認':(cloud?'上傳失敗':'儲存失敗');
  const message=s.busy?'請稍候，本次配對已保留，完成後會自動顯示結果。':uploaded?'對戰表已確認儲存。':queued?'前一筆儲存仍在處理，本次配對尚未重新送出。稍後按重試會沿用相同配對。':preflightTimeout?'送出前未能讀取完整雲端資料，本次配對尚未送出。請保留此頁，稍後按重試會沿用相同配對。':uncertain?'尚未取得完整雲端確認，不能判定上傳失敗。請保留此頁；提交回覆後會自動查證，重試也會沿用相同配對。':s.error==='bracket-version-conflict'?'已同步雲端最新資料，請確認後再抽籤。':'本次配對已保留，重試時不會重新抽籤。';
  const failureDetail=!s.busy&&!uploaded&&s.error?'<p>原因：'+esc(s.error)+'</p>':'';
- return rosterUpdate+'<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+message+'</p>'+
+ const detail=c.server?(uploaded?(s.action==='start'?'已讀回正式開賽狀態。':'已核對公私對戰表。'):s.pending?'重試會沿用同一筆操作，並重新核對雲端結果。':'請依下列原因核對名單或對戰表，再重新操作。'):message;
+ return rosterUpdate+'<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+detail+'</p>'+
  failureDetail+
  (s.pending&&(appPhase==='app'||appPhase==='community-room')?'<button class="btn btn-ghost" data-action="bracket-commit-manage" data-section="confirmed">停止等待，返回管理</button>':'')+
- (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存'))+'</button>':'')+
+ (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.action==='start'?(s.busy?'確認開賽中…':'重試確認開賽'):(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存')))+'</button>':'')+
  (cloud&&s.canDiscard?'<button class="btn btn-ghost" data-action="bracket-commit-discard">取消上傳</button>':'')+
  (s.pending&&!s.busy&&s.result==='failed'&&canOfferAdminOperationalOverride()&&!adminOperationalOverrideBusy?'<button class="btn btn-danger" data-action="admin-force-reconfirm">管理員強制提交原配對</button>':'')+'</section>';
 }
@@ -16628,7 +16652,7 @@ function registrationRosterContextIsCurrent(context){
 function requireRegistrationRosterContext(context){
   if(!registrationRosterContextIsCurrent(context)) throw new Error("room-context-changed");
 }
-async function refreshBackendRegistrationRoster(context,catchup=false){
+async function refreshBackendRegistrationRoster(context,catchup=false,serverOnly=false){
   requireRegistrationRosterContext(context);
   if(catchup){
     // Quick COMMUNITY rosters are projected by the owner-only callable. Never
@@ -16637,7 +16661,7 @@ async function refreshBackendRegistrationRoster(context,catchup=false){
     await window.cloudSync.syncCommunityRegistrationSummary(context.code);
     requireRegistrationRosterContext(context);
   }
-  const result=await window.cloudSync.joinRoom(context.code);
+  const result=serverOnly?await window.cloudSync.joinRoom(context.code,{serverOnly:true}):await window.cloudSync.joinRoom(context.code);
   requireRegistrationRosterContext(context);
   if(result?.ok!==true||result.data?.id!==context.roomId) throw new Error(result?.reason||"roster-readback-failed");
   if(isCommunityRoomOwner() && (result.data.ownerUid!==firebaseUser.uid||result.data.createdBy!==firebaseUser.uid)) throw new Error("permission-denied");
@@ -21405,7 +21429,7 @@ function handleAction(action, target){
   }
   if(action==='bracket-commit-submit'){void bracketCommitController()?.submit();return;}
   if(action==='bracket-commit-retry'){void bracketCommitController()?.retry();return;}
-  if(action==='bracket-commit-discard'){void bracketCommitController()?.discard();return;}
+  if(action==='bracket-commit-discard'){void bracketCommitController()?.discard?.();return;}
   if(['draw-bracket','reset-bracket','start-tournament','admin-force-draw','admin-force-start'].includes(action)&&typeof adminRosterBusyOrPending==='function'&&adminRosterBusyOrPending()){showToast('請先核實上一筆名單覆核，再操作對戰表',true);return;}
   if(['draw-bracket','reset-bracket','start-tournament'].includes(action)&&window.BXHBracketCommit&&bracketCommitBlocked()){showToast('對戰表尚未上傳成功，請先重試上傳',true);return;}
   if(peopleOnsiteWaitlistManaged()){
@@ -25726,9 +25750,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         const scheduledStart=scheduledTournamentStartMs(state.meta);
         const now=Date.now();
         const isEarly=scheduledStart!=null && now<scheduledStart;
+        const lifecycle=window.BXHBracketCommit?bracketCommitController():null;
+        const confirmedDrawId=state.bracketDraw?.id;
 
         const actuallyStart=()=>{
           (async ()=>{
+            if(lifecycle?.server&&lifecycle!==bracketCommitController())return;
             // Re-check immediately before committing the lock. This narrows the
             // race window between the confirmation dialog and the final start.
             try{
@@ -25744,6 +25771,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
               return;
             }
             if(window.BXHBracketCommit&&!(await verifyBracketBeforeStart()))return;
+            if(lifecycle?.server){
+              if(lifecycle!==bracketCommitController())return;
+              if(state.bracketDraw?.id!==confirmedDrawId){showToast('對戰表已更新，請核對後重新確認開賽。',true);return;}
+              await lifecycle.start(isEarly);
+              return;
+            }
             const beforeStart=JSON.parse(JSON.stringify(state));
             state.startedAt=Date.now();
             rebuildCourtAssignments();
@@ -25808,6 +25841,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="reset-bracket"){
+    if(window.BXH_REGISTRATION_LIFECYCLE_V2_ROOMS?.includes(state.cloudCode)){showToast("請使用重新抽籤更新對戰表。",true);return;}
     if(state.startedAt){ showToast("賽事開始後無法重設對戰表", true); return; }
     if(!state.bracketSize && !(state.matches&&state.matches.length)){ showToast("目前尚未產生對戰表"); return; }
     openModal({
@@ -25826,8 +25860,17 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="draw-bracket"){
-    const doDraw = ()=>{adminOperationalFailure=null;void bracketCommitController()?.begin();};
+    const lifecycle=bracketCommitController();
     const doCheckThenDraw = ()=>{
+      if(lifecycle?.server&&lifecycle!==bracketCommitController())return;
+      const rosterRevision=state.registrationRosterRevision??0;
+      const baseDrawId=state.bracketDraw?.id??null;
+      const doDraw=()=>{
+        if(lifecycle?.server&&lifecycle!==bracketCommitController())return;
+        adminOperationalFailure=null;
+        if(lifecycle?.server)void lifecycle.begin({rosterRevision,baseDrawId});
+        else void bracketCommitController()?.begin();
+      };
       if(state.meta.battleMode==="team"){doDraw();return;}
       const total = state.players.length;
       const checkedCount = eligiblePlayers().length;
@@ -25843,6 +25886,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       }
     };
     const syncThenDraw=async()=>{
+      if(lifecycle?.server&&lifecycle!==bracketCommitController())return;
       const rosterSyncStartedAt=Date.now();
       let rosterSynced=false;
       try{
