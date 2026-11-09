@@ -4,6 +4,8 @@ const project='demo-bxh-four-court-buckets';
 assert.equal(process.env.GCLOUD_PROJECT,project);assert.equal(process.env.FIRESTORE_EMULATOR_HOST,'127.0.0.1:8188');
 const {initializeApp,deleteApp}=require('firebase-admin/app'),{getFirestore,FieldValue}=require('firebase-admin/firestore');
 const {fixture,largeFixture,specs,NOW,code}=require('./probe.cjs');
+const {randomUUID}=require('node:crypto');
+const {createBucketMigrationService}=require('../../../referee-seats/functions/bucket-migration-service.cjs');
 const app=initializeApp({projectId:project}),db=getFirestore(app);db.settings({host:process.env.FIRESTORE_EMULATOR_HOST,ssl:false});
 const release=path.resolve(__dirname,'../../../release/buckets/settlement'),temp=fs.mkdtempSync(path.join(os.tmpdir(),'bucket-settlement-native-')),cache=new Map();
 const collections=['users','tournaments','publicTournaments','systemConfig','ladderPlayers','ladderTransactions','ladderSystem'];
@@ -19,6 +21,28 @@ async function clear(){for(const name of collections)await db.recursiveDelete(db
 async function seed(f){await clear();const rows=[...f.m.rows];for(let i=0;i<rows.length;i+=400){const b=db.batch();for(const [p,v]of rows.slice(i,i+400))b.set(db.doc(p),v);await b.commit();}}
 function normalize(v){if(v&&typeof v.toMillis==='function')return '<server-timestamp>';if(typeof v==='string'&&/^[\[{]/.test(v)){try{return normalize(JSON.parse(v));}catch{}}if(Array.isArray(v))return v.map(normalize);if(v&&typeof v==='object')return Object.fromEntries(Object.entries(v).map(([k,x])=>[k,normalize(x)]));return v;}
 async function state(){const out=[];async function walk(col){for(const ref of await col.listDocuments()){const s=await ref.get();if(s.exists)out.push([ref.path,normalize(s.data())]);for(const child of await ref.listCollections())await walk(child);}}for(const col of collections)await walk(db.collection(col));return out.sort(([a],[b])=>a.localeCompare(b));}
+async function activateRankedFixture(){
+ const f=largeFixture(320,12);
+ const roomPath='tournaments/'+code,publicPath='publicTournaments/'+code;
+ const {scoreStorage,...legacyRoom}=f.m.rows.get(roomPath);
+ const {scoreBucketProjection,...legacyPublic}=f.m.rows.get(publicPath);
+ f.m.put(roomPath,{...legacyRoom,updatedAt:NOW-10});
+ f.m.put(publicPath,{...legacyPublic,updatedAt:NOW-10});
+ f.m.put('systemConfig/fourCourtScoreBuckets',{enabled:true,migrationEnabled:true,settlementEnabled:true});
+ for(const bucket of f.buckets)f.m.remove(roomPath+'/matchBuckets/'+bucket.bucketId);
+ await seed(f);
+
+ const migration=createBucketMigrationService(db,{clock:()=>NOW});
+ const epoch='operator-epoch';
+ const migrate=async action=>{
+  const request={action,code,epoch,actorUid:'admin'};
+  const plan=await migration.preflight(request);
+  return migration.commit({...request,sourceDigest:plan.sourceDigest,operationId:randomUUID()});
+ };
+ const activated=await migrate('activate');
+ assert.equal(activated.buckets,3);
+ return {migrate,epoch,room:db.doc(roomPath),publicRoom:db.doc(publicPath)};
+}
 (async()=>{let checks=0;
  try{
   for(const spec of specs){
@@ -122,6 +146,50 @@ async function state(){const out=[];async function walk(col){for(const ref of aw
    checks++;
   }
   const boundManual=specs.find(s=>s.function==='settleLadderTournament');
+  {
+   console.log('Checking ranked settlement after actual operator cutover');
+   const {migrate,room,publicRoom}=await activateRankedFixture();
+   const {bucketMigration}=(await room.get()).data();
+   await room.update({bucketMigration:{...bucketMigration,operation:'a'.repeat(64)}});
+   for(const spec of specs)assert.equal((await handler(spec,true)()).reason,'bucket-settlement-fenced');
+   assert.equal((await db.collection('ladderTransactions').get()).size,0);
+   await room.update({bucketMigration});
+   const results=await Promise.all(specs.map(spec=>handler(spec,true)()));
+   assert(results.every(result=>result.ok),JSON.stringify(results.map(result=>result.reason)));
+   assert.equal(results.filter(result=>result.alreadyAwarded).length,1);
+   assert.equal((await db.collection('ladderTransactions').get()).size,320);
+   await db.doc('systemConfig/fourCourtScoreBuckets').update({enabled:false});
+   await migrate('rollback');
+   assert.equal((await room.get()).data().scoreStorage,undefined);
+   assert.equal((await publicRoom.get()).data().scoreBucketProjection,undefined);
+   assert.equal((await room.collection('matchBuckets').get()).size,0);
+   assert.equal((await handler(boundManual,true)()).alreadyAwarded,true);
+   assert.equal((await db.collection('ladderTransactions').get()).size,320);
+   checks++;
+  }
+  {
+   console.log('Checking pre-award rollback, score reconstruction and legacy manual recovery');
+   const {migrate,epoch,room}=await activateRankedFixture();
+   const root=JSON.parse((await room.get()).data().data);
+   const bucket=room.collection('matchBuckets').doc('court-1');
+   const matches=JSON.parse((await bucket.get()).data().matches);
+   const match=matches.find(row=>!row.isBye);
+   const score=match.scoreA+1;
+   match.scoreA=score;
+   await bucket.update({matches:JSON.stringify(matches),revision:1});
+   await db.doc('systemConfig/fourCourtScoreBuckets').update({enabled:false});
+   await migrate('rollback');
+   const restored=JSON.parse((await room.get()).data().data);
+   assert.equal(restored.matches.find(row=>row.id===match.id).scoreA,score);
+   const stale=await handler(boundManual,true)({expectedRoom:{roomId:root.id,epoch}});
+   assert.equal(stale.reason,'bucket-mode-changed');
+   assert.equal((await db.collection('ladderTransactions').get()).size,0);
+   const recovered=await handler(boundManual,true)();
+   assert(recovered.ok,recovered.reason);
+   assert.equal((await handler(boundManual,true)()).alreadyAwarded,true);
+   assert.equal((await db.collection('ladderTransactions').get()).size,320);
+   checks++;
+  }
  for(const expectedRoom of [null,{}, {roomId:'wrong',epoch:'epoch-1'}, {roomId:'room-1',epoch:'old'}, {roomId:'room-1',epoch:'epoch-1',extra:1}]){await seed(fixture());const before=await state();const r=await handler(boundManual,true)({expectedRoom});assert.equal(r.ok,false);assert.deepEqual(await state(),before);checks++;}
  {await seed(fixture());assert((await handler(boundManual,true)()).ok);await db.doc('users/admin').update({active:false});const before=await state();assert.equal((await handler(boundManual,true)()).ok,false);assert.deepEqual(await state(),before);checks++;}
  {await seed(fixture({bucket:false}));const before=await state();assert.equal((await handler(boundManual,true)({expectedRoom:{roomId:'room-1',epoch:'epoch-1'}})).ok,false);assert.deepEqual(await state(),before);checks++;}
