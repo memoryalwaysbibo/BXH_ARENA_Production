@@ -3173,7 +3173,7 @@ function restoreCommunitySettingsInputs(draft){
 function renderCommunityRoomPreservingSettings(app){
   const context=communitySettingsDraftContext();
   const draft=!communitySettingsSaving && context && context===communitySettingsRenderedContext ? captureCommunitySettingsInputs() : null;
-  app.innerHTML=renderCommunityRoomApp();
+  renderRefereeCourtView(app,renderCommunityRoomApp());
   communitySettingsRenderedContext=context;
   bindDynamicInputs();
   restoreCommunitySettingsInputs(draft);
@@ -5469,8 +5469,8 @@ function invalidateMyRegistrationsCache(result){
   if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true)myEventsPlayerSlice?.invalidate(result);
   myRegistrationsRequest++;myRegistrationsCache=null;myRegistrationsLoading=false;
 }
-function shouldBindLobbyInput(element,key){
-  if(!isTournamentLobbyVisible()&&!(appPhase==="player-center"&&playerActiveTab==="registered"&&!mailboxContext().open))return true;
+function shouldBindLobbyInput(element,key,retained=false){
+  if(!retained&&!isTournamentLobbyVisible()&&!(appPhase==="player-center"&&playerActiveTab==="registered"&&!mailboxContext().open))return true;
   let keys=lobbyInputBindings.get(element);
   if(!keys){keys=new Set();lobbyInputBindings.set(element,keys);}
   if(keys.has(key))return false;
@@ -12552,35 +12552,67 @@ async function exportRefereeSyncRecovery(){
     a.href=url;a.download=code+"-local-recovery-"+backup.savedAt+".json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }catch(e){showToast("本機復原備份無法讀取，請先匯出目前賽事資料。",true);}
 }
+let refereeCourtView={key:null,station:0};
+function refereeCourtViewKey(){
+  return JSON.stringify([appPhase,state.id,state.cloudCode,currentAuthUid()]);
+}
+function refereeCourtCount(){
+  const count=Math.max(1,Number(state.meta.stations)||1);
+  return state.bracketSize?count:Math.min(32,count);
+}
+function refereeCourtSelection(){
+  const key=refereeCourtViewKey();
+  const count=refereeCourtCount();
+  if(refereeCourtView.key!==key||count<2||refereeCourtView.station>count){
+    refereeCourtView={key,station:0};
+  }
+  return refereeCourtView.station;
+}
+function supportsRefereeCourtSelection(){
+  return state.meta?.battleMode!=="team"&&state.meta?.playMode!=="enchantment";
+}
+function refereeTabOpen(){
+  return (appPhase==="app"&&activeTab==="referee")||
+    (appPhase==="community-room"&&communityRoomActiveTab==="referee");
+}
+function refereeCourtFocusActive(){
+  return refereeTabOpen()&&supportsRefereeCourtSelection()&&refereeCourtSelection()>0;
+}
+function renderRefereeCourtSelector(count,selected){
+  if(count<2)return "";
+  const buttons=Array.from({length:count+1},(_,station)=>
+    `<button type="button" class="court-jump-btn" data-action="referee-select-court" data-court="${station}" aria-pressed="${selected===station}"${station?` style="${courtAtmosphereStyle(station)}"`:""}>${station?`台${station}`:"全部台"}</button>`);
+  return `<div class="court-jump-nav referee-court-switch" role="group" aria-label="切換裁判台">${buttons.join("")}</div>`;
+}
 function renderReferee(){
   if(state.meta?.battleMode==="team")return renderTeamReferee();
+  const n=refereeCourtCount();
+  const supportsSelection=supportsRefereeCourtSelection();
+  const selected=supportsSelection?refereeCourtSelection():0;
+  const stations=selected?[selected]:Array.from({length:n},(_,i)=>i+1);
+  const visibleCount=stations.length;
+  const gridClass=visibleCount===1?"court-grid court-grid-1":visibleCount===2?"court-grid court-grid-2":visibleCount===4?"court-grid court-grid-many court-grid-4fit":"court-grid court-grid-many";
+  const selector=supportsSelection?renderRefereeCourtSelector(n,selected):"";
   const quickNav = refereeBracketRoundtripNav("bracket")+refereeSyncRecoveryControlsHtml()
     +(isCommunityRoomOwner()&&!window.BXHRefereeSeats?.enabled(state)?window.BXHRefereeSeats?.settings()||"":"");
   if(!state.bracketSize){
-    const n=Math.max(1,Math.min(32,Number(state.meta.stations)||1));
-    return quickNav+`<div class="court-grid ${n===1?'court-grid-1':n===2?'court-grid-2':n===4?'court-grid-many court-grid-4fit':'court-grid-many'}">${Array.from({length:n},(_,i)=>renderWaitingRefereeCourt(i+1)).join('')}</div>`;
+    return quickNav+selector+`<div class="${gridClass}">${stations.map(renderWaitingRefereeCourt).join("")}</div>`;
   }
   const rm = refereeMatches();
   if(rm.length===0){
-    return quickNav+`<div class="panel"><div class="empty-state">沒有需要裁判的對戰</div></div>`;
+    return quickNav+selector+`<div class="panel"><div class="empty-state">沒有需要裁判的對戰</div></div>`;
   }
   // Dynamic court count — always driven by state.meta.stations, never
   // hardcoded. Rebuild defensively here too (idempotent) in case something
   // changed stations/matches without going through the usual save-meta path.
-  const n = Math.max(1, state.meta.stations||1);
   if(!state.courtAssignments || Object.keys(state.courtAssignments).length!==n){
     rebuildCourtAssignments();
   }
-  const jumpNav = n>1 ? `<div class="court-jump-nav">
-    ${Array.from({length:n}, (_,i)=>i+1).map(i=>`<button class="court-jump-btn" style="${courtAtmosphereStyle(i)}" data-action="jump-to-court" data-court="${i}">台${i}</button>`).join("")}
+  const jumpNav = !supportsSelection&&n>1 ? `<div class="court-jump-nav">
+    ${stations.map(i=>`<button class="court-jump-btn" style="${courtAtmosphereStyle(i)}" data-action="jump-to-court" data-court="${i}">台${i}</button>`).join("")}
   </div>` : "";
-  const cards = Array.from({length:n}, (_,i)=>i+1).map(i=>renderCourtCard(i)).join("");
-  const gridClass = n===1
-    ? "court-grid court-grid-1"
-    : (n===2
-      ? "court-grid court-grid-2"
-      : (n===4 ? "court-grid court-grid-many court-grid-4fit" : "court-grid court-grid-many"));
-  return `${quickNav}${renderForcedCourtExitPanel()}${renderCourtRetirementPanel()}${renderSkippedMatches()}${jumpNav}<div class="${gridClass}">${cards}</div>`;
+  const overview=selected?"":renderForcedCourtExitPanel()+renderCourtRetirementPanel()+renderSkippedMatches();
+  return `${quickNav}${overview}${selector||jumpNav}<div class="${gridClass}">${stations.map(renderCourtCard).join("")}</div>`;
 }
 
 /* ==== tab: settings ==== */
@@ -20596,6 +20628,82 @@ function renderAdminNoTournamentScreen(){
   renderApp();
 }
 
+// Compare generated output, never room revisions: authorization and connection
+// rendering still runs on every notification. Templates are separate from live
+// DOM so native input drafts and focus survive unrelated court updates.
+let refereeTemplates=new WeakMap(),refereeRenderContext=null;
+function refereeNodeKey(node){
+  if(node.nodeType!==1)return "";
+  if(node.id)return "id:"+node.id;
+  const action=node.getAttribute("data-action")||node.getAttribute("data-seat-action");
+  if(action)return "action:"+action+":"+["data-id","data-station","data-court","data-slot","data-side","data-type","data-tab","data-request","data-code","data-value"].map(k=>node.getAttribute(k)||"").join(":");
+  return node.getAttribute("class")||"";
+}
+function rememberRefereeTemplate(node,template=node){
+  refereeTemplates.set(node,{html:template.nodeType===1?template.outerHTML:template.nodeValue,
+    attrs:template.nodeType===1?Object.fromEntries([...template.attributes].map(a=>[a.name,a.value])):{}});
+  [...node.childNodes].forEach((child,i)=>{if(template.childNodes[i])rememberRefereeTemplate(child,template.childNodes[i]);});
+}
+function patchRefereeNode(node,template){
+  const prior=refereeTemplates.get(node);
+  const html=template.nodeType===1?template.outerHTML:template.nodeValue;
+  // Comparing generated templates, rather than the live DOM, preserves native
+  // details state and module-owned UI/event-hook flags.
+  if(prior&&prior.html===html)return;
+  if(node.nodeType!==1){if(node.nodeValue!==template.nodeValue)node.nodeValue=template.nodeValue;rememberRefereeTemplate(node,template);return;}
+  const before=prior?.attrs||{},after=Object.fromEntries([...template.attributes].map(a=>[a.name,a.value]));
+  for(const name of new Set([...Object.keys(before),...Object.keys(after)])){
+    if(name==="open"&&node.tagName==="DETAILS")continue;
+    if(before[name]===after[name])continue;
+    if(after[name]===undefined)node.removeAttribute(name);else node.setAttribute(name,after[name]);
+  }
+  // Form properties are user drafts; generated value attributes may change but
+  // an existing editor's current value/selection must never be overwritten.
+  const selectedValue=node.tagName==="SELECT"?node.value:null;
+  if(!["INPUT","TEXTAREA"].includes(node.tagName))patchRefereeChildren(node,template);
+  if(selectedValue!==null&&[...node.options].some(option=>option.value===selectedValue))node.value=selectedValue;
+  refereeTemplates.set(node,{html,attrs:after});
+}
+function patchRefereeChildren(parent,template){
+  const previous=[...parent.childNodes],used=new Set(),candidates=new Map();let cursor=parent.firstChild;
+  const matchKey=node=>node.nodeType+":"+node.nodeName+":"+refereeNodeKey(node);
+  for(const node of previous){const key=matchKey(node);if(!candidates.has(key))candidates.set(key,{nodes:[],index:0});candidates.get(key).nodes.push(node);}
+  for(const next of [...template.childNodes]){
+    const queue=candidates.get(matchKey(next));
+    let node=queue?.nodes[queue.index++];
+    if(node){
+      used.add(node);
+      if(node!==cursor)parent.insertBefore(node,cursor);
+      patchRefereeNode(node,next);
+      cursor=node.parentNode===parent?node.nextSibling:cursor;
+    }else{node=next.cloneNode(true);parent.insertBefore(node,cursor);used.add(node);rememberRefereeTemplate(node);cursor=node.nextSibling;}
+  }
+  for(const node of previous){
+    if(used.has(node)||node.parentNode!==parent)continue;
+    node.remove();
+  }
+}
+function renderStableRefereeScreen(app,html,key){
+  const fragment=document.createElement("template");fragment.innerHTML=html;
+  if(!refereeRenderContext||refereeRenderContext.key!==key||refereeRenderContext.root!==app.firstElementChild){
+    app.innerHTML=html;refereeTemplates=new WeakMap();rememberRefereeTemplate(app);
+    refereeRenderContext={key,root:app.firstElementChild};return;
+  }
+  patchRefereeChildren(app,fragment.content);
+  refereeRenderContext.root=app.firstElementChild;
+}
+
+
+function renderRefereeCourtView(app,html){
+  if(refereeCourtFocusActive()){
+    renderStableRefereeScreen(app,html,refereeCourtViewKey());
+    return true;
+  }
+  refereeRenderContext=null;
+  app.innerHTML=html;
+  return false;
+}
+
 function renderApp(){
   const app = document.getElementById("app");
   const allTabs = [["management","賽事管理"],["ladder","排行榜"],["live","即時戰況"],["bracket","對戰表"],["referee","裁判台"],["duty","我的執勤"],["registrations","報名管理"],["settings","賽事設定"],["people","人員管理"],["operations","抽獎與維護"],["history","賽事紀錄"],["version","版本更新"]];
@@ -20632,7 +20740,7 @@ function renderApp(){
   else if(activeTab==="version") content = wrapBracketWatermark(renderVersionPage());
   else content = wrapBracketWatermark(renderSettings());
 
-  app.innerHTML = `
+  const appHtml = `
     <div class="stickytop mode-shell">
       <header class="topbar">
         <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
@@ -20664,6 +20772,7 @@ function renderApp(){
     ${renderCloudTestResultModal()}
   `;
 
+  const refereeFocus=renderRefereeCourtView(app,appHtml);
   bindDynamicInputs();
 
   // Preserve the user's horizontal position during live updates; only center
@@ -20680,7 +20789,9 @@ function renderApp(){
         nav.scrollLeft=Math.min(maxLeft,Math.max(0,mainTabNavScrollLeft));
       }
       mainTabNavCenterRequested=false;
-      nav.addEventListener("scroll",()=>{ mainTabNavScrollLeft=nav.scrollLeft; },{passive:true});
+      if(!refereeFocus||shouldBindLobbyInput(nav,"referee-tab-scroll",true)){
+        nav.addEventListener("scroll",()=>{ mainTabNavScrollLeft=nav.scrollLeft; },{passive:true});
+      }
     }
     const courtTrack=app.querySelector(".live-court-switch-track");
     if(courtTrack){
@@ -21225,13 +21336,14 @@ function bindDynamicInputs(){
 
   const modalConfirmBtn = document.getElementById("modal-confirm-btn");
   const forceExitAck=document.getElementById('court-force-exit-ack');
-  if(forceExitAck)forceExitAck.addEventListener('change',()=>{
+  const retainedRefereeControls=refereeCourtFocusActive();
+  if(forceExitAck&&shouldBindLobbyInput(forceExitAck,"force-exit-ack",retainedRefereeControls))forceExitAck.addEventListener('change',()=>{
     if(pendingModal?.type!=='court-force-exit')return;
     pendingModal.acknowledged=forceExitAck.checked;
     pendingModal.confirmDisabled=!forceExitAck.checked;
     if(modalConfirmBtn)modalConfirmBtn.disabled=!forceExitAck.checked;
   });
-  if(modalConfirmBtn&&shouldBindLobbyInput(modalConfirmBtn,"confirm")){
+  if(modalConfirmBtn&&shouldBindLobbyInput(modalConfirmBtn,"confirm",retainedRefereeControls)){
     modalConfirmBtn.addEventListener("click", (ev)=>{
       ev.preventDefault();
       ev.stopPropagation();
@@ -21239,7 +21351,7 @@ function bindDynamicInputs(){
     });
   }
   const modalCancelBtn = document.getElementById("modal-cancel-btn");
-  if(modalCancelBtn&&shouldBindLobbyInput(modalCancelBtn,"cancel")){
+  if(modalCancelBtn&&shouldBindLobbyInput(modalCancelBtn,"cancel",retainedRefereeControls)){
     modalCancelBtn.addEventListener("click", (ev)=>{
       ev.preventDefault();
       ev.stopPropagation();
@@ -24823,6 +24935,17 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(!requireTournamentStartedForMatchAction()) return;
     const winnerId = target.getAttribute("data-winner");
     openModal({ type:"confirm-quick", matchId:id, selectedWinnerId:winnerId, title:"確認簡易判定結果", confirmLabel:"確認獲勝並晉級", cancelLabel:"返回重新選擇" });
+    return;
+  }
+  if(action==="referee-select-court"){
+    if(!refereeTabOpen()||!supportsRefereeCourtSelection())return;
+    const station=Number(target.getAttribute("data-court"));
+    if(!Number.isInteger(station)||station<0||station>refereeCourtCount())return;
+    refereeCourtView={key:refereeCourtViewKey(),station};
+    render();
+    const selected=document.querySelector('.referee-court-switch [aria-pressed="true"]');
+    selected?.focus?.({preventScroll:true});
+    selected?.scrollIntoView?.({block:"nearest",inline:"nearest"});
     return;
   }
   if(action==="jump-to-court"){

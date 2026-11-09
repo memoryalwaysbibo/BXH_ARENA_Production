@@ -65,6 +65,7 @@ const LOGO_SRC = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 const topbarConnectionRailHtml = () => '', accountMenuHtml = () => '<span>管理身分（隔離測試）</span>', accountMenuOverlayHtml = () => '';
 const tournamentViewContextHeaderHtml = () => '', renderSystemClosureNotice = () => '', adminManagementContextHtml = () => '', testSandboxBannerHtml = () => '';
 const renderPrintBracket = () => '', renderModal = () => '', renderCloudJoinModal = () => '', renderEventEntryModal = () => '', renderQrScannerModal = () => '', renderSwitchTournamentModal = () => '', renderCloudTestResultModal = () => '';
+const renderRefereeCourtView = (app, markup) => { app.innerHTML = markup; return false; };
 const bindDynamicInputs = () => bindAdminTournamentSearchInput(), resetRegistrationFormDraft = () => {}, stopAdminRosterWatch = () => {}, showToast = () => {};
 // Summary transport only. Full Firestore reads are forbidden in this fixture.
 const cloudEnabled=true,dbHandle={},fx={getDocs(){throw Error('full-collection-read-forbidden');},getDoc(){throw Error('extra-document-read-forbidden');}};

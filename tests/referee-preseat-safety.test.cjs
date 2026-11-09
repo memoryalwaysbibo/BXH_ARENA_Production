@@ -2,10 +2,11 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
+const courtView=source.slice(source.indexOf('let refereeCourtView='),source.indexOf('/* ==== tab: settings ==== */'));
 const seats=require('../referee-seats/functions/core.cjs');
 function fn(name){const start=source.indexOf('function '+name+'(');assert(start>=0);const end=source.indexOf('\nfunction ',start+1);return source.slice(start,end<0?undefined:end);}
 function fixture(){
- const c={state:{id:'test',cloudCode:'BXH-TEST',meta:{stations:6},bracketSize:0,matches:[]},pendingModal:null,courtRetirementBusy:false,
+ const c={appPhase:'app',currentAuthUid:()=> 'judge',state:{id:'test',cloudCode:'BXH-TEST',meta:{stations:6},bracketSize:0,matches:[]},pendingModal:null,courtRetirementBusy:false,
   window:{BXHRefereeSeats:{render:(st,n)=>`<button data-seat-action="seat" data-station="${n}">加入裁判席</button>`}},
   isCommunityRoomOwner:()=>false,esc:v=>String(v??'').replace(/[<>&"']/g,''),refereeBracketRoundtripNav:()=>'',courtAtmosphereStyle:()=>'',
   POINT_LABELS:{spin:'旋轉',knockout:'擊飛',burst:'爆裂',extreme:'極限'},canOperateStation:()=>true,checkWinnerSide:()=>null,refereeFaultWritePending:()=>false,refereeFaultCount:()=>0,refereeFaultLast:()=>null,refereeViewClass:()=>'',refereeCourtSwapButton:()=>'',matchStatusBarHtml:()=> '準備中',
@@ -14,7 +15,8 @@ function fixture(){
   playerName:id=>({a:'選手甲',b:'選手乙'})[id]||id,executed:[],toasts:[],render:()=>{},document:{getElementById:()=>({focus(){c.focused=true;}})}};
  c.executeCourtForceAction=change=>c.executed.push(change);c.showToast=m=>c.toasts.push(m);
  vm.createContext(c);
- for(const name of ['canUseRefereeSyncRecovery','refereeSyncRecoveryControlsHtml','refereeWorkstationHeader','refereeSwapControl','renderRefereeScorePanel','refereeWaitingControls','renderWaitingRefereeCourt','renderReferee','courtForceExitConfirmation','renderModal','openModal','closeModal'])vm.runInContext(fn(name),c);
+ for(const name of ['canUseRefereeSyncRecovery','refereeSyncRecoveryControlsHtml','refereeWorkstationHeader','refereeSwapControl','renderRefereeScorePanel','refereeWaitingControls','renderWaitingRefereeCourt','courtForceExitConfirmation','renderModal','openModal','closeModal'])vm.runInContext(fn(name),c);
+ vm.runInContext(courtView,c);
  return c;
 }
 test('6 and 12 pre-draw courts render seats outside disabled scoring, without mutating state',()=>{
@@ -23,7 +25,7 @@ test('6 and 12 pre-draw courts render seats outside disabled scoring, without mu
   c.state.meta.stations=n;const before=JSON.stringify(c.state),html=c.renderReferee();
   assert.equal((html.match(/data-seat-action="seat"/g)||[]).length,n);
   assert.equal((html.match(/class="ref-vs-arena standard"/g)||[]).length,n);
-  for(const button of html.matchAll(/<button\b[^>]*>/g))if(!button[0].includes('data-seat-action'))assert.match(button[0],/disabled/);
+  for(const button of html.matchAll(/<button\b[^>]*>/g))if(!/data-seat-action|data-action="referee-select-court"/.test(button[0]))assert.match(button[0],/disabled/);
   assert(!html.includes('data-action="score"'));assert(!html.includes('court-force-exit'));
   assert.equal(JSON.stringify(c.state),before);
  }
