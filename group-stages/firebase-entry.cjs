@@ -8,7 +8,7 @@ const { createGroupStageCommand } = require('./command.cjs');
 
 if (!getApps().length) initializeApp();
 const run = createGroupStageCommand(createCoordinator(getFirestore()));
-const invalid = new Set(['group-room-code', 'group-invalid-action']);
+const invalid = new Set(['group-room-code', 'group-invalid-action', 'group-invalid-count']);
 const forbidden = new Set(['group-permission-denied', 'group-room-disabled']);
 
 exports.groupStageCommand = onCall({

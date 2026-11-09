@@ -1,13 +1,15 @@
 'use strict';
 
 const { randomBytes } = require('node:crypto');
-const { GROUPS, prepare, nextStage, collect, settlementInput } = require('./core.cjs');
+const { GROUPS, groupKeys, prepare, nextStage, collect, settlementInput } = require('./core.cjs');
 
 const ROOM_CODE = /^BXH-[A-Z0-9]{6}$/;
-const TITLES = {
-  A: 'A 組', B: 'B 組', C: 'C 組', D: 'D 組',
-  champions: '第 1～4 名賽', 'runners-up': '第 5～8 名賽',
-};
+function stageTitle(stage) {
+  if (GROUPS.includes(stage.key)) return stage.key + ' 組';
+  const count = stage.players.length;
+  return stage.key === 'champions' ? '第 1～' + count + ' 名賽' :
+    '第 ' + (count + 1) + '～' + (count * 2) + ' 名賽';
+}
 
 function check(condition, code) {
   if (!condition) throw Object.assign(new Error(code), { code });
@@ -30,7 +32,7 @@ function startingRoster(parent) {
 
 function publicStatus(plan) {
   return {
-    groups: GROUPS.map(key => ({ key, count: plan.event.groups[key].length })),
+    groups: groupKeys(plan.event).map(key => ({ key, count: plan.event.groups[key].length })),
     completed: Object.keys(plan.event.results),
     current: plan.active ? { ...plan.active } : null,
     next: plan.active ? null : nextStage(plan.event)?.key || null,
@@ -47,7 +49,7 @@ function onlineAccount(player) {
 function stageRoom(parent, stage, parentCode, code, now) {
   const { meta: source } = roomState(parent);
   const meta = {
-    name: source.name + '｜' + TITLES[stage.key],
+    name: source.name + '｜' + stageTitle(stage),
     date: source.date || '',
     location: source.location || '',
     format: '單淘汰賽',
@@ -70,7 +72,7 @@ function stageRoom(parent, stage, parentCode, code, now) {
   const data = {
     id, meta, cloudCode: code, createdAt: now, updatedAt: now, archiveStatus: 'ongoing',
     settlementPhase: 'idle', createdBy: parent.createdBy, ownerUid: parent.ownerUid || parent.createdBy,
-    players: stage.players, matches: [], registrations: [], teams: [], courtAssignments: {},
+    players: stage.players, matches: [], registrations: [], teams: [], courtAssignments: {}, groupStage: link,
     bracketSize: 0, startedAt: null, drawnAt: null, currentMatchId: null, rosterLocked: false,
   };
   const shared = {
@@ -150,7 +152,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
   }
 
   return {
-    async prepare(parentCode, actorUid) {
+    async prepare(parentCode, actorUid, groupCount) {
       const parent = refs(parentCode), seed = makeSeed();
       return db.runTransaction(async tx => {
         await authorize(tx, parentCode, actorUid, true);
@@ -159,15 +161,17 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         if (plan.exists) {
           const current = plan.data();
           checkRoster(current, parentData);
+          check(groupCount === undefined || groupCount === groupKeys(current.event).length,
+            'group-count-locked');
           return publicStatus(current);
         }
         const players = startingRoster(parentData);
-        const event = prepare(players, seed);
+        const event = prepare(players, seed, groupCount);
         await checkRegistrations(tx, parent.room, players);
         const next = { parentRoomId: roomState(parentData).id, event, active: null, roomCodes: {} };
         tx.create(parent.plan, next);
         const assignments = new Map();
-        for (const group of GROUPS) {
+        for (const group of groupKeys(event)) {
           for (const player of event.groups[group]) {
             const uid = onlineAccount(player);
             if (!uid) continue;
@@ -201,12 +205,55 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
           !Object.values(current.roomCodes).includes(code), 'group-room-code-collision');
         await checkRegistrations(tx, parent.room, stage.players);
         const documents = stageRoom(parentData, stage, parentCode, code, now);
-        const next = { ...current, active: { key: stage.key, code },
+        const drawPending = !GROUPS.includes(stage.key);
+        const next = { ...current, active: { key: stage.key, code, drawPending },
           roomCodes: { ...current.roomCodes, [stage.key]: code } };
         tx.create(child.room, documents.privateDocument);
         tx.create(child.publicRoom, documents.publicDocument);
         tx.set(parent.plan, next);
         const status = publicStatus(next);
+        tx.set(parent.routing, { ...status,
+          eligibleUids: drawPending ? [] : [...new Set(stage.players.map(onlineAccount).filter(Boolean))] });
+        return status;
+      });
+    },
+
+    async readOperatorStatus(parentCode, actorUid) {
+      const parent = refs(parentCode);
+      return db.runTransaction(async tx => {
+        await authorize(tx, parentCode, actorUid, true);
+        const snapshot = await tx.get(parent.routing);
+        if (!snapshot.exists) return null;
+        const { eligibleUids, ...status } = snapshot.data();
+        return status;
+      }, { readOnly: true });
+    },
+
+    async publishDraw(parentCode, key, code, actorUid) {
+      const parent = refs(parentCode), child = refs(code);
+      return db.runTransaction(async tx => {
+        await authorize(tx, parentCode, actorUid, true);
+        const [plan, room, source] = await tx.getAll(parent.plan, parent.room, child.room);
+        check(plan.exists, 'group-plan-required');
+        const current = plan.data();
+        checkRoster(current, room.data());
+        check(!GROUPS.includes(key) && current.active?.key === key && current.active.code === code,
+          'group-stage-source');
+        if (!current.active.drawPending) return publicStatus(current);
+
+        const document = source.data(), state = roomState(document), stage = nextStage(current.event);
+        check(document?.groupStage?.parentCode === parentCode && document.groupStage.key === key &&
+          state?.id === parentCode + ':' + key && state.cloudCode === code, 'group-stage-source');
+        const firstRound = Array.isArray(state.matches)
+          ? state.matches.filter(match => match.bracket === 'SE' && match.round === 0 && !match.isBye)
+          : [];
+        const drawn = new Set(firstRound.flatMap(match => [match.a?.playerId, match.b?.playerId]));
+        const count = stage.players.length;
+        check(state.drawnAt && state.bracketSize === count && firstRound.length === count / 2 &&
+          drawn.size === count && stage.players.every(player => drawn.has(player.id)), 'group-draw-not-ready');
+        const next = { ...current, active: { ...current.active, drawPending: false } };
+        const status = publicStatus(next);
+        tx.set(parent.plan, next);
         tx.set(parent.routing, { ...status,
           eligibleUids: [...new Set(stage.players.map(onlineAccount).filter(Boolean))] });
         return status;
@@ -223,6 +270,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         return {
           ...status,
           current: current?.key || null,
+          drawPending: current?.drawPending === true,
           assignedGroups: assignment.data()?.assignedGroups || [],
           roomCode: current && eligibleUids.includes(viewerUid) ? current.code : null,
         };
@@ -241,6 +289,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         }
         checkRoster(current, room.data());
         check(current.active?.key === key && current.active.code === code, 'group-stage-source');
+        check(!current.active.drawPending, 'group-draw-not-published');
         const document = source.data(), state = roomState(document);
         check(document?.groupStage?.parentCode === parentCode && document.groupStage.key === key &&
           document.ladderMode === 'general' && state?.id === parentCode + ':' + key && state.cloudCode === code,

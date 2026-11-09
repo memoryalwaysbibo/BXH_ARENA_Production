@@ -16,6 +16,10 @@ test('draw balances the locked roster and preserves each original identity', () 
   for (const group of Object.values(event.groups)) {
     for (const player of group) assert.deepEqual(player, original.get(player.id));
   }
+  assert.deepEqual(Object.values(prepare(roster(129), 'test-seed', 2).groups).map(group => group.length), [65, 64]);
+  assert.throws(() => prepare(roster(193), 'test-seed', 2), { code: 'group-roster-size' });
+  assert.throws(() => prepare(roster(512), 'test-seed', 4), { code: 'group-roster-size' });
+  assert.throws(() => prepare(roster(64), 'test-seed', 3), { code: 'group-invalid-count' });
   assert.throws(() => prepare(roster(385), 'test-seed'), { code: 'group-roster-size' });
   assert.throws(() => prepare(roster(15), 'test-seed'), { code: 'group-roster-size' });
   players[0].registrationUid = players[1].registrationUid;

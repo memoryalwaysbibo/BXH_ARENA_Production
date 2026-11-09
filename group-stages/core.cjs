@@ -4,9 +4,13 @@ const { createHmac } = require('node:crypto');
 const ladder = require('../ladder-v1.js');
 
 const GROUPS = Object.freeze(['A', 'B', 'C', 'D']);
-const STAGES = Object.freeze([...GROUPS, 'champions', 'runners-up']);
+const GROUP_COUNTS = Object.freeze([2, 4]);
+const PLAYOFFS = Object.freeze(['champions', 'runners-up']);
 const MAX_PER_GROUP = 96;
-const MAX_ROSTER = GROUPS.length * MAX_PER_GROUP;
+
+function groupKeys(event) {
+  return GROUPS.filter(key => Object.hasOwn(event.groups, key));
+}
 
 function check(condition, code) {
   if (!condition) throw Object.assign(new Error(code), { code });
@@ -18,9 +22,11 @@ function accountId(player) {
     : player.registrationUid || player.accountUid || player.playerUid || player.uid || null;
 }
 
-function prepare(players, seed) {
-  check(Array.isArray(players) && players.length >= GROUPS.length * 4 &&
-    players.length <= MAX_ROSTER, 'group-roster-size');
+function prepare(players, seed, groupCount = GROUPS.length) {
+  check(GROUP_COUNTS.includes(groupCount), 'group-invalid-count');
+  const keys = GROUPS.slice(0, groupCount);
+  check(Array.isArray(players) && players.length >= groupCount * 4 &&
+    players.length <= groupCount * MAX_PER_GROUP, 'group-roster-size');
   check(typeof seed === 'string' && seed.length > 0, 'group-draw-seed');
 
   const ids = new Set(), registrations = new Set(), identities = new Set();
@@ -42,25 +48,26 @@ function prepare(players, seed) {
   });
   draw.sort((a, b) => a.drawKey.localeCompare(b.drawKey) || a.player.id.localeCompare(b.player.id));
 
-  const groups = Object.fromEntries(GROUPS.map(group => [group, []]));
-  draw.forEach(({ player }, index) => groups[GROUPS[index % GROUPS.length]].push(player));
+  const groups = Object.fromEntries(keys.map(group => [group, []]));
+  draw.forEach(({ player }, index) => groups[keys[index % groupCount]].push(player));
   return { groups, results: {} };
 }
 
 function nextStage(event) {
-  const stage = STAGES.find(key => !Object.hasOwn(event.results, key));
+  const keys = groupKeys(event);
+  const stage = [...keys, ...PLAYOFFS].find(key => !Object.hasOwn(event.results, key));
   if (!stage) return null;
-  if (GROUPS.includes(stage)) {
+  if (keys.includes(stage)) {
     return { key: stage, players: event.groups[stage], bronzeMatch: false };
   }
   const place = stage === 'champions' ? 0 : 1;
   return {
     key: stage,
-    players: GROUPS.map(group => {
+    players: keys.map(group => {
       const id = event.results[group].places[place];
       return event.groups[group].find(player => player.id === id);
     }),
-    bronzeMatch: true,
+    bronzeMatch: keys.length === 4,
   };
 }
 
@@ -164,7 +171,8 @@ function settlementInput(event) {
   check(!nextStage(event), 'group-stage-incomplete');
   const places = new Map();
   const eliminations = new Map();
-  for (const key of GROUPS) {
+  const keys = groupKeys(event);
+  for (const key of keys) {
     const { matches, finalRound } = event.results[key];
     for (const match of matches) {
       const distance = finalRound - match.round;
@@ -173,16 +181,16 @@ function settlementInput(event) {
       eliminations.get(distance).push(match.loserId);
     }
   }
-  let remaining = GROUPS.reduce((count, key) => count + event.groups[key].length, 0);
+  let remaining = keys.reduce((count, key) => count + event.groups[key].length, 0);
   for (const distance of [...eliminations.keys()].sort((a, b) => b - a)) {
     const eliminated = eliminations.get(distance);
     remaining -= eliminated.length;
     for (const id of eliminated) places.set(id, remaining + 1);
   }
-  const topEight = ['champions', 'runners-up'].flatMap(key => event.results[key].places);
+  const topEight = PLAYOFFS.flatMap(key => event.results[key].places);
   topEight.forEach((id, index) => places.set(id, index + 1));
 
-  const matches = STAGES.flatMap(key => event.results[key].matches);
+  const matches = [...keys, ...PLAYOFFS].flatMap(key => event.results[key].matches);
   const actual = new Set(), wins = new Map(), losses = new Map();
   for (const match of matches.filter(ladder.isPlayed)) {
     actual.add(match.winnerId);
@@ -213,4 +221,4 @@ function settlementInput(event) {
   return { effectiveCount, multiplier, topEight, participants, matches };
 }
 
-module.exports = { GROUPS, prepare, nextStage, collect, settlementInput };
+module.exports = { GROUPS, groupKeys, prepare, nextStage, collect, settlementInput };

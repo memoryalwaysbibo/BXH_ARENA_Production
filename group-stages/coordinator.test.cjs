@@ -12,15 +12,21 @@ assert.equal(process.env.FIRESTORE_EMULATOR_HOST, '127.0.0.1:8199');
 const { initializeApp, deleteApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 
-test('group-stage rehearsal covers full and almost-full events', async t => {
+test('group-stage rehearsal covers two and four groups', async t => {
   const app = initializeApp({ projectId: project });
   const db = getFirestore(app);
   try {
     const { groupStageCommand } = require('./firebase-entry.cjs');
     assert(groupStageCommand.__endpoint.callableTrigger);
-    for (const eligibleCount of [384, 383]) {
-      await t.test(eligibleCount + ' checked-in players', async t => {
-        const parentCode = eligibleCount === 384 ? 'BXH-FULL01' : 'BXH-ALMOST';
+    const scenarios = [
+      { parentCode: 'BXH-FULL01', sizes: [96, 96, 96, 96] },
+      { parentCode: 'BXH-ALMOST', sizes: [96, 96, 96, 95] },
+      { parentCode: 'BXH-TWO128', sizes: [64, 64] },
+    ];
+    for (const { parentCode, sizes: expectedSizes } of scenarios) {
+      const groupCount = expectedSizes.length;
+      const eligibleCount = expectedSizes.reduce((total, size) => total + size, 0);
+      await t.test(eligibleCount + ' checked-in players in ' + groupCount + ' groups', async t => {
         const parent = db.doc('tournaments/' + parentCode);
         const players = [...roster(eligibleCount), {
           id: 'unchecked', name: 'Unchecked', source: 'online',
@@ -64,9 +70,13 @@ test('group-stage rehearsal covers full and almost-full events', async t => {
         await badEntry.update({ status: 'waitlist' });
         await assert.rejects(coordinator.prepare(parentCode, operator), { code: 'group-registration-mismatch' });
         await badEntry.update({ status: 'confirmed' });
-        const prepared = await command({ auth: { uid: operator }, data: { action: 'prepare', parentCode } });
-        const expectedSizes = eligibleCount === 384 ? [96, 96, 96, 96] : [96, 96, 96, 95];
+        const prepared = await command({
+          auth: { uid: operator },
+          data: { action: 'prepare', parentCode, ...(groupCount === 2 ? { groupCount } : {}) },
+        });
         assert.deepEqual(prepared.groups.map(group => group.count), expectedSizes);
+        await assert.rejects(coordinator.prepare(parentCode, operator, groupCount === 2 ? 4 : 2),
+          { code: 'group-count-locked' });
         const routing = db.doc('groupStageRoutes/' + parentCode);
         assert.equal((await routing.collection('players').get()).size, eligibleCount);
         assert(JSON.stringify((await routing.get()).data()).length < 1000);
@@ -94,7 +104,7 @@ test('group-stage rehearsal covers full and almost-full events', async t => {
 
         const childRooms = db.collection('tournaments').where('groupStage.parentCode', '==', parentCode);
         assert.equal((await childRooms.get()).size, 0);
-        const steps = ['A', 'B', 'C', 'D', 'champions', 'runners-up'];
+        const steps = [...prepared.groups.map(group => group.key), 'champions', 'runners-up'];
         const openTimes = [], collectTimes = [];
         for (const [index, key] of steps.entries()) {
           const openStarted = performance.now();
@@ -112,13 +122,38 @@ test('group-stage rehearsal covers full and almost-full events', async t => {
           const publicRoom = db.doc('publicTournaments/' + code);
           const [room, mirror] = await db.getAll(privateRoom, publicRoom);
           const state = JSON.parse(room.data().data);
-          assert.equal(state.players.length, index < 4 ? expectedSizes[index] : 4);
-          assert.equal(state.meta.stations, index < 4 ? 12 : 2);
+          const isPlayoff = index >= groupCount;
+          assert.equal(state.players.length, isPlayoff ? groupCount : expectedSizes[index]);
+          assert.equal(state.meta.stations, isPlayoff ? 2 : 12);
+          assert.equal(state.meta.bronzeMatch, isPlayoff && groupCount === 4);
+          if (isPlayoff && groupCount === 2) {
+            assert.match(state.meta.name, key === 'champions' ? /第 1～2 名賽$/ : /第 3～4 名賽$/);
+          }
           assert.equal(room.data().ladderMode, 'general');
           assert.equal(mirror.data().registrationEnabled, false);
           assert(!JSON.stringify(mirror.data()).includes('user-'));
 
-          const viewer = await coordinator.readRouting(parentCode, state.players[0].registrationUid);
+          const done = finish({ players: state.players, bronzeMatch: state.meta.bronzeMatch });
+          const viewerUid = state.players[0].registrationUid;
+          if (isPlayoff) {
+            assert.equal((await coordinator.readOperatorStatus(parentCode, operator)).current.drawPending, true);
+            const waiting = await coordinator.readRouting(parentCode, viewerUid);
+            assert.equal(waiting.drawPending, true);
+            assert.equal(waiting.roomCode, null);
+            await assert.rejects(coordinator.publishDraw(parentCode, key, code, operator),
+              { code: 'group-draw-not-ready' });
+            await assert.rejects(coordinator.collect(parentCode, key, code, operator),
+              { code: 'group-draw-not-published' });
+            const matches = done.matches.filter(match => match.bracket === 'SE').map(match => ({
+              ...match, completed: false, winnerId: null, loserId: null,
+            }));
+            await privateRoom.update({ data: JSON.stringify({ ...state, drawnAt: 1, bracketSize: done.bracketSize, matches }) });
+            await groupStageCommand.run({
+              auth: { uid: operator }, data: { action: 'publish-draw', parentCode, stage: key, roomCode: code },
+            });
+          }
+
+          const viewer = await coordinator.readRouting(parentCode, viewerUid);
           assert.equal(viewer.roomCode, code);
           assert.deepEqual(await groupStageCommand.run({
             auth: { uid: state.players[0].registrationUid }, data: { action: 'routing', parentCode },
@@ -149,7 +184,6 @@ test('group-stage rehearsal covers full and almost-full events', async t => {
           }
           await assert.rejects(coordinator.collect(parentCode, key, code, operator), { code: 'group-stage-not-complete' });
 
-          const done = finish({ players: state.players, bronzeMatch: state.meta.bronzeMatch });
           await privateRoom.update({ data: JSON.stringify({ ...state, ...done, meta: state.meta }) });
           const collectStarted = performance.now();
           const [collected, repeatedCollect] = await Promise.all([
@@ -167,10 +201,11 @@ test('group-stage rehearsal covers full and almost-full events', async t => {
         const input = await db.runTransaction(tx => coordinator.readSettlement(tx, parentCode));
         assert.equal(input.effectiveCount, eligibleCount);
         assert.equal(input.participants.length, eligibleCount);
-        assert.equal(input.matches.length, eligibleCount + 4);
+        assert.equal(input.matches.length, groupCount === 4 ? eligibleCount + 4 : eligibleCount);
         assert.equal(new Set(input.matches.map(match => match.id)).size, input.matches.length);
-        assert.equal(input.topEight.length, 8);
-        assert.equal((await childRooms.get()).size, 6);
+        assert.equal(input.topEight.length, groupCount * 2);
+        assert.equal((await childRooms.get()).size, steps.length);
+        assert.equal(input.participants.filter(player => player.placement === groupCount * 2 + 1).length, groupCount * 2);
         assert.equal((await db.collection('ladderTransactions').get()).size, 0);
         t.diagnostic(JSON.stringify({
           eligibleCount,
