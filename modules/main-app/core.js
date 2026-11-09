@@ -11148,12 +11148,9 @@ function bracketCommitStatusHtml(inRosterOverview=false){
  (cloud&&s.canDiscard?'<button class="btn btn-ghost" data-action="bracket-commit-discard">取消上傳</button>':'')+
  (s.pending&&!s.busy&&s.result==='failed'&&canOfferAdminOperationalOverride()&&!adminOperationalOverrideBusy?'<button class="btn btn-danger" data-action="admin-force-reconfirm">管理員強制提交原配對</button>':'')+'</section>';
 }
-function groupStageParentDrawRequired(){
- return !state.groupStage?.parentCode && window.BXHGroupStageUi?.enabled(state.cloudCode)===true;
-}
 function bracketDrawButtonHtml(){
  if(bracketCommitController()?.status().pending)return '';
- const groupDrawRequired=groupStageParentDrawRequired();
+ const groupDrawRequired=window.BXHGroupStageUi?.enabled(state.cloudCode,state.groupStage?.parentCode)===true;
  return (groupDrawRequired?'':adminOverrideButtonsHtml())+'<button class="btn '+(state.bracketSize?'btn-ghost':'btn-primary')+'" data-action="draw-bracket" '+(groupDrawRequired||state.startedAt||bracketCommitBlocked()||(state.meta.battleMode!=="team"&&!entryRosterValid())?'disabled':'')+'>'+(state.bracketSize?'重新抽籤':'抽籤')+'</button>';
 }
 async function verifyBracketBeforeStart(){
@@ -13645,7 +13642,7 @@ function renderPeopleManagement(){
 
   const groupStageUi = window.BXHGroupStageUi && isAdminTierOrAbove() ? window.BXHGroupStageUi : null;
   const groupStagePanel = groupStageUi?.slot(state.cloudCode,"operator",state.groupStage?.parentCode)||"";
-  const groupStageDraw = groupStageUi && groupStageParentDrawRequired() ? groupStageUi.drawButton(state.cloudCode,
+  const groupStageDraw = groupStageUi?.enabled(state.cloudCode,state.groupStage?.parentCode) ? groupStageUi.drawButton(state.cloudCode,
     !!state.startedAt || !!state.bracketSize || bracketCommitBlocked() ||
     (typeof adminRosterBusyOrPending==="function" && adminRosterBusyOrPending()))||"" : "";
   const bracketPanel=`
@@ -21429,7 +21426,7 @@ async function handleTeamMatchAction(action,target){
   finally{teamMatchActionsBusy.delete(busyKey);}
 }
 function handleAction(action, target){
-  if((action==='draw-bracket'||action==='admin-force-draw')&&groupStageParentDrawRequired()){
+  if((action==='draw-bracket'||action==='admin-force-draw')&&window.BXHGroupStageUi?.enabled(state.cloudCode,state.groupStage?.parentCode)){
     showToast("本場請使用「分組抽籤」",true);return;
   }
   if(action==='admin-force-reconfirm'){reconfirmPendingAdminOverride();return;}

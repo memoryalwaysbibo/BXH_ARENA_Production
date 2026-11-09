@@ -16,8 +16,8 @@
     'group-roster-size': '有效參賽人數超出所選組數的範圍，請確認名單與組數。',
   };
 
-  function enabled(code) {
-    return roomCode.test(code || '') && Array.isArray(root.BXH_GROUP_STAGE_PARENT_CODES) &&
+  function enabled(code, parentCode) {
+    return !parentCode && roomCode.test(code || '') && Array.isArray(root.BXH_GROUP_STAGE_PARENT_CODES) &&
       root.BXH_GROUP_STAGE_PARENT_CODES.includes(code);
   }
 
