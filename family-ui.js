@@ -114,14 +114,15 @@ async function chooseFamilyRegistrationToCancel(rows){
 
 async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode='self'){
  const owner=currentAuthUid(),epoch=engagementSessionEpoch;
- // Clicking self registration is the user's submission; preserve the server
- // allocation preflight without opening a second confirmation dialog.
+ // Clicking self registration submits once. The join transaction decides the
+ // current confirmed/waitlist slot and returns a definitive full error.
  if(mode!=='children'){
   const queued=Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code)&&event.battleMode!=='team';
+  if(!queued)return {childIds:[null]};
   // Use the already-read display allocation as consent; the authoritative
   // queued transaction still rejects any allocation change. Do not silently
   // convert a confirmed expectation to waitlist or weaken capacity checks.
-  if(queued&&Number.isSafeInteger(event.confirmedCount)&&event.confirmedCount>=0){
+  if(Number.isSafeInteger(event.confirmedCount)&&event.confirmedCount>=0){
    const unlimited=window.BXHDomainUtils?.isUnlimitedCommunityRegistration(event)===true;
    const capacity=event.capacity;
    // The public roster omits player provenance. A populated or unreadable
