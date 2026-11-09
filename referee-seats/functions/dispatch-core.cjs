@@ -7,6 +7,7 @@ function authorizationStation(d){return ['idle-claim','claim-skipped','claim-det
 function protectedPass(s,m){return !!(m&&(m.callPass&&!m.completed||(s.matches||[]).some(x=>!x.completed&&x.skippedAt&&x.callPass?.waitFor?.includes(m.id))));}
 function transition({room,state,user,uid,d,now,authority={}}){
  if(!ACTIONS.has(d.action))fail('invalid-action');
+ if(room.groupStage?.sharedCourts===true&&['resize','force-exit','reopen'].includes(d.action))fail('group-court-unavailable');
  if(room.refereeSeatsV1?.version!==1)fail('not-enabled');
  if((room.eventAuthority!==state.meta?.eventAuthority||(room.eventAuthority!=='official'&&!S.communitySupport(room,user,uid,authority)&&!S.communitySeatedPlayer(room,user,uid,authorizationStation(d),authority)))||state.meta?.battleMode==='team'||state.meta?.playMode==='enchantment')fail('unsupported-mode');
  if(room.eventCancelled||room.systemClosed||room.deletionStatus||['completed','archived'].includes(room.archiveStatus)||['completed','archived'].includes(state.archiveStatus))fail('room-read-only');

@@ -9,7 +9,14 @@ const sourceFiles = [
   'group-stages/coordinator.cjs',
   'group-stages/core.cjs',
   'group-stages/draw.cjs',
+  'group-stages/court-pool.cjs',
   'referee-seats/functions/bucket-state.cjs',
+  'referee-seats/functions/core.cjs',
+  'referee-seats/functions/event-staff-core.cjs',
+  'referee-seats/functions/engine/index.cjs',
+  'referee-seats/functions/engine/court-retirement.cjs',
+  'referee-seats/functions/engine/double-elimination.cjs',
+  'referee-seats/functions/engine/match-utils.cjs',
   'ladder-v1.js',
 ];
 

@@ -14,6 +14,7 @@ function seedOrder(size) {
 // Server-owned draw for the group rooms. The seed is retained in the private
 // plan so a retried transaction cannot silently generate a different bracket.
 function drawGroup(stage, code, seed, stations, now) {
+  const courtNumbers = Array.isArray(stations) ? stations : Array.from({ length: stations }, (_, i) => i + 1);
   const players = stage.players;
   const shuffled = players.map(player => ({
     player,
@@ -64,11 +65,10 @@ function drawGroup(stage, code, seed, stations, now) {
       .sort((a, b) => tier(a) - tier(b) || a.indexInRound - b.indexInRound)) {
       match.seq = nextSeq++;
       match.scheduleTier = tier(match);
-      if (!match.isBye) match.station = playable++ % stations + 1;
+      if (!match.isBye) match.station = courtNumbers[playable++ % courtNumbers.length];
     }
   }
-  const courts = Object.fromEntries(Array.from({ length: stations }, (_, index) => {
-    const station = index + 1;
+  const courts = Object.fromEntries(courtNumbers.map(station => {
     const queue = matches.filter(match => match.station === station && match.a && match.b && !match.completed)
       .sort((a, b) => a.seq - b.seq);
     const current = queue[0], next = queue[1];

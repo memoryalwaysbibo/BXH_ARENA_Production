@@ -150,10 +150,16 @@ test('the rehearsal release packages only the group callable codebase', () => {
     assert.deepEqual(fs.readdirSync(output).sort(), ['firebase.json', 'functions']);
     const config = JSON.parse(fs.readFileSync(path.join(output, 'firebase.json'), 'utf8'));
     assert.deepEqual(config, { functions: [{ source: 'functions', codebase: 'arena-group-stages', runtime: 'nodejs22' }] });
-    const deployedFiles = fs.readdirSync(path.join(output, 'functions'), { recursive: true, withFileTypes: true })
-      .filter(item => item.isFile()).map(item => item.name).sort();
-    assert.deepEqual(deployedFiles, ['bucket-state.cjs','command.cjs','coordinator.cjs','core.cjs','draw.cjs',
-      'firebase-entry.cjs','ladder-v1.js','package.json']);
+    const source = path.join(output, 'functions');
+    const deployedFiles = fs.readdirSync(source, { recursive: true, withFileTypes: true })
+      .filter(item => item.isFile()).map(item => path.relative(source, path.join(item.parentPath, item.name))).sort();
+    assert.deepEqual(deployedFiles, ['group-stages/command.cjs', 'group-stages/coordinator.cjs',
+      'group-stages/core.cjs', 'group-stages/court-pool.cjs', 'group-stages/draw.cjs', 'group-stages/firebase-entry.cjs',
+      'ladder-v1.js', 'package.json', 'referee-seats/functions/bucket-state.cjs', 'referee-seats/functions/core.cjs',
+      'referee-seats/functions/engine/court-retirement.cjs', 'referee-seats/functions/engine/double-elimination.cjs',
+      'referee-seats/functions/engine/index.cjs', 'referee-seats/functions/engine/match-utils.cjs',
+      'referee-seats/functions/event-staff-core.cjs']);
+    assert.equal(typeof require(path.join(source, 'group-stages/coordinator.cjs')).createCoordinator, 'function');
     assert.throws(() => prepareRelease(root, output), { code: 'EEXIST' });
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
@@ -181,4 +187,26 @@ test('one server draw creates four complete, disjoint 80-player group brackets',
     assert.equal(Object.keys(drawn.courtAssignments).length, 12);
   }
   assert.equal(entrants.size, 320);
+});
+
+test('a group can release an idle physical court with future matches and invalidate its old seat', () => {
+  const pool = require('./court-pool.cjs');
+  const { drawGroup } = require('./draw.cjs');
+  const stage = { key: 'A', players: roster(4), bronzeMatch: false };
+  const courts = pool.initialCourts(['A', 'B', 'C', 'D']);
+  const state = { ...drawGroup(stage, 'BXH-POOL00', 'seed', [1, 2, 3], 1), players: stage.players,
+    meta: { stations: 12, formatType: 'single', eventAuthority: 'official' }, archiveStatus: 'ongoing' };
+  pool.initializeRoom(state, courts, 'A', 1);
+  const document = { createdBy: 'host', refereeSeatsV1: { version: 1, revision: 5,
+    courts: { 3: { revision: 4, main: { uid: 'old-judge', name: '裁判' } } },
+    requests: { invite: { station: 3, status: 'pending' } } } };
+  const final = state.matches.find(match => match.round === 1);
+  assert.equal(final.station, 3);
+  const projection = pool.changeRoom(state, document, courts, 'A', 3, false, 2);
+  assert.equal(state.forcedCourtExits[3].closed, true);
+  assert([1, 2].includes(final.station));
+  assert(final.dispatchRevision > 0);
+  assert.equal(projection.refereeSeatsV1.courts[3].revision, 5);
+  assert.equal(projection.refereeSeatsV1.courts[3].main, null);
+  assert.equal(projection.refereeSeatsV1.requests.invite.status, 'stale');
 });
