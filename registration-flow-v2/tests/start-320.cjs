@@ -10,6 +10,7 @@ const bracket=require('../../modules/main-app/bracket-commit.js');
 const {createQueuedPromotion}=require('../backend/management.cjs');
 const {createPromotionHandler}=require('../../registration-promotion/functions/service.cjs');
 const {createCheckinHandler}=require('../../qr-checkin/backend/firebase-callable.cjs');
+const {createStartHandler}=require('../backend/start.cjs');
 
 const root=path.resolve(__dirname,'../..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
@@ -62,7 +63,10 @@ async function run(){
  const promotion={code,route:'promotion',operationId:'start320-late-promotion',payload:{code,action:'promote',intent:'admin',registrationId:promoted,expandBy:0,operationId:'start320-late-promotion'}};
 
  const timings=[],notices=[],storage=new Map();
- let startWrites=0, drawn=0, next=0, modal, controller, eventResolve;
+ let startWrites=0, drawn=0, next=0, modal, controller, eventResolve, startRequest;
+ const start=createStartHandler({db,enabled:async requested=>requested===code});
+ const startData=snapshot=>({code,roomId:snapshot.id,drawId:snapshot.bracketDraw.id,
+  rosterRevision:snapshot.registrationRosterRevision,operationId:'start-320-operation'});
  const observed=()=>new Promise(resolve=>{eventResolve=resolve;});
  const emit=value=>eventResolve?.(value);
  const measure=async(label,fn)=>{
@@ -109,7 +113,14 @@ async function run(){
   saveState:async()=>{
    startWrites++;
    const snapshot=clone(c.state);
-   try{return (await write(snapshot,{bracketStartSignature:bracket.signature(snapshot)},'start-write')).ok;}
+   try{
+    startRequest={auth:{uid:admin},data:startData(snapshot)};
+    const results=await measure('start-write-and-concurrent-retry',()=>Promise.all([start(startRequest),start(startRequest)]));
+    assert.equal(results.filter(result=>result.replayed===true).length,1);
+    assert.equal(results[0].startedAt,results[1].startedAt);
+    c.state=(await readBracket()).data;
+    return results.every(result=>result.ok);
+   }
    catch(e){c.window.__BXH_LAST_CLOUD_ERROR_CODE=e.message;return false;}
   }
  });
@@ -149,6 +160,8 @@ async function run(){
  assert.equal(blocked.operation.state,'queued');
  assert.equal(behind.operation.state,'queued');
  assert.equal((await worker.drain(code)).processed,0);
+ const staleStart={auth:{uid:admin},data:startData(c.state)};
+ await assert.rejects(start(staleStart),/registration-queue-pending/);
 
  let event=observed();
  await measure('first-start-click-to-confirmation',async()=>{c.clickStart();assert.equal((await event).title,'確認開始賽事');});
@@ -169,6 +182,7 @@ async function run(){
  assert.equal(afterQr.data().registrationQueueVersion,2);
  assert.equal(afterQr.data().qrCheckinRevision,publicAfterQr.data().qrCheckinRevision);
  assert.equal(JSON.parse(publicAfterQr.data().bracketView).players.filter(player=>player.checkedIn).length,320);
+ await assert.rejects(start(staleStart),/registration-roster-stale/);
  event=observed();
  await measure('confirm-with-stale-pairing',async()=>{firstConfirm();assert.match((await event).message,/名單又有異動/);});
  assert.equal(startWrites,0);
@@ -177,6 +191,16 @@ async function run(){
  await measure('redraw',()=>controller.begin());
  assert.equal(drawn,2);
  assert.equal(c.currentBracketParticipantIds().size,320);
+ const validStart={auth:{uid:admin},data:startData(c.state)};
+ await assert.rejects(start({...validStart,auth:{uid:late[0]}}),/permission-denied/);
+ await assert.rejects(start({...validStart,data:{...validStart.data,drawId:'another-draw'}}),/bracket-version-conflict/);
+ await assert.rejects(createStartHandler({db})(validStart),/registration-queue-disabled/);
+ await reg(late[0]).update({status:'waitlist'});
+ await assert.rejects(start(validStart),/registration-roster-stale/);
+ await reg(late[0]).update({status:'confirmed'});
+ await tr.update({eventDate:'2099-01-01',startAt:'14:00'});
+ await assert.rejects(start(validStart),/early-start-confirmation-required/);
+ await tr.update({eventDate:FieldValue.delete(),startAt:FieldValue.delete()});
  event=observed();
  const beforeStartReads=rosterReadCount();
  await measure('start-click-to-confirmation',async()=>{c.clickStart();assert.equal((await event).title,'確認開始賽事');});
@@ -190,8 +214,21 @@ async function run(){
  assert.equal(room.data().tournamentPhase,'live');
  assert.equal(mirror.data().tournamentPhase,'live');
  assert.equal(room.data().confirmedCount,320);
+ const started=JSON.parse(room.data().data),publicStarted=JSON.parse(mirror.data().bracketView);
+ assert.equal(started.rosterLocked,true);
+ assert.equal(started.startedAt,publicStarted.startedAt);
+ assert.equal(room.data().qrCheckinRevision,mirror.data().qrCheckinRevision);
+ assert.equal(Object.values(started.courtAssignments).filter(court=>court.status==='in_progress').length,12);
+ assert.deepEqual(Object.values(publicStarted.courtAssignments).map(court=>court.currentMatchId),
+  Object.values(started.courtAssignments).map(court=>court.currentMatchId));
+ const replay=await createStartHandler({db})(startRequest);
+ assert.deepEqual(replay,{ok:true,startedAt:started.startedAt,drawId:started.bracketDraw.id,replayed:true});
+ await assert.rejects(start({...startRequest,data:{...startRequest.data,drawId:'modified-draw'}}),/operation-conflict/);
+ await assert.rejects(start({...startRequest,data:{...startRequest.data,operationId:'another-start-operation'}}),/bracket-started/);
+ assert.equal((await tr.collection('operationLog').get()).size,1);
+ await assert.rejects(worker.enqueue(admin,{...configure,operationId:'after-start-config',payload:{...configure.payload,operationId:'after-start-config'}}),/tournament-started/);
  assert.equal(notices.filter(x=>x.error).length,1);
- return {scope:'Firestore Emulator with V2 ownership and the QR handler; browser draw/start writes and UI state simulated by the test, no browser Auth, App Check, production Rules or referee DOM',
+ return {scope:'Firestore Emulator with V2 ownership, QR and trusted start handlers; draw writes and UI state simulated by the test, no browser Auth, App Check, production Rules or referee DOM',
   players:320,courtsConfigured:12,matchedEntrants:c.currentBracketParticipantIds().size,draws:drawn,startWrites,lateQrAudits:audits.length,
   pendingOperationsDuringFirstClick:2,postDrawPromotion:refused.reason,staleStartMessage:notices.find(x=>x.error).message,timings};
 }

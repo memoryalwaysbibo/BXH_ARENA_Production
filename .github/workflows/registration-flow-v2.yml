@@ -7,6 +7,8 @@ on:
       - 'modules/cloud/cloud-runtime.js'
       - 'family-ui.js'
       - 'qr-checkin/backend/**'
+      - 'referee-seats/functions/engine/**'
+      - 'modules/main-app/bracket-commit.js'
       - 'referee-seats/reference/firestore.production-20261104.rules'
       - '.github/workflows/registration-flow-v2.yml'
 permissions:

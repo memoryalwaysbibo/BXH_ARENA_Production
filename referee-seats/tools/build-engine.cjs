@@ -6,7 +6,7 @@ const root=path.resolve(__dirname,'../..'),src=fs.readFileSync(path.join(root,'m
 const ast=acorn.parse(src,{ecmaVersion:'latest',sourceType:'script'}),fns=new Map(ast.body.filter(n=>n.type==='FunctionDeclaration').map(n=>[n.id.name,n]));
 const overrides=new Set(['uid','currentRefereeIdentity']),names=new Set();
 function add(name){if(names.has(name)||overrides.has(name))return;const node=fns.get(name);if(!node)throw new Error('missing engine function: '+name);names.add(name);walk.simple(node,{Identifier(n){if(fns.has(n.name))add(n.name);}});}
-const exportedNames=['rebuildPropagationForState','evaluateMatchCompletion','evaluateQuickDecision','applyMatchCompletionFields','applyQuickDecisionFields','createHunterRoundEvent','singleElimBronzeBeforeFinalBlocked','applyCompletedMatchCorrection','checkWinnerSide','markMatchSkipped','applyIdleCourtClaim','applySkippedDispatch','applyCourtSwapMutation','applyManualCourtAssign'];
+const exportedNames=['rebuildPropagationForState','evaluateMatchCompletion','evaluateQuickDecision','applyMatchCompletionFields','applyQuickDecisionFields','createHunterRoundEvent','singleElimBronzeBeforeFinalBlocked','applyCompletedMatchCorrection','checkWinnerSide','markMatchSkipped','applyIdleCourtClaim','applySkippedDispatch','applyCourtSwapMutation','applyManualCourtAssign','rebuildCourtAssignments'];
 exportedNames.forEach(add);
 const constants=['POINT_TYPES','HUNTER_ROUND_SCHEMA_VERSION','HUNTER_SCORING_VERSION','HUNTER_VALID_POINT_TYPES'].map(name=>{const declaration=ast.body.filter(n=>n.type==='VariableDeclaration').flatMap(n=>n.declarations).find(n=>n.id.name===name);if(!declaration)throw Error(name);return 'const '+src.slice(declaration.start,declaration.end)+';';}).join('\n');
 const files={

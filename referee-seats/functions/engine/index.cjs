@@ -906,6 +906,6 @@ function validateHunterRoundLedger(match){
   else if(scoreA!==expectedA||scoreB!==expectedB) errors.push({reason:"score-ledger-mismatch",scoreA,scoreB,expectedA,expectedB});
   return {ok:errors.length===0,events,roundCount:events.length,scoreA,scoreB,errors};
 }
- return {rebuildPropagationForState,evaluateMatchCompletion,evaluateQuickDecision,applyMatchCompletionFields,applyQuickDecisionFields,createHunterRoundEvent,singleElimBronzeBeforeFinalBlocked,applyCompletedMatchCorrection,checkWinnerSide,markMatchSkipped,applyIdleCourtClaim,applySkippedDispatch,applyCourtSwapMutation,applyManualCourtAssign};
+ return {rebuildPropagationForState,evaluateMatchCompletion,evaluateQuickDecision,applyMatchCompletionFields,applyQuickDecisionFields,createHunterRoundEvent,singleElimBronzeBeforeFinalBlocked,applyCompletedMatchCorrection,checkWinnerSide,markMatchSkipped,applyIdleCourtClaim,applySkippedDispatch,applyCourtSwapMutation,applyManualCourtAssign,rebuildCourtAssignments};
 }
 module.exports={createEngine};
