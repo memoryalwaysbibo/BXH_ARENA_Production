@@ -6,20 +6,24 @@ const {createQueue}=require('./queue.cjs');
 const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
 const {createStartHandler,createDrawHandler}=require('./lifecycle.cjs');
-function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled}){
+function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled,pilotRoom=null}){
  if(createFamilyRegistration?.v2CapacityAware!==true)throw Error('queue-family-capacity-source-required');
  const familyFactory=store=>createFamilyRegistration(store,Date.now,{myEventsProofEnabled:true});
  if(typeof promotionFactory!=='function')throw Error('queue-promotion-factory-required');
  const {onCall,HttpsError}=require('firebase-functions/v2/https');
  const {onDocumentCreated}=require('firebase-functions/v2/firestore');
  const {onSchedule}=require('firebase-functions/v2/scheduler');
- const queue=createQueue(db,{FieldValue,requireRoomOwnership:true,handlers:{family:familyFactory,roster:rosterFactory,promotion:promotionFactory}});
  const workersReady=async()=>!stagedOnly&&await workersEnabled()===true;
- const intakeEnabled=async code=>await workersReady()&&await enabled(code)===true;
+ const roomAllowed=code=>pilotRoom===null||code===pilotRoom;
+ const intakeEnabled=async(code,tx)=>roomAllowed(code)&&!stagedOnly&&
+  (pilotRoom!==null||await workersReady())&&await enabled(code,tx)===true;
+ const queue=createQueue(db,{FieldValue,requireRoomOwnership:true,
+  authorizeIntake:pilotRoom===null?undefined:intakeEnabled,
+  handlers:{family:familyFactory,roster:rosterFactory,promotion:promotionFactory}});
  const api=createApi({queue,family:familyFactory(db),enabled:intakeEnabled});
  const managementApi=createManagementApi({queue,enabled:intakeEnabled,authorize:authorizeManagement});
  const bind=(handler,{options,preconditions=[]}={})=>onCall({region:'asia-east1',cors:true,timeoutSeconds:30,maxInstances:5,...options},async req=>{
-  if(stagedOnly)throw new HttpsError('failed-precondition','registration-queue-disabled');
+  if(stagedOnly||!roomAllowed(req.data?.code))throw new HttpsError('failed-precondition','registration-queue-disabled');
   try{return await handler(req);}catch(error){
    const m=String(error.message||'');
    if(m==='auth-required')throw new HttpsError('unauthenticated',m);
@@ -39,11 +43,26 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
  const registrationStartV2=bind(createStartHandler({db,enabled:startEnabled}),lifecycleOptions);
  const registrationDrawV2=bind(createDrawHandler({db,enabled:drawEnabled}),lifecycleOptions);
  const registrationQueueV2Worker=onDocumentCreated({region:'asia-east1',document:'_registrationQueueV2/{code}/_registrationQueueJobsV2/{job}',timeoutSeconds:60,maxInstances:5,retry:true},async event=>{
-  if(await workersReady())await queue.drainCreatedJob(event.params.code,event.params.job,{limit:200,budgetMs:45000});
+  if(roomAllowed(event.params.code)&&await workersReady())await queue.drainCreatedJob(event.params.code,event.params.job,{limit:200,budgetMs:45000});
  });
  const registrationQueueV2Sweep=onSchedule({region:'asia-east1',schedule:'every 1 minutes',timeoutSeconds:540,maxInstances:1},async()=>{
-  if(await workersReady())await queue.sweep();
+  if(await workersReady())await queue.sweep(pilotRoom);
  });
  return {registrationQueueV2,registrationRosterQueueV2,registrationQueueV2Worker,registrationQueueV2Sweep,registrationStartV2,registrationDrawV2};
 }
-module.exports={createBindings};
+function createPilotBindings({pilotRoom,...dependencies}){
+ if(typeof pilotRoom!=='string'||!/^BXH-[A-Z0-9]{4,16}$/.test(pilotRoom))throw Error('invalid-pilot-room');
+ const ref=dependencies.db.doc('systemSettings/registrationFlowV2Pilot');
+ const allows=async(field,tx)=>{
+  const snapshot=tx?await tx.get(ref):await ref.get();
+  const config=snapshot.data();
+  return config?.roomCode===pilotRoom&&config.workersEnabled===true&&config[field]===true;
+ };
+ const lifecycle=(_code,tx)=>allows('lifecycleEnabled',tx);
+ return createBindings({...dependencies,pilotRoom,stagedOnly:false,
+  workersEnabled:()=>allows('workersEnabled'),
+  enabled:(_code,tx)=>allows('intakeEnabled',tx),
+  drawEnabled:lifecycle,startEnabled:lifecycle,
+ });
+}
+module.exports={createBindings,createPilotBindings};

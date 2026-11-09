@@ -35,7 +35,7 @@ function validate(uid,input){
 // Private server-only operation journal. This is a candidate, not an installed
 // Cloud Tasks deployment. onCreate + a scheduled sweep must both be wired before
 // rollout. Queue acceptance is NOT a reservation or proof of registration.
-function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAttempts=5,requireRoomOwnership=false,workerId=randomUUID(),beforeExecute=async()=>{}}={}){
+function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAttempts=5,requireRoomOwnership=false,authorizeIntake,workerId=randomUUID(),beforeExecute=async()=>{}}={}){
  if(!handlers?.family||!handlers?.roster||!FieldValue)throw Error('queue-dependencies-required');
  const rooms=db.collection('_registrationQueueV2');
  const roomRef=code=>rooms.doc(code);
@@ -52,6 +52,7 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
    const roomData=room?.data();
    if(requireRoomOwnership&&!registrationQueueOwnsRoom(roomData))throw fail('registration-queue-disabled');
    if(requireRoomOwnership&&(roomData.startedAt||roomData.tournamentPhase==='live'))throw fail('tournament-started');
+   if(authorizeIntake&&!await authorizeIntake(value.code,tx))throw fail('registration-queue-disabled');
    if(authorize)await authorize(tx,user.data(),value,roomData);
    tx.create(ref,{...value,requestHash:hash,state:'queued',attempts:0,acceptedAt:FieldValue.serverTimestamp(),updatedAt:clock()});
   });
@@ -150,7 +151,13 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
   // stopped early. Leave the event retryable until its own job is settled.
   if(await pending())throw fail('queue-delivery-pending');
  }
- async function sweep(){
+ async function sweep(pilotRoom=null){
+  if(pilotRoom!==null){
+   const pending=await jobsRef(pilotRoom).where('state','in',['queued','running']).limit(1).get();
+   if(pending.empty)return {rooms:0};
+   await drain(pilotRoom);
+   return {rooms:1};
+  }
   // A sweeper is a recovery path, not an unbounded scan of every tournament.
   const pending=await db.collectionGroup('_registrationQueueJobsV2').where('state','in',['queued','running']).limit(200).get();
   const codes=[...new Set(pending.docs.filter(s=>s.ref.parent.parent?.parent.path==='_registrationQueueV2').map(s=>s.data().code))];

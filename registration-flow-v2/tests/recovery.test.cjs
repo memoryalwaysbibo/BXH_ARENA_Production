@@ -441,3 +441,45 @@ test('the closed deployment rejects every callable before database access even w
  await release.registrationQueueV2Worker.run({params:{code:'BXH-TEST',job:'fixture'}});
  await release.registrationQueueV2Sweep.run({});
 });
+
+test('pilot accepts and drains only the bound room, including after closing intake',async t=>{
+ const {createPilotBindings}=require('../backend/bindings.cjs');
+ const pilot=await seed(2),other=await seed(1),control=db.doc('systemSettings/registrationFlowV2Pilot');
+ const pilotRequest=request(pilot.code,pilot.ids[0]),otherRequest=request(other.code,other.ids[0]);
+ const pilotRegistration=db.doc('tournaments/'+pilot.code),otherRegistration=db.doc('tournaments/'+other.code);
+ t.after(()=>control.delete());
+ await Promise.all([pilotRegistration.update({registrationQueueVersion:2}),otherRegistration.update({registrationQueueVersion:2})]);
+ const queue=service({requireRoomOwnership:true});
+ await queue.enqueue(other.ids[0],otherRequest);
+ const createFamilyRegistration=Object.assign(store=>handlers.family(store),{v2CapacityAware:true});
+ const endpoints=createPilotBindings({pilotRoom:pilot.code,db,FieldValue,createFamilyRegistration,
+  rosterFactory:handlers.roster,promotionFactory:()=>()=>{},authorizeManagement:async()=>{}});
+ const submit=(room,operation)=>endpoints.registrationQueueV2.run({
+  auth:{uid:room.ids[0]},data:{action:'submit',code:room.code,operation},
+ });
+ const setControls=(roomCode,workersEnabled,intakeEnabled)=>control.set({roomCode,workersEnabled,intakeEnabled});
+ await assert.rejects(submit(pilot,pilotRequest),/registration-queue-disabled/);
+ await setControls(other.code,true,true);
+ await assert.rejects(submit(pilot,pilotRequest),/registration-queue-disabled/);
+ await setControls(pilot.code,false,true);
+ await assert.rejects(submit(pilot,pilotRequest),/registration-queue-disabled/);
+ await setControls(pilot.code,true,true);
+ await assert.rejects(submit(other,otherRequest),/registration-queue-disabled/);
+ assert.equal((await submit(pilot,pilotRequest)).operation.state,'queued');
+ await setControls(pilot.code,true,false);
+ const fresh=request(pilot.code,pilot.ids[1]);
+ await assert.rejects(endpoints.registrationQueueV2.run({
+  auth:{uid:pilot.ids[1]},data:{action:'submit',code:pilot.code,operation:fresh},
+ }),/registration-queue-disabled/);
+ await endpoints.registrationQueueV2Worker.run({
+  params:{code:other.code,job:queue.jobRef(other.code,other.ids[0],otherRequest.operationId).id},
+ });
+ await endpoints.registrationQueueV2Sweep.run({});
+ const status=await endpoints.registrationQueueV2.run({
+  auth:{uid:pilot.ids[0]},data:{action:'status',code:pilot.code,operationId:pilotRequest.operationId},
+ });
+ assert.equal(status.operation.state,'completed');
+ assert.equal((await queue.status(other.ids[0],other.code,otherRequest.operationId)).operation.state,'queued');
+ assert.equal((await audit(pilot.code,1)).summary.jobs,1);
+ assert.equal((await audit(other.code,0)).summary.jobs,1);
+});

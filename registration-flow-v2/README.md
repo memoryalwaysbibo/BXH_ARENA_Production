@@ -69,3 +69,9 @@ CI 安裝固定 firebase-tools@13.35.1、firebase-admin@14.4.0、firebase-functi
 - 正式 Auth、App Check、實體瀏覽器及小範圍活動驗收，並準備來源／設定 readback 與 rollback。
 
 上述條件未完成前，server enabled 預設 false，前端 allowlist 必須保持未定義／空。此模擬不解釋 BXH-ANYX2T 當時的確切失敗原因，該事件仍需歷史後端紀錄。
+
+## 單房試跑候選
+
+`tools/prepare-pilot-entrypoint.cjs` 接受已審查的硬關閉入口及單一房號，產生試跑入口。正式部署來源仍須核對六支函式的完整 ZIP、候選差異及流量設定。
+候選只接受綁定房間。受信任的伺服器設定 `systemSettings/registrationFlowV2Pilot` 必須含相同的 `roomCode`，並分開設定 `workersEnabled`、`intakeEnabled` 和 `lifecycleEnabled`。缺設定或房號不符時不受理。正式 Rules、前端允許名單及房間所有權另行核對。
+停用時先關閉 `intakeEnabled` 和 `lifecycleEnabled`，保留 worker 與既有操作回執查詢。確認該房佇列排空後，再關閉 worker 並處理房間所有權。掃描器只處理綁定房間。
