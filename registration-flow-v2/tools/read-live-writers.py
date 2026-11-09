@@ -52,12 +52,12 @@ def describe(name):
     return revision, bucket, obj, str(generation)
 
 
-def source_hashes(archive):
+def source_hashes(archive, required_files=()):
     result = {}
     with zipfile.ZipFile(archive) as package:
         for entry in package.infolist():
             path = PurePosixPath(entry.filename)
-            if path.name not in HANDLER_NAMES or "node_modules" in path.parts:
+            if (path.name not in HANDLER_NAMES and str(path) not in required_files) or "node_modules" in path.parts:
                 continue
             if path.is_absolute() or ".." in path.parts or str(path) in result:
                 raise ValueError("unexpected-archive-entry")
@@ -69,7 +69,7 @@ def source_hashes(archive):
     return result
 
 
-def inspect(name, export_roster=None):
+def inspect(name, export_roster=None, required_files=()):
     original = describe(name)
     revision, bucket, obj, generation = original
     with tempfile.TemporaryDirectory(prefix="bxh746-writer-", dir="/tmp") as staging:
@@ -77,7 +77,7 @@ def inspect(name, export_roster=None):
         gcloud("storage", "cp", f"gs://{bucket}/{obj}#{generation}", str(archive))
         with archive.open("rb") as stream:
             digest = hashlib.file_digest(stream, "sha256").hexdigest()
-        files = source_hashes(archive)
+        files = source_hashes(archive, required_files)
         if export_roster is not None:
             with zipfile.ZipFile(archive) as package:
                 roster = package.read('roster-service.js')
@@ -103,10 +103,47 @@ def waitlist_inventory():
     return {"status": "LISTED" if matches else "NOT_LISTED_IN_REGION", "functions": matches}
 
 
+def verify_release_inputs(manifest_path):
+    expected = json.loads(manifest_path.read_text())
+    if set(expected) != {"familyRegistration", "registrationRosterService"}:
+        raise ValueError("unexpected-release-input-functions")
+    results = {}
+    for name, baseline in expected.items():
+        try:
+            live = inspect(name, required_files=baseline["files"])
+        except (OSError, subprocess.SubprocessError, ValueError, zipfile.BadZipFile) as error:
+            results[name] = {"error": str(error) if type(error) is ValueError else type(error).__name__}
+            continue
+        changed = [field for field in ("revision", "generation") if live[field] != baseline[field]]
+        missing = sorted(path for path in baseline["files"] if path not in live["files"])
+        mismatches = sorted(path for path, sha in baseline["files"].items()
+                            if path in live["files"] and live["files"][path] != sha)
+        results[name] = {
+            "revision": live["revision"], "generation": live["generation"],
+            "archiveSha256": live["archiveSha256"], "checkedFiles": len(baseline["files"]),
+            "changed": changed, "missing": missing, "mismatches": mismatches,
+            "verified": not (changed or missing or mismatches),
+        }
+    ready = all(row.get("verified") for row in results.values())
+    print(json.dumps({"status": "SOURCE_INPUTS_MATCHED" if ready else "SOURCE_INPUTS_BLOCKED",
+                      "productionWrites": 0, "writers": results}, indent=2))
+    return 0 if ready else 1
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--export-roster", type=Path, help="Write the reviewed roster handler to a new local file.")
+    parser.add_argument("--verify-release-inputs", type=Path, metavar="MANIFEST",
+                        help="Compare the two live application source ZIPs against the reviewed manifest.")
     args = parser.parse_args()
+    if args.verify_release_inputs is not None:
+        if args.export_roster is not None:
+            parser.error("Choose one inspection mode.")
+        try:
+            return verify_release_inputs(args.verify_release_inputs)
+        except (OSError, ValueError, TypeError, KeyError):
+            print(json.dumps({"status": "INVALID_RELEASE_INPUT_MANIFEST", "productionWrites": 0}))
+            return 1
     if args.export_roster is not None:
         try:
             row = inspect("registrationRosterService", args.export_roster)
