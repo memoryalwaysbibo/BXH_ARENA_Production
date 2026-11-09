@@ -1,5 +1,6 @@
 'use strict';
 const {createHash}=require('node:crypto');
+const {operationFields}=require('./my-events-operation-proof.cjs');
 const {quickPolicy,quickParticipants}=require('./community-registration-policy');
 const {projectQuickRoster,assertPendingBracketOnly}=require('./community-registration-roster');
 const {onsiteWaitlistOwned,readManagedRows,projectManagedCancellation,projectManagedLocalCancellation}=require('./onsite-waitlist-writer-guards');
@@ -22,8 +23,8 @@ function promotionManager(user,uid,t){
  return user.role==='staff'&&(!Object.prototype.hasOwnProperty.call(t,'assignedStaffUids')||
   Array.isArray(t.assignedStaffUids)&&(t.assignedStaffUids.length===0||t.assignedStaffUids.includes(uid)));
 }
-function mutable(t,p,s){
- if(t.systemClosed||t.eventCancelled||p.eventCancelled||s.meta?.eventCancelled||s.startedAt||s.bracketSize||s.archiveStatus==='completed'||t.archiveStatus==='completed'||['live','settling','done','cancelled'].includes(t.tournamentPhase)||['live','settling','done','cancelled'].includes(p.tournamentPhase))throw Error('bracket-locked');
+function mutable(t,p,s,prestartCancellation=false){
+ if(t.systemClosed||p.systemClosed||t.eventCancelled||p.eventCancelled||s.meta?.eventCancelled||s.startedAt||t.startedAt||p.startedAt||(!prestartCancellation&&s.bracketSize)||s.archiveStatus==='completed'||t.archiveStatus==='completed'||p.archiveStatus==='completed'||['live','settling','done','cancelled'].includes(t.tournamentPhase)||['live','settling','done','cancelled'].includes(p.tournamentPhase))throw Error('bracket-locked');
  if(t.registrationSelection||p.registrationSelection||s.entrySelection?.mode==='registration')throw Error('selection-managed');
  if((t.battleMode||s.meta?.battleMode)==='team')throw Error('team-roster-managed');
 }
@@ -57,7 +58,7 @@ function reconcile(s,rows,quick=false,code=''){
  s.players=(s.players||[]).filter(onsite).concat(rows.filter(r=>r.status==='confirmed').map(player));
  s.waitlistPlayers=(s.waitlistPlayers||[]).filter(onsite).concat(rows.filter(r=>r.status==='waitlist').map(player));
 }
-function createRosterService(db,FieldValue,clock=Date.now){return async req=>{
+function createRosterService(db,FieldValue,clock=Date.now,{myEventsProofEnabled=false}={}){return async req=>{
  const uid=req.auth?.uid,d=req.data||{};
  if(!uid)throw Error('auth-required');
  const code=String(d.code||'').trim().toUpperCase();
@@ -76,7 +77,7 @@ function createRosterService(db,FieldValue,clock=Date.now){return async req=>{
   const user=us.data();if(!active(user))throw Error('auth-required');
   if(!ts.exists||!ps.exists)throw Error('not-found');
   const t=ts.data(),pub=ps.data();
-  if(Object.prototype.hasOwnProperty.call(t,'scoreStorage'))throw Error('bucket-scoring-required');
+  if([t, pub].some(x=>x&&['scoreStorage','scoreBucketProjection'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');
   const s=parse(t.data),quick=quickPolicy(t,pub);
   if(quick&&(!s||typeof s!=='object'||Array.isArray(s)||!Array.isArray(s.players)))throw Error('corrupt-state');
   s.meta=s.meta||{};
@@ -97,8 +98,10 @@ function createRosterService(db,FieldValue,clock=Date.now){return async req=>{
   const finalized=t.onsiteWaitlistFinalized===true&&pub.onsiteWaitlistFinalized===true&&s.onsiteWaitlistFinalized===true;
   if(managed&&(d.action==='configure'||localId&&!finalized))throw Error('onsite-waitlist-managed');
   if(os.exists){if(os.data().requestHash!==hash)throw Error('operation-conflict');return {...os.data().result,state:s,replayed:true};}
-  mutable(t,pub,s);
-  if(quick)assertPendingBracketOnly(s,parse(pub.bracketView));
+  const prestartCancellation=d.action==='cancel'&&intent==='admin'&&isManager&&!managed;
+  mutable(t,pub,s,prestartCancellation);
+  if(quick||prestartCancellation)assertPendingBracketOnly(s,parse(pub.bracketView));
+  const pendingBracket=!!s.bracketSize||(s.matches||[]).length>0;
   const now=clock();
   if(d.action==='configure'){
    s.meta.registrationAutoFillEnabled=d.enabled;
@@ -169,7 +172,16 @@ function createRosterService(db,FieldValue,clock=Date.now){return async req=>{
   }
   const oldStatus=row?row.status:'confirmed';
   if(!['confirmed','waitlist','cancelled'].includes(oldStatus))throw Error('nothing-to-cancel');
-  if(oldStatus==='cancelled')return {ok:true,status:'cancelled',registrationId,autoPromoted:false,state:s,alreadyCancelled:true};
+  if(oldStatus==='cancelled'){
+   if(myEventsProofEnabled!==true||intent!=='player')return {ok:true,status:'cancelled',registrationId,autoPromoted:false,state:s,alreadyCancelled:true};
+   // The opt-in player no-op needs an action document. Read SDK metadata before
+   // writing; data.updatedAt can be legacy/client time and is not the anchor.
+   const source=await tx.get(row.ref);
+   const result={ok:true,status:'cancelled',registrationId,autoPromoted:false,alreadyCancelled:true};
+   const proofFields=operationFields(uid,code,'cancel',ts.createTime,[{id:registrationId,mode:'observed',observedUpdateTime:source.updateTime}],now);
+   tx.create(op,{actorUid:uid,requestHash:hash,result,createdAt:now,...proofFields});
+   return {...result,state:s};
+  }
   if(managed){
    // Preserve the existing actor/deadline checks above. Canonical projection
    // changes only this registration and invalidates any locked selected pool.
@@ -181,7 +193,8 @@ function createRosterService(db,FieldValue,clock=Date.now){return async req=>{
    tx.update(tr,projected.private);
    tx.update(pr,projected.public);
    const result={ok:true,status:'cancelled',registrationId,localId,autoPromoted:false,promotedRegistrationId:'',promotedLocalId:'',promotedName:'',confirmedCount:projected.private.confirmedCount,waitlistCount:projected.private.waitlistCount,capacity:t.capacity,registrationChanges:row?[{registrationId,status:'cancelled'}]:[]};
-   tx.create(op,{actorUid:uid,requestHash:hash,result,createdAt:now});
+   const proofFields=myEventsProofEnabled===true&&intent==='player'?operationFields(uid,code,'cancel',ts.createTime,[{id:registrationId,mode:'write'}],now):{};
+   tx.create(op,{actorUid:uid,requestHash:hash,result,createdAt:now,...proofFields});
    return {...result,state:parse(projected.private.data)};
   }
   if(local)s.players=s.players.filter(p=>p!==local);
@@ -190,7 +203,7 @@ function createRosterService(db,FieldValue,clock=Date.now){return async req=>{
   let promoted=null;
   const capacity=quick?quick.capacity:Number(t.capacity??s.meta.registrationCapacity??0);
   const participantCount=()=>quick?quickParticipants(s,rows).count:s.players.length;
-  if(oldStatus==='confirmed'&&s.meta.registrationAutoFillEnabled===true&&(capacity===null||!capacity||participantCount()<capacity)){
+  if(!pendingBracket&&oldStatus==='confirmed'&&s.meta.registrationAutoFillEnabled===true&&(capacity===null||!capacity||participantCount()<capacity)){
    const queue=rows.filter(r=>r.status==='waitlist').sort((a,b)=>epoch(a.createdAt)-epoch(b.createdAt)||a.registrationId.localeCompare(b.registrationId));
    if(queue.length){promoted=queue[0];promoted.status='confirmed';reconcile(s,rows,quick,code);}
    else{
@@ -201,8 +214,8 @@ function createRosterService(db,FieldValue,clock=Date.now){return async req=>{
   const confirmed=rows.filter(r=>r.status==='confirmed').length,waitlist=rows.filter(r=>r.status==='waitlist').length;
   s.registrationRosterRevision=Number(s.registrationRosterRevision||0)+1;s.updatedAt=now;
   let status=String(t.registrationStatus||pub.registrationStatus||s.meta.registrationStatus||'open');
-  if(status==='full'&&(capacity===null||!capacity||participantCount()<capacity))status='open';
-  if(['open','full'].includes(status)&&capacity>0&&participantCount()>=capacity)status='full';
+  if(!pendingBracket&&status==='full'&&(capacity===null||!capacity||participantCount()<capacity))status='open';
+  if(!pendingBracket&&['open','full'].includes(status)&&capacity>0&&participantCount()>=capacity)status='full';
   s.meta.registrationStatus=status;
   const participantPatch=quick?{communityParticipantCount:participantCount()}:{};
   if(quick)s.communityParticipantCount=participantPatch.communityParticipantCount;
@@ -212,7 +225,10 @@ function createRosterService(db,FieldValue,clock=Date.now){return async req=>{
   tx.update(tr,{...patch,data:JSON.stringify(s)});
   tx.update(pr,{...patch,bracketView:publicMirror(pub,s,{},quick)});
   const result={ok:true,status:'cancelled',registrationId,localId,autoPromoted:!!promoted,promotedRegistrationId:promoted?.registrationId||'',promotedLocalId:promoted?.localId||'',promotedName:promoted?.displayName||promoted?.publicName||promoted?.realName||promoted?.name||'',confirmedCount:confirmed,waitlistCount:waitlist,capacity,registrationChanges:rows.filter(r=>r.registrationId===registrationId||r.registrationId===promoted?.registrationId).map(r=>({registrationId:r.registrationId,status:r.status}))};
-  tx.create(op,{actorUid:uid,requestHash:hash,result,createdAt:now});
+  // Capture every online registration write, including another owner's auto-
+  // promotion. Existing player response filtering does not expose these IDs.
+  const proofFields=myEventsProofEnabled===true&&intent==='player'?operationFields(uid,code,'cancel',ts.createTime,[{id:registrationId,mode:'write'},...(promoted?.ref?[{id:promoted.registrationId,mode:'write'}]:[])],now):{};
+  tx.create(op,{actorUid:uid,requestHash:hash,result,createdAt:now,...proofFields});
   return {...result,state:s};
  });
  // Player cancellations return only the cancellation outcome; private runtime
