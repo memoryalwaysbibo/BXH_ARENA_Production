@@ -1,0 +1,45 @@
+name: Referee notice cleanup isolated tests
+on:
+  pull_request:
+    paths:
+      - 'modules/main-app/core.js'
+      - 'modules/main-app/referee-seats.js'
+      - 'modules/cloud/cloud-runtime.js'
+      - 'tests/referee-seat-cleanup/**'
+      - '.github/workflows/referee-seat-cleanup.yml'
+permissions:
+  contents: read
+jobs:
+  isolated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check full modified modules
+        run: |
+          node --check modules/main-app/core.js
+          node --check modules/cloud/cloud-runtime.js
+          node --check modules/main-app/referee-seats.js
+      - name: Test real lifecycle and persistence functions with synthetic data
+        run: node --test tests/referee-seat-cleanup/regression.test.cjs
+      - name: Install isolated browser test dependency
+        run: npm install --prefix /tmp/referee-cleanup-tests --no-save --ignore-scripts playwright@1.55.0
+      - name: Install Chromium
+        run: node /tmp/referee-cleanup-tests/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Browser integration on desktop mobile and tablet viewports
+        env:
+          NODE_PATH: /tmp/referee-cleanup-tests/node_modules
+        run: node tests/referee-seat-cleanup/browser.test.cjs
+      - name: Keep synthetic test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: referee-seat-cleanup-results
+          path: test-results/referee-seat-cleanup/
+          retention-days: 7
+          if-no-files-found: warn
