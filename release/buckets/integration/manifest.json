@@ -625,7 +625,7 @@
       ]
     },
     "release/buckets/settlement/candidate/10/ladder-auto-settlement.js": {
-      "blob": "85d8a05a6e5042d4fc6eb8f03eed14982616e5ae",
+      "blob": "df94624bdf44259d276c5ac1aaf754adb4255198",
       "components": [
         713
       ]
@@ -643,13 +643,13 @@
       ]
     },
     "release/buckets/settlement/candidate/21/ladder-settlement.js": {
-      "blob": "09a5880a15f6dcbec1b0b8858c44a42fec58f213",
+      "blob": "1868e91358ff176f70896a28a0ac265cf59b2639",
       "components": [
         713
       ]
     },
     "release/buckets/settlement/patch-manifest.json": {
-      "blob": "b5ef91361a4f00e4c779cc26b659e409259a613e",
+      "blob": "af21ecb5ba37beb534338767a23bb5880569d052",
       "components": [
         713
       ]
@@ -1815,7 +1815,7 @@
       ]
     },
     "tests/four-court-buckets/settlement/native-emulator.cjs": {
-      "blob": "6087828bf17bc0a243bc7ee01d164b6c760577c7",
+      "blob": "bcc55c1f780407bea2874d524060f7000273b7a7",
       "components": [
         713
       ]

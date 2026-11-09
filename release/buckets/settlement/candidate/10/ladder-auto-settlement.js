@@ -77,7 +77,7 @@ function createSettlementService({db=getFirestore(),serverTimestamp=()=>FieldVal
 
     const observed={};
     return db.runTransaction(async tx=>{
-      const [tourSnap,publicSnap,controlSnap]=await Promise.all([tx.get(tourRef),tx.get(publicRef),tx.get(controlRef)]);
+      const [tourSnap,publicSnap,controlSnap]=await tx.getAll(tourRef,publicRef,controlRef);
       if(!tourSnap.exists)return {ok:false,reason:'event-not-found'};
       let input;try{input=await A.load({tx,db,root:tourSnap,pub:publicSnap,observed,runtime:bucketRuntime,env:bucketEnv});}catch(e){if(e.bucketSettlement)return {ok:false,reason:e.message,permanent:true};throw e;}
       const top=tourSnap.data()||{},st=input.bucket?input.state:parseState(top);
@@ -100,7 +100,7 @@ function createSettlementService({db=getFirestore(),serverTimestamp=()=>FieldVal
 
       const candidates=[...new Set(scored.players.map(x=>input.bucket?A.playerUid(x.player):core.candidateUid(x.player)).filter(Boolean))];
       const userRefs=candidates.map(uid=>db.doc('users/'+uid));
-      const userSnaps=await Promise.all(userRefs.map(ref=>tx.get(ref)));
+      const userSnaps=userRefs.length ? await tx.getAll(...userRefs) : [];
       const profiles={};userSnaps.forEach((snap,i)=>{if(snap.exists&&(!input.bucket||A.validProfile(snap.data())))profiles[candidates[i]]=snap.data()||{};});
 
       let plan;
@@ -108,14 +108,21 @@ function createSettlementService({db=getFirestore(),serverTimestamp=()=>FieldVal
 
       const txRefs=plan.rows.map(row=>db.doc('ladderTransactions/'+txId(eventCode,row.uid)));
       const playerRefs=plan.rows.map(row=>db.doc('ladderPlayers/'+row.uid));
-      const [priorTxSnaps,playerSnaps]=await Promise.all([
-        Promise.all(txRefs.map(ref=>tx.get(ref))),
-        Promise.all(playerRefs.map(ref=>tx.get(ref)))
-      ]);
+      const snapshots=await tx.getAll(...txRefs,...playerRefs);
+      const priorTxSnaps=snapshots.slice(0,txRefs.length);
+      const playerSnaps=snapshots.slice(txRefs.length);
 
       if(input.bucket&&playerSnaps.some(s=>s.exists&&s.data().currentSeason&&s.data().currentSeason!==plan.seasonId))return {ok:false,reason:'player-season-mismatch',permanent:true};
       if(input.bucket&&priorTxSnaps.some(s=>s.exists))return {ok:false,reason:'bucket-settlement-requires-review',permanent:true};
-      if(input.bucket){const registrations=await Promise.all(scored.players.map(row=>row.player.source==='online'&&A.playerUid(row.player)?tx.get(tourRef.collection('registrations').doc(A.playerUid(row.player))):null));if(registrations.some((s,i)=>scored.players[i].player.source==='online'&&A.playerUid(scored.players[i].player)&&(!s?.exists||s.data().status!=='confirmed')))return {ok:false,reason:'bucket-cancelled-players',permanent:true};}
+      if(input.bucket){
+        const onlineUids=scored.players.filter(row=>row.player.source==='online')
+          .map(row=>A.playerUid(row.player)).filter(Boolean);
+        const registrationRefs=onlineUids.map(uid=>tourRef.collection('registrations').doc(uid));
+        const registrations=registrationRefs.length ? await tx.getAll(...registrationRefs) : [];
+        if(registrations.some(snapshot=>snapshot.data()?.status!=='confirmed')){
+          return {ok:false,reason:'bucket-cancelled-players',permanent:true};
+        }
+      }
       const results=[];
       for(let i=0;i<plan.rows.length;i++){
         const row=plan.rows[i],profile=profiles[row.uid]||{},prior=priorTxSnaps[i],playerSnap=playerSnaps[i];

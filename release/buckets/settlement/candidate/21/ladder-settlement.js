@@ -167,7 +167,7 @@ function createLadderSettlement({db, FieldValue, now = () => Date.now(), bucketR
     if(A.ownership(source,sourcePublic.data())){
       if(!expectedRoom||typeof expectedRoom.roomId!=='string'||!expectedRoom.roomId||typeof expectedRoom.epoch!=='string'||!expectedRoom.epoch||JSON.stringify(expectedRoom).length>2000||Object.keys(expectedRoom).some(k=>!['roomId','epoch'].includes(k)))return result(false,'bucket-expected-room-required','請重新載入分桶房間後再結算');
       try{
-        const initial=await db.runTransaction(async tx=>{const [r,p,user]=await Promise.all([tx.get(tournamentRef),tx.get(publicRef),tx.get(db.doc('users/'+actor.uid))]);if(!r.exists)A.fail('bucket-room-changed');if(!A.validProfile(user.data())||!['admin','super_admin'].includes(user.data().role))A.fail('admin-required');const input=await A.load({tx,db,root:r,pub:p,observed,runtime:bucketRuntime,env:bucketEnv});if(!input.bucket)A.fail('bucket-mode-changed');if(input.m.roomId!==expectedRoom.roomId||input.m.epoch!==expectedRoom.epoch)A.fail('bucket-room-changed');return {r,input};});
+        const initial=await db.runTransaction(async tx=>{const [r,p,user]=await tx.getAll(tournamentRef,publicRef,db.doc('users/'+actor.uid));if(!r.exists)A.fail('bucket-room-changed');if(!A.validProfile(user.data())||!['admin','super_admin'].includes(user.data().role))A.fail('admin-required');const input=await A.load({tx,db,root:r,pub:p,observed,runtime:bucketRuntime,env:bucketEnv});if(!input.bucket)A.fail('bucket-mode-changed');if(input.m.roomId!==expectedRoom.roomId||input.m.epoch!==expectedRoom.epoch)A.fail('bucket-room-changed');return {r,input};});
         sourceSnapshot=initial.r;source=initial.r.data();sourceInput=initial.input;
       }catch(e){if(e.bucketSettlement)return result(false,e.message,'分桶結算資料尚未符合驗收條件');throw e;}
     }else if(expectedRoom!==undefined)return result(false,'bucket-mode-changed','房間儲存模式已變更，請重新讀取');
@@ -199,7 +199,7 @@ function createLadderSettlement({db, FieldValue, now = () => Date.now(), bucketR
 
     const controlRef = db.doc("ladderSystem/current");
     return db.runTransaction(async (transaction) => {
-      const [tournamentSnapshot, controlSnapshot,publicSnapshot] = await Promise.all([transaction.get(tournamentRef), transaction.get(controlRef),transaction.get(publicRef)]);
+      const [tournamentSnapshot, controlSnapshot,publicSnapshot] = await transaction.getAll(tournamentRef, controlRef, publicRef);
       if (!tournamentSnapshot.exists) return result(false, "not-found", "找不到這場賽事");
       const tournament = tournamentSnapshot.data() || {};
       const currentInput=await A.load({tx:transaction,db,root:tournamentSnapshot,pub:publicSnapshot,observed,runtime:bucketRuntime,env:bucketEnv});
@@ -228,16 +228,19 @@ function createLadderSettlement({db, FieldValue, now = () => Date.now(), bucketR
       const profileRefs = resolved.map((item) => db.doc(`users/${item.playerUid}`));
       const logRefs = resolved.map((item) => db.doc(`ladderTransactions/${normalized}_${item.playerUid}`));
       const registrationRefs = resolved.map((item) => item.source === "online" ? db.doc(`tournaments/${normalized}/registrations/${item.playerUid}`) : null);
-      const [playerSnapshots, profileSnapshots, logSnapshots, registrationSnapshots] = await Promise.all([
-        Promise.all(playerRefs.map((ref) => transaction.get(ref))),
-        Promise.all(profileRefs.map((ref) => transaction.get(ref))),
-        Promise.all(logRefs.map((ref) => transaction.get(ref))),
-        Promise.all(registrationRefs.map((ref) => ref ? transaction.get(ref) : null)),
-      ]);
+      const refs = [...playerRefs, ...profileRefs, ...logRefs, ...registrationRefs.filter(Boolean)];
+      const snapshots = refs.length ? await transaction.getAll(...refs) : [];
+      const count = resolved.length;
+      const playerSnapshots = snapshots.slice(0, count);
+      const profileSnapshots = snapshots.slice(count, count * 2);
+      const logSnapshots = snapshots.slice(count * 2, count * 3);
+      const registrationSnapshots = new Map(snapshots.slice(count * 3).map(snapshot => [snapshot.ref.path, snapshot]));
       if (logSnapshots.some((snapshot) => snapshot.exists)) return result(false, "settlement-conflict", "偵測到既有積分紀錄但賽事尚未標記完成，請由最高管理員檢查");
       const cancelled = [];
-      registrationSnapshots.forEach((snapshot, index) => {
-        if (registrationRefs[index] && (!snapshot?.exists || snapshot.data()?.status !== "confirmed")) cancelled.push(resolved[index].playerName);
+      registrationRefs.forEach((ref, index) => {
+        if (ref && registrationSnapshots.get(ref.path)?.data()?.status !== "confirmed") {
+          cancelled.push(resolved[index].playerName);
+        }
       });
       if (cancelled.length) return result(false, "cancelled-players", `名單含已取消或非正取玩家：${cancelled.join("、")}`, {unlinkedPlayers: cancelled});
       if (playerSnapshots.some((snapshot) => snapshot.exists && snapshot.data()?.currentSeason && snapshot.data().currentSeason !== seasonId)) {

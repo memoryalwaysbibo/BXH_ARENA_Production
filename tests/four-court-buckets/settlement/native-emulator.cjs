@@ -58,6 +58,7 @@ async function state(){const out=[];async function walk(col){for(const ref of aw
    {await seed(fixture());const before=await state(),r=await handler(spec,true,{production:true})();assert.equal(r.ok,false);assert.match(r.reason,/runtime-disabled|project-mismatch/);assert.deepEqual(await state(),before);checks++;}
    // Preserve career totals for S0 and explicitly non-career seasons.
    for(const currentSeason of ['S0','S1']){const f=fixture();f.m.put('ladderSystem/current',{status:'active',currentSeason,countsTowardCareer:false,isTrialSeason:currentSeason==='S0'});for(let i=1;i<=4;i++)f.m.put('ladderPlayers/u'+i,{...f.m.rows.get('ladderPlayers/u'+i),currentSeason});await seed(f);const r=await handler(spec,true)();assert(r.ok,r.reason);assert.equal((await db.doc('ladderPlayers/u1').get()).data().careerPoints,10);checks++;}
+   console.log('Checking 160 and 321 player capacity for '+spec.function);
    // Six-court / 160-player transaction: real points + ledger + archive writes.
    {const f=largeFixture(160);await seed(f);const r=await handler(spec,true)();assert(r.ok,r.reason);assert.equal((await db.collection('ladderTransactions').get()).size,160);assert.equal((await db.doc('ladderPlayers/u0').get()).data().seasonPoints,246);assert.equal((await db.doc('tournaments/'+code).get()).data().archiveStatus,'completed');checks++;}
    {const f=largeFixture(321,12);await seed(f);const r=await handler(spec,true)();assert.equal(r.ok,false);assert.equal(r.reason,'eligible-player-limit');assert.equal((await db.collection('ladderTransactions').get()).size,0);assert.equal((await db.doc('ladderPlayers/u0').get()).data().seasonPoints,0);assert.equal((await db.doc('tournaments/'+code).get()).data().archiveStatus,'ongoing');checks++;}
@@ -65,6 +66,7 @@ async function state(){const out=[];async function walk(col){for(const ref of aw
   // Both services read the same buckets and contend on the same ledger/root.
   for(const qr of [false,true]){await seed(fixture({qr}));const r=await Promise.all(specs.map(s=>handler(s,true)()));assert(r.every(x=>x.ok));assert.equal((await db.doc('ladderPlayers/u1').get()).data().seasonPoints,105);assert.equal((await db.collection('ladderTransactions').get()).size,4);if(qr)assert.equal((await db.doc('tournaments/'+code).get()).data().qrCheckinRevision,2);checks++;}
   {
+   console.log('Checking concurrent manual and automatic settlement for 320 players');
    await seed(largeFixture(320,12));
    const results=await Promise.all(specs.map(spec=>handler(spec,true)()));
    assert(results.every(result=>result.ok),JSON.stringify(results.map(result=>result.reason)));
