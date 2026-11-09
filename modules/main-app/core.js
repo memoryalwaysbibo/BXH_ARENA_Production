@@ -9815,7 +9815,8 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
   if(!window.cloudSync||!window.cloudSync.listRegistrationsForAdmin) throw new Error("registration api unavailable");
   const publicRoom=await window.cloudSync.getPublicTournamentFull(context.code);
   requireRegistrationRosterContext(context);
-  if(publicRoom?.registrationRosterSyncBackendEnabled===true) return refreshBackendRegistrationRoster(context);
+  if(publicRoom?.registrationRosterSyncBackendEnabled===true)
+    return refreshBackendRegistrationRoster(context,false,!Array.isArray(registrationRows));
   const regs=Array.isArray(registrationRows)?registrationRows:await window.cloudSync.listRegistrationsForAdmin(context.code);
   requireRegistrationRosterContext(context);
   if(Array.isArray(registrationRows) && (registrationRows!==adminRegistrationsCache || peopleRosterBusy))
@@ -10771,12 +10772,17 @@ function canOfferAdminOperationalOverride(){
 function adminOverrideButtonsHtml(){
  if(!canOfferAdminOperationalOverride())return '';
  const failure=currentAdminOperationalFailure();if(!failure)return '';
+ if(failure.reason==='roster-projection-pending')return '';
  const disabled=adminOperationalOverrideBusy||bracketCommitController()?.blocked();
  const start=failure.operation==='start-tournament';
  if(start&&!state.bracketSize)return '';
  return '<button class="btn btn-danger" data-action="'+(start?'admin-force-start':'admin-force-draw')+'" '+(disabled?'disabled':'')+'>'+(start?'管理員強制開賽':'管理員強制抽籤')+'</button>';
 }
 function offerAdminOperationalOverride(operation,reason){
+ // A known missing/cancelled registration is evidence of a stale room, not
+ // an unavailable service that an operator can safely accept as a snapshot.
+ if(reason==='roster-projection-pending'){noteAdminOperationalFailure(operation,reason);return false;}
+ if(currentAdminOperationalFailure()?.reason==='roster-projection-pending')return false;
  noteAdminOperationalFailure(operation,reason);
  if(!canOfferAdminOperationalOverride()||adminOperationalOverrideBusy||bracketCommitBlocked())return false;
  const participantIds=operation==='draw-bracket'?eligiblePlayers().map(p=>String(p.id)):Array.from(currentBracketParticipantIds());
@@ -16653,7 +16659,7 @@ function registrationRosterContextIsCurrent(context){
 function requireRegistrationRosterContext(context){
   if(!registrationRosterContextIsCurrent(context)) throw new Error("room-context-changed");
 }
-async function refreshBackendRegistrationRoster(context,catchup=false){
+async function refreshBackendRegistrationRoster(context,catchup=false,verifyConfirmed=false){
   requireRegistrationRosterContext(context);
   if(catchup){
     // Quick COMMUNITY rosters are projected by the owner-only callable. Never
@@ -16666,8 +16672,22 @@ async function refreshBackendRegistrationRoster(context,catchup=false){
   requireRegistrationRosterContext(context);
   if(result?.ok!==true||result.data?.id!==context.roomId) throw new Error(result?.reason||"roster-readback-failed");
   if(isCommunityRoomOwner() && (result.data.ownerUid!==firebaseUser.uid||result.data.createdBy!==firebaseUser.uid)) throw new Error("permission-denied");
+  // Explicit preparation, draw and start actions must not accept a room
+  // snapshot while the backend registration trigger is still catching up.
+  // The subscription path already has registration rows and does not add a
+  // second read for each burst of incoming registrations.
+  if(verifyConfirmed){
+    const registrations=await window.cloudSync.listRegistrationsForAdmin(context.code);
+    requireRegistrationRosterContext(context);
+    if(!Array.isArray(registrations)) throw new Error("roster-readback-failed");
+    const confirmed=new Set(registrations.filter(row=>row?.status==="confirmed").map(row=>String(row.registrationId||"")));
+    const projected=new Set((result.data.players||[]).filter(row=>row?.source==="online"&&row.registrationId).map(row=>String(row.registrationId)));
+    if(confirmed.has("")||[...confirmed].some(id=>!projected.has(id))||[...projected].some(id=>!confirmed.has(id)))
+      throw Object.assign(new Error("roster-projection-pending"),{code:"roster-projection-pending"});
+  }
   const before=JSON.stringify(state.players||[]);
   applyRemoteState(result.data);
+  if(verifyConfirmed&&currentAdminOperationalFailure()?.reason==='roster-projection-pending')adminOperationalFailure=null;
   requireRegistrationRosterContext(context);
   publicTournamentsCache=null;
   myRegistrationsCache=null;
@@ -25764,7 +25784,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
               }
             }catch(e){
               console.warn("[start-tournament roster sync]",e);
-              if(!offerAdminOperationalOverride("start-tournament",mapRegistrationError(e)))showToast("無法確認最新報名名單，為避免漏人，本次未開始賽事", true);
+              if(!offerAdminOperationalOverride("start-tournament",e?.code==='roster-projection-pending'?e.code:mapRegistrationError(e)))showToast("無法確認最新報名名單，為避免漏人，本次未開始賽事", true);
               return;
             }
             if(window.BXHBracketCommit&&!(await verifyBracketBeforeStart()))return;
@@ -25826,7 +25846,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         });
       }catch(e){
         console.warn("[start-tournament roster preflight]",e);
-        if(!offerAdminOperationalOverride("start-tournament",mapRegistrationError(e)))showToast("無法取得最新線上報名名單，為避免漏人，本次未開始賽事", true);
+        if(!offerAdminOperationalOverride("start-tournament",e?.code==='roster-projection-pending'?e.code:mapRegistrationError(e)))showToast("無法取得最新線上報名名單，為避免漏人，本次未開始賽事", true);
       }
     })();
     return;
@@ -25887,7 +25907,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           });
         }
         console.warn("[draw-bracket roster sync]",e);
-        if(!offerAdminOperationalOverride("draw-bracket",mapRegistrationError(e)))showToast("無法取得最新線上報名名單，為避免漏人，暫不產生對戰表", true);
+        if(!offerAdminOperationalOverride("draw-bracket",e?.code==='roster-projection-pending'?e.code:mapRegistrationError(e)))showToast("無法取得最新線上報名名單，為避免漏人，暫不產生對戰表", true);
       }
     };
     if(state.bracketSize){

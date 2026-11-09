@@ -483,6 +483,17 @@ test('family discovery is read only and exposes only the caller confirmed partic
  assert.deepEqual(r.players.map(p=>p.id),['p1','row-child1','row-child2']);
  assert.deepEqual((await x.ref.get()).data(),before);assert.equal((await x.ref.collection('checkinAudit').get()).size,0);
 });
+test('V2 child document identity remains selectable and records guardian QR attendance',async()=>{
+ const x=await seedFamily();
+ await x.ref.collection('registrations').doc('reg-child1').update({uid:'reg-child1'});
+ assert.deepEqual((await x.choose()).players.map(p=>p.id),['p1','row-child1','row-child2']);
+ assert.equal((await x.child('child1')).checkedIn,true);
+ const room=JSON.parse((await x.ref.get()).data().data);
+ const publicRoom=JSON.parse((await x.pub.get()).data().bracketView);
+ assert.equal(room.players.find(p=>p.id==='row-child1').checkedIn,true);
+ assert.equal(publicRoom.players.find(p=>p.id==='row-child1').checkedIn,true);
+ assert.equal((await x.ref.collection('checkinAudit').get()).size,1);
+});
 test('concurrent sibling scans and duplicate taps commit independent receipts and public states',async()=>{
  const x=await seedFamily();await Promise.all([x.child('child1'),x.child('child2'),x.child('child1')]);
  const privatePlayers=JSON.parse((await x.ref.get()).data().data).players;
