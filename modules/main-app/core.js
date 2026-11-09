@@ -13643,9 +13643,9 @@ function renderPeopleManagement(){
 
   const staffPanel=`<details class="settings-accordion" open><summary><span>工作人員分派</span><span class="hint">賽事人力</span></summary><div class="settings-accordion-body">${renderStaffAssignmentPanel()}</div></details>${renderRefereeStationAssignmentPanel()}`;
 
-  const groupStageUi = isAdminTierOrAbove() ? window.BXHGroupStageUi : null;
+  const groupStageUi = window.BXHGroupStageUi && isAdminTierOrAbove() ? window.BXHGroupStageUi : null;
   const groupStagePanel = groupStageUi?.slot(state.cloudCode,"operator",state.groupStage?.parentCode)||"";
-  const groupStageDraw = groupStageParentDrawRequired() ? groupStageUi?.drawButton(state.cloudCode,
+  const groupStageDraw = groupStageUi && groupStageParentDrawRequired() ? groupStageUi.drawButton(state.cloudCode,
     !!state.startedAt || !!state.bracketSize || bracketCommitBlocked() ||
     (typeof adminRosterBusyOrPending==="function" && adminRosterBusyOrPending()))||"" : "";
   const bracketPanel=`
