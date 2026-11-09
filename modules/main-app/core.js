@@ -6023,7 +6023,7 @@ const COMPLETED_TOURNAMENT_MUTATION_ACTIONS = new Set([
 
 const COMMUNITY_OWNER_ACTIONS = new Set([
   "score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match","draw-bracket","update-players","quick-add-players","random-test-roster",
-  "toggle-checkin-btn","delete-player","archive-complete","save-pause","reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete",
+  "toggle-checkin-btn","delete-player","people-move-to-waitlist","archive-complete","save-pause","reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete",
   "load-online-roster","start-tournament","set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","idle-court-claim","open-quick-confirm","goto-settings"
 ]);
 const COMMUNITY_OWNER_TIER_ACTIONS = new Set(["set-round-scoring-mode","correct-quick-result"]);
