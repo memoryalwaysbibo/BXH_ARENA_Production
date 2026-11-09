@@ -146,8 +146,16 @@
     } else if (!operator && titles[key] && !drawPending) {
       actions = roomButton(status.roomCode, view, '進入' + titles[key] + '戰場') + refresh;
     }
+    const pendingRooms = operator && status.preDrawnRooms
+      ? groups.filter(group => group !== key && !completed.includes(group) &&
+        roomCode.test(status.preDrawnRooms[group] || ''))
+        .map(group => roomButton(status.preDrawnRooms[group], 'operator',
+          '查看' + group + '組對戰表（待開放）')).join('') : '';
+    const previews = pendingRooms
+      ? '<div class="panel"><strong>已抽好的後續組別</strong><p class="hint">可先查看對戰表；依序回收前一組後才開放下一組。</p>' +
+        '<div class="btn-row">' + pendingRooms + '</div></div>' : '';
     return header + assignment + '<p class="hint" role="status">' + message + '</p>' +
-      progress + notice + '<div class="btn-row">' + actions + '</div>';
+      progress + notice + '<div class="btn-row">' + actions + '</div>' + previews;
   }
 
   let active = null;

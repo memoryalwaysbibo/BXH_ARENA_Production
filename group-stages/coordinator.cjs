@@ -57,6 +57,14 @@ function publicStatus(plan) {
   };
 }
 
+function operatorStatus(plan) {
+  const status = publicStatus(plan);
+  if (plan.groupDrawAll !== true) return status;
+  return { ...status, preDrawnRooms: Object.fromEntries(
+    groupKeys(plan.event).filter(key => plan.roomCodes[key])
+      .map(key => [key, plan.roomCodes[key]])) };
+}
+
 function onlineAccount(player) {
   return player.source === 'online'
     ? (player.familyPlayerId ? player.guardianUid : player.registrationUid)
@@ -247,7 +255,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         const current = snapshot.data();
         checkRoster(current, room.data(), rehearsal);
         const keys = groupKeys(current.event);
-        if (current.groupDrawAll === true) return publicStatus(current);
+        if (current.groupDrawAll === true) return operatorStatus(current);
         check(!current.active && !keys.some(key => current.roomCodes[key]), 'group-stage-already-open');
         check(new Set(candidateCodes.slice(0, keys.length)).size === keys.length,
           'group-room-code-collision');
@@ -278,7 +286,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         tx.set(parent.plan, next);
         tx.set(parent.routing, { ...status,
           eligibleUids: [...new Set(first.stage.players.map(onlineAccount).filter(Boolean))] });
-        return status;
+        return operatorStatus(next);
       });
     },
 
@@ -301,9 +309,9 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
             tx.set(parent.plan, next);
             tx.set(parent.routing, { ...status,
               eligibleUids: [...new Set(stage.players.map(onlineAccount).filter(Boolean))] });
-            return status;
+            return operatorStatus(next);
           }
-          return publicStatus(current);
+          return operatorStatus(current);
         }
         const stage = nextStage(current.event);
         check(!current.active && stage?.key === expectedKey, 'group-stage-order');
@@ -322,7 +330,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         const status = publicStatus(next);
         tx.set(parent.routing, { ...status,
           eligibleUids: drawPending ? [] : [...new Set(stage.players.map(onlineAccount).filter(Boolean))] });
-        return status;
+        return operatorStatus(next);
       });
     },
 
@@ -334,11 +342,13 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
           const room = await tx.get(parent.room);
           startingRoster(room.data(), true);
         }
-        const snapshot = await tx.get(parent.routing);
+        const [snapshot, plan] = await tx.getAll(parent.routing, parent.plan);
         if (!snapshot.exists) return { unprepared: true, rehearsal };
         const { eligibleUids, ...status } = snapshot.data();
         check((status.rehearsal === true) === rehearsal, 'group-room-disabled');
-        return status;
+        return plan.exists && plan.data().groupDrawAll === true
+          ? { ...status, preDrawnRooms: operatorStatus(plan.data()).preDrawnRooms }
+          : status;
       }, { readOnly: true });
     },
 
@@ -426,7 +436,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         tx.set(parent.plan, next);
         const status = publicStatus(next);
         tx.set(parent.routing, { ...status, eligibleUids: [] });
-        return status;
+        return operatorStatus(next);
       });
     },
 
