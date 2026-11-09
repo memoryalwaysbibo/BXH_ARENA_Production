@@ -40,6 +40,14 @@ function update(path,fields,status=200,uid='admin'){
  return request(`${documents}/${path}?${mask}`,'PATCH',status,{uid,body:{fields}});
 }
 
+function writeRoomPair(privateFields,publicFields,status){
+ const writes=[[privatePath,privateFields],[publicPath,publicFields]].map(([path,fields])=>({
+  update:{name:`projects/${project}/databases/(default)/documents/${path}`,fields},
+  updateMask:{fieldPaths:Object.keys(fields)},
+ }));
+ return request(`${documents}:commit`,'POST',status,{uid:'admin',body:{writes}});
+}
+
 async function install(rules){
  const result=await request(`/emulator/v1/projects/${project}:securityRules`,'PUT',200,{
   body:{rules:{files:[{name:'firestore.rules',content:rules}]}},
@@ -74,6 +82,15 @@ test('the reviewed rules fence closes browser writes only while the server owns 
  const stalePublic={...publicEdit,bracketView:{stringValue:'{"players":[]}'}};
  await update(privatePath,stalePrivate,403);
  await update(publicPath,stalePublic,403);
+ const drawn={stringValue:'{"bracketSize":2,"matches":[{"id":"match-1"}]}'};
+ const started={stringValue:'{"bracketSize":2,"matches":[{"id":"match-1"}],"startedAt":3}'};
+ const drawPrivate={data:drawn,bracketSize:{integerValue:'2'},updatedAt:{integerValue:'3'}};
+ const drawPublic={bracketView:drawn,updatedAt:{integerValue:'3'}};
+ const startFields={tournamentPhase:{stringValue:'live'},registrationStatus:{stringValue:'started'},updatedAt:{integerValue:'4'}};
+ await writeRoomPair(drawPrivate,drawPublic,403);
+ await writeRoomPair({data:started,...startFields},{bracketView:started,...startFields},403);
+ assert.equal((await db.doc(privatePath).get()).data().tournamentPhase,'waiting');
+ assert.equal((await db.doc(publicPath).get()).data().tournamentPhase,'waiting');
  await update(participant,{name:{stringValue:'Attempted overwrite'}},403);
  for(const path of [registration,publicPath,privatePath]){
   await request(`${documents}/${path}`,'DELETE',403,{uid:'admin'});
@@ -99,4 +116,6 @@ test('the reviewed rules fence closes browser writes only while the server owns 
  await update(publicPath,{...publicEdit,updatedAt:{integerValue:'4'}});
  await update(participant,{name:{stringValue:'Legacy write restored'}});
  await request(`${documents}/${registration}`,'DELETE',200,{uid:'admin'});
+ await writeRoomPair(drawPrivate,drawPublic,200);
+ await writeRoomPair({data:started,...startFields},{bracketView:started,...startFields},200);
 });

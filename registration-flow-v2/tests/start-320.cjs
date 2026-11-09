@@ -9,6 +9,7 @@ const {db,FieldValue,handlers,service,seed}=require('./harness.cjs');
 const bracket=require('../../modules/main-app/bracket-commit.js');
 const {createQueuedPromotion}=require('../backend/management.cjs');
 const {createPromotionHandler}=require('../../registration-promotion/functions/service.cjs');
+const {createCheckinHandler}=require('../../qr-checkin/backend/firebase-callable.cjs');
 
 const root=path.resolve(__dirname,'../..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
@@ -33,18 +34,24 @@ async function run(){
  const runtime={id:'start-320',cloudCode:code,updatedAt:now,meta:{
   name:'Start fixture',formatType:'single',battleMode:'individual',stations:12,registrationEnabled:true,
   registrationCapacity:320,registrationAutoFillEnabled:false,checkinRequired:true
- },players,waitlistPlayers:[],matches:[],archiveStatus:'ongoing',registrationRosterRevision:0,qrCheckinManaged:true,qrCheckinRevision:0};
+ },players,waitlistPlayers:[],matches:[],archiveStatus:'ongoing',registrationRosterRevision:0};
  const publicMirror=vm.runInNewContext(block(cloud,'  function buildPublicMirrorFields(state){','\n  function currentUserUidForWrites()')+'\nbuildPublicMirrorFields',{buildPublicEventInfo:()=>({})});
- const common={eventAuthority:'official',confirmedCount:319,waitlistCount:1,qrCheckinManaged:true,qrCheckinRevision:0};
+ const common={eventAuthority:'official',confirmedCount:319,waitlistCount:1};
  const batch=db.batch();
- batch.update(tr,{...common,data:JSON.stringify(runtime),ownerUid:admin});
+ batch.update(tr,{...common,data:JSON.stringify(runtime),ownerUid:admin,registrationQueueVersion:2});
  batch.update(pr,{...common,bracketView:JSON.stringify(publicMirror(runtime))});
  batch.update(db.doc('users/'+admin),{role:'admin'});
+ batch.set(db.doc('systemConfig/qrCheckin'),{enabled:true,writerGuardsVerified:true,roomCodes:[code]});
  entrants.forEach((id,index)=>batch.set(reg(id),{uid:id,displayName:'Fixture '+index,status:index<319?'confirmed':'waitlist',createdAt:now}));
  await batch.commit();
 
+ const checkIn=createCheckinHandler(db,()=> 'start-320-emulator-only-secret');
+ const qr=(uid,data)=>checkIn({auth:{uid},data:{code,...data}});
+ assert.equal((await qr(admin,{action:'configure',enabled:true})).enabled,true);
+
  let clock=now, failOnce=true;
  const worker=service({
+  requireRoomOwnership:true,
   clock:()=>clock,
   beforeExecute:async job=>{if(job.payload.action==='configure'&&failOnce){failOnce=false;throw Error('fixture-transient-error');}},
   handlers:{...handlers,promotion:createQueuedPromotion({
@@ -150,13 +157,18 @@ async function run(){
  await measure('queue-retry-after-draw',()=>worker.drain(code));
  const refused=(await worker.status(admin,code,tooLate.operationId)).operation;
  assert.equal(refused.reason,'bracket-locked');
- await measure('late-check-in-fixture',()=>db.runTransaction(async tx=>{
-  const current=JSON.parse((await tx.get(tr)).data().data);
-  for(const id of entrants.slice(-2))current.players.find(p=>p.registrationId===id).checkedIn=true;
-  current.qrCheckinRevision++;
-  tx.update(tr,{data:JSON.stringify(current),qrCheckinRevision:current.qrCheckinRevision});
-  tx.update(pr,{bracketView:JSON.stringify(publicMirror(current)),qrCheckinRevision:current.qrCheckinRevision});
- }));
+ const {token}=await qr(admin,{action:'status'});
+ assert.ok(token);
+ const late=entrants.slice(-2);
+ const receipts=await measure('late-qr-check-in',()=>Promise.all(late.map(uid=>qr(uid,{action:'scan',token}))));
+ assert.ok(receipts.every(receipt=>receipt.checkedIn===true&&!receipt.already));
+ assert.equal((await qr(late[0],{action:'scan',token})).already,true);
+ const audits=(await tr.collection('checkinAudit').where('action','==','scan').get()).docs.map(doc=>doc.data());
+ assert.deepEqual(audits.map(audit=>audit.registrationId).sort(),late.slice().sort());
+ const [afterQr,publicAfterQr]=await db.getAll(tr,pr);
+ assert.equal(afterQr.data().registrationQueueVersion,2);
+ assert.equal(afterQr.data().qrCheckinRevision,publicAfterQr.data().qrCheckinRevision);
+ assert.equal(JSON.parse(publicAfterQr.data().bracketView).players.filter(player=>player.checkedIn).length,320);
  event=observed();
  await measure('confirm-with-stale-pairing',async()=>{firstConfirm();assert.match((await event).message,/名單又有異動/);});
  assert.equal(startWrites,0);
@@ -179,8 +191,8 @@ async function run(){
  assert.equal(mirror.data().tournamentPhase,'live');
  assert.equal(room.data().confirmedCount,320);
  assert.equal(notices.filter(x=>x.error).length,1);
- return {scope:'Firestore Emulator and real start, roster, pairing code in VM; simulated check-in write and UI state, no browser, Auth, production Rules or referee DOM',
-  players:320,courtsConfigured:12,matchedEntrants:c.currentBracketParticipantIds().size,draws:drawn,startWrites,
+ return {scope:'Firestore Emulator with V2 ownership and the QR handler; browser draw/start writes and UI state simulated by the test, no browser Auth, App Check, production Rules or referee DOM',
+  players:320,courtsConfigured:12,matchedEntrants:c.currentBracketParticipantIds().size,draws:drawn,startWrites,lateQrAudits:audits.length,
   pendingOperationsDuringFirstClick:2,postDrawPromotion:refused.reason,staleStartMessage:notices.find(x=>x.error).message,timings};
 }
 
