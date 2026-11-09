@@ -11,12 +11,13 @@ const chooser=family.slice(family.indexOf('async function chooseFamilyParticipan
 const helperStart=cloud.indexOf('  function runMyEventsPlayerOperation('),helperEnd=cloud.indexOf('\n  }',helperStart),helper=cloud.slice(helperStart,helperEnd+4);
 function memory(){const data=new Map();return {get length(){return data.size;},key:i=>[...data.keys()][i],getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)};}
 const percentile=(a,p)=>a.slice().sort((x,y)=>x-y)[Math.min(a.length-1,Math.ceil(a.length*p)-1)]||0;
+const waveSizes=[50,100,150,320];
 const report={scope:'Actual frontend self-registration functions + feedback controller + captured backend + local Firestore Emulator. Synthetic Auth/DOM-free VM; not browser, mobile, production networking or live Cloud Run.',results:[]};
 (async()=>{
  const watchdog=setTimeout(()=>{console.error('frontend-wave-timeout');process.exit(1);},120000);
- for(const n of [50,100,150]){
+ for(const n of waveSizes){
   let accepted=0,release;const acceptedAll=new Promise(r=>{release=r;});
-  const {code,ids}=await seed(n,200,0),services=Array.from({length:5},()=>service()),controllers=[],storages=[],times=[],traffic={preview:0,submit:0,mine:0};let clockOffset=0;
+  const {code,ids}=await seed(n,Math.max(200,n),0),services=Array.from({length:5},()=>service()),controllers=[],storages=[],times=[],traffic={preview:0,submit:0,mine:0};let clockOffset=0;
   const start=performance.now();
   const calls=ids.map((uid,i)=>{
    const api=createApi({queue:services[i%5],family:handlers.family(db),enabled:async c=>c===code});
@@ -46,5 +47,5 @@ const report={scope:'Actual frontend self-registration functions + feedback cont
   const row={n,workers:5,confirmed:n,failed:0,duplicateRegistrations:0,remainingJournalEntries:0,traffic,p50Ms:Math.round(percentile(times,.5)),p95Ms:Math.round(percentile(times,.95)),maxMs:Math.round(Math.max(...times)),totalMs:Math.round(performance.now()-start)};
   report.results.push(row);fs.writeFileSync(path.join(__dirname,'../evidence/frontend-waves.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(row));
  }
- clearTimeout(watchdog);assert.equal(report.results.length,3);await db.terminate();
+ clearTimeout(watchdog);assert.equal(report.results.length,waveSizes.length);await db.terminate();
 })().catch(async e=>{console.error(e);await db.terminate();process.exitCode=1;});

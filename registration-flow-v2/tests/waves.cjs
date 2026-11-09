@@ -14,6 +14,8 @@ async function wave(n,capacity,waitlistCapacity,repetition){
  const states=await Promise.all(ids.map(async(uid,i)=>{const s=await services[i%5].status(uid,code,request(code,uid).operationId);finished.push(performance.now()-start);return s.operation;}));
  const a=await audit(code,Math.min(n,capacity+waitlistCapacity));
  assert(states.every(s=>['completed','rejected'].includes(s.state)));
+ assert.equal(a.summary.confirmed,Math.min(n,capacity));
+ assert.equal(a.summary.waitlist,Math.min(Math.max(0,n-capacity),waitlistCapacity));
  assert.equal(a.summary.completed,Math.min(n,capacity+waitlistCapacity));assert.equal(a.summary.rejected,Math.max(0,n-capacity-waitlistCapacity));
  assert(a.jobs.filter(j=>j.state==='rejected').every(j=>j.reason==='full'));
  assert.equal(a.summary.jobs,n);assert.equal(new Set(a.rows.map(r=>r.id)).size,a.rows.length);
@@ -25,6 +27,8 @@ async function wave(n,capacity,waitlistCapacity,repetition){
   await wave(n,200,0,repetition);
   await wave(n,Math.floor(n*.6),Math.floor(n*.2),repetition);
  }
+ // A sold-out 320-player room must preserve both the confirmed and waitlist limits.
+ await wave(384,320,32,1);
  report.completedAt=new Date().toISOString();report.queueSha256=crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname,'../backend/queue.cjs'))).digest('hex');fs.writeFileSync(out,JSON.stringify(report,null,2)+'\n');
  await db.terminate();
 })().catch(async e=>{console.error(e);await db.terminate();process.exitCode=1;});
