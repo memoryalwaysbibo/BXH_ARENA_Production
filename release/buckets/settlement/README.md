@@ -56,7 +56,7 @@ and old permanent ledger collisions stop before any credit commits.
 
 The supported path remains official individual standard single elimination with
 optional BZ bronze match, at most 32 courts, matching ranked metadata on both root
-and state, and at most 240 eligible account awards in one transaction. Trial and
+and state, and at most 320 eligible account awards in one transaction. Trial and
 explicit non-career seasons preserve career totals/highest permanent rank. Input
 state is bounded to 5 MB; each resulting room document has a conservative 750 KB
 budget. SDK transaction failure or a late projection/size validation error rolls
@@ -86,13 +86,16 @@ scores, QR, replays, interleavings, career rules and arithmetic parity. Native
 Emulator tests exercise real transactions and QR transforms, late aborts,
 six-court 160-player awards, and competing manual and automatic settlement for
 320 players across 12 courts. A 321-player fixture verifies rejection before
-any award. Production Auth, App Check, Eventarc and Rules require separate acceptance.
+any award. A corrupt public view forces a late abort at 320 accounts. Repairing
+the view lets the other entry point settle once, with zero points from the
+failed attempt. Production Auth, App Check, Eventarc and Rules require separate acceptance.
 
 The automatic entry uses the selected files read back for revision
 `ladderautosettlement-00003-kuf` and generation `1793906143803503`. Its
 `ladder-settlement-core.js` baseline is byte-identical to the earlier fixture.
-The candidate changes its award limit to 320 accounts, matching the manual
-bucket settlement limit. The entry preserves the deployed real-name policy for ranking records. Both settlement
+The candidate raises the automatic bucket award limit to 320 accounts, matching
+the manual bucket settlement limit. Legacy automatic settlement retains its
+240-account limit. The entry preserves the deployed real-name policy for ranking records. Both settlement
 paths verify that a profile name stays out of the public room data. The
 manifest records the selected-file provenance separately from the historical
 archive. The exact current ZIP and complete dependency and metadata readback

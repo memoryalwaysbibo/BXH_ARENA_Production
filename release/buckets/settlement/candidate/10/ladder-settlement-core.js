@@ -160,7 +160,7 @@ function candidateUid(player){
 function validProfile(profile){
   return !!profile&&profile.active===true&&profile.deleted!==true&&profile.isTestAccount!==true&&profile.role!=='tester';
 }
-function buildPlan(top,st,profilesByUid,control){
+function buildPlan(top,st,profilesByUid,control,{bucket=false}={}){
   const eligibility=tournamentEligible(top,st);if(!eligibility.ok)throw Object.assign(Error(eligibility.reason),{reason:eligibility.reason});
   const scored=analyze(st),rows=[],skipped=[],seen=new Set();
   for(const item of scored.players){
@@ -170,7 +170,8 @@ function buildPlan(top,st,profilesByUid,control){
     seen.add(uid);rows.push({...item,uid,playerName:String(item.player.name||profile.realName||profile.displayName||profile.nickname||uid)});
   }
   if(rows.length<2)throw Object.assign(Error('insufficient-eligible-players'),{reason:'insufficient-eligible-players'});
-  if(rows.length>320)throw Object.assign(Error('eligible-player-limit'),{reason:'eligible-player-limit'});
+  const accountLimit=bucket?320:240;
+  if(rows.length>accountLimit)throw Object.assign(Error('eligible-player-limit'),{reason:'eligible-player-limit'});
   if(!control||control.status!=='active'||control.rolloverInProgress===true)throw Object.assign(Error('season-unavailable'),{reason:'season-unavailable'});
   const seasonId=String(control.currentSeason||'S1'),isTrialSeason=control.isTrialSeason===true||seasonId.toUpperCase()==='S0';
   const countsTowardCareer=control.countsTowardCareer===undefined?!isTrialSeason:control.countsTowardCareer===true;

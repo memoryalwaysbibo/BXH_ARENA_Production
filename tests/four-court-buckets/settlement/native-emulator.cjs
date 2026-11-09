@@ -79,6 +79,48 @@ async function state(){const out=[];async function walk(col){for(const ref of aw
    assert.equal((await db.doc('publicTournaments/'+code).get()).data().archiveStatus,'completed');
    checks++;
   }
+  const automatic=specs.find(spec=>spec.function==='ladderAutoSettlement');
+  {
+   const f=largeFixture(320,12);
+   const {scoreStorage,...legacyRoom}=f.m.rows.get('tournaments/'+code);
+   const {scoreBucketProjection,...legacyPublic}=f.m.rows.get('publicTournaments/'+code);
+   f.m.put('tournaments/'+code,legacyRoom);
+   f.m.put('publicTournaments/'+code,legacyPublic);
+   await seed(f);
+   const result=await handler(automatic,true)();
+   assert.equal(result.reason,'eligible-player-limit');
+   assert.equal((await db.collection('ladderTransactions').get()).size,0);
+   checks++;
+  }
+  for(const failed of specs){
+   console.log('Checking 320-player rollback and cross-service retry after '+failed.function);
+   await seed(largeFixture(320,12));
+   const room=db.doc('tournaments/'+code),publicRoom=db.doc('publicTournaments/'+code);
+   const {bracketView}=(await publicRoom.get()).data();
+   await publicRoom.update({bracketView:'{invalid'});
+   const before=await db.getAll(room,publicRoom);
+   const result=await handler(failed,true)();
+   assert.equal(result.ok,false);
+   assert.equal(result.reason,'bucket-public-corrupt');
+   const after=await db.getAll(room,publicRoom);
+   assert(before.every((snapshot,index)=>snapshot.updateTime.isEqual(after[index].updateTime)));
+   assert.equal((await db.collection('ladderTransactions').get()).size,0);
+   const unawarded=await db.collection('ladderPlayers').get();
+   assert.equal(unawarded.size,320);
+   assert(unawarded.docs.every(document=>document.data().seasonPoints===0));
+
+   await publicRoom.update({bracketView});
+   const retry=specs.find(spec=>spec!==failed);
+   const recovered=await handler(retry,true)();
+   assert(recovered.ok,recovered.reason);
+   assert.equal((await handler(failed,true)()).alreadyAwarded,true);
+   assert.equal((await db.collection('ladderTransactions').get()).size,320);
+   const awarded=await db.collection('ladderPlayers').get();
+   assert(awarded.docs.every(document=>document.data().seasonPoints>0&&document.data().totalEvents===1));
+   assert.equal((await room.get()).data().archiveStatus,'completed');
+   assert.equal((await publicRoom.get()).data().archiveStatus,'completed');
+   checks++;
+  }
   const boundManual=specs.find(s=>s.function==='settleLadderTournament');
  for(const expectedRoom of [null,{}, {roomId:'wrong',epoch:'epoch-1'}, {roomId:'room-1',epoch:'old'}, {roomId:'room-1',epoch:'epoch-1',extra:1}]){await seed(fixture());const before=await state();const r=await handler(boundManual,true)({expectedRoom});assert.equal(r.ok,false);assert.deepEqual(await state(),before);checks++;}
  {await seed(fixture());assert((await handler(boundManual,true)()).ok);await db.doc('users/admin').update({active:false});const before=await state();assert.equal((await handler(boundManual,true)()).ok,false);assert.deepEqual(await state(),before);checks++;}

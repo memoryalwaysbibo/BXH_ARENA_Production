@@ -589,7 +589,7 @@
       ]
     },
     "release/buckets/settlement/README.md": {
-      "blob": "68e0ee3eb0dec17fd423fe7156325d326d6cdcbd",
+      "blob": "15b3a6ad52af9328622d3b644b18eae0f0f81375",
       "components": [
         713
       ]
@@ -625,13 +625,13 @@
       ]
     },
     "release/buckets/settlement/candidate/10/ladder-auto-settlement.js": {
-      "blob": "df94624bdf44259d276c5ac1aaf754adb4255198",
+      "blob": "ee4e1580c79dc245684f5b55238679c33d17de0d",
       "components": [
         713
       ]
     },
     "release/buckets/settlement/candidate/10/ladder-settlement-core.js": {
-      "blob": "6fc9ed5eb62e7757b3ef81b7faeefb2dfa4e0556",
+      "blob": "d39366858033a10f1b7f515e62cb42f4a612c8c4",
       "components": [
         713
       ]
@@ -649,7 +649,7 @@
       ]
     },
     "release/buckets/settlement/patch-manifest.json": {
-      "blob": "af21ecb5ba37beb534338767a23bb5880569d052",
+      "blob": "2712dcc1480b0287da0ab85768ff732a4a2125d9",
       "components": [
         713
       ]
@@ -1815,7 +1815,7 @@
       ]
     },
     "tests/four-court-buckets/settlement/native-emulator.cjs": {
-      "blob": "bcc55c1f780407bea2874d524060f7000273b7a7",
+      "blob": "5dcfa651cb3a955c736edf5a82f4ba48aa0ffb2d",
       "components": [
         713
       ]
@@ -2341,6 +2341,6 @@
     "tests/four-court-buckets/settlement/fixtures/10/ladder-auto-settlement.js": "Use the independently read back automatic settlement entry point.",
     "tests/four-court-buckets/settlement/probe.cjs": "Check the real-name policy and public data boundary for both settlement paths.",
     "tests/four-court-buckets/settlement/verify-package.py": "Validate selected-file readback independently from full archive provenance.",
-    "release/buckets/settlement/candidate/10/ladder-settlement-core.js": "Raise the reviewed automatic settlement capacity to 320 accounts and keep the original source fixture pinned."
+    "release/buckets/settlement/candidate/10/ladder-settlement-core.js": "Raise the automatic bucket award limit to 320 accounts and preserve the legacy limit and the original source fixture."
   }
 }

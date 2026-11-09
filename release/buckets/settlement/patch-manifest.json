@@ -9,7 +9,7 @@
       "path": "ladder-auto-settlement.js",
       "archiveSha256": null,
       "baselineFileSha256": "334106be168bcb3c3991c88fc42e282c5a1524b39293f6d50fa05d092c660ead",
-      "patchedFileSha256": "d951e75df108ad0d57811b5986444edf7cedf66f92050c42abdc89cabe9d0c5c",
+      "patchedFileSha256": "12b1b1237a04e7839e15458c783847597afb7a98d60c5f891a2fb7141e9f856b",
       "edits": [
         {
           "before": "const core=require('./ladder-settlement-core');",
@@ -90,6 +90,10 @@
         {
           "before": "      if(input.bucket){const registrations=await Promise.all(scored.players.map(row=>row.player.source==='online'&&A.playerUid(row.player)?tx.get(tourRef.collection('registrations').doc(A.playerUid(row.player))):null));if(registrations.some((s,i)=>scored.players[i].player.source==='online'&&A.playerUid(scored.players[i].player)&&(!s?.exists||s.data().status!=='confirmed')))return {ok:false,reason:'bucket-cancelled-players',permanent:true};}\n",
           "after": "      if(input.bucket){\n        const onlineUids=scored.players.filter(row=>row.player.source==='online')\n          .map(row=>A.playerUid(row.player)).filter(Boolean);\n        const registrationRefs=onlineUids.map(uid=>tourRef.collection('registrations').doc(uid));\n        const registrations=registrationRefs.length ? await tx.getAll(...registrationRefs) : [];\n        if(registrations.some(snapshot=>snapshot.data()?.status!=='confirmed')){\n          return {ok:false,reason:'bucket-cancelled-players',permanent:true};\n        }\n      }\n"
+        },
+        {
+          "before": "core.buildPlan(top,st,profiles,control)",
+          "after": "core.buildPlan(top,st,profiles,control,{bucket:input.bucket})"
         }
       ],
       "deployedSourceReadback": {
@@ -197,11 +201,15 @@
     "sourceSet": 10,
     "path": "ladder-settlement-core.js",
     "baselineFileSha256": "9ba05fa0548bd6cb52225c18f8e52d078c70e10be3e6ef7c28a2e676abbf32a6",
-    "patchedFileSha256": "979c537e802210cf62f1b2903326cb75dced544a7c8a263e217b1407c3f9768b",
+    "patchedFileSha256": "912694bf01c19f40f90e2cdb2a5ed28d8aecc617e1b3f7d577631cb810b3362f",
     "edits": [
       {
+        "before": "function buildPlan(top,st,profilesByUid,control){",
+        "after": "function buildPlan(top,st,profilesByUid,control,{bucket=false}={}){"
+      },
+      {
         "before": "  if(rows.length>240)",
-        "after": "  if(rows.length>320)"
+        "after": "  const accountLimit=bucket?320:240;\n  if(rows.length>accountLimit)"
       }
     ]
   }

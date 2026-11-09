@@ -104,7 +104,7 @@ function createSettlementService({db=getFirestore(),serverTimestamp=()=>FieldVal
       const profiles={};userSnaps.forEach((snap,i)=>{if(snap.exists&&(!input.bucket||A.validProfile(snap.data())))profiles[candidates[i]]=snap.data()||{};});
 
       let plan;
-      try{plan=core.buildPlan(top,st,profiles,control);}catch(e){return {ok:false,reason:e.reason||e.message||'plan-failed'};}
+      try{plan=core.buildPlan(top,st,profiles,control,{bucket:input.bucket});}catch(e){return {ok:false,reason:e.reason||e.message||'plan-failed'};}
 
       const txRefs=plan.rows.map(row=>db.doc('ladderTransactions/'+txId(eventCode,row.uid)));
       const playerRefs=plan.rows.map(row=>db.doc('ladderPlayers/'+row.uid));
