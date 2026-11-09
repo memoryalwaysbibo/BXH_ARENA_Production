@@ -115,7 +115,7 @@ function saveHarness({ capacity = '', enabled = true, saveResult = true, meta = 
     cloneStateForSave: clone,
     render: () => { renderCount++; }, showToast: (message, error) => toasts.push({ message, error: !!error }),
   });
-  for(const name of ['communitySettingsDraftContext','communitySettingsInputs','communitySettingBadInput','setCommunitySettingsInputsSaving','captureCommunitySettingsInputs','restoreCommunitySettingsInputs','refereeTabOpen','refereeCourtFocusActive','renderRefereeCourtView','renderCommunityRoomPreservingSettings'])vm.runInContext(extractFunction(core,name),ctx);
+  for(const name of ['communitySettingsDraftContext','communitySettingsInputs','communitySettingBadInput','setCommunitySettingsInputsSaving','captureCommunitySettingsInputs','restoreCommunitySettingsInputs','refereeTabOpen','refereeStableRenderActive','renderRefereeCourtView','renderCommunityRoomPreservingSettings'])vm.runInContext(extractFunction(core,name),ctx);
   ctx.saveState = async (options = {}) => {
     const snapshot = options.snapshot || ctx.state;
     if (snapshot.meta.registrationEnabled) snapshot.meta.registrationStatus = ctx.computeRegistrationStatus(snapshot.meta, snapshot);
