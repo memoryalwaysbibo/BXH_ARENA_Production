@@ -1,6 +1,7 @@
 'use strict';
 
 const { randomBytes } = require('node:crypto');
+const buckets = require('../referee-seats/functions/bucket-state.cjs');
 const { GROUPS, groupKeys, prepare, nextStage, collect, settlementInput } = require('./core.cjs');
 
 const ROOM_CODE = /^BXH-[A-Z0-9]{6}$/;
@@ -19,14 +20,26 @@ function roomState(document) {
   return typeof document?.data === 'string' ? JSON.parse(document.data) : document?.data;
 }
 
-function startingRoster(parent) {
+function startingRoster(parent, rehearsal = false) {
   const state = roomState(parent);
-  check(parent?.eventAuthority === 'official' && parent.ladderMode === 'ranked' &&
+  const allowedMode = rehearsal
+    ? parent?.ladderMode === 'general' && state?.meta?.ladderMode === 'general' &&
+      parent.visibility === 'private' && state.meta.registrationVisibility === 'private' &&
+      parent.registrationEnabled === false && state.meta.registrationEnabled === false
+    : parent?.ladderMode === 'ranked';
+  check(parent?.eventAuthority === 'official' && allowedMode &&
     typeof state?.id === 'string' && state.id.length > 0 && Array.isArray(state.players) &&
     state.meta?.formatType === 'single' && state.meta.battleMode === 'individual' &&
     state.meta.playMode === 'standard' && !state.startedAt && !state.matches?.length &&
     state.archiveStatus !== 'completed' && !parent.ladderPointsAwarded && !state.testMode && !state.meta.eventCancelled,
   'group-parent-unavailable');
+  if (rehearsal) {
+    check(state.players.every(player => player.source === 'onsite' && player.participantType === 'onsite_guest' &&
+      player.accountLinked === false && player.ladderEligible === false && player.activityEligible === false &&
+      ![player.registrationId, player.regId, player.familyPlayerId, player.guardianUid, player.registrationUid,
+        player.accountUid, player.playerUid, player.uid, player.userUid, player.authUid, player.playerId].some(Boolean)),
+    'group-rehearsal-linked-roster');
+  }
   return state.players.filter(player => !state.meta.checkinRequired || player.checkedIn === true);
 }
 
@@ -37,6 +50,7 @@ function publicStatus(plan) {
     current: plan.active ? { ...plan.active } : null,
     next: plan.active ? null : nextStage(plan.event)?.key || null,
     readyForSettlement: !nextStage(plan.event),
+    ...(plan.rehearsal ? { rehearsal: true } : {}),
   };
 }
 
@@ -46,7 +60,7 @@ function onlineAccount(player) {
     : null;
 }
 
-function stageRoom(parent, stage, parentCode, code, now) {
+function stageRoom(parent, stage, parentCode, code, now, rehearsal) {
   const { meta: source } = roomState(parent);
   const meta = {
     name: source.name + '｜' + stageTitle(stage),
@@ -64,6 +78,7 @@ function stageRoom(parent, stage, parentCode, code, now) {
     stations: GROUPS.includes(stage.key) ? 12 : 2,
     bronzeMatch: stage.bronzeMatch,
     registrationEnabled: false,
+    ...(rehearsal ? { registrationVisibility: 'private' } : {}),
     checkinRequired: false,
     assignedStaffUids: source.assignedStaffUids || [],
   };
@@ -77,7 +92,9 @@ function stageRoom(parent, stage, parentCode, code, now) {
   };
   const shared = {
     name: meta.name, location: meta.location, eventDate: meta.date, updatedAt: now,
-    visibility: 'public', tournamentPhase: 'waiting', eventAuthority: 'official', ladderMode: 'general',
+    visibility: rehearsal ? 'private' : 'public',
+    ...(rehearsal ? { registrationVisibility: 'private' } : {}),
+    tournamentPhase: 'waiting', eventAuthority: 'official', ladderMode: 'general',
     formatType: 'single', battleMode: 'individual', playMode: 'standard',
     registrationEnabled: false, registrationStatus: 'closed', groupStage: link,
     confirmedCount: 0, waitlistCount: 0,
@@ -117,6 +134,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
       user.role !== 'tester' && (!operate || ['admin', 'super_admin'].includes(user.role)), 'group-permission-denied');
     check(settings?.enabled === true && Array.isArray(settings.parentCodes) &&
       settings.parentCodes.includes(parentCode), 'group-room-disabled');
+    return Array.isArray(settings.rehearsalParentCodes) && settings.rehearsalParentCodes.includes(parentCode);
   }
 
   async function checkRegistrations(tx, parentRef, players) {
@@ -140,7 +158,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
   function checkRoster(plan, parent) {
     check(roomState(parent)?.id === plan.parentRoomId, 'group-parent-room-changed');
     const original = Object.values(plan.event.groups).flat();
-    const current = startingRoster(parent);
+    const current = startingRoster(parent, plan.rehearsal === true);
     const identity = player => JSON.stringify([
       player.id, player.registrationId || player.regId || null, player.familyPlayerId || null,
       player.registrationUid || player.accountUid || player.playerUid || player.uid || null,
@@ -155,20 +173,21 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
     async prepare(parentCode, actorUid, groupCount) {
       const parent = refs(parentCode), seed = makeSeed();
       return db.runTransaction(async tx => {
-        await authorize(tx, parentCode, actorUid, true);
+        const rehearsal = await authorize(tx, parentCode, actorUid, true);
         const [plan, room] = await tx.getAll(parent.plan, parent.room);
         const parentData = room.data();
         if (plan.exists) {
           const current = plan.data();
+          check((current.rehearsal === true) === rehearsal, 'group-parent-unavailable');
           checkRoster(current, parentData);
           check(groupCount === undefined || groupCount === groupKeys(current.event).length,
             'group-count-locked');
           return publicStatus(current);
         }
-        const players = startingRoster(parentData);
+        const players = startingRoster(parentData, rehearsal);
         const event = prepare(players, seed, groupCount);
         await checkRegistrations(tx, parent.room, players);
-        const next = { parentRoomId: roomState(parentData).id, event, active: null, roomCodes: {} };
+        const next = { parentRoomId: roomState(parentData).id, event, active: null, roomCodes: {}, rehearsal };
         tx.create(parent.plan, next);
         const assignments = new Map();
         for (const group of groupKeys(event)) {
@@ -204,7 +223,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         check(rooms.every(snapshot => !snapshot.exists) &&
           !Object.values(current.roomCodes).includes(code), 'group-room-code-collision');
         await checkRegistrations(tx, parent.room, stage.players);
-        const documents = stageRoom(parentData, stage, parentCode, code, now);
+        const documents = stageRoom(parentData, stage, parentCode, code, now, current.rehearsal === true);
         const drawPending = !GROUPS.includes(stage.key);
         const next = { ...current, active: { key: stage.key, code, drawPending },
           roomCodes: { ...current.roomCodes, [stage.key]: code } };
@@ -294,7 +313,19 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         check(document?.groupStage?.parentCode === parentCode && document.groupStage.key === key &&
           document.ladderMode === 'general' && state?.id === parentCode + ':' + key && state.cloudCode === code,
         'group-stage-source');
-        const next = { ...current, active: null, event: collect(current.event, key, state) };
+        let result = state;
+        if (Object.hasOwn(document, 'scoreStorage')) {
+          let manifest;
+          try { manifest = buckets.context(document, state); }
+          catch { check(false, 'group-stage-score-unavailable'); }
+          check(manifest.courtCount <= 32, 'group-stage-score-unavailable');
+          const refs = Array.from({ length: manifest.bucketCount },
+            (_, index) => child.room.collection('matchBuckets').doc('court-' + (index + 1)));
+          const scores = await tx.getAll(...refs);
+          try { result = buckets.materialize(state, manifest, scores.map(snapshot => snapshot.data())); }
+          catch { check(false, 'group-stage-score-unavailable'); }
+        }
+        const next = { ...current, active: null, event: collect(current.event, key, result) };
         tx.set(parent.plan, next);
         const status = publicStatus(next);
         tx.set(parent.routing, { ...status, eligibleUids: [] });
@@ -307,6 +338,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
       const [plan, room] = await tx.getAll(parent.plan, parent.room);
       check(plan.exists, 'group-plan-required');
       const current = plan.data();
+      check(current.rehearsal !== true, 'group-rehearsal-no-ladder');
       checkRoster(current, room.data());
       const input = settlementInput(current.event);
       await checkRegistrations(tx, parent.room, Object.values(current.event.groups).flat());

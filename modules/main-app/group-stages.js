@@ -8,9 +8,12 @@
     'group-parent-roster-changed': '報到名單已變動，請先確認名單。',
     'group-registration-mismatch': '分組名單和報名紀錄不同步，請先核對。',
     'group-stage-not-complete': '這一階段尚未打完或尚未封存。',
+    'group-stage-score-unavailable': '目前無法確認子房的分桶比分，請更新進度後再試。',
     'group-draw-not-ready': '名次賽尚未抽籤，請先到子房產生對戰表。',
     'group-draw-not-published': '請先公布名次賽籤表。',
     'group-room-disabled': '這間房尚未啟用分組。',
+    'group-parent-unavailable': '請確認房間類型、公開狀態與賽事進度。',
+    'group-rehearsal-linked-roster': '分組測試房只接受未綁定帳號的現場訪客。',
     'group-invalid-count': '請選擇 2 組或 4 組。',
     'group-count-locked': '這場已完成分組。請更新進度查看結果。',
     'group-roster-size': '有效參賽人數超出所選組數的範圍，請確認名單與組數。',
@@ -84,7 +87,8 @@
     }).join('') + '</ol>';
     const waitingForFinals = groups.every(stage => completed.includes(stage)) &&
       !completed.includes('champions') && (!key || drawPending);
-    const message = status.readyForSettlement ? '各階段賽果已收齊，等待全場結算。' :
+    const message = status.readyForSettlement
+      ? (status.rehearsal ? '測試賽果已收齊，本場不發放天梯積分。' : '各階段賽果已收齊，等待全場結算。') :
       waitingForFinals ? (groupCount * 2) + ' 位晉級者已確認｜名次賽待抽籤' :
       titles[key] ? '目前進行：' + titles[key] + (drawPending ? '待抽籤' : '') :
       next ? '下一階段：' + next : '等待主辦開放下一階段。';

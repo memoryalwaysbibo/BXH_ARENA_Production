@@ -5,6 +5,7 @@ const test = require('node:test');
 const { createCoordinator } = require('./coordinator.cjs');
 const { createGroupStageCommand } = require('./command.cjs');
 const { roster, finish } = require('./test-fixtures.cjs');
+const buckets = require('../referee-seats/functions/bucket-state.cjs');
 
 const project = 'demo-bxh-group-stages';
 assert.equal(process.env.GCLOUD_PROJECT, project);
@@ -226,6 +227,101 @@ test('group-stage rehearsal covers two and four groups', async t => {
     }
   } finally {
     await db.terminate();
+    await deleteApp(app);
+  }
+});
+
+test('private general-room rehearsal collects a 320-player event without a ladder input', async () => {
+  const app = initializeApp({ projectId: project });
+  const db = getFirestore(app);
+  try {
+    const parentCode = 'BXH-GROUPT', operator = 'rehearsal-admin';
+    const parent = db.doc('tournaments/' + parentCode);
+    const gate = db.doc('systemConfig/groupStages');
+    const coordinator = createCoordinator(db);
+    const players = Array.from({ length: 320 }, (_, index) => ({
+      id: 'guest-' + index,
+      name: 'Fixture ' + index,
+      source: 'onsite',
+      participantType: 'onsite_guest',
+      checkedIn: true,
+      accountLinked: false,
+      activityEligible: false,
+      ladderEligible: false,
+    }));
+    const parentState = {
+      id: 'private-rehearsal',
+      meta: { name: 'Rehearsal', formatType: 'single', battleMode: 'individual',
+        playMode: 'standard', ladderMode: 'general', registrationVisibility: 'private',
+        registrationEnabled: false },
+      players, matches: [],
+    };
+    const parentData = {
+      eventAuthority: 'official', ladderMode: 'general', createdBy: operator,
+      registrationEnabled: false, visibility: 'private', data: JSON.stringify(parentState),
+    };
+    const enabled = { enabled: true, parentCodes: [parentCode] };
+    await Promise.all([
+      parent.set(parentData),
+      db.doc('users/' + operator).set({ active: true, role: 'admin' }),
+      gate.set(enabled),
+    ]);
+    await assert.rejects(coordinator.prepare(parentCode, operator, 4), { code: 'group-parent-unavailable' });
+    await gate.set({ ...enabled, rehearsalParentCodes: [parentCode] });
+    await parent.update({ visibility: 'public' });
+    await assert.rejects(coordinator.prepare(parentCode, operator, 4), { code: 'group-parent-unavailable' });
+    await parent.set({ ...parentData, data: JSON.stringify({
+      ...parentState, players: [{ ...players[0], playerUid: 'linked-account' }, ...players.slice(1)],
+    }) });
+    await assert.rejects(coordinator.prepare(parentCode, operator, 4), { code: 'group-rehearsal-linked-roster' });
+    await parent.set(parentData);
+
+    let status = await coordinator.prepare(parentCode, operator, 4);
+    assert.equal(status.rehearsal, true);
+    assert.deepEqual(status.groups.map(group => group.count), [80, 80, 80, 80]);
+    while (status.next) {
+      const key = status.next;
+      const { current } = await coordinator.openNext(parentCode, key, operator);
+      const child = db.doc('tournaments/' + current.code);
+      const mirror = db.doc('publicTournaments/' + current.code);
+      const [childSnap, mirrorSnap] = await db.getAll(child, mirror);
+      const room = childSnap.data(), state = JSON.parse(room.data);
+      assert.equal(room.ladderMode, 'general');
+      assert.equal(room.visibility, 'private');
+      assert.equal(mirrorSnap.data().visibility, 'private');
+      assert.equal(state.meta.registrationVisibility, 'private');
+      assert(state.players.every(player => player.ladderEligible === false));
+      const done = finish({ players: state.players, bronzeMatch: state.meta.bronzeMatch });
+      if (current.drawPending) {
+        await child.update({ data: JSON.stringify({ ...state, drawnAt: 1, bracketSize: done.bracketSize,
+          matches: done.matches.filter(match => match.bracket === 'SE').map(match => ({
+            ...match, completed: false, winnerId: null, loserId: null,
+          })) }) });
+        await coordinator.publishDraw(parentCode, key, current.code, operator);
+      }
+      const archived = { ...state, ...done, meta: state.meta };
+      if (key === 'A') {
+        archived.matches.filter(match => !match.isBye).forEach((match, index) => { match.station = index % 12 + 1; });
+        const manifest = buckets.makeManifest(archived, 'rehearsal-scores');
+        const canonical = buckets.encode(archived, manifest);
+        const staleMatch = archived.matches.find(match => !match.isBye);
+        staleMatch.winnerId = null;
+        await child.update({ scoreStorage: manifest, data: JSON.stringify(archived) });
+        await assert.rejects(coordinator.collect(parentCode, key, current.code, operator),
+          { code: 'group-stage-score-unavailable' });
+        await Promise.all(canonical.map(bucket => child.collection('matchBuckets').doc(bucket.bucketId).set(bucket)));
+      } else {
+        await child.update({ data: JSON.stringify(archived) });
+      }
+      status = await coordinator.collect(parentCode, key, current.code, operator);
+    }
+    assert.equal(status.readyForSettlement, true);
+    assert.equal(status.completed.length, 6);
+    await assert.rejects(db.runTransaction(tx => coordinator.readSettlement(tx, parentCode)),
+      { code: 'group-rehearsal-no-ladder' });
+    assert.deepEqual((await parent.get()).data(), parentData);
+    assert.equal((await db.collection('ladderTransactions').get()).size, 0);
+  } finally {
     await deleteApp(app);
   }
 });
