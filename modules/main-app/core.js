@@ -7229,16 +7229,15 @@ function singleElimBronzeGatePhase(matches=state.matches, meta=state.meta){
 }
 
 function singleElimBronzeBeforeFinalBlocked(match,matches=state.matches,meta=state.meta){
-  if(!match||match.bracket!=="SE") return false;
-  const gate=singleElimBronzeGatePhase(matches,meta);
-  if(!gate) return false;
-  return Number(match.round||0)===Number(gate.finalRound);
+  // Compatibility hook shared by browser dispatch and the trusted scoring engine.
+  // Bronze has scheduling priority, but is not a prerequisite for playing the final.
+  // Existing manual assignment, swap and PASS controls may override that priority.
+  return false;
 }
 
 function activeSingleElimSchedulePhase(matches=state.matches, meta=state.meta){
-  // Placement gate is stronger than normal per-court progression: once both
-  // semifinal losers are known, 季殿 must finish before 冠亞 can become ready,
-  // current, manually assigned, swapped in, or started.
+  // Prefer bronze in the automatic queue; this phase is an ordering hint only.
+  // A ready championship final remains eligible for dispatch and manual control.
   const placementGate=singleElimBronzeGatePhase(matches,meta);
   if(placementGate) return placementGate;
 
@@ -8020,8 +8019,7 @@ function stationExecutionQueue(stationNum){
   if((state.meta.formatType||"single")==="single"){
     const phase=activeSingleElimSchedulePhase();
     if(phase){
-      // Preserve normal independent per-court progression, but never permit the
-      // championship final to bypass a pending 季殿 placement match.
+      // Keep the preferred phase first without locking later ready matches.
       const samePhase=available.filter(m=>isInActiveSingleElimPhase(m,phase));
       const laterReady=available.filter(m=>!isInActiveSingleElimPhase(m,phase));
       available=samePhase.concat(laterReady.filter(m=>!singleElimBronzeBeforeFinalBlocked(m)));

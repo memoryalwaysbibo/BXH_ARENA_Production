@@ -138,14 +138,14 @@ test('explicit transfer/resume and eligible PASS priority still override an old 
   h.st.matches[0].completed=true;h.ctx.rebuildCourtAssignments();assert.equal(h.st.courtAssignments.court1.currentMatchId,manual.id);
  }
 });
-test('bronze gate is unchanged across expansion, including blocked championship final',()=>{
+test('expansion retains bronze preference while championship final stays available',()=>{
  const h=harness(4);h.st.meta.bronzeMatch=true;
  for(const m of h.st.matches.filter(m=>m.round===0)){m.completed=true;m.status='completed';m.winnerId=m.a.playerId;m.loserId=m.b.playerId;}
  // A stable existing bronze node avoids only the random ID generator; all propagation is original.
  h.st.bronzeMatchId='bronze';h.st.matches.push({id:'bronze',bracket:'BZ',round:0,indexInRound:0,seq:1.5,station:1,status:'pending',a:null,b:null,scoreA:0,scoreB:0,log:[],completed:false});
  resize(h,6);const final=h.st.matches.find(m=>m.id==='r1m0');
- assert(h.ctx.singleElimBronzeBeforeFinalBlocked(final,h.st.matches,h.st.meta));
- assert(!Object.values(h.st.courtAssignments).some(c=>c.currentMatchId===final.id||c.nextMatchId===final.id));
+ assert(!h.ctx.singleElimBronzeBeforeFinalBlocked(final,h.st.matches,h.st.meta));
+ assert(Object.values(h.st.courtAssignments).some(c=>c.currentMatchId===final.id||c.nextMatchId===final.id));
 });
 test('stale plan revision rejects ABA count changes before mutating state',()=>{
  const h=harness();h.api.request(h.st,6,1,100,0);
