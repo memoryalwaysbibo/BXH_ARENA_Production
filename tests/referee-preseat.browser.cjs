@@ -9,10 +9,14 @@ const index=fs.readFileSync(path.join(repo,'index.html'),'utf8');
 const styles=[...index.matchAll(/<link\b[^>]*rel="stylesheet"[^>]*href="([^"?]+)[^"]*"/g)].map(m=>m[1]).filter(p=>!/^https?:/.test(p)&&fs.existsSync(path.join(repo,p))).map(p=>fs.readFileSync(path.join(repo,p),'utf8')).join('\n');
 const confirmStart=core.indexOf('  if(action==="modal-confirm"){',core.indexOf('function handleAction('));
 const confirmEnd=core.indexOf('// v13.14.2',confirmStart);
-const ackStart=core.indexOf('  const modalConfirmBtn = document.getElementById("modal-confirm-btn");',core.indexOf('function bindDynamicInputs('));
+const ackStart=core.indexOf('  const courtNameStation=document.getElementById("court-name-station");',core.indexOf('function bindDynamicInputs('));
 const ackEnd=core.indexOf('  const ta = document.getElementById("player-textarea");',ackStart);
 assert(confirmStart>0&&confirmEnd>confirmStart&&ackStart>0&&ackEnd>ackStart);
 const productionFunctions=['canUseRefereeSyncRecovery','refereeSyncRecoveryControlsHtml','refereeWorkstationHeader','refereeSwapControl','renderRefereeScorePanel','refereeWaitingControls','renderWaitingRefereeCourt','courtForceExitConfirmation','renderModal','openModal','closeModal'].map(fn).join('\n');
+const renameStart=core.indexOf('  if(action==="edit-court-name"){');
+const renameEnd=core.indexOf('  if(action==="modal-overlay"',renameStart);
+assert(renameStart>0&&renameEnd>renameStart);
+const courtNames=core.slice(core.indexOf('const roomCourtNames = new Map()'),core.indexOf('function refereeStationAssignmentsMap('));
 const courtView=core.slice(core.indexOf('let refereeCourtView='),core.indexOf('/* ==== tab: settings ==== */'));
 const stableView=core.slice(core.indexOf('let refereeTemplates='),core.indexOf('function renderApp()'));
 const selectStart=core.indexOf('  if(action==="referee-select-court"){');
@@ -29,15 +33,25 @@ assert(selectStart>0&&selectEnd>selectStart);
   await page.addScriptTag({content:fs.readFileSync(path.join(repo,'modules/main-app/referee-seats.js'),'utf8')});
   await page.addScriptTag({content:`
     var appPhase='app',activeTab='referee',communityRoomActiveTab='referee',judgeUid='judge';
-    var focusLab=false,restricted=false,allowed=true;
+    var focusLab=false,restricted=false,allowed=true,isCourtManager=false;
+    const isTester=()=>false,isAdminTierOrAbove=()=>isCourtManager,renderPreservingScroll=()=>render();
     const currentAuthUid=()=>judgeUid;
     var state={id:'fixture',cloudCode:'BXH-TEST',meta:{stations:6,refereeSeatsV1:{version:1,revision:1,courts:{},requests:{}}},matches:[],bracketSize:0};
     var pendingModal=null,courtRetirementBusy=false,executed=[],seatWrites=[],toasts=[];
     const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const refereeStageLabel=()=> '第一輪',canOperateCurrentTournament=()=>false,isCommunityRoomOwner=()=>false,refereeBracketRoundtripNav=()=>'',courtAtmosphereStyle=()=>'',refereeDisplayForStation=()=> '測試裁判',refereeStationStatus=()=>({label:'等待中',cls:'waiting'}),stationCompletedCount=()=>0,refereeStationRestrictionEnabled=()=>true,canForceExitCourt=()=>true,canManageCourtRetirement=()=>true;
     const POINT_LABELS={spin:'旋轉',knockout:'擊飛',burst:'爆裂',extreme:'極限'},canOperateStation=n=>!restricted||(n===1&&allowed),checkWinnerSide=()=>null,refereeFaultWritePending=()=>false,refereeFaultCount=()=>0,refereeFaultLast=()=>null,refereeViewClass=()=>'',refereeCourtSwapButton=()=>'',matchStatusBarHtml=()=> '準備中';
-    const playerName=id=>({a:'測試選手甲',b:'測試選手乙'})[id]||id,showToast=m=>toasts.push(m),executeCourtForceAction=change=>executed.push(change),shouldBindLobbyInput=()=>true;
+    const playerName=id=>({a:'測試選手甲',b:'測試選手乙'})[id]||id,showToast=m=>toasts.push(m),executeCourtForceAction=change=>executed.push(change);
+    const inputBindings=new WeakMap();
+    function shouldBindLobbyInput(node,key){
+      if(!inputBindings.has(node))inputBindings.set(node,new Set());
+      const keys=inputBindings.get(node);
+      if(keys.has(key))return false;
+      keys.add(key);
+      return true;
+    }
     ${productionFunctions}
+    ${courtNames}
     ${courtView}
     ${stableView}
     const refereeMatches=()=>state.matches;
@@ -48,12 +62,13 @@ assert(selectStart>0&&selectEnd>selectStart);
     }
     function handleAction(action,target){
       ${core.slice(selectStart,selectEnd)}
+      ${core.slice(renameStart,renameEnd)}
       if(action==='modal-cancel'){closeModal();return;}
       ${core.slice(confirmStart,confirmEnd)}
     function bindConfirmation(){${core.slice(ackStart,ackEnd)}}
     function render(){
       BXHRefereeSeats.bind({state:()=>state,uid:()=>'judge',eligible:()=>true,operator:()=>true,manager:()=>true,render,toast:showToast});
-      if(focusLab){renderRefereeCourtView(document.getElementById('app'),'<main>'+renderReferee()+'</main>'+renderModal());return;}
+      if(focusLab){renderRefereeCourtView(document.getElementById('app'),'<main>'+renderReferee()+'</main>'+renderModal());bindConfirmation();return;}
       document.getElementById('app').innerHTML=(state.bracketSize?renderWaitingRefereeCourt(1):renderReferee())+renderModal();
       bindConfirmation();
       document.querySelector('[data-action="court-force-exit"]')?.addEventListener('click',()=>openModal(courtForceExitConfirmation({kind:'force-exit',station:1,matchId:'m'}, {a:{playerId:'a'},b:{playerId:'b'},scoreA:3,scoreB:2})));
@@ -66,8 +81,8 @@ assert(selectStart>0&&selectEnd>selectStart);
       return {ok:true};
     }};
     document.addEventListener('click',event=>{
-      const target=event.target.closest('[data-action="referee-select-court"]');
-      if(target)handleAction('referee-select-court',target);
+      const target=event.target.closest('[data-action="referee-select-court"],[data-action="edit-court-name"]');
+      if(target)handleAction(target.dataset.action,target);
     });
     render();
   `});
@@ -190,6 +205,30 @@ assert(selectStart>0&&selectEnd>selectStart);
   await page.evaluate(()=>{state.cloudCode='BXH-OTHER';render();});
   assert.equal(await page.locator('.referee-workstation').count(),12);
   console.log('PASS single court selection, 12-court overview, score and permission updates, and zero selected-court DOM mutations from other-court scores');
+
+  // A focused court retains input DOM on score refresh. Switching the editor's
+  // station must still replace the previous station's draft and save the shown value.
+  await page.evaluate(()=>{
+    appPhase='app';isCourtManager=true;state.meta.ladderMode='ranked';
+    BXHCourtDisplayNames.observe(state.cloudCode,{revision:1,names:{2:'舞台右側'}});
+    window.cloudSync.renameTournamentCourt=async data=>{
+      window.renamePayload=data;
+      return {ok:true,courtDisplayNames:{revision:2,names:{2:data.name}}};
+    };
+    render();
+  });
+  await selector.getByRole('button',{name:'台1',exact:true}).tap();
+  await page.getByRole('button',{name:'修改裁判台名稱'}).tap();
+  await page.locator('#court-name-value').fill('未儲存的草稿');
+  await page.locator('#court-name-station').selectOption('2');
+  assert.equal(await page.locator('#court-name-value').inputValue(),'舞台右側');
+  await page.locator('#court-name-value').fill('舞台左側');
+  await page.locator('#modal-confirm-btn').tap();
+  await page.waitForFunction(()=>window.renamePayload?.name==='舞台左側'&&!pendingModal);
+  assert.equal(await page.evaluate(()=>renamePayload.expectedName),'舞台右側');
+  await selector.getByRole('button',{name:'台2｜舞台左側',exact:true}).tap();
+  assert.match(await page.locator('#court-card-2 .ref-workstation-identity').innerText(),/台2[\s\S]*舞台左側/);
+  console.log('PASS court names in the focused scoreboard, station switch and confirmed save');
 
   assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
   console.log('PASS pre-draw seats, disabled scoring, retained seats, collapsed court maintenance, cancel focus, acknowledgment, touch confirmation and 320/390/430/960 layouts (isolated transport)');

@@ -21376,6 +21376,7 @@ function bindDynamicInputs(){
     const mm=pendingModal;
     mm.station=Number(courtNameStation.value);
     mm.name=mm.expectedName=courtName(mm.code,mm.station);
+    if(courtNameValue)courtNameValue.value=mm.name;
     mm.error="";
     renderPreservingScroll();
   });

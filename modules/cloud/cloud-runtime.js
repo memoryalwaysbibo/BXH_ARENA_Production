@@ -1184,7 +1184,7 @@
   // the old "data" field — never breaking guest viewing for older tournament
   // codes that haven't been through the cleanup tool yet.
   function reconstructPublicStateFromDoc(id, d){
-    window.BXHCourtDisplayNames?.observe(id,d.courtDisplayNames);
+    globalThis.BXHCourtDisplayNames?.observe(id,d.courtDisplayNames);
     let out=null;
     if(d.bracketView){
       try{ out=Object.assign({ id }, JSON.parse(d.bracketView)); }catch(e){ /* fall through */ }
@@ -3062,7 +3062,7 @@
         const snap = options.serverOnly===true?await fx.getDocFromServer(ref):await fx.getDoc(ref);
         if(!snap.exists()) return { ok:false, reason:"not-found" };
         const d = snap.data();
-        window.BXHCourtDisplayNames?.observe(snap.id,d.courtDisplayNames);
+        globalThis.BXHCourtDisplayNames?.observe(snap.id,d.courtDisplayNames);
         if(Object.hasOwn(d,'scoreStorage')){
           const confirmed=options.serverOnly===true?snap:await fx.getDocFromServer(ref);
           if(!confirmed.exists()||!Object.hasOwn(confirmed.data(),'scoreStorage'))return {ok:false,reason:'not-synchronized'};
@@ -4191,7 +4191,7 @@ if(testerSession){
           if(!snap.exists()){callback({roomMissing:true,code:String(code).toUpperCase()},true);return;}
           if(snap.metadata.hasPendingWrites||snap.metadata.fromCache) return; // 略過自己剛寫入、尚未確認的本地回音
           const d = snap.data();
-          window.BXHCourtDisplayNames?.observe(snap.id,d.courtDisplayNames);
+          globalThis.BXHCourtDisplayNames?.observe(snap.id,d.courtDisplayNames);
           if(Number.isSafeInteger(d.updatedAt)){if(d.updatedAt<lastRootVersion)return;lastRootVersion=d.updatedAt;}
           if(Object.hasOwn(d,'scoreStorage')){
             if(bucketAttached&&bucketUid!==authHandle?.currentUser?.uid)return;
