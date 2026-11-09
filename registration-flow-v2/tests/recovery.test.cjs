@@ -382,3 +382,46 @@ test('server ownership switches legacy callable writes to the queue without bloc
  const {code:old,ids:[legacyPlayer]}=await seed(1);
  assert.equal((await guarded({auth:{uid:legacyPlayer},data:request(old,legacyPlayer).payload})).status,'confirmed');
 });
+
+test('disabled release bindings deny intake and leave background processing idle',async()=>{
+ const {createBindings}=require('../backend/bindings.cjs');
+ const {code,ids:[player]}=await seed(1);
+ const tr=db.doc('tournaments/'+code);
+ await tr.update({registrationQueueVersion:2});
+ const queued=service({requireRoomOwnership:true});
+ const signup=request(code,player);
+ await queued.enqueue(player,signup);
+ const family=Object.assign(store=>handlers.family(store),{v2CapacityAware:true});
+ let workers=false;
+ const dependencies={db,FieldValue,createFamilyRegistration:family,rosterFactory:handlers.roster,
+  promotionFactory:()=>()=>{},authorizeManagement:async()=>{},enabled:async()=>true};
+ const call=(endpoint,data)=>endpoint.run({auth:{uid:player},data:{code,...data}});
+ const defaults=createBindings(dependencies);
+ const event={params:{code,job:queued.jobRef(code,player,signup.operationId).id}};
+ await assert.rejects(call(defaults.registrationQueueV2,{action:'submit',operation:signup}),/registration-queue-disabled/);
+ await assert.rejects(call(defaults.registrationRosterQueueV2,{action:'configure',operationId:'manage-closed-test',enabled:true}),/registration-queue-disabled/);
+ await defaults.registrationQueueV2Worker.run(event);
+ await defaults.registrationQueueV2Sweep.run({});
+ assert.equal((await audit(code,0)).summary.jobs,1);
+ assert.equal((await call(defaults.registrationQueueV2,{action:'status',operationId:signup.operationId})).operation.state,'queued');
+ const enabled=createBindings({...dependencies,enabled:async()=>false,workersEnabled:async()=>workers});
+ workers=true;
+ await assert.rejects(call(enabled.registrationQueueV2,{action:'submit',operation:signup}),/registration-queue-disabled/);
+ await enabled.registrationQueueV2Sweep.run({});
+ assert.equal((await call(enabled.registrationQueueV2,{action:'status',operationId:signup.operationId})).operation.state,'completed');
+ assert.equal((await audit(code,1)).summary.confirmed,1);
+});
+
+test('ownership removed after admission stops the worker before the roster changes',async()=>{
+ const {code,ids:[player]}=await seed(1);
+ const tr=db.doc('tournaments/'+code);
+ await tr.update({registrationQueueVersion:2});
+ const queued=service({requireRoomOwnership:true,beforeExecute:()=>tr.update({registrationQueueVersion:FieldValue.delete()})});
+ const signup=request(code,player);
+ await queued.enqueue(player,signup);
+ await queued.drain(code);
+ const result=await queued.status(player,code,signup.operationId);
+ assert.equal(result.operation.state,'rejected');
+ assert.equal(result.operation.reason,'registration-queue-disabled');
+ assert.equal((await audit(code,0)).summary.confirmed,0);
+});

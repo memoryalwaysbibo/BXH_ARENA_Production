@@ -5,7 +5,7 @@ const digest=value=>createHash('sha256').update(value).digest('hex');
 const canonical=value=>JSON.stringify(value===null||typeof value!=='object'?value:Array.isArray(value)?value.map(x=>JSON.parse(canonical(x))):Object.fromEntries(Object.keys(value).sort().map(k=>[k,JSON.parse(canonical(value[k]))])));
 const active=u=>u?.active===true&&!u.deleted&&!['deleted','disabled','frozen'].includes(u.accountStatus);
 const millis=t=>t?.toMillis?t.toMillis():Number(t)||0;
-const businessRejections=new Set(('auth-required not-found room-password-required operation-conflict onsite-waitlist-managed corrupt-state family-lottery-unavailable tournament-started registration-state-conflict permission-denied not-enabled not-open-yet closed profile-incomplete invalid-participants child-not-found roster-locked child-eligibility-required already-registered full allocation-changed invalid-operation cancel-deadline-passed not-registered nothing-to-cancel bracket-locked selection-managed team-roster-managed bucket-scoring-required unlimited-quick-registration-required not-waitlist invalid-registration-capacity invalid-registration-schedule capacity-full invalid-capacity-step promotion-route-not-supported operation-outdated qr-checkin-stale court-lifecycle-stale roster-too-large online-registration-required invalid-request unauthenticated public-mirror-stale not-confirmed call-state-stale entry-selection-stale').split(' '));
+const businessRejections=new Set(('auth-required not-found room-password-required operation-conflict registration-queue-disabled onsite-waitlist-managed corrupt-state family-lottery-unavailable tournament-started registration-state-conflict permission-denied not-enabled not-open-yet closed profile-incomplete invalid-participants child-not-found roster-locked child-eligibility-required already-registered full allocation-changed invalid-operation cancel-deadline-passed not-registered nothing-to-cancel bracket-locked selection-managed team-roster-managed bucket-scoring-required unlimited-quick-registration-required not-waitlist invalid-registration-capacity invalid-registration-schedule capacity-full invalid-capacity-step promotion-route-not-supported operation-outdated qr-checkin-stale court-lifecycle-stale roster-too-large online-registration-required invalid-request unauthenticated public-mirror-stale not-confirmed call-state-stale entry-selection-stale').split(' '));
 const fail=reason=>Object.assign(Error(reason),{reason});
 function safeResult(result,job){
  const out={};
@@ -93,8 +93,10 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
    if(key==='runTransaction')return (callback,options)=>{
     if(options?.readOnly)throw fail('queue-unexpected-readonly');
     return target.runTransaction(async tx=>{
-     const [ls,js]=await tx.getAll(roomRef(code),ref);checkLease(ls.data(),token);
+     const roomReads=requireRoomOwnership?[target.doc('tournaments/'+code)]:[];
+     const [ls,js,room]=await tx.getAll(roomRef(code),ref,...roomReads);checkLease(ls.data(),token);
      if(js.data()?.state!=='running'||js.data()?.workerToken!==token)throw fail('queue-lease-lost');
+     if(requireRoomOwnership&&!registrationQueueOwnsRoom(room?.data()))throw fail('registration-queue-disabled');
      // The operation result and all registration mutations commit atomically.
      // A lost response cannot leave a committed registration with an absent
      // completion marker. A new lease invalidates the old transaction's read.

@@ -53,11 +53,11 @@ CI 安裝固定 firebase-tools@13.35.1、firebase-admin@14.4.0、firebase-functi
 
 ## 正式發布阻擋項目
 
-- 重新擷取並對照當前 family、roster、遞補、管理及其他會寫名額的正式來源／設定。不能只以 #730 的擷取或本地測試當成當前線上版本證明。
+- 重新擷取並對照當前 family、roster、遞補、管理及其他會寫名額的正式來源／設定。 在 Cloud Shell 執行 `python3 -B registration-flow-v2/tools/read-live-writers.py` 可記錄現行版本、固定來源世代與來源雜湊。工具只輸出盤點結果，部署整合仍需審查來源及相依檔。不能只以 #730 的擷取或本地測試當成當前線上版本證明。
 - 一般官方房的 V2 家庭報名完成後，必須由後端把報名文件投影成 QR 可讀的參賽名單。試點要核對 `registrationRosterSyncBackendEnabled`、正式 `syncRegistrationRoster` 的版本與房間設定，再驗證報名完成、觸發交付、名單讀回和 QR 報到能接續。2026-11-09 擷取的同步來源會在開賽或已有對戰表時停止投影，試點也要驗證抽籤前補齊名單，避免把不同步的名單鎖進對戰表。
 - 將**所有**相關名額寫入入口接至同一協調規則，包括舊版客戶端與直接 Firestore 管理寫入。此候選已接入本人／家庭報名、玩家與管理端取消、線上備取升正取、官方個人賽的線上降備取和自動補位設定。一般官方個人賽的現場手動升正取與批次新增也已接入候選。現場專用備取流程與舊版客戶端寫入仍待查核與整合。有限額遞補目前只驗證官方個人賽候選；不限額社群房由既有 roster handler 處理。
 - 先部署並驗證新函式、文件觸發器、恢復排程與 indexes，確認自動交付及中斷接手。`backend/bindings.cjs` 尚未加入正式 entrypoint，並要求由 `node backend/prepare-family.cjs <核對後的原始 family-registration.js>` 產生的容量候選。若目前正式來源與擷取版本不同，先重新審查差異並更新候選，再產出部署套件。
-- V2 佇列在接受新操作的交易內要求私有房間的 `registrationQueueVersion === 2`。現有 callable 的寫入入口須以 `createGuardedLegacyWriter` 包裝，並在同一寫入交易拒絕已切換的房間。名額預查及名單讀取可以保留。正式入口尚未安裝此包裝。停用 V2 時先關閉新操作，再確認原佇列排空，最後移除房間所有權標記。
+- V2 佇列在接受新操作的交易內要求私有房間的 `registrationQueueVersion === 2`。現有 callable 的寫入入口須以 `createGuardedLegacyWriter` 包裝，並在同一寫入交易拒絕已切換的房間。名額預查及名單讀取可以保留。正式入口尚未安裝此包裝。首次部署時，worker 與 sweep 的獨立開關也預設關閉。先驗證索引與背景入口，再開背景處理及指定房間的新請求。停用 V2 時先關閉新操作，維持背景處理直到原佇列排空，再移除房間所有權標記。工作者也會在寫入交易內重查私有房間所有權，防止舊任務跨越回切。
 - 儲存庫的 `manageOnsiteWaitlist` 候選在同一交易讀取 V2 所有權，保留預覽及舊操作回執，拒絕新的專用備取寫入。此防護須以當前正式來源核對後接入。啟用檢查也必須拒絕由專用備取掌管的房間。
 - 舊瀏覽器可直接更新 JSON 字串 `tournaments.data` 及 `publicTournaments.bracketView`。Firestore Rules 無法逐欄辨識字串內的名單、報到、對戰內容。啟用前需先把允許的狀態寫入移到受信任函式，或隔離成可由 Rules 辨識的欄位，再封鎖瀏覽器對 V2 房的直接名單寫入。只改前端開關無法封鎖舊頁面。
 - `backend/compose-rules.cjs` 對 2026-11-04 已審查快照產出完整隔離候選，另接受 2026-11-09 正式唯讀預檢確認的 `3d1b40ac…500d7f` 來源。兩個雜湊以外的來源一律停止。可在隔離模擬器執行既有權限回歸時，以 `BXH_REGISTRATION_V2_RULES_BASELINE` 指定已擷取的 Rules 原文。候選規則在 `registrationQueueVersion === 2` 時會封鎖私有房與公開鏡像的所有瀏覽器寫入，也封鎖名單子集合。任何仍依賴瀏覽器寫入的報到、抽籤、開賽、計分或房間設定須先改走可信任入口。發布前要重新讀取當前正式 Rules 並審查差異。`queue-rules.fragment` 不能單獨部署，新增 deny 不能推翻其他重疊 allow。
