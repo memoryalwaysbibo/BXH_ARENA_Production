@@ -6,7 +6,7 @@ const {createQueue}=require('./queue.cjs');
 const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
 const {createStartHandler,createDrawHandler}=require('./lifecycle.cjs');
-function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled}){
+function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled}){
  if(createFamilyRegistration?.v2CapacityAware!==true)throw Error('queue-family-capacity-source-required');
  const familyFactory=store=>createFamilyRegistration(store,Date.now,{myEventsProofEnabled:true});
  if(typeof promotionFactory!=='function')throw Error('queue-promotion-factory-required');
@@ -14,11 +14,12 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
  const {onDocumentCreated}=require('firebase-functions/v2/firestore');
  const {onSchedule}=require('firebase-functions/v2/scheduler');
  const queue=createQueue(db,{FieldValue,requireRoomOwnership:true,handlers:{family:familyFactory,roster:rosterFactory,promotion:promotionFactory}});
- const workersReady=async()=>await workersEnabled()===true;
+ const workersReady=async()=>!stagedOnly&&await workersEnabled()===true;
  const intakeEnabled=async code=>await workersReady()&&await enabled(code)===true;
  const api=createApi({queue,family:familyFactory(db),enabled:intakeEnabled});
  const managementApi=createManagementApi({queue,enabled:intakeEnabled,authorize:authorizeManagement});
  const bind=(handler,{options,preconditions=[]}={})=>onCall({region:'asia-east1',cors:true,timeoutSeconds:30,maxInstances:5,...options},async req=>{
+  if(stagedOnly)throw new HttpsError('failed-precondition','registration-queue-disabled');
   try{return await handler(req);}catch(error){
    const m=String(error.message||'');
    if(m==='auth-required')throw new HttpsError('unauthenticated',m);
