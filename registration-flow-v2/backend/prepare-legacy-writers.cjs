@@ -4,6 +4,17 @@ const {createHash}=require('node:crypto');
 const {readFileSync}=require('node:fs');
 const releaseInputs=require('../release-inputs.json');
 
+const selectionHashes={
+ lotteryRegistration:'d4fc39819cd27ffa27a97f3d7253737a16d66b672191c376b8ee94ceb15ee17d',
+ manageRegistrationSelection:'026833cc060963c12f475151a2d4c96537c179f1eccafa70d7271d761d0ec02b',
+};
+const selectionImport="const {assertLegacyRosterWritable}=require('./onsite-waitlist-writer-guards');";
+const guardedSelectionImport=`const {assertLegacyRosterWritable:assertExistingRosterWritable}=require('./onsite-waitlist-writer-guards');
+function assertLegacyRosterWritable(room,pub,state){
+ assertExistingRosterWritable(room,pub,state);
+ if(room?.registrationQueueVersion===2)throw Error('registration-queue-required');
+}`;
+
 const writers={
  familyRegistration:{
   file:'family-registration.js',
@@ -18,15 +29,25 @@ const writers={
 };
 
 function prepareLegacyWriterSource(name,source){
+ if(Object.hasOwn(selectionHashes,name)){
+  // Lottery and selection management are outside V2. Every mutating path
+  // already reads the private room and calls this guard before its writes.
+  verifySource(name,source,selectionHashes[name],selectionImport);
+  return source.replace(selectionImport,guardedSelectionImport);
+ }
  if(!Object.hasOwn(writers,name))throw Error('unsupported-legacy-writer');
  const {file,anchor,guard}=writers[name];
  const expected=releaseInputs[name].files[file];
- if(createHash('sha256').update(source).digest('hex')!==expected)
-  throw Error('legacy-writer-source-baseline-mismatch: '+name);
- if(source.split(anchor).length!==2)throw Error('legacy-writer-patch-mismatch: '+name);
+ verifySource(name,source,expected,anchor);
  // The handlers have already authenticated the request and returned any
  // matching receipt. Check the room read in the transaction before a new write.
  return source.replace(anchor,guard+'\n'+anchor);
+}
+
+function verifySource(name,source,expected,anchor){
+ if(createHash('sha256').update(source).digest('hex')!==expected)
+  throw Error('legacy-writer-source-baseline-mismatch: '+name);
+ if(source.split(anchor).length!==2)throw Error('legacy-writer-patch-mismatch: '+name);
 }
 
 if(require.main===module){
