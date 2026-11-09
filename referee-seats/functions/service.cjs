@@ -3,9 +3,49 @@ const {createHash,randomUUID,randomBytes}=require('node:crypto');
 const C=require('./core.cjs');
 const {activeAccount}=require('./event-staff-core.cjs');
 const {assertLegacyScoringWritable}=require('./bucket-legacy-fence.cjs');
+async function renameCourt(db, code, uid, request, now) {
+ const {station, name, expectedName} = request;
+ if(!Number.isSafeInteger(station)||station<1||typeof name!=='string'||typeof expectedName!=='string'||
+    name.length>32||expectedName.length>32||/[\u0000-\u001f\u007f]/.test(name))throw Error('invalid-court-name');
+ const privateRef=db.doc('tournaments/'+code),publicRef=db.doc('publicTournaments/'+code);
+ return db.runTransaction(async tx=>{
+  const [privateSnap,publicSnap,profile]=await Promise.all([tx.get(privateRef),tx.get(publicRef),tx.get(db.doc('users/'+uid))]);
+  if(!privateSnap.exists||!publicSnap.exists)throw Error('not-found');
+  const room=privateSnap.data(),user=profile.data();
+  if(!C.manager(room,user,uid,{now,communitySeatsEnabled:true,partnerEnabled:true}))throw Error('permission-denied');
+  let state;
+  try{state=JSON.parse(room.data);}catch{throw Error('corrupt-data');}
+  const meta=state?.meta||{};
+  const eventAuthority=room.eventAuthority||meta.eventAuthority||'official';
+  const ladderMode=room.ladderMode||meta.ladderMode||'general';
+  if(!['official','community'].includes(eventAuthority)||!['general','ranked'].includes(ladderMode)||
+     (eventAuthority==='community'&&ladderMode!=='general')||room.tournamentPhase==='done'||
+     state?.completedAt||meta.eventCancelled)throw Error('room-read-only');
+  C.writable({...room,eventAuthority},{...state,meta:{...meta,eventAuthority:meta.eventAuthority||eventAuthority}},
+    eventAuthority==='community');
+  const count=Number(meta.stations);
+  if(!Number.isSafeInteger(count)||station>count)throw Error('invalid-station');
+  const saved=room.courtDisplayNames||{revision:0,names:{}};
+  const nextName=name.trim(),oldName=saved.names?.[station]||'';
+  if(oldName===nextName)return {ok:true,courtDisplayNames:saved};
+  if(expectedName!==oldName)throw Error('court-name-stale');
+  const names={...saved.names};
+  if(nextName)names[station]=nextName;
+  else delete names[station];
+  const courtDisplayNames={revision:Number(saved.revision||0)+1,names};
+  tx.update(privateRef,{courtDisplayNames});
+  tx.update(publicRef,{courtDisplayNames});
+  return {ok:true,courtDisplayNames};
+ });
+}
+
 function createHandler(db,{clock=Date.now,uuid=randomUUID}={}){return async request=>{
  const uid=request.auth?.uid,d={...request.data},code=String(d.code||'').trim().toUpperCase();
  if(!uid)throw new Error('unauthenticated');
+ if(d.action==='rename-court'){
+  if(!/^BXH-[A-Z0-9]{4,16}$/.test(code))throw Error('invalid-request');
+  return renameCourt(db,code,uid,d,clock());
+ }
  if(['invite-mail-list','invite-mail-read'].includes(d.action)){
   const actor=await db.doc('users/'+uid).get();
   if(!activeAccount(actor.data()))throw Error('permission-denied');

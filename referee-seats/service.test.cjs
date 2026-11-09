@@ -165,3 +165,29 @@ test('name lookup returns matching active players with game IDs, without private
  await h.run('host','invite',{...qrBase,targetUid:r.players[1].uid});
  const req=Object.values(h.doc().refereeSeatsV1.requests)[0];assert.equal(req.toUid,'backup');
 });
+
+test('court labels work for community hosts and ranked managers without touching scores or seats',async()=>{
+ for(const scenario of ['community','official-general','ranked']){
+  const mode=scenario==='ranked'?'ranked':'general';
+  const h=scenario==='community'?communityFixture():harness();
+  const room=h.doc();
+  room.ladderMode=mode;
+  room.scoreStorage={status:'active'}; // Display names do not use either scoring write path.
+  h.docs.get('systemConfig/refereeSeatsV1').enabled=false;
+  const pub=h.docs.get('publicTournaments/BXH-TEST');
+  const beforePrivate=clone(room),beforePublic=clone(pub);
+  const rename={station:1,name:'舞台右側',expectedName:''};
+  await assert.rejects(h.run('main','rename-court',rename),/permission-denied/);
+  await assert.rejects(h.run('host','rename-court',{...rename,station:99}),/invalid-station/);
+  const saved=await h.run('host','rename-court',rename);
+  assert.deepEqual(saved.courtDisplayNames,{revision:1,names:{1:'舞台右側'}});
+  assert.deepEqual(await h.run('host','rename-court',rename),saved);
+  await assert.rejects(h.run('host','rename-court',{...rename,name:'過期修改'}),/court-name-stale/);
+  assert.deepEqual(h.doc(),{...beforePrivate,courtDisplayNames:saved.courtDisplayNames});
+  assert.deepEqual(h.docs.get('publicTournaments/BXH-TEST'),{...beforePublic,courtDisplayNames:saved.courtDisplayNames});
+  const cleared=await h.run('host','rename-court',{station:1,name:'',expectedName:'舞台右側'});
+  assert.deepEqual(cleared.courtDisplayNames,{revision:2,names:{}});
+  h.doc().tournamentPhase='done';
+  await assert.rejects(h.run('host','rename-court',rename),/room-read-only/);
+ }
+});

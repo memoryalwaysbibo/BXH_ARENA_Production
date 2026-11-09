@@ -172,4 +172,4 @@ function transition({room,state,user,uid,d,now,id,targetUser,requesterUser,autho
  model.requests=Object.fromEntries(recent.filter((r,i)=>r.status==='pending'&&r.expiresAt>now||i<50).map(r=>[r.id,r]));
  return {model,projection:project(model),result:{ok:true,revision:model.revision,...(['request','invite','create-qr'].includes(action)?{requestId:id}:{}),...(action==='respond'?{status:model.requests[d.requestId]?.status}:{})}};
 }
-module.exports={communityRoom,communityOwner,canEnableCommunity,SLOTS,LABELS,admin,manager,eligible,partnerRoom,transition,project};
+module.exports={writable,communityRoom,communityOwner,canEnableCommunity,SLOTS,LABELS,admin,manager,eligible,partnerRoom,transition,project};

@@ -93,6 +93,7 @@ console.log('PASS team scoring board and direct public-watch role isolation cont
 
 const lineupSource=source.slice(source.indexOf('function renderTeamLineupPanel('),source.indexOf('function renderTeamScorePanel('));
 const captainSource=source.slice(source.indexOf('function renderTeamCaptainScreen('),source.indexOf('function renderTeamReferee('));
+const courtNameSource=source.slice(source.indexOf('const roomCourtNames = new Map();'),source.indexOf('function canRenameTournamentCourts('));
 const captainMatch={id:'m1',teamIds:['a','b'],station:1};
 const captainView={ownTeamId:'a',ownOrder:['p2','p1'],submitted:{a:true,b:false},isReferee:true};
 const captainSandbox={
@@ -101,10 +102,14 @@ const captainSandbox={
   teamMatchUi:new Map([['m1',captainView]]),teamMatchLoading:new Set(),
   firebaseUser:{uid:'captain'},currentRole:'player',appPhase:'team-lineup',
   esc:String,teamMatchPlayerName:String,teamMatchNames:()=>['A','B'],
-  authShellOpen:()=>'',authShellClose:()=>'',authBrandHeader:()=>'',setTimeout:()=>{}
+  authShellOpen:()=>'',authShellClose:()=>'',authBrandHeader:()=>'',setTimeout:()=>{},
+  window:{},queueMicrotask:()=>{}
 };
-vm.runInNewContext(lineupSource+captainSource,captainSandbox);
+vm.runInNewContext(courtNameSource+lineupSource+captainSource,captainSandbox);
 let captainHtml=captainSandbox.renderTeamCaptainScreen();
+assert(captainHtml.includes('>1號台</div>'));
+captainSandbox.window.BXHCourtDisplayNames.observe('BXH-QATEST',{revision:1,names:{1:'舞台左側'}});
+assert(captainSandbox.renderTeamCaptainScreen().includes('>1號台｜舞台左側</div>'));
 assert(captainHtml.includes('team-lineup-submit'));
 assert(captainHtml.includes('value="p2" selected'));
 assert(!captainHtml.includes('team-lineup-default'));
