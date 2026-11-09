@@ -16,7 +16,7 @@ test('draw balances the locked roster and preserves each original identity', () 
   for (const group of Object.values(event.groups)) {
     for (const player of group) assert.deepEqual(player, original.get(player.id));
   }
-  assert.throws(() => prepare(roster(321), 'test-seed'), { code: 'group-roster-size' });
+  assert.throws(() => prepare(roster(385), 'test-seed'), { code: 'group-roster-size' });
   assert.throws(() => prepare(roster(15), 'test-seed'), { code: 'group-roster-size' });
   players[0].registrationUid = players[1].registrationUid;
   assert.throws(() => prepare(players, 'test-seed'), { code: 'group-duplicate-identity' });
@@ -63,21 +63,22 @@ test('four 80-player brackets and two playoffs produce one 320-player settlement
   assert.equal(champion.pointsEarned, 10 + Math.round(90 * ladder.multiplier(320)));
 });
 
-test('custom groups can reach 96 and use actual elimination counts for shared ranks', () => {
-  const players = roster(320);
-  assert.throws(() => prepare(players, 'test-seed', [97, 96, 95, 32]), { code: 'group-invalid-sizes' });
-  assert.throws(() => prepare(players, 'test-seed', [96, 96, 96, 33]), { code: 'group-invalid-sizes' });
-  assert.throws(() => prepare(roster(384), 'test-seed', [96, 96, 96, 96]), { code: 'group-roster-size' });
+test('the upper boundary balances 383 entrants and supports a full 384-player settlement input', () => {
+  const almostFull = prepare(roster(383), 'test-seed');
+  assert.deepEqual(Object.values(almostFull.groups).map(group => group.length), [96, 96, 96, 95]);
 
-  let event = prepare(players, 'test-seed', [96, 96, 96, 32]);
-  assert.deepEqual(Object.values(event.groups).map(group => group.length), [96, 96, 96, 32]);
+  let event = prepare(roster(384), 'test-seed');
+  assert.deepEqual(Object.values(event.groups).map(group => group.length), [96, 96, 96, 96]);
   for (let stage = nextStage(event); stage; stage = nextStage(event)) {
     event = collect(event, stage.key, finish(stage));
   }
   const input = settlementInput(event);
-  assert.equal(input.participants.length, 320);
-  assert.equal(input.matches.length, 324);
-  assert.equal(input.participants.filter(player => player.placement === 225).length, 96);
+  assert.equal(input.effectiveCount, 384);
+  assert.equal(input.multiplier, ladder.multiplier(384));
+  assert.equal(input.participants.length, 384);
+  assert.equal(input.matches.length, 388);
+  assert.equal(input.topEight.length, 8);
+  assert.equal(input.participants.filter(player => player.placement === 257).length, 128);
   assert.equal(input.participants.filter(player => player.placement === 9).length, 8);
 });
 

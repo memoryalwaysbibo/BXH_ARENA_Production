@@ -6,7 +6,7 @@ const ladder = require('../ladder-v1.js');
 const GROUPS = Object.freeze(['A', 'B', 'C', 'D']);
 const STAGES = Object.freeze([...GROUPS, 'champions', 'runners-up']);
 const MAX_PER_GROUP = 96;
-const MAX_ROSTER = 320;
+const MAX_ROSTER = GROUPS.length * MAX_PER_GROUP;
 
 function check(condition, code) {
   if (!condition) throw Object.assign(new Error(code), { code });
@@ -18,15 +18,10 @@ function accountId(player) {
     : player.registrationUid || player.accountUid || player.playerUid || player.uid || null;
 }
 
-function prepare(players, seed, groupSizes) {
+function prepare(players, seed) {
   check(Array.isArray(players) && players.length >= GROUPS.length * 4 &&
     players.length <= MAX_ROSTER, 'group-roster-size');
   check(typeof seed === 'string' && seed.length > 0, 'group-draw-seed');
-  if (groupSizes !== undefined) {
-    check(Array.isArray(groupSizes) && groupSizes.length === GROUPS.length &&
-      [...groupSizes].every(size => Number.isInteger(size) && size >= 4 && size <= MAX_PER_GROUP) &&
-      groupSizes.reduce((sum, size) => sum + size, 0) === players.length, 'group-invalid-sizes');
-  }
 
   const ids = new Set(), registrations = new Set(), identities = new Set();
   const draw = players.map(player => {
@@ -48,16 +43,7 @@ function prepare(players, seed, groupSizes) {
   draw.sort((a, b) => a.drawKey.localeCompare(b.drawKey) || a.player.id.localeCompare(b.player.id));
 
   const groups = Object.fromEntries(GROUPS.map(group => [group, []]));
-  if (groupSizes === undefined) {
-    draw.forEach(({ player }, index) => groups[GROUPS[index % GROUPS.length]].push(player));
-  } else {
-    let offset = 0;
-    GROUPS.forEach((group, index) => {
-      const end = offset + groupSizes[index];
-      groups[group] = draw.slice(offset, end).map(({ player }) => player);
-      offset = end;
-    });
-  }
+  draw.forEach(({ player }, index) => groups[GROUPS[index % GROUPS.length]].push(player));
   return { groups, results: {} };
 }
 

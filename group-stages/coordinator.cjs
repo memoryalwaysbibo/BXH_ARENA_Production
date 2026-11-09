@@ -150,7 +150,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
   }
 
   return {
-    async prepare(parentCode, actorUid, groupSizes) {
+    async prepare(parentCode, actorUid) {
       const parent = refs(parentCode), seed = makeSeed();
       return db.runTransaction(async tx => {
         await authorize(tx, parentCode, actorUid, true);
@@ -159,15 +159,10 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         if (plan.exists) {
           const current = plan.data();
           checkRoster(current, parentData);
-          if (groupSizes !== undefined) {
-            const existing = GROUPS.map(key => current.event.groups[key].length);
-            check(Array.isArray(groupSizes) && groupSizes.length === existing.length &&
-              existing.every((size, index) => size === groupSizes[index]), 'group-plan-already-prepared');
-          }
           return publicStatus(current);
         }
         const players = startingRoster(parentData);
-        const event = prepare(players, seed, groupSizes);
+        const event = prepare(players, seed);
         await checkRegistrations(tx, parent.room, players);
         const next = { parentRoomId: roomState(parentData).id, event, active: null, roomCodes: {} };
         tx.create(parent.plan, next);

@@ -25,7 +25,7 @@ jobs:
           java-version: 21
       - run: node --test group-stages/core.test.cjs
       - run: npm install --prefix /tmp/bxh-group-stages --no-save --ignore-scripts firebase-tools@14.27.0 firebase-admin@13.10.0 firebase-functions@6.6.0
-      - name: Run the 320-player workflow against Firestore Emulator
+      - name: Run the 384-player workflow against Firestore Emulator
         run: /tmp/bxh-group-stages/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-group-stages --config group-stages/emulator.json 'node --test group-stages/coordinator.test.cjs'
         env:
           NODE_PATH: /tmp/bxh-group-stages/node_modules
