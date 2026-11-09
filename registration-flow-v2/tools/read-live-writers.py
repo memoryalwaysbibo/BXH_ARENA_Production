@@ -37,7 +37,7 @@ def gcloud(*args):
     ).stdout
 
 
-def describe(name):
+def read_function(name):
     path = f"projects/{PROJECT}/locations/{REGION}/functions/{name}"
     info = json.loads(gcloud("functions", "describe", name, "--gen2", "--region=" + REGION, "--format=json"))
     build = info.get("buildConfig", {})
@@ -49,7 +49,11 @@ def describe(name):
             or not re.fullmatch(r"[a-z0-9][a-z0-9._-]+", bucket)
             or not obj or "#" in obj or not re.fullmatch(r"[0-9]+", str(generation))):
         raise ValueError("unverified-source-pointer")
-    return revision, bucket, obj, str(generation)
+    return info, (revision, bucket, obj, str(generation))
+
+
+def describe(name):
+    return read_function(name)[1]
 
 
 def source_hashes(archive, required_files=()):
