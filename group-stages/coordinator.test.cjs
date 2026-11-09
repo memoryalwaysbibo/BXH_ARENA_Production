@@ -275,8 +275,15 @@ test('private general-room rehearsal collects a 320-player event without a ladde
     }) });
     await assert.rejects(coordinator.prepare(parentCode, operator, 4), { code: 'group-rehearsal-linked-roster' });
     await parent.set(parentData);
+    assert.deepEqual(await coordinator.readOperatorStatus(parentCode, operator),
+      { unprepared: true, rehearsal: true });
+    await assert.rejects(coordinator.readRouting(parentCode, operator), { code: 'group-room-disabled' });
 
     let status = await coordinator.prepare(parentCode, operator, 4);
+    await gate.set(enabled);
+    await assert.rejects(coordinator.readOperatorStatus(parentCode, operator), { code: 'group-room-disabled' });
+    await assert.rejects(coordinator.openNext(parentCode, 'A', operator), { code: 'group-room-disabled' });
+    await gate.set({ ...enabled, rehearsalParentCodes: [parentCode] });
     assert.equal(status.rehearsal, true);
     assert.deepEqual(status.groups.map(group => group.count), [80, 80, 80, 80]);
     while (status.next) {

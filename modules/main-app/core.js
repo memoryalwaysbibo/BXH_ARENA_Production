@@ -11150,7 +11150,7 @@ function bracketCommitStatusHtml(inRosterOverview=false){
 }
 function bracketDrawButtonHtml(){
  if(bracketCommitController()?.status().pending)return '';
- const groupDrawRequired=window.BXHGroupStageUi?.enabled(state.cloudCode,state.groupStage?.parentCode)===true;
+ const groupDrawRequired=window.BXHGroupStageUi?.enabled(state.cloudCode,state.groupStage?.parentCode,firebaseUser?.uid)===true;
  return (groupDrawRequired?'':adminOverrideButtonsHtml())+'<button class="btn '+(state.bracketSize?'btn-ghost':'btn-primary')+'" data-action="draw-bracket" '+(groupDrawRequired||state.startedAt||bracketCommitBlocked()||(state.meta.battleMode!=="team"&&!entryRosterValid())?'disabled':'')+'>'+(state.bracketSize?'重新抽籤':'抽籤')+'</button>';
 }
 async function verifyBracketBeforeStart(){
@@ -13641,13 +13641,14 @@ function renderPeopleManagement(){
   const staffPanel=`<details class="settings-accordion" open><summary><span>工作人員分派</span><span class="hint">賽事人力</span></summary><div class="settings-accordion-body">${renderStaffAssignmentPanel()}</div></details>${renderRefereeStationAssignmentPanel()}`;
 
   const groupStageUi = window.BXHGroupStageUi && isAdminTierOrAbove() ? window.BXHGroupStageUi : null;
-  const groupStagePanel = groupStageUi?.slot(state.cloudCode,"operator",state.groupStage?.parentCode)||"";
-  const groupStageDraw = groupStageUi?.enabled(state.cloudCode,state.groupStage?.parentCode) ? groupStageUi.drawButton(state.cloudCode,
+  const groupStagePanel = groupStageUi?.slot(state.cloudCode,"operator",state.groupStage?.parentCode,firebaseUser?.uid)||"";
+  const groupStageDraw = groupStageUi?.enabled(state.cloudCode,state.groupStage?.parentCode,firebaseUser?.uid) ? groupStageUi.drawButton(state.cloudCode,
     !!state.startedAt || !!state.bracketSize || bracketCommitBlocked() ||
-    (typeof adminRosterBusyOrPending==="function" && adminRosterBusyOrPending()))||"" : "";
+    (typeof adminRosterBusyOrPending==="function" && adminRosterBusyOrPending()),firebaseUser?.uid)||"" : "";
   const bracketPanel=`
     ${bracketCommitStatusHtml()}<div class="panel"><div class="panel-title">對戰表</div><div class="grid grid-3" style="margin-bottom:14px;"><div class="stat-box"><div class="label">對戰形式</div><div class="value small">${esc(BATTLE_MODE_LABELS[state.meta.battleMode]||"個人戰")}${state.meta.battleMode==="team"?" "+Math.max(3,Number(state.meta.teamSize)||3)+"V"+Math.max(3,Number(state.meta.teamSize)||3):""}</div></div><div class="stat-box"><div class="label">賽事制度</div><div class="value small">${esc(FORMAT_LABELS[state.meta.formatType]||"單淘汰賽")}</div></div><div class="stat-box"><div class="label">對戰表</div><div class="value small">${state.bracketSize?"已產生":"尚未產生"}</div></div></div><div class="btn-row">${bracketDrawButtonHtml()}${groupStageDraw}${state.bracketSize&&!state.startedAt?'<button class="btn btn-danger" data-action="reset-bracket" '+(bracketCommitBlocked()?'disabled':'')+'>重設對戰表</button>':''}${state.bracketSize&&!state.startedAt?'<button class="btn btn-primary" data-action="start-tournament" '+(bracketCommitBlocked()?'disabled':'')+'>賽事開始</button>':''}${state.startedAt?'<span class="badge badge-neon">'+(tournamentStatus()==="settling"?"🟠 結算中":tournamentStatus()==="done"?"⚪ 已結束":tournamentStatus()==="cancelled"?"🔴 已取消":"🟡 比賽中")+'</span>':''}</div></div>
     ${groupStagePanel}
+    ${groupStageUi?.rehearsalProbe(state)||""}
     ${renderEntrySelection()}`;
 
   const panels={confirmed:confirmedPanel,pending:pendingPanel,waitlist:waitlistPanel,tools:toolsPanel,staff:staffPanel,bracket:bracketPanel};
@@ -19713,9 +19714,12 @@ function render(){
     renderPlayerCardOverlay();
     bindOnsiteWaitlistPanel();
     window.BXHTeamAdminPreview?.bind?.();
-    window.BXHGroupStageUi?.bind(document.getElementById("bxh-group-stage-panel"),currentAuthUid(),
-      payload=>window.engagementService.tournamentOperation("groupStageCommand",payload),
-      document.getElementById("bxh-group-stage-draw"));
+    if(window.BXHGroupStageUi){
+      const requestGroupStage=payload=>window.engagementService.tournamentOperation("groupStageCommand",payload);
+      window.BXHGroupStageUi.discover(document.getElementById("bxh-group-rehearsal-probe"),currentAuthUid(),requestGroupStage,render);
+      window.BXHGroupStageUi.bind(document.getElementById("bxh-group-stage-panel"),currentAuthUid(),
+        requestGroupStage,document.getElementById("bxh-group-stage-draw"));
+    }
     if(__viewportSnapshot.lobbyPatched){
       __lastRenderedViewportKey=__viewportSnapshot.key;
       ++__viewportRestoreToken; // Cancel old delayed restores; stable nodes keep their own viewport.
@@ -21426,7 +21430,7 @@ async function handleTeamMatchAction(action,target){
   finally{teamMatchActionsBusy.delete(busyKey);}
 }
 function handleAction(action, target){
-  if((action==='draw-bracket'||action==='admin-force-draw')&&window.BXHGroupStageUi?.enabled(state.cloudCode,state.groupStage?.parentCode)){
+  if((action==='draw-bracket'||action==='admin-force-draw')&&window.BXHGroupStageUi?.enabled(state.cloudCode,state.groupStage?.parentCode,firebaseUser?.uid)){
     showToast("本場請使用「分組抽籤」",true);return;
   }
   if(action==='admin-force-reconfirm'){reconfirmPendingAdminOverride();return;}

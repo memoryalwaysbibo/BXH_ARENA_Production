@@ -102,3 +102,35 @@ test('result collection rejects out-of-order, altered rosters, and invalid propa
   const accepted = collect(event, 'A', state);
   assert.throws(() => collect(accepted, 'A', state), { code: 'group-stage-order' });
 });
+
+test('the private rehearsal entry only appears for the approved admin session', async () => {
+  const ui = require('../modules/main-app/group-stages.js');
+  const state = {
+    cloudCode: 'BXH-ENTRY1',
+    meta: { registrationVisibility: 'private', registrationEnabled: false, ladderMode: 'general',
+      formatType: 'single', battleMode: 'individual', playMode: 'standard' },
+  };
+  assert.match(ui.rehearsalProbe(state), /BXH-ENTRY1/);
+  assert.equal(ui.rehearsalProbe({ ...state, meta: { ...state.meta, registrationVisibility: 'public' } }), '');
+  assert.equal(ui.rehearsalProbe({ ...state, groupStage: { parentCode: 'BXH-PARENT' } }), '');
+  const node = { dataset: { code: state.cloudCode }, isConnected: true };
+  const requests = [];
+  let release, renders = 0;
+  const waiting = new Promise(resolve => { release = resolve; });
+  const request = payload => { requests.push(payload); return waiting; };
+  const refresh = () => { renders++; };
+  ui.discover(node, 'operator', request, refresh);
+  ui.discover(node, 'operator', request, refresh);
+  assert.equal(ui.drawButton(state.cloudCode, false, 'operator'), '');
+  release({ unprepared: true, rehearsal: true });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(requests, [{ action: 'status', parentCode: state.cloudCode }]);
+  assert.equal(renders, 1);
+  assert.match(ui.drawButton(state.cloudCode, false, 'operator'), /分組抽籤/);
+  assert.equal(ui.slot(state.cloudCode, 'player'), '');
+  ui.discover(node, 'other-admin', async () => { throw Error('group-room-disabled'); }, refresh);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(ui.drawButton(state.cloudCode, false, 'other-admin'), '');
+  assert.equal(ui.drawButton(state.cloudCode, false, 'operator'), '');
+  assert.equal(renders, 1);
+});

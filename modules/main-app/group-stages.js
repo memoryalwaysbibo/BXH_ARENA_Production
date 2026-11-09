@@ -19,23 +19,60 @@
     'group-roster-size': '有效參賽人數超出所選組數的範圍，請確認名單與組數。',
   };
 
-  function enabled(code, parentCode) {
-    return !parentCode && roomCode.test(code || '') && Array.isArray(root.BXH_GROUP_STAGE_PARENT_CODES) &&
-      root.BXH_GROUP_STAGE_PARENT_CODES.includes(code);
+  let rehearsalUid = null;
+  let rehearsalNode = null;
+  const rehearsalAccess = new Map();
+
+  function enabled(code, parentCode, uid) {
+    if (parentCode || !roomCode.test(code || '')) return false;
+    return (Array.isArray(root.BXH_GROUP_STAGE_PARENT_CODES) && root.BXH_GROUP_STAGE_PARENT_CODES.includes(code)) ||
+      (!!uid && uid === rehearsalUid && rehearsalAccess.get(code)?.allowed === true);
   }
 
-  function slot(code, role, parentCode) {
-    if (role === 'operator' && enabled(parentCode) && parentCode !== code) {
+  function rehearsalProbe(state) {
+    const m = state.meta;
+    if (!roomCode.test(state.cloudCode || '') || state.groupStage || state.testMode || state.startedAt ||
+      state.matches?.length || state.archiveStatus === 'completed' || m?.eventCancelled ||
+      m?.registrationVisibility !== 'private' || m.registrationEnabled !== false || m.ladderMode !== 'general' ||
+      (m.eventAuthority && m.eventAuthority !== 'official') || m.formatType !== 'single' ||
+      m.battleMode !== 'individual' || m.playMode !== 'standard') return '';
+    return '<span id="bxh-group-rehearsal-probe" data-code="' + state.cloudCode + '" hidden></span>';
+  }
+
+  function discover(node, uid, request, refresh) {
+    if (uid !== rehearsalUid) {
+      rehearsalAccess.clear();
+      rehearsalUid = uid;
+    }
+    rehearsalNode = node;
+    const code = node?.dataset.code;
+    if (!uid || !roomCode.test(code || '') || enabled(code, null, uid)) return;
+    const existing = rehearsalAccess.get(code);
+    if (existing?.pending || existing?.retryAfter > Date.now()) return;
+    const attempt = { pending: true };
+    rehearsalAccess.set(code, attempt);
+    void Promise.resolve().then(() => request({ action: 'status', parentCode: code })).then(status => {
+      if (rehearsalAccess.get(code) !== attempt) return;
+      attempt.allowed = status?.rehearsal === true && (status.unprepared === true || Array.isArray(status.groups));
+      if (attempt.allowed && rehearsalNode?.isConnected && rehearsalNode.dataset.code === code) refresh();
+    }).catch(() => {}).finally(() => {
+      attempt.pending = false;
+      attempt.retryAfter = Date.now() + 30000;
+    });
+  }
+
+  function slot(code, role, parentCode, uid) {
+    if (role === 'operator' && enabled(parentCode, null, uid) && parentCode !== code) {
       return '<div class="panel">' + roomButton(parentCode, 'operator', '返回主房分組管理') + '</div>';
     }
-    if (!enabled(code)) return '';
+    if (!enabled(code, parentCode, uid)) return '';
     const view = role === 'operator' ? 'operator' : 'player';
     return '<section id="bxh-group-stage-panel" class="panel" data-code="' + code +
       '" data-view="' + view + '" aria-label="分組賽進度"></section>';
   }
 
-  function drawButton(code, blocked) {
-    if (!enabled(code)) return '';
+  function drawButton(code, blocked, uid) {
+    if (!enabled(code, null, uid)) return '';
     return '<span data-group-stage-draw-controls class="btn-row">' +
       '<label>組數 <select aria-label="分組組數" disabled>' +
       '<option value="">請選擇組數</option>' + groupCounts.map(count =>
@@ -154,10 +191,14 @@
     model.error = '';
     render(model);
     try {
-      model.status = await model.request(payload);
+      const status = await model.request(payload);
+      if (status?.unprepared === true || status === null) model.status = null;
+      else if (Array.isArray(status?.groups)) model.status = status;
+      else throw new Error('group-invalid-response');
       model.loaded = true;
     } catch (error) {
-      model.error = errors[error?.message] || '無法更新分組進度，請稍後重試。';
+      const reason = Object.keys(errors).find(code => String(error?.message || '').includes(code));
+      model.error = errors[reason] || '無法更新分組進度，請稍後重試。';
     } finally {
       model.busy = false;
       if (active === model) {
@@ -168,7 +209,7 @@
   }
 
   function bind(node, uid, request, groupDrawButton) {
-    if (!node || !uid || !enabled(node.dataset.code) || typeof request !== 'function') {
+    if (!node || !uid || !enabled(node.dataset.code, null, node.dataset.view === 'operator' ? uid : null) || typeof request !== 'function') {
       clearTimeout(timer);
       active = null;
       return;
@@ -204,7 +245,7 @@
     else void send(model, 'refresh');
   }
 
-  const api = { enabled, slot, drawButton, bind, content };
+  const api = { enabled, slot, drawButton, bind, content, rehearsalProbe, discover };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.BXHGroupStageUi = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

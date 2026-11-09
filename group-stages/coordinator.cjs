@@ -155,7 +155,8 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
     });
   }
 
-  function checkRoster(plan, parent) {
+  function checkRoster(plan, parent, rehearsal = plan.rehearsal === true) {
+    check((plan.rehearsal === true) === rehearsal, 'group-room-disabled');
     check(roomState(parent)?.id === plan.parentRoomId, 'group-parent-room-changed');
     const original = Object.values(plan.event.groups).flat();
     const current = startingRoster(parent, plan.rehearsal === true);
@@ -178,8 +179,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         const parentData = room.data();
         if (plan.exists) {
           const current = plan.data();
-          check((current.rehearsal === true) === rehearsal, 'group-parent-unavailable');
-          checkRoster(current, parentData);
+          checkRoster(current, parentData, rehearsal);
           check(groupCount === undefined || groupCount === groupKeys(current.event).length,
             'group-count-locked');
           return publicStatus(current);
@@ -210,11 +210,11 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
     async openNext(parentCode, expectedKey, actorUid) {
       const parent = refs(parentCode), code = makeCode(), now = clock();
       return db.runTransaction(async tx => {
-        await authorize(tx, parentCode, actorUid, true);
+        const rehearsal = await authorize(tx, parentCode, actorUid, true);
         const [plan, room] = await tx.getAll(parent.plan, parent.room);
         check(plan.exists, 'group-plan-required');
         const current = plan.data(), parentData = room.data();
-        checkRoster(current, parentData);
+        checkRoster(current, parentData, rehearsal);
         if (Object.hasOwn(current.roomCodes, expectedKey)) return publicStatus(current);
         const stage = nextStage(current.event);
         check(!current.active && stage?.key === expectedKey, 'group-stage-order');
@@ -240,10 +240,15 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
     async readOperatorStatus(parentCode, actorUid) {
       const parent = refs(parentCode);
       return db.runTransaction(async tx => {
-        await authorize(tx, parentCode, actorUid, true);
+        const rehearsal = await authorize(tx, parentCode, actorUid, true);
+        if (rehearsal) {
+          const room = await tx.get(parent.room);
+          startingRoster(room.data(), true);
+        }
         const snapshot = await tx.get(parent.routing);
-        if (!snapshot.exists) return null;
+        if (!snapshot.exists) return { unprepared: true, rehearsal };
         const { eligibleUids, ...status } = snapshot.data();
+        check((status.rehearsal === true) === rehearsal, 'group-room-disabled');
         return status;
       }, { readOnly: true });
     },
@@ -251,11 +256,11 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
     async publishDraw(parentCode, key, code, actorUid) {
       const parent = refs(parentCode), child = refs(code);
       return db.runTransaction(async tx => {
-        await authorize(tx, parentCode, actorUid, true);
+        const rehearsal = await authorize(tx, parentCode, actorUid, true);
         const [plan, room, source] = await tx.getAll(parent.plan, parent.room, child.room);
         check(plan.exists, 'group-plan-required');
         const current = plan.data();
-        checkRoster(current, room.data());
+        checkRoster(current, room.data(), rehearsal);
         check(!GROUPS.includes(key) && current.active?.key === key && current.active.code === code,
           'group-stage-source');
         if (!current.active.drawPending) return publicStatus(current);
@@ -282,10 +287,12 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
     async readRouting(parentCode, viewerUid) {
       const parent = refs(parentCode);
       return db.runTransaction(async tx => {
-        await authorize(tx, parentCode, viewerUid, false);
+        const rehearsal = await authorize(tx, parentCode, viewerUid, false);
+        check(!rehearsal, 'group-room-disabled');
         const [route, assignment] = await tx.getAll(parent.routing, parent.routing.collection('players').doc(viewerUid));
-        if (!route.exists) return null;
+        if (!route.exists) return { unprepared: true };
         const { eligibleUids, current, ...status } = route.data();
+        check(!status.rehearsal, 'group-room-disabled');
         return {
           ...status,
           current: current?.key || null,
@@ -299,14 +306,15 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
     async collect(parentCode, key, code, actorUid) {
       const parent = refs(parentCode), child = refs(code);
       return db.runTransaction(async tx => {
-        await authorize(tx, parentCode, actorUid, true);
+        const rehearsal = await authorize(tx, parentCode, actorUid, true);
         const [plan, room, source] = await tx.getAll(parent.plan, parent.room, child.room);
         check(plan.exists, 'group-plan-required');
         const current = plan.data();
+        check((current.rehearsal === true) === rehearsal, 'group-room-disabled');
         if (Object.hasOwn(current.event.results, key) && current.roomCodes[key] === code) {
           return publicStatus(current);
         }
-        checkRoster(current, room.data());
+        checkRoster(current, room.data(), rehearsal);
         check(current.active?.key === key && current.active.code === code, 'group-stage-source');
         check(!current.active.drawPending, 'group-draw-not-published');
         const document = source.data(), state = roomState(document);
