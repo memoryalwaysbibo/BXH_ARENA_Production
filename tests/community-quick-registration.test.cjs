@@ -106,7 +106,7 @@ function saveHarness({ capacity = '', enabled = true, saveResult = true, meta = 
   let renderCount = 0;
   const ctx = context({
     state: clone(original), document: { getElementById: id => elements[id] || null, querySelectorAll: () => Object.values(elements) },
-    appPhase:'community-room',communityRoomActiveTab:'settings',communityRoomSnapshotGeneration:0,communitySettingsRenderedContext:null,canManageRegistrationRoster:()=>true,
+    appPhase:'community-room',communityRoomActiveTab:'settings',communityRoomSnapshotGeneration:0,communitySettingsRenderedContext:null,refereeRenderContext:null,canManageRegistrationRoster:()=>true,
     FORMAT_LABELS: { single: '單淘汰賽' }, crypto: { randomUUID: () => 'local-operation' },
     publicTournamentsCache: [{ code: 'stale' }], communityEventsCache: [{ code: 'stale' }],
     isCommunityRoomOwner: () => true, touchCommunityActivity: () => {},
@@ -115,7 +115,7 @@ function saveHarness({ capacity = '', enabled = true, saveResult = true, meta = 
     cloneStateForSave: clone,
     render: () => { renderCount++; }, showToast: (message, error) => toasts.push({ message, error: !!error }),
   });
-  for(const name of ['communitySettingsDraftContext','communitySettingsInputs','communitySettingBadInput','setCommunitySettingsInputsSaving','captureCommunitySettingsInputs','restoreCommunitySettingsInputs','renderCommunityRoomPreservingSettings'])vm.runInContext(extractFunction(core,name),ctx);
+  for(const name of ['communitySettingsDraftContext','communitySettingsInputs','communitySettingBadInput','setCommunitySettingsInputsSaving','captureCommunitySettingsInputs','restoreCommunitySettingsInputs','refereeTabOpen','refereeCourtFocusActive','renderRefereeCourtView','renderCommunityRoomPreservingSettings'])vm.runInContext(extractFunction(core,name),ctx);
   ctx.saveState = async (options = {}) => {
     const snapshot = options.snapshot || ctx.state;
     if (snapshot.meta.registrationEnabled) snapshot.meta.registrationStatus = ctx.computeRegistrationStatus(snapshot.meta, snapshot);
