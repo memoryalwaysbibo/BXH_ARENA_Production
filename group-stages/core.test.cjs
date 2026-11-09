@@ -134,3 +134,28 @@ test('the private rehearsal entry only appears for the approved admin session', 
   assert.equal(ui.drawButton(state.cloudCode, false, 'operator'), '');
   assert.equal(renders, 1);
 });
+
+test('the rehearsal release packages only the group callable codebase', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { prepareRelease } = require('./prepare-release.cjs');
+  const root = path.resolve(__dirname, '..');
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxh-group-release-'));
+  try {
+    assert.throws(() => prepareRelease(root, path.join(root, 'release')), /outside-checkout/);
+    const output = path.join(temp, 'artifact');
+    const manifest = prepareRelease(root, output);
+    assert.deepEqual(manifest.functions, ['groupStageCommand']);
+    assert.deepEqual(fs.readdirSync(output).sort(), ['firebase.json', 'functions']);
+    const config = JSON.parse(fs.readFileSync(path.join(output, 'firebase.json'), 'utf8'));
+    assert.deepEqual(config, { functions: [{ source: 'functions', codebase: 'arena-group-stages', runtime: 'nodejs22' }] });
+    const deployedFiles = fs.readdirSync(path.join(output, 'functions'), { recursive: true, withFileTypes: true })
+      .filter(item => item.isFile()).map(item => item.name).sort();
+    assert.deepEqual(deployedFiles, ['bucket-state.cjs','command.cjs','coordinator.cjs','core.cjs',
+      'firebase-entry.cjs','ladder-v1.js','package.json']);
+    assert.throws(() => prepareRelease(root, output), { code: 'EEXIST' });
+  } finally {
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
+});

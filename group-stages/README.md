@@ -9,3 +9,10 @@
 本候選可在隔離 Firestore 中建立子房、讀取分流入口與收回賽果。正式發行前需接上管理與玩家介面、驗證發行包和正式 Firestore 規則，以及把主房結果接到現有天梯交易。測試使用合成帳號，積分紀錄寫入為零。
 
 不公開一般房可用於管理員演練。房號需同時列入 `systemConfig/groupStages.parentCodes` 與 `rehearsalParentCodes`，管理員進入不公開一般房的賽事編排時，前端透過具 App Check 的分組入口查詢後端允許狀態。演練房關閉線上報名，名單限未綁定帳號且不計積分的現場訪客，子房保持不公開。賽果可回收，結算入口會拒絕演練房。分桶子房由伺服器在同一交易回讀計分分桶，資料缺漏時保留當前階段供重試。
+
+### 單房演練發布
+
+1. 從已驗證的提交執行 `node group-stages/prepare-release.cjs /tmp/bxh-group-stages-release`。輸出為獨立 Firebase Functions codebase，僅匯出 `groupStageCommand`，不包含 Hosting 或 Firestore 規則。
+2. 確認正式的 `systemConfig/groupStages` 尚未開啟本次演練房號。發布後端時將範圍限定為 `functions:arena-group-stages`，驗證函式位於 `asia-east1` 且拒絕未登入的請求。
+3. 前端發布後，先核對正式站 `release.json` 對應已驗證的提交，再由有權限的操作者將指定不公開一般房加入後端的 `parentCodes` 與 `rehearsalParentCodes`。保留其他現有設定。
+4. 以管理員開啟指定房的賽事編排，確認可選 4 組。另選一間未允許的一般房，確認只顯示原本的抽籤流程。若需停止演練，從兩份名單移除指定房號。
