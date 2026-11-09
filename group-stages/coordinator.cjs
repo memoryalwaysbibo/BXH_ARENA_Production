@@ -3,6 +3,7 @@
 const { randomBytes } = require('node:crypto');
 const buckets = require('../referee-seats/functions/bucket-state.cjs');
 const { GROUPS, groupKeys, prepare, nextStage, collect, settlementInput } = require('./core.cjs');
+const { drawGroup } = require('./draw.cjs');
 
 const ROOM_CODE = /^BXH-[A-Z0-9]{6}$/;
 function stageTitle(stage) {
@@ -49,6 +50,8 @@ function publicStatus(plan) {
     completed: Object.keys(plan.event.results),
     current: plan.active ? { ...plan.active } : null,
     next: plan.active ? null : nextStage(plan.event)?.key || null,
+    drawAllPending: !plan.active && !Object.keys(plan.roomCodes).length &&
+      !Object.keys(plan.event.results).length,
     readyForSettlement: !nextStage(plan.event),
     ...(plan.rehearsal ? { rehearsal: true } : {}),
   };
@@ -107,6 +110,30 @@ function stageRoom(parent, stage, parentCode, code, now, rehearsal) {
         bronzeMatch: meta.bronzeMatch, formatType: 'single', ladderMode: 'general' },
       players: [], matches: [], archiveStatus: 'ongoing',
     }) },
+  };
+}
+
+function publicDraw(state) {
+  return {
+    meta: { name: state.meta.name, date: state.meta.date, location: state.meta.location,
+      stations: state.meta.stations, bronzeMatch: false, formatType: 'single',
+      ladderMode: 'general', eventAuthority: 'official' },
+    players: state.players.map(player => ({ id: player.id, name: player.name,
+      checkedIn: !!player.checkedIn })),
+    matches: state.matches.map(match => ({
+      id: match.id, seq: match.seq, bracket: match.bracket, round: match.round,
+      indexInRound: match.indexInRound, station: match.station,
+      a: match.a ? { playerId: match.a.playerId } : null,
+      b: match.b ? { playerId: match.b.playerId } : null,
+      isBye: match.isBye, scoreA: 0, scoreB: 0, log: [],
+      winnerId: match.winnerId, loserId: null, completed: match.completed,
+      status: match.status,
+    })),
+    courtAssignments: Object.fromEntries(Object.entries(state.courtAssignments).map(([key, court]) =>
+      [key, { currentMatchId: court.currentMatchId,
+        nextMatchId: court.nextMatchId, status: court.status }])),
+    bracketSize: state.bracketSize, drawnAt: state.drawnAt,
+    archiveStatus: 'ongoing', startedAt: null,
   };
 }
 
@@ -187,7 +214,8 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         const players = startingRoster(parentData, rehearsal);
         const event = prepare(players, seed, groupCount);
         await checkRegistrations(tx, parent.room, players);
-        const next = { parentRoomId: roomState(parentData).id, event, active: null, roomCodes: {}, rehearsal };
+        const next = { parentRoomId: roomState(parentData).id, event, active: null,
+          roomCodes: {}, rehearsal, groupDrawSeed: seed };
         tx.create(parent.plan, next);
         const assignments = new Map();
         for (const group of groupKeys(event)) {
@@ -207,6 +235,53 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
       });
     },
 
+    async openAllGroups(parentCode, actorUid) {
+      const parent = refs(parentCode), now = clock();
+      // Allocate once outside the transaction callback. Firestore can retry a
+      // callback, but retries must continue to target the same room codes.
+      const candidateCodes = GROUPS.map(makeCode);
+      return db.runTransaction(async tx => {
+        const rehearsal = await authorize(tx, parentCode, actorUid, true);
+        const [snapshot, room] = await tx.getAll(parent.plan, parent.room);
+        check(snapshot.exists, 'group-plan-required');
+        const current = snapshot.data();
+        checkRoster(current, room.data(), rehearsal);
+        const keys = groupKeys(current.event);
+        if (current.groupDrawAll === true) return publicStatus(current);
+        check(!current.active && !keys.some(key => current.roomCodes[key]), 'group-stage-already-open');
+        check(new Set(candidateCodes.slice(0, keys.length)).size === keys.length,
+          'group-room-code-collision');
+        const destinations = keys.map((key, index) => ({ key, code: candidateCodes[index],
+          child: refs(candidateCodes[index]), stage: {
+            key, players: current.event.groups[key], bronzeMatch: false,
+          } }));
+        const collisions = await tx.getAll(...destinations.flatMap(item =>
+          [item.child.room, item.child.publicRoom]));
+        check(collisions.every(item => !item.exists), 'group-room-code-collision');
+        await checkRegistrations(tx, parent.room, destinations.flatMap(item => item.stage.players));
+        for (const item of destinations) {
+          const documents = stageRoom(room.data(), item.stage, parentCode, item.code, now, rehearsal);
+          const seed = current.groupDrawSeed || parentCode + ':' + current.parentRoomId;
+          const drawn = drawGroup(item.stage, item.code, seed, 12, now);
+          const state = { ...JSON.parse(documents.privateDocument.data), ...drawn };
+          tx.create(item.child.room, { ...documents.privateDocument, data: JSON.stringify(state) });
+          // The mirror is published when the child room is opened. Keep the
+          // future groups private while preserving their completed draw.
+          tx.create(item.child.publicRoom, { ...documents.publicDocument,
+            bracketView: JSON.stringify(publicDraw(state)) });
+        }
+        const first = destinations[0];
+        const next = { ...current, groupDrawAll: true,
+          active: { key: first.key, code: first.code, drawPending: false },
+          roomCodes: Object.fromEntries(destinations.map(item => [item.key, item.code])) };
+        const status = publicStatus(next);
+        tx.set(parent.plan, next);
+        tx.set(parent.routing, { ...status,
+          eligibleUids: [...new Set(first.stage.players.map(onlineAccount).filter(Boolean))] });
+        return status;
+      });
+    },
+
     async openNext(parentCode, expectedKey, actorUid) {
       const parent = refs(parentCode), code = makeCode(), now = clock();
       return db.runTransaction(async tx => {
@@ -215,7 +290,21 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         check(plan.exists, 'group-plan-required');
         const current = plan.data(), parentData = room.data();
         checkRoster(current, parentData, rehearsal);
-        if (Object.hasOwn(current.roomCodes, expectedKey)) return publicStatus(current);
+        if (Object.hasOwn(current.roomCodes, expectedKey)) {
+          if (current.groupDrawAll === true && !current.active &&
+            nextStage(current.event)?.key === expectedKey) {
+            const code = current.roomCodes[expectedKey];
+            const stage = nextStage(current.event);
+            await checkRegistrations(tx, parent.room, stage.players);
+            const next = { ...current, active: { key: expectedKey, code, drawPending: false } };
+            const status = publicStatus(next);
+            tx.set(parent.plan, next);
+            tx.set(parent.routing, { ...status,
+              eligibleUids: [...new Set(stage.players.map(onlineAccount).filter(Boolean))] });
+            return status;
+          }
+          return publicStatus(current);
+        }
         const stage = nextStage(current.event);
         check(!current.active && stage?.key === expectedKey, 'group-stage-order');
         const child = refs(code);

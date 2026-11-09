@@ -152,10 +152,33 @@ test('the rehearsal release packages only the group callable codebase', () => {
     assert.deepEqual(config, { functions: [{ source: 'functions', codebase: 'arena-group-stages', runtime: 'nodejs22' }] });
     const deployedFiles = fs.readdirSync(path.join(output, 'functions'), { recursive: true, withFileTypes: true })
       .filter(item => item.isFile()).map(item => item.name).sort();
-    assert.deepEqual(deployedFiles, ['bucket-state.cjs','command.cjs','coordinator.cjs','core.cjs',
+    assert.deepEqual(deployedFiles, ['bucket-state.cjs','command.cjs','coordinator.cjs','core.cjs','draw.cjs',
       'firebase-entry.cjs','ladder-v1.js','package.json']);
     assert.throws(() => prepareRelease(root, output), { code: 'EEXIST' });
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }
+});
+
+test('one server draw creates four complete, disjoint 80-player group brackets', () => {
+  const { drawGroup } = require('./draw.cjs');
+  const players = Array.from({ length: 320 }, (_, index) => ({ id: 'guest-' + index }));
+  const { prepare } = require('./core.cjs');
+  const event = prepare(players, 'group-assignment-seed', 4);
+  const entrants = new Set();
+  for (const key of ['A', 'B', 'C', 'D']) {
+    const stage = { key, players: event.groups[key] };
+    const drawn = drawGroup(stage, 'BXH-TEST' + key + '0', 'private-draw-seed', 12, 1);
+    assert.equal(drawn.bracketSize, 128);
+    assert.equal(drawn.matches.length, 127);
+    assert.equal(drawn.matches.filter(match => match.isBye).length, 48);
+    assert.equal(drawn.matches.filter(match => !match.isBye && match.round === 0).length, 16);
+    const entry = drawn.matches.filter(match => match.round === 0)
+      .flatMap(match => [match.a?.playerId, match.b?.playerId].filter(Boolean));
+    assert.equal(entry.length, 80);
+    for (const id of entry) { assert(!entrants.has(id)); entrants.add(id); }
+    assert.deepEqual(drawGroup(stage, 'BXH-TEST' + key + '0', 'private-draw-seed', 12, 1), drawn);
+    assert.equal(Object.keys(drawn.courtAssignments).length, 12);
+  }
+  assert.equal(entrants.size, 320);
 });
