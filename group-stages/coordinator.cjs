@@ -2,7 +2,7 @@
 
 const { randomBytes } = require('node:crypto');
 const buckets = require('../referee-seats/functions/bucket-state.cjs');
-const { GROUPS, groupKeys, prepare, nextStage, collect, settlementInput } = require('./core.cjs');
+const { GROUPS, groupKeys, prepare, openableStages, nextStage, collect, settlementInput } = require('./core.cjs');
 const { drawGroup } = require('./draw.cjs');
 
 const ROOM_CODE = /^BXH-[A-Z0-9]{6}$/;
@@ -59,6 +59,8 @@ function publicStatus(plan) {
 
 function operatorStatus(plan) {
   const status = publicStatus(plan);
+  const choices = plan.active ? [] : openableStages(plan.event);
+  if (choices.length > 1) status.openChoices = choices;
   if (plan.groupDrawAll !== true) return status;
   return { ...status, preDrawnRooms: Object.fromEntries(
     groupKeys(plan.event).filter(key => plan.roomCodes[key])
@@ -298,11 +300,10 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         check(plan.exists, 'group-plan-required');
         const current = plan.data(), parentData = room.data();
         checkRoster(current, parentData, rehearsal);
+        const stage = nextStage(current.event, expectedKey);
         if (Object.hasOwn(current.roomCodes, expectedKey)) {
-          if (current.groupDrawAll === true && !current.active &&
-            nextStage(current.event)?.key === expectedKey) {
+          if (current.groupDrawAll === true && !current.active && stage?.key === expectedKey) {
             const code = current.roomCodes[expectedKey];
-            const stage = nextStage(current.event);
             await checkRegistrations(tx, parent.room, stage.players);
             const next = { ...current, active: { key: expectedKey, code, drawPending: false } };
             const status = publicStatus(next);
@@ -313,8 +314,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
           }
           return operatorStatus(current);
         }
-        const stage = nextStage(current.event);
-        check(!current.active && stage?.key === expectedKey, 'group-stage-order');
+        check(!current.active && stage && stage.key === expectedKey, 'group-stage-order');
         const child = refs(code);
         const rooms = await tx.getAll(child.room, child.publicRoom);
         check(rooms.every(snapshot => !snapshot.exists) &&
@@ -346,9 +346,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         if (!snapshot.exists) return { unprepared: true, rehearsal };
         const { eligibleUids, ...status } = snapshot.data();
         check((status.rehearsal === true) === rehearsal, 'group-room-disabled');
-        return plan.exists && plan.data().groupDrawAll === true
-          ? { ...status, preDrawnRooms: operatorStatus(plan.data()).preDrawnRooms }
-          : status;
+        return plan.exists ? operatorStatus(plan.data()) : status;
       }, { readOnly: true });
     },
 
@@ -364,7 +362,8 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
           'group-stage-source');
         if (!current.active.drawPending) return publicStatus(current);
 
-        const document = source.data(), state = roomState(document), stage = nextStage(current.event);
+        const document = source.data(), state = roomState(document), stage = nextStage(current.event, key);
+        check(stage, 'group-stage-order');
         check(document?.groupStage?.parentCode === parentCode && document.groupStage.key === key &&
           state?.id === parentCode + ':' + key && state.cloudCode === code, 'group-stage-source');
         const firstRound = Array.isArray(state.matches)
@@ -411,7 +410,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         const current = plan.data();
         check((current.rehearsal === true) === rehearsal, 'group-room-disabled');
         if (Object.hasOwn(current.event.results, key) && current.roomCodes[key] === code) {
-          return publicStatus(current);
+          return operatorStatus(current);
         }
         checkRoster(current, room.data(), rehearsal);
         check(current.active?.key === key && current.active.code === code, 'group-stage-source');

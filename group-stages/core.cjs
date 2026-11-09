@@ -53,10 +53,20 @@ function prepare(players, seed, groupCount = GROUPS.length) {
   return { groups, results: {} };
 }
 
-function nextStage(event) {
+function openableStages(event) {
   const keys = groupKeys(event);
-  const stage = [...keys, ...PLAYOFFS].find(key => !Object.hasOwn(event.results, key));
-  if (!stage) return null;
+  const pendingGroup = keys.find(key => !Object.hasOwn(event.results, key));
+  if (pendingGroup) return [pendingGroup];
+  // Scheduling order is independent of the placement order used for settlement.
+  const pendingPlayoffs = PLAYOFFS.filter(key => !Object.hasOwn(event.results, key));
+  return keys.length === 4 ? pendingPlayoffs.reverse() : pendingPlayoffs.slice(0, 1);
+}
+
+function nextStage(event, requestedKey) {
+  const openable = openableStages(event);
+  const stage = requestedKey === undefined ? openable[0] : requestedKey;
+  if (!openable.includes(stage)) return null;
+  const keys = groupKeys(event);
   if (keys.includes(stage)) {
     return { key: stage, players: event.groups[stage], bronzeMatch: false };
   }
@@ -159,7 +169,7 @@ function matchesFor(stage, state) {
 }
 
 function collect(event, key, roomState) {
-  const stage = nextStage(event);
+  const stage = nextStage(event, key);
   check(stage?.key === key, 'group-stage-order');
   return {
     ...event,
@@ -221,4 +231,4 @@ function settlementInput(event) {
   return { effectiveCount, multiplier, topEight, participants, matches };
 }
 
-module.exports = { GROUPS, groupKeys, prepare, nextStage, collect, settlementInput };
+module.exports = { GROUPS, groupKeys, prepare, openableStages, nextStage, collect, settlementInput };

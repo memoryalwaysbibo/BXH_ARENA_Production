@@ -21,10 +21,10 @@ test('group-stage rehearsal covers two and four groups', async t => {
     assert(groupStageCommand.__endpoint.callableTrigger);
     const scenarios = [
       { parentCode: 'BXH-FULL01', sizes: [96, 96, 96, 96] },
-      { parentCode: 'BXH-ALMOST', sizes: [96, 96, 96, 95] },
+      { parentCode: 'BXH-ALMOST', sizes: [96, 96, 96, 95], manualChampionsFirst: true },
       { parentCode: 'BXH-TWO128', sizes: [64, 64] },
     ];
-    for (const { parentCode, sizes: expectedSizes } of scenarios) {
+    for (const { parentCode, sizes: expectedSizes, manualChampionsFirst } of scenarios) {
       const groupCount = expectedSizes.length;
       const eligibleCount = expectedSizes.reduce((total, size) => total + size, 0);
       await t.test(eligibleCount + ' checked-in players in ' + groupCount + ' groups', async t => {
@@ -105,7 +105,9 @@ test('group-stage rehearsal covers two and four groups', async t => {
 
         const childRooms = db.collection('tournaments').where('groupStage.parentCode', '==', parentCode);
         assert.equal((await childRooms.get()).size, 0);
-        const steps = [...prepared.groups.map(group => group.key), 'champions', 'runners-up'];
+        const playoffs = groupCount === 4 && !manualChampionsFirst
+          ? ['runners-up', 'champions'] : ['champions', 'runners-up'];
+        const steps = [...prepared.groups.map(group => group.key), ...playoffs];
         const openTimes = [], collectTimes = [];
         for (const [index, key] of steps.entries()) {
           const openStarted = performance.now();
@@ -137,6 +139,10 @@ test('group-stage rehearsal covers two and four groups', async t => {
           const done = finish({ players: state.players, bronzeMatch: state.meta.bronzeMatch });
           const viewerUid = state.players[0].registrationUid;
           if (isPlayoff) {
+            if (index === groupCount) {
+              await assert.rejects(coordinator.openNext(parentCode, playoffs[1], operator),
+                { code: 'group-stage-order' });
+            }
             assert.equal((await coordinator.readOperatorStatus(parentCode, operator)).current.drawPending, true);
             const waiting = await coordinator.readRouting(parentCode, viewerUid);
             assert.equal(waiting.drawPending, true);
@@ -194,7 +200,15 @@ test('group-stage rehearsal covers two and four groups', async t => {
           collectTimes.push(performance.now() - collectStarted);
           assert.deepEqual(repeatedCollect, collected);
           assert.equal((await coordinator.readRouting(parentCode, state.players[0].registrationUid)).roomCode, null);
-          assert.equal(collected.next, steps[index + 1] || null);
+          if (index === groupCount - 1 && groupCount === 4) {
+            assert.equal(collected.next, 'runners-up');
+            assert.deepEqual(collected.openChoices, ['runners-up', 'champions']);
+            await routing.update({ next: 'champions' });
+            assert.deepEqual(await coordinator.readOperatorStatus(parentCode, operator), collected);
+          } else {
+            assert.equal(collected.next, steps[index + 1] || null);
+            assert.equal(collected.openChoices, undefined);
+          }
           assert.deepEqual(await coordinator.collect(parentCode, key, code, operator), collected);
           assert.deepEqual(await coordinator.openNext(parentCode, key, operator), collected);
         }
@@ -379,6 +393,21 @@ test('one server transaction pre-draws four 80-player child rooms', async () => 
       }
     }
     assert.equal(entrants.size, 320);
+    let status = opened;
+    for (const key of ['A', 'B', 'C', 'D']) {
+      if (key !== 'A') status = await coordinator.openNext(parentCode, key, operator);
+      assert.equal(status.current.code, plan.roomCodes[key]);
+      const child = db.doc('tournaments/' + status.current.code);
+      const state = JSON.parse((await child.get()).data().data);
+      const done = finish({ players: state.players, bronzeMatch: false });
+      await child.update({ data: JSON.stringify({ ...state, ...done, meta: state.meta }) });
+      status = await coordinator.collect(parentCode, key, status.current.code, operator);
+    }
+    assert.equal(status.next, 'runners-up');
+    assert.deepEqual(status.openChoices, ['runners-up', 'champions']);
+    const chosen = await coordinator.openNext(parentCode, 'champions', operator);
+    assert.equal(chosen.current.key, 'champions');
+    assert.equal(chosen.current.drawPending, true);
     assert.equal((await db.collection('ladderTransactions').get()).size, 0);
   } finally {
     await deleteApp(app);

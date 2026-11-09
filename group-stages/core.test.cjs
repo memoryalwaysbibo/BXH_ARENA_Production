@@ -42,7 +42,7 @@ test('four 80-player brackets and two playoffs produce one 320-player settlement
   assert.deepEqual(first.results, {});
   assert.throws(() => settlementInput(event), { code: 'group-stage-incomplete' });
 
-  for (const [index, key] of ['champions', 'runners-up'].entries()) {
+  for (const [key, index] of [['runners-up', 1], ['champions', 0]]) {
     const stage = nextStage(event);
     assert.equal(stage.key, key);
     assert.equal(stage.bronzeMatch, true);
@@ -84,6 +84,30 @@ test('the upper boundary balances 383 entrants and supports a full 384-player se
   assert.equal(input.topEight.length, 8);
   assert.equal(input.participants.filter(player => player.placement === 257).length, 128);
   assert.equal(input.participants.filter(player => player.placement === 9).length, 8);
+});
+
+test('either placement bracket can go first after the four groups finish', () => {
+  const ui = require('../modules/main-app/group-stages.js');
+  let event = prepare(roster(16), 'test-seed');
+  assert.equal(nextStage(event, 'champions'), null);
+  assert.equal(nextStage(event, 'runners-up'), null);
+  for (const key of GROUPS) event = collect(event, key, finish(nextStage(event)));
+
+  const groups = GROUPS.map(key => ({ key, count: 4 }));
+  const html = ui.content('operator', { groups, completed: GROUPS, next: 'runners-up',
+    openChoices: ['runners-up', 'champions'] });
+  assert.match(html, /data-group-stage-choice="runners-up">先開放第 5～8 名賽（預設）.*data-group-stage-choice="champions">先開放第 1～4 名賽/);
+
+  function settle(order) {
+    let plan = event;
+    for (const key of order) {
+      const stage = nextStage(plan, key);
+      plan = collect(plan, key, finish(stage));
+      assert.equal(nextStage(plan, key), null);
+    }
+    return settlementInput(plan);
+  }
+  assert.deepEqual(settle(['champions', 'runners-up']), settle(['runners-up', 'champions']));
 });
 
 test('result collection rejects out-of-order, altered rosters, and invalid propagation', () => {
