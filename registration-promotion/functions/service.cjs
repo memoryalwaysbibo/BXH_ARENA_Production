@@ -8,7 +8,7 @@ function authorized(user,uid,room){
  if(['admin','super_admin'].includes(user.role))return true;
  return user.role==='staff'&&(!Object.hasOwn(room,'assignedStaffUids')||Array.isArray(room.assignedStaffUids)&&(room.assignedStaffUids.length===0||room.assignedStaffUids.includes(uid)));
 }
-function createPromotionHandler(db,{clock=Date.now,timestamp=()=>clock(),allowUnseatedOfficial=false}={}){return async req=>{
+function createPromotionHandler(db,{clock=Date.now,timestamp=()=>clock(),allowUnseatedOfficial=false,rejectV2OwnedRoom=false}={}){return async req=>{
  const uid=req.auth?.uid,d=req.data||{};
  if(!uid)fail('unauthenticated');
  const demote=d.action==='demote',add=d.action==='addLocal',local=d.localId!==undefined;
@@ -63,6 +63,7 @@ function createPromotionHandler(db,{clock=Date.now,timestamp=()=>clock(),allowUn
    if((!local&&reg.status!==(demote?'waitlist':'confirmed'))||!projected||t.confirmedCount!==pub.confirmedCount||t.waitlistCount!==pub.waitlistCount)fail('operation-outdated');
    return {...os.data().result,capacity:t.capacity,confirmedCount:t.confirmedCount,waitlistCount:t.waitlistCount,state,replayed:true};
   }
+  if(rejectV2OwnedRoom&&t.registrationQueueVersion===2)fail('registration-queue-required');
   if(regRef&&reg.status!==(demote?'confirmed':'waitlist'))fail(demote?'not-confirmed':'not-waitlist');
   const capacity=t.capacity,confirmed=t.confirmedCount,waiting=t.waitlistCount;
   if(!Number.isSafeInteger(capacity)||capacity<1||!Number.isSafeInteger(confirmed)||confirmed<(demote?1:0)||!Number.isSafeInteger(waiting)||waiting<(demote||local||add?0:1)||pub.capacity!==capacity||pub.confirmedCount!==confirmed||pub.waitlistCount!==waiting||confirmed>capacity)fail('registration-state-conflict');

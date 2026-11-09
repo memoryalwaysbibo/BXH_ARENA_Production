@@ -14,7 +14,7 @@ async function fixture({role='staff',assigned=true,capacity=88,confirmed=80,wait
  const state={id:code,meta:{registrationCapacity:capacity,checkinRequired:true},players,waitlistPlayers:[candidate],matches:[],registrationRosterRevision:5,courtLifecycleEpoch:1,...(qr?{qrCheckinManaged:true,qrCheckinRevision:3}:{})};
  const common={eventAuthority:'official',createdBy:'host',ownerUid:'host',createdByRole:'staff',assignedStaffUids:assigned?[actor]:['other'],tournamentPhase:'waiting',archiveStatus:'ongoing',registrationStatus:'open',capacity,confirmedCount:confirmed,waitlistCount:waiting,updatedAt:1,...(qr?{qrCheckinManaged:true,qrCheckinRevision:3}:{})};
  await Promise.all([tr.set({...common,refereeSeatsV1:{version:1,revision:7,courts:{},requests:{}},courtLifecycleEpoch:1,courtLifecycleWriteSeq:9,data:JSON.stringify(state),...(qr?{qrCheckin:{enabled:true,session:'synthetic'}}:{})}),pr.set({...common,bracketView:JSON.stringify({meta:{name:'Public'},players,matches:[]})}),rr.set({status:'waitlist',uid:'candidate',displayName:'Synthetic'}),db.doc('users/'+actor).set({active:true,role})]);
- const handler=createPromotionHandler(db,{clock:()=>1000,timestamp:()=>FieldValue.serverTimestamp()});
+ const handler=createPromotionHandler(db,{clock:()=>1000,timestamp:()=>FieldValue.serverTimestamp(),rejectV2OwnedRoom:true});
  const request={auth:{uid:actor},data:{code,registrationId:'candidate',expandBy:0,operationId:'operation-example-123'}};
  const run=patch=>handler({...request,data:{...request.data,...patch}});
  const snapshot=async()=>Promise.all([tr.get(),pr.get(),rr.get()].map(async p=>(await p).data()));
@@ -61,4 +61,23 @@ test('a superseded receipt requires explicit reconciliation instead of replaying
  s.waitlistPlayers.push(candidate);m.players=m.players.filter(p=>p.id!==candidate.id);
  await Promise.all([h.tr.update({data:JSON.stringify(s),confirmedCount:80,waitlistCount:1}),h.pr.update({bracketView:JSON.stringify(m),confirmedCount:80,waitlistCount:1}),h.rr.update({status:'waitlist'})]);
  const before=await h.snapshot();await assert.rejects(h.run(),/operation-outdated/);assert.deepEqual(await h.snapshot(),before);
+});
+
+test('a V2 room blocks fresh legacy promotions, preserves receipts and allows the queue handler',async()=>{
+ const old=await fixture();
+ await old.run();
+ await old.tr.update({registrationQueueVersion:2});
+ const replayState=await old.snapshot();
+ assert.equal((await old.run()).replayed,true);
+ await assert.rejects(old.run({operationId:'new-legacy-operation'}),/registration-queue-required/);
+ assert.deepEqual(await old.snapshot(),replayState);
+
+ const next=await fixture();
+ await next.tr.update({registrationQueueVersion:2});
+ const waiting=await next.snapshot();
+ await assert.rejects(next.run(),/registration-queue-required/);
+ assert.deepEqual(await next.snapshot(),waiting);
+ const runV2=createPromotionHandler(db,{allowUnseatedOfficial:true});
+ assert.equal((await runV2(next.request)).verified,true);
+ assert.equal((await next.snapshot())[2].status,'confirmed');
 });
