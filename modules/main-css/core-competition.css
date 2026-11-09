@@ -1965,6 +1965,13 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
   box-shadow:0 0 10px var(--court-glow,transparent);
 }
 
+/* Keep the single-court selector accessible on both referee layouts. */
+.referee-court-switch{display:flex;overscroll-behavior-x:contain;}
+.referee-court-switch .court-jump-btn[aria-pressed="true"]{
+  background:var(--court-accent,var(--gold));color:#090a0b;
+}
+.referee-court-switch .court-jump-btn:focus-visible{outline:2px solid #fff;outline-offset:2px;}
+
 /* Four-court referee mode: preserve every control; the page may scroll instead of clipping. */
 @media (min-width:900px){
   .court-grid-4fit{

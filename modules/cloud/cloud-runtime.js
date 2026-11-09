@@ -1728,6 +1728,12 @@
         const latest=await this.joinRoom(eventCode,{serverOnly:true});
         return latest.ok?{...queued,state:latest.data}:queued;
       }
+      let communityOwnerDemotion=false;
+      if(action==="demote"){
+        const tourSnap=await fx.getDoc(tourRef);
+        const tour=tourSnap.exists()?tourSnap.data():null;
+        communityOwnerDemotion=tour?.eventAuthority==="community" && tour.ownerUid===staffUid;
+      }
       let unlimitedPromotion=false;
       if(action==="promote"){
         const [tourSnap,pubSnap]=await Promise.all([fx.getDoc(tourRef),fx.getDoc(pubRef)]);
@@ -1754,7 +1760,9 @@
       }
       // Unlimited promotions use the existing staff/admin-only trusted service.
       // The common server read-back below still verifies roster + both mirrors.
-      const txResult=unlimitedPromotion
+      const txResult=communityOwnerDemotion
+        ?await callEngagementFunction("registrationRosterService",{action:"demote",code:eventCode,registrationId:regId,intent:"admin",operationId:options.operationId||crypto.randomUUID()},60000)
+        :unlimitedPromotion
         ?await callEngagementFunction("registrationRosterService",{action:"promote",code:eventCode,registrationId:regId,intent:"admin",operationId:options.operationId||crypto.randomUUID()},60000)
         :await fx.runTransaction(dbHandle,async tx=>{
         const tourSnap=await tx.get(tourRef);

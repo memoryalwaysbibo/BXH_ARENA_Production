@@ -8,6 +8,7 @@ const sourceFiles = [
   'group-stages/command.cjs',
   'group-stages/coordinator.cjs',
   'group-stages/core.cjs',
+  'group-stages/draw.cjs',
   'referee-seats/functions/bucket-state.cjs',
   'ladder-v1.js',
 ];

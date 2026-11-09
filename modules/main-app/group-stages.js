@@ -16,6 +16,7 @@
     'group-rehearsal-linked-roster': '分組測試房只接受未綁定帳號的現場訪客。',
     'group-invalid-count': '請選擇 2 組或 4 組。',
     'group-count-locked': '這場已完成分組。請更新進度查看結果。',
+    'group-stage-already-open': '這場已有分組開賽，無法重新抽籤。',
     'group-roster-size': '有效參賽人數超出所選組數的範圍，請確認名單與組數。',
   };
 
@@ -101,7 +102,7 @@
     const notice = error ? '<p class="hint" role="status">' + error + '</p>' : '';
     if (!loaded) return header + (error ? notice + refresh : '<p class="hint" role="status">正在讀取分組進度…</p>');
     if (!status) {
-      const message = operator ? '請先選擇組數，再按「分組抽籤」。系統會平均分配有效參賽名單。' : '等待主辦確認分組。';
+      const message = operator ? '選擇組數後按一次分組抽籤，系統會分配名單並產生 A～D 組對戰表。' : '等待主辦確認分組。';
       return header + '<p class="hint">' + message + '</p>' + notice + refresh;
     }
 
@@ -134,7 +135,9 @@
       ? '<p><strong>我的組別　' + myGroups.map(group => titles[group]).join('、') + '</strong></p>'
       : '';
     let actions = refresh;
-    if (operator && titles[key]) {
+    if (operator && status.drawAllPending) {
+      actions = commandButton('open-all', '完成各組對戰表抽籤', busy) + refresh;
+    } else if (operator && titles[key]) {
       actions = roomButton(status.current.code, view, '開啟' + titles[key] + (drawPending ? '抽籤' : '房間')) +
         (drawPending ? commandButton('publish-draw', '公布名次賽籤表', busy) :
           commandButton('collect', '回收' + titles[key] + '賽果', busy)) + refresh;
@@ -143,8 +146,16 @@
     } else if (!operator && titles[key] && !drawPending) {
       actions = roomButton(status.roomCode, view, '進入' + titles[key] + '戰場') + refresh;
     }
+    const pendingRooms = operator && status.preDrawnRooms
+      ? groups.filter(group => group !== key && !completed.includes(group) &&
+        roomCode.test(status.preDrawnRooms[group] || ''))
+        .map(group => roomButton(status.preDrawnRooms[group], 'operator',
+          '查看' + group + '組對戰表（待開放）')).join('') : '';
+    const previews = pendingRooms
+      ? '<div class="panel"><strong>已抽好的後續組別</strong><p class="hint">可先查看對戰表；依序回收前一組後才開放下一組。</p>' +
+        '<div class="btn-row">' + pendingRooms + '</div></div>' : '';
     return header + assignment + '<p class="hint" role="status">' + message + '</p>' +
-      progress + notice + '<div class="btn-row">' + actions + '</div>';
+      progress + notice + '<div class="btn-row">' + actions + '</div>' + previews;
   }
 
   let active = null;
@@ -168,7 +179,7 @@
     if (button) {
       const blocked = button.dataset.blocked === 'true' || !model.loaded || model.busy || !!model.status;
       button.disabled = blocked || !groupCounts.includes(model.groupCount);
-      button.textContent = model.status ? '已完成分組抽籤' : '分組抽籤';
+      button.textContent = model.status ? '已完成分組抽籤' : '一次抽好各組';
       if (model.groupSelect) {
         model.groupSelect.disabled = blocked;
         model.groupSelect.value = String(model.status?.groups.length ?? model.groupCount ?? '');
@@ -191,7 +202,10 @@
     model.error = '';
     render(model);
     try {
-      const status = await model.request(payload);
+      let status = await model.request(payload);
+      if (action === 'prepare' && Array.isArray(status?.groups) && status.drawAllPending) {
+        status = await model.request({ action: 'open-all', parentCode: model.code });
+      }
       if (status?.unprepared === true || status === null) model.status = null;
       else if (Array.isArray(status?.groups)) model.status = status;
       else throw new Error('group-invalid-response');

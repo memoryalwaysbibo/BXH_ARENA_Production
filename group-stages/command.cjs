@@ -8,6 +8,7 @@ function createGroupStageCommand(coordinator) {
       case 'routing': return coordinator.readRouting(parentCode, actorUid);
       case 'status': return coordinator.readOperatorStatus(parentCode, actorUid);
       case 'prepare': return coordinator.prepare(parentCode, actorUid, groupCount);
+      case 'open-all': return coordinator.openAllGroups(parentCode, actorUid);
       case 'open': return coordinator.openNext(parentCode, stage, actorUid);
       case 'publish-draw': return coordinator.publishDraw(parentCode, stage, roomCode, actorUid);
       case 'collect': return coordinator.collect(parentCode, stage, roomCode, actorUid);
