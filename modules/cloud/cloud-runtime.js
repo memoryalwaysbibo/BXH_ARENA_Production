@@ -1098,6 +1098,8 @@
     });
     return {
       courtLifecycleEpoch:Number(state.courtLifecycleEpoch||0),
+      ...(state.groupStage?.sharedCourts ? { forcedCourtExits:Object.fromEntries(
+        Object.entries(state.forcedCourtExits||{}).map(([number,court])=>[number,{closed:court.closed===true}])) } : {}),
       callRevision:Number(state.callRevision||0),
       registrationRosterRevision:Number(state.registrationRosterRevision||0),
       ...(state.meta?.eventAuthority==="community"&&state.meta.communityQuickRegistration===true&&Number.isSafeInteger(state.communityParticipantCount)&&state.communityParticipantCount>=0?{communityParticipantCount:state.communityParticipantCount}:{}),
@@ -1192,6 +1194,7 @@
       try{ out=JSON.parse(d.data); }catch(e){ /* fall through */ }
     }
     if(!out)throw new Error("corrupt-public-document");
+    if(d.groupStage?.sharedCourts===true)out.groupStage=d.groupStage;
     out.meta=out.meta||{};out.meta.roomAccessMode=d.roomAccessMode||out.meta.roomAccessMode||"public";
     if(d.eventAuthority==="community"&&d.communityQuickRegistration===true){
       out.communityQuickRegistration=true;out.meta.communityQuickRegistration=true;out.meta.eventAuthority="community";
@@ -3474,6 +3477,10 @@ if(testerSession){
                 }
               }
               if(JSON.stringify(remoteState.forcedCourtExits||{})!==JSON.stringify(data.forcedCourtExits||{}))throw new Error("court-exit-stale");
+              if(remoteDoc.groupStage?.sharedCourts===true&&(data.groupStage?.sharedCourts!==true||
+                data.groupStage.parentCode!==remoteDoc.groupStage.parentCode||data.groupStage.key!==remoteDoc.groupStage.key||
+                data.meta.stations!==remoteState.meta.stations||data.bracketSize!==remoteState.bracketSize||
+                (data.matches||[]).some(m=>!m.isBye&&!m.completed&&data.forcedCourtExits?.[m.station]?.closed)))throw new Error("group-court-state-changed");
               const dispatchById=new Map((data.matches||[]).map(m=>[m.id,m]));
               for(const m of remoteState.matches||[]){if(m.forceDetached||m.dispatchRevision){const incoming=dispatchById.get(m.id);if(!incoming||Number(incoming.dispatchRevision||0)!==Number(m.dispatchRevision||0)||Number(incoming.station)!==Number(m.station))throw new Error("court-dispatch-stale");}}
               if(remoteState.courtRetirementPlan){
@@ -3906,6 +3913,7 @@ if(testerSession){
           const snap=await tx.get(ref),actorSnap=await tx.get(fx.doc(dbHandle,USERS_COLLECTION,uid));
           if(!snap.exists()||!actorSnap.exists())throw new Error("not-found");
           const docData=snap.data(),actor=actorSnap.data(),st=JSON.parse(docData.data);
+          if(docData.groupStage?.sharedCourts===true)throw new Error("group-court-unavailable");
           if(docData.refereeSeatsV1?.version===1)throw new Error("seat-command-required");
           if(actor.active!==true)throw new Error("permission-denied");
           const creator=docData.createdBy||st.createdBy;

@@ -384,3 +384,91 @@ test('one server transaction pre-draws four 80-player child rooms', async () => 
     await deleteApp(app);
   }
 });
+
+test('320-player parallel rehearsal collects out of order and transfers one physical court atomically', async () => {
+  const app = initializeApp({ projectId: project });
+  const db = getFirestore(app);
+  const parentCode = 'BXH-PAR320', operator = 'parallel-admin';
+  try {
+    const players = Array.from({ length: 320 }, (_, index) => ({
+      id: 'parallel-' + index, name: 'Guest ' + index, source: 'onsite', participantType: 'onsite_guest',
+      accountLinked: false, ladderEligible: false, activityEligible: false,
+    }));
+    await Promise.all([
+      db.doc('users/' + operator).set({ active: true, role: 'admin' }),
+      db.doc('users/parallel-player').set({ active: true, role: 'player' }),
+      db.doc('systemConfig/groupStages').set({ enabled: true, parentCodes: [parentCode],
+        rehearsalParentCodes: [parentCode], parallelRehearsalParentCodes: [parentCode] }),
+      db.doc('tournaments/' + parentCode).set({ eventAuthority: 'official', ladderMode: 'general', createdBy: operator,
+        visibility: 'private', registrationEnabled: false,
+        data: JSON.stringify({ id: 'parallel-parent', players, matches: [],
+          meta: { name: 'Parallel rehearsal', ladderMode: 'general', formatType: 'single', battleMode: 'individual',
+            playMode: 'standard', registrationVisibility: 'private', registrationEnabled: false } }) }),
+    ]);
+    const coordinator = createCoordinator(db);
+    const call = createGroupStageCommand(coordinator);
+    const run = (action, data = {}, uid = operator) => call({ auth: { uid }, data: { action, parentCode, ...data } });
+    await run('prepare', { groupCount: 4 });
+    const opened = await run('open-all');
+    const codes = opened.preDrawnRooms;
+    const groups = ['A', 'B', 'C', 'D'];
+    assert.deepEqual(opened.runningGroups.map(group => group.key), groups);
+    assert.equal(opened.next, null);
+    assert.deepEqual(await run('open-all'), opened);
+    const child = group => db.doc('tournaments/' + codes[group]);
+    const mirror = group => db.doc('publicTournaments/' + codes[group]);
+    const archive = async group => {
+      const { data } = (await child(group).get()).data();
+      const state = JSON.parse(data);
+      await child(group).update({ data: JSON.stringify({ ...state,
+        ...finish({ players: state.players, bronzeMatch: false }), meta: state.meta }) });
+    };
+    for (const [index, group] of groups.entries()) {
+      const document = (await child(group).get()).data();
+      const state = JSON.parse(document.data);
+      const numbers = [index * 3 + 1, index * 3 + 2, index * 3 + 3];
+      assert.equal(document.visibility, 'private');
+      assert.equal(document.courtLifecycleWriteSeq, 1);
+      assert.equal(state.players.length, 80);
+      assert.deepEqual([...new Set(state.matches.filter(m => !m.isBye).map(m => m.station))], numbers);
+      assert.equal(Object.values(state.forcedCourtExits).filter(court => court.closed).length, 9);
+    }
+    await assert.rejects(run('open', { stage: 'champions' }), { code: 'group-stage-order' });
+    await assert.rejects(run('release-court', { stage: 'A', court: 1, revision: 1 }), { code: 'group-court-busy' });
+    await assert.rejects(run('collect', { stage: 'D', roomCode: codes.D }), { code: 'group-stage-not-complete' });
+    await assert.rejects(run('claim-court', { stage: 'B', court: 10, revision: 1 }, 'parallel-player'),
+      { code: 'group-permission-denied' });
+    await archive('D');
+    const d = await run('collect', { stage: 'D', roomCode: codes.D });
+    assert.deepEqual(d.completed, ['D']);
+    assert.deepEqual(d.courts[10], { group: null, revision: 2 });
+    assert.deepEqual(await run('collect', { stage: 'D', roomCode: codes.D }), d);
+
+    const claims = await Promise.allSettled(['B', 'C'].map(stage => run('claim-court', { stage, court: 10, revision: 2 })));
+    const [winner] = claims.filter(result => result.status === 'fulfilled');
+    assert.equal(claims.filter(result => result.status === 'fulfilled').length, 1);
+    assert.equal(claims.find(result => result.status === 'rejected').reason.code, 'group-court-stale');
+    const owner = winner.value.courts[10].group, other = owner === 'B' ? 'C' : 'B';
+    const [ownerDoc, otherDoc, publicDoc] = await db.getAll(child(owner), child(other), mirror(owner));
+    assert.equal(JSON.parse(ownerDoc.data().data).forcedCourtExits[10].closed, false);
+    assert.equal(JSON.parse(otherDoc.data().data).forcedCourtExits[10].closed, true);
+    assert.equal(JSON.parse(publicDoc.data().bracketView).forcedCourtExits[10].closed, false);
+    assert(JSON.parse(ownerDoc.data().data).matches.some(match => match.station === 10 && match.dispatchRevision > 0));
+    assert.equal(ownerDoc.data().courtLifecycleWriteSeq, 2);
+    assert.deepEqual((await run('status')).courts[10], { group: owner, revision: 3 });
+
+    for (const group of ['C', 'A', 'B']) {
+      await archive(group);
+      await run('collect', { stage: group, roomCode: codes[group] });
+    }
+    const status = await run('status');
+    assert.equal(status.next, 'champions');
+    assert.equal(status.runningGroups.length, 0);
+    assert(Object.values(status.courts).every(court => court.group === null));
+    assert.equal((await run('open', { stage: 'champions' })).current.key, 'champions');
+    await assert.rejects(db.runTransaction(tx => coordinator.readSettlement(tx, parentCode)),
+      { code: 'group-rehearsal-no-ladder' });
+  } finally {
+    await deleteApp(app);
+  }
+});

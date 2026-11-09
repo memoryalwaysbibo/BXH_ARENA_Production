@@ -18,3 +18,5 @@
 2. 確認正式的 `systemConfig/groupStages` 尚未開啟本次演練房號。發布後端時將範圍限定為 `functions:arena-group-stages`，驗證函式位於 `asia-east1` 且拒絕未登入的請求。
 3. 前端發布後，先核對正式站 `release.json` 對應已驗證的提交，再由有權限的操作者將指定不公開一般房加入後端的 `parentCodes` 與 `rehearsalParentCodes`。保留其他現有設定。
 4. 以管理員開啟指定房的賽事編排，確認可選 4 組。另選一間未允許的一般房，確認只顯示原本的抽籤流程。若需停止演練，從兩份名單移除指定房號。
+
+四組並行演練只會套用到同時列在 `parentCodes`、`rehearsalParentCodes` 和 `parallelRehearsalParentCodes` 的新分組測試房，且在第一次分組時選 4 組。主房一次抽好並開放四個子房，管理員各自進房開始賽事。主房和子房都可管理 1～12 號實體台，釋出時會檢查當前場次、已排定的下一場和未同步工作。主房可依完成順序回收，回收後該組的台會釋出。名次賽仍要等四組結果收齊。啟用前需確認前端、分組 Callable 與計分 Callable 的限制已一併驗收。並行測試子房使用原本的房間比分儲存。

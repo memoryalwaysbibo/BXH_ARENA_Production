@@ -10101,9 +10101,10 @@ let liveCourtSwitchCenterRequested=false;
 function liveCourtSelection(stationCount){
   const room=String(state.cloudCode||state.id||"");
   if(room!==liveSelectedRoom){liveSelectedRoom=room;liveSelectedCourt=0;liveCourtSwitchScrollLeft=0;}
-  if((liveSelectedCourt<1&&liveSelectedCourt!==-1)||liveSelectedCourt>stationCount){
-    liveSelectedCourt=Array.from({length:stationCount},(_,i)=>i+1)
-      .find(i=>liveCurrentMatchForStation(i).m&&!liveCurrentMatchForStation(i).m.completed)||1;
+  const stations=Array.from({length:stationCount},(_,i)=>i+1)
+    .filter(station=>!state.groupStage?.sharedCourts||!state.forcedCourtExits?.[station]?.closed);
+  if(liveSelectedCourt!==-1&&!stations.includes(liveSelectedCourt)){
+    liveSelectedCourt=stations.find(i=>liveCurrentMatchForStation(i).m&&!liveCurrentMatchForStation(i).m.completed)||stations[0]||-1;
     liveCourtSwitchCenterRequested=true;
   }
   return liveSelectedCourt;
@@ -10141,10 +10142,12 @@ function renderLive(){
   const officialCount=officialPlayers.length;
 
   const stationCount=Math.max(1,Number(state.meta.stations)||1);
+  const stations=Array.from({length:stationCount},(_,i)=>i+1)
+    .filter(station=>!state.groupStage?.sharedCourts||!state.forcedCourtExits?.[station]?.closed);
   const selectedCourt=liveCourtSelection(stationCount);
-  const liveCourtsHtml=Array.from({length:stationCount},(_,i)=>liveCourtCardHtml(i+1,selectedCourt)).join("");
-  const liveCourtSwitchHtml=stationCount>1?`<div class="live-court-switch" role="group" aria-label="切換現場戰鬥台"><div class="live-court-switch-track"><button type="button" class="live-court-switch-btn live-court-switch-all ${selectedCourt===-1?"is-selected":""}" data-action="live-select-court" data-court="0" aria-pressed="${selectedCourt===-1}"><strong>全部</strong><span>${stationCount}台</span></button>${Array.from({length:stationCount},(_,i)=>{
-    const n=i+1,current=liveCurrentMatchForStation(n),m=current.m;
+  const liveCourtsHtml=stations.map(n=>liveCourtCardHtml(n,selectedCourt)).join("");
+  const liveCourtSwitchHtml=stations.length>1?`<div class="live-court-switch" role="group" aria-label="切換現場戰鬥台"><div class="live-court-switch-track"><button type="button" class="live-court-switch-btn live-court-switch-all ${selectedCourt===-1?"is-selected":""}" data-action="live-select-court" data-court="0" aria-pressed="${selectedCourt===-1}"><strong>全部</strong><span>${stations.length}台</span></button>${stations.map(n=>{
+    const current=liveCurrentMatchForStation(n),m=current.m;
     const hasFuture=state.matches.some(mm=>!mm.isBye&&Number(mm.station)===n&&!mm.completed);
     const status=m?refereeStationStatus(m).label:(hasFuture?"等待中":"已完成");
     return `<button type="button" class="live-court-switch-btn ${n===selectedCourt?"is-selected":""}" data-action="live-select-court" data-court="${n}" aria-pressed="${n===selectedCourt}" style="${courtAtmosphereStyle(n)}"><strong>${n}號台</strong><span>${esc(status)}</span></button>`;
@@ -11150,6 +11153,7 @@ function bracketCommitStatusHtml(inRosterOverview=false){
 }
 function bracketDrawButtonHtml(){
  if(bracketCommitController()?.status().pending)return '';
+ if(state.groupStage?.sharedCourts)return '';
  const groupDrawRequired=window.BXHGroupStageUi?.enabled(state.cloudCode,state.groupStage?.parentCode,firebaseUser?.uid)===true;
  return (groupDrawRequired?'':adminOverrideButtonsHtml())+'<button class="btn '+(state.bracketSize?'btn-ghost':'btn-primary')+'" data-action="draw-bracket" '+(groupDrawRequired||state.startedAt||bracketCommitBlocked()||(state.meta.battleMode!=="team"&&!entryRosterValid())?'disabled':'')+'>'+(state.bracketSize?'重新抽籤':'抽籤')+'</button>';
 }
@@ -12381,8 +12385,8 @@ function renderSkippedMatches(){
   return `<section class="panel"><div class="panel-title">待承接場次（${skipped.length}）</div><div class="hint">保留原比分。閒置台立即承接；忙碌台安排在目前比賽之後。未承接的場次依原台佇列接續；跳過時沒有其他可執行場次，則保留待承接。</div>${skipped.map(m=>`<div class="panel" style="margin-top:12px"><strong>${esc(matchLabel(m))}｜${esc(playerName(m.a.playerId))} vs ${esc(playerName(m.b.playerId))}</strong><div class="hint">台${Number(m.station)} · ${m.callPass?'PASS：同台兩場後回補':m.resumeQueuedAt?'已安排承接':'已跳過'}</div>${!m.resumeQueuedAt&&!m.callPass&&canOperateCurrentTournament()&&state.archiveStatus!=="completed"?`<div class="btn-row">${targets.map(i=>`<button class="btn btn-ghost btn-sm" data-action="claim-skipped-match" data-id="${esc(m.id)}" data-station="${i}" ${courtQueueBusy?'disabled':''}>${isAdminTierOrAbove()?'指派':'承接'}至台${i}</button>`).join("")}</div>`:""}</div>`).join("")}</section>`;
 }
 let courtRetirementBusy=false;
-function canForceExitCourt(n){return canManageCourtRetirement()||(canOperateCurrentTournament()&&canOperateStation(n));}
-function canManageCourtRetirement(){return canManageRefereeStationAssignments()||isCommunityRoomOwner()||(isPartnerOrganizerMode()&&isCurrentOfficialTournamentCreator());}
+function canForceExitCourt(n){return !state.groupStage?.sharedCourts&&(canManageCourtRetirement()||(canOperateCurrentTournament()&&canOperateStation(n)));}
+function canManageCourtRetirement(){return !state.groupStage?.sharedCourts&&(canManageRefereeStationAssignments()||isCommunityRoomOwner()||(isPartnerOrganizerMode()&&isCurrentOfficialTournamentCreator()));}
 async function resizeCourtsSafely(n,expected,nextMeta,expectedRevision=Number(state.courtRetirementPlan?.revision||0)){
   if(state.meta?.refereeSeatsV1?.version===1){
     const metaPatch=Object.fromEntries(Object.entries(nextMeta||{}).filter(([key,value])=>key!=="stations"&&JSON.stringify(value)!==JSON.stringify(state.meta[key])));
@@ -12563,7 +12567,8 @@ function refereeCourtCount(){
 function refereeCourtSelection(){
   const key=refereeCourtViewKey();
   const count=refereeCourtCount();
-  if(refereeCourtView.key!==key||count<2||refereeCourtView.station>count){
+  if(refereeCourtView.key!==key||count<2||refereeCourtView.station>count||
+     (state.groupStage?.sharedCourts&&state.forcedCourtExits?.[refereeCourtView.station]?.closed)){
     refereeCourtView={key,station:0};
   }
   return refereeCourtView.station;
@@ -12580,7 +12585,8 @@ function refereeCourtFocusActive(){
 }
 function renderRefereeCourtSelector(count,selected){
   if(count<2)return "";
-  const buttons=Array.from({length:count+1},(_,station)=>
+  const buttons=Array.from({length:count+1},(_,station)=>station)
+    .filter(station=>!state.groupStage?.sharedCourts||!state.forcedCourtExits?.[station]?.closed).map(station=>
     `<button type="button" class="court-jump-btn" data-action="referee-select-court" data-court="${station}" aria-pressed="${selected===station}"${station?` style="${courtAtmosphereStyle(station)}"`:""}>${station?`台${station}`:"全部台"}</button>`);
   return `<div class="court-jump-nav referee-court-switch" role="group" aria-label="切換裁判台">${buttons.join("")}</div>`;
 }
@@ -12589,7 +12595,8 @@ function renderReferee(){
   const n=refereeCourtCount();
   const supportsSelection=supportsRefereeCourtSelection();
   const selected=supportsSelection?refereeCourtSelection():0;
-  const stations=selected?[selected]:Array.from({length:n},(_,i)=>i+1);
+  const stations=selected?[selected]:Array.from({length:n},(_,i)=>i+1)
+    .filter(station=>!state.groupStage?.sharedCourts||!state.forcedCourtExits?.[station]?.closed);
   const visibleCount=stations.length;
   const gridClass=visibleCount===1?"court-grid court-grid-1":visibleCount===2?"court-grid court-grid-2":visibleCount===4?"court-grid court-grid-many court-grid-4fit":"court-grid court-grid-many";
   const selector=supportsSelection?renderRefereeCourtSelector(n,selected):"";
@@ -13673,12 +13680,13 @@ function renderPeopleManagement(){
   const staffPanel=`<details class="settings-accordion" open><summary><span>工作人員分派</span><span class="hint">賽事人力</span></summary><div class="settings-accordion-body">${renderStaffAssignmentPanel()}</div></details>${renderRefereeStationAssignmentPanel()}`;
 
   const groupStageUi = window.BXHGroupStageUi && isAdminTierOrAbove() ? window.BXHGroupStageUi : null;
-  const groupStagePanel = groupStageUi?.slot(state.cloudCode,"operator",state.groupStage?.parentCode,firebaseUser?.uid)||"";
+  const groupStagePanel = groupStageUi?.slot(state.cloudCode,"operator",state.groupStage?.parentCode,firebaseUser?.uid,
+    state.groupStage?.sharedCourts ? state.groupStage.key : null)||"";
   const groupStageDraw = groupStageUi?.enabled(state.cloudCode,state.groupStage?.parentCode,firebaseUser?.uid) ? groupStageUi.drawButton(state.cloudCode,
     !!state.startedAt || !!state.bracketSize || bracketCommitBlocked() ||
     (typeof adminRosterBusyOrPending==="function" && adminRosterBusyOrPending()),firebaseUser?.uid)||"" : "";
   const bracketPanel=`
-    ${bracketCommitStatusHtml()}<div class="panel"><div class="panel-title">對戰表</div><div class="grid grid-3" style="margin-bottom:14px;"><div class="stat-box"><div class="label">對戰形式</div><div class="value small">${esc(BATTLE_MODE_LABELS[state.meta.battleMode]||"個人戰")}${state.meta.battleMode==="team"?" "+Math.max(3,Number(state.meta.teamSize)||3)+"V"+Math.max(3,Number(state.meta.teamSize)||3):""}</div></div><div class="stat-box"><div class="label">賽事制度</div><div class="value small">${esc(FORMAT_LABELS[state.meta.formatType]||"單淘汰賽")}</div></div><div class="stat-box"><div class="label">對戰表</div><div class="value small">${state.bracketSize?"已產生":"尚未產生"}</div></div></div><div class="btn-row">${bracketDrawButtonHtml()}${groupStageDraw}${state.bracketSize&&!state.startedAt?'<button class="btn btn-danger" data-action="reset-bracket" '+(bracketCommitBlocked()?'disabled':'')+'>重設對戰表</button>':''}${state.bracketSize&&!state.startedAt?'<button class="btn btn-primary" data-action="start-tournament" '+(bracketCommitBlocked()?'disabled':'')+'>賽事開始</button>':''}${state.startedAt?'<span class="badge badge-neon">'+(tournamentStatus()==="settling"?"🟠 結算中":tournamentStatus()==="done"?"⚪ 已結束":tournamentStatus()==="cancelled"?"🔴 已取消":"🟡 比賽中")+'</span>':''}</div></div>
+    ${bracketCommitStatusHtml()}<div class="panel"><div class="panel-title">對戰表</div><div class="grid grid-3" style="margin-bottom:14px;"><div class="stat-box"><div class="label">對戰形式</div><div class="value small">${esc(BATTLE_MODE_LABELS[state.meta.battleMode]||"個人戰")}${state.meta.battleMode==="team"?" "+Math.max(3,Number(state.meta.teamSize)||3)+"V"+Math.max(3,Number(state.meta.teamSize)||3):""}</div></div><div class="stat-box"><div class="label">賽事制度</div><div class="value small">${esc(FORMAT_LABELS[state.meta.formatType]||"單淘汰賽")}</div></div><div class="stat-box"><div class="label">對戰表</div><div class="value small">${state.bracketSize?"已產生":"尚未產生"}</div></div></div><div class="btn-row">${bracketDrawButtonHtml()}${groupStageDraw}${state.bracketSize&&!state.startedAt&&!state.groupStage?.sharedCourts?'<button class="btn btn-danger" data-action="reset-bracket" '+(bracketCommitBlocked()?'disabled':'')+'>重設對戰表</button>':''}${state.bracketSize&&!state.startedAt?'<button class="btn btn-primary" data-action="start-tournament" '+(bracketCommitBlocked()?'disabled':'')+'>賽事開始</button>':''}${state.startedAt?'<span class="badge badge-neon">'+(tournamentStatus()==="settling"?"🟠 結算中":tournamentStatus()==="done"?"⚪ 已結束":tournamentStatus()==="cancelled"?"🔴 已取消":"🟡 比賽中")+'</span>':''}</div></div>
     ${groupStagePanel}
     ${groupStageUi?.rehearsalProbe(state)||""}
     ${renderEntrySelection()}`;
@@ -21542,6 +21550,9 @@ async function handleTeamMatchAction(action,target){
   finally{teamMatchActionsBusy.delete(busyKey);}
 }
 function handleAction(action, target){
+  if(state.groupStage?.sharedCourts&&['draw-bracket','reset-bracket','admin-force-draw','save-meta'].includes(action)){
+    showToast('此子房使用主房的籤表與實體台，請在分組管理調整裁判台。',true);return;
+  }
   if((action==='draw-bracket'||action==='admin-force-draw')&&window.BXHGroupStageUi?.enabled(state.cloudCode,state.groupStage?.parentCode,firebaseUser?.uid)){
     showToast("本場請使用「分組抽籤」",true);return;
   }

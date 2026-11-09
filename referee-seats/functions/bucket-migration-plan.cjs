@@ -13,6 +13,7 @@ function prepare({action,code,epoch,room,publicDocument,buckets,versions}){
  const count=Math.ceil(base.meta.stations/4);if(count>MAX_BUCKETS||buckets.length>MAX_BUCKETS)throw Error('migration-size-budget');
  let manifest,state,encoded;
  if(action==='activate'){
+  if(room.groupStage?.sharedCourts===true)throw Error('unsupported-migration-room');
   if(Object.hasOwn(room,'scoreStorage')||Object.hasOwn(base,'scoreStorage'))throw Error('already-bucketed');
   if(Object.hasOwn(room,'bucketMigration'))throw Error('migration-metadata-exists');
   if(room.eventAuthority!=='official'||base.meta.eventAuthority!=='official'||room.createdByRole==='partner_organizer'||base.meta.formatType!=='single'||!['standard',undefined].includes(base.meta.scoringMode)||!['individual',undefined].includes(base.meta.battleMode)||!['standard',undefined].includes(base.meta.playMode)||room.refereeSeatsV1?.version!==1||base.courtRetirementPlan&&Number(base.courtRetirementPlan.targetCount)!==base.meta.stations)throw Error('unsupported-migration-room');

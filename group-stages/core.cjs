@@ -158,8 +158,10 @@ function matchesFor(stage, state) {
   return { places, matches: played, finalRound: rounds - 1 };
 }
 
-function collect(event, key, roomState) {
-  const stage = nextStage(event);
+function collect(event, key, roomState, parallel = false) {
+  const stage = parallel && Object.hasOwn(event.groups, key) && !Object.hasOwn(event.results, key)
+    ? { key, players: event.groups[key], bronzeMatch: false }
+    : nextStage(event);
   check(stage?.key === key, 'group-stage-order');
   return {
     ...event,
