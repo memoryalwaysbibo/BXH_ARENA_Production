@@ -1,0 +1,51 @@
+name: Six-court scoring contention lab
+on:
+  pull_request:
+    paths: ['tests/scoring-contention/**', '.github/workflows/scoring-contention-lab.yml']
+permissions:
+  contents: read
+concurrency:
+  group: scoring-contention-lab-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: c125c750aed6e1e44d2347310ac06d02322242e3
+          path: baseline
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install isolated Firebase dependencies
+        run: npm install --prefix /tmp/scoring-lab-deps --no-save --ignore-scripts firebase@10.13.0 firebase-tools@14.0.0
+      - name: Diagnose original front-end queue gates
+        env:
+          BXH_LAB_SOURCE_ROOT: ${{ github.workspace }}/baseline
+        run: node --test tests/scoring-contention/queue.test.cjs
+      - name: Run original transaction against real Firestore Emulator
+        env:
+          NODE_PATH: /tmp/scoring-lab-deps/node_modules
+          BXH_LAB_SOURCE_ROOT: ${{ github.workspace }}/baseline
+          GCLOUD_PROJECT: demo-bxh-scoring-contention
+        run: /tmp/scoring-lab-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-scoring-contention --config tests/scoring-contention/firebase.json 'node tests/scoring-contention/emulator.cjs && BXH_LAB_PHASE=confirmation node tests/scoring-contention/emulator.cjs'
+      - name: Retain evidence even when a test fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: six-court-contention-evidence
+          path: |
+            test-results/scoring-contention/
+            firestore-debug.log
+          if-no-files-found: warn
+          retention-days: 14
