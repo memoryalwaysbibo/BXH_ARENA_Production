@@ -4,11 +4,14 @@ const {createHash}=require('node:crypto');
 const {readFileSync}=require('node:fs');
 const {join}=require('node:path');
 
-const reviewedHash='580da8c9dbde90e936ff7ddd88543b3370ff2f3cd9c27c749b6aecc11802977e';
+const reviewedHashes=new Set([
+ '580da8c9dbde90e936ff7ddd88543b3370ff2f3cd9c27c749b6aecc11802977e', // Archived Rules used by the CI fixture.
+ '3d1b40acb1f4a53b43b8d8cdeabbe1a70779c59307465f0882f5e0e118500d7f', // Live Rules confirmed by the 2026-11-09 read-only check.
+]);
 const queueRules=readFileSync(join(__dirname,'../queue-rules.fragment'),'utf8').trimEnd();
 
 function composeRules(source){
- if(createHash('sha256').update(source).digest('hex')!==reviewedHash){
+ if(!reviewedHashes.has(createHash('sha256').update(source).digest('hex'))){
   throw Error('Unreviewed Firestore Rules baseline');
  }
  const edits=[
