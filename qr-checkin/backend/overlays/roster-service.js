@@ -61,12 +61,13 @@ function createRosterService(db,FieldValue,clock=Date.now){return async req=>{
  const uid=req.auth?.uid,d=req.data||{};
  if(!uid)throw Error('auth-required');
  const code=String(d.code||'').trim().toUpperCase();
- if(!/^BXH-[A-Z0-9]{4,16}$/.test(code)||!['configure','cancel','promote'].includes(d.action)||!/^[A-Za-z0-9_-]{8,100}$/.test(d.operationId||''))throw Error('invalid-operation');
+ if(!/^BXH-[A-Z0-9]{4,16}$/.test(code)||!['configure','cancel','promote','demote'].includes(d.action)||!/^[A-Za-z0-9_-]{8,100}$/.test(d.operationId||''))throw Error('invalid-operation');
  if(d.action==='configure'&&typeof d.enabled!=='boolean')throw Error('invalid-operation');
  const intent=d.intent==='player'?'player':'admin';
  const registrationId=String(d.registrationId||''),localId=String(d.localId||'');
  if(d.action==='cancel'&&((!registrationId&&!localId)||(registrationId&&localId)||!(/^[A-Za-z0-9_-]{1,128}$/.test(registrationId||localId))))throw Error('invalid-operation');
  if(d.action==='promote'&&(!/^[A-Za-z0-9_-]{1,128}$/.test(registrationId)||localId||d.expandBy!==undefined&&d.expandBy!==0))throw Error('invalid-operation');
+ if(d.action==='demote'&&(!/^[A-Za-z0-9_-]{1,128}$/.test(registrationId)||localId))throw Error('invalid-operation');
  const tr=db.doc('tournaments/'+code),pr=db.doc('publicTournaments/'+code);
  const op=tr.collection('rosterActions').doc(createHash('sha256').update(uid+'|'+d.operationId).digest('hex'));
  const hash=createHash('sha256').update(JSON.stringify({action:d.action,intent,registrationId,localId,enabled:d.enabled})).digest('hex');
@@ -86,6 +87,10 @@ function createRosterService(db,FieldValue,clock=Date.now){return async req=>{
    if(intent!=='admin'||!promotionManager(user,uid,t))throw Error('permission-denied');
    if(managed)throw Error('onsite-waitlist-managed');
    if(!quick||quick.capacity!==null)throw Error('unlimited-quick-registration-required');
+  }else if(d.action==='demote'){
+   const owner=user.role==='player'&&t.eventAuthority==='community'&&t.ownerUid===uid&&t.createdBy===uid;
+   if(intent!=='admin'||!(owner||promotionManager(user,uid,t)))throw Error('permission-denied');
+   if(managed)throw Error('onsite-waitlist-managed');
   }else if((d.action==='configure'||intent==='admin'||localId)&&!isManager)throw Error('permission-denied');
   // Ownership outlives close/disable and is read in the writing transaction.
   // Never replay an old configure/promote as if it could bypass that ownership.
@@ -112,6 +117,30 @@ function createRosterService(db,FieldValue,clock=Date.now){return async req=>{
   const local=localId?(s.players||[]).find(p=>String(p.id)===localId):null;
   if(registrationId&&!row||localId&&!local)throw Error('not-found');
   if(local&&(local.registrationId||local.source==='online'))throw Error('online-registration-required');
+  if(d.action==='demote'){
+   if(t.tournamentPhase!=='waiting'||row.status!=='confirmed')throw Error('not-confirmed');
+   if(t.waitlistEnabled===false||Number.isSafeInteger(t.waitlistCapacity)&&t.waitlistCapacity>0&&t.waitlistCapacity<=t.waitlistCount)throw Error('waitlist-full');
+   for(const [field,status]of [['confirmedCount','confirmed'],['waitlistCount','waitlist']]){
+    if(!Number.isSafeInteger(t[field])||t[field]<0||pub[field]!==t[field]||rows.filter(r=>r.status===status).length!==t[field])throw Error('registration-state-conflict');
+   }
+   if(typeof t.registrationStatus!=='string'||pub.registrationStatus!==t.registrationStatus)throw Error('registration-state-conflict');
+   row.status='waitlist';row.waitRank=t.waitlistCount+1;
+   reconcile(s,rows,quick,code);
+   const confirmed=t.confirmedCount-1,waitlist=t.waitlistCount+1;
+   const capacity=quick?quick.capacity:Number(t.capacity??s.meta.registrationCapacity??0);
+   const occupied=quick?quickParticipants(s,rows).count:s.players.length;
+   const status=t.registrationStatus==='full'&&(capacity===null||capacity<=0||occupied<capacity)?'open':t.registrationStatus;
+   s.meta.registrationCapacity=capacity;s.meta.registrationStatus=status;
+   s.registrationRosterRevision=Number(s.registrationRosterRevision||0)+1;s.updatedAt=now;
+   const patch={confirmedCount:confirmed,waitlistCount:waitlist,registrationStatus:status,updatedAt:now,lastRegistrationMutationType:'demote',lastRegistrationMutationUid:registrationId,lastRegistrationMutationBy:uid};
+   if(quick){patch.communityParticipantCount=quickParticipants(s,rows).count;s.communityParticipantCount=patch.communityParticipantCount;}
+   tx.update(row.ref,{status:'waitlist',waitRank:row.waitRank,updatedAt:FieldValue.serverTimestamp()});
+   tx.update(tr,{...patch,data:JSON.stringify(s)});
+   tx.update(pr,{...patch,bracketView:publicMirror(pub,s,{registrationCapacity:capacity,registrationStatus:status},!!quick)});
+   const result={ok:true,registrationId,status:'waitlist',capacity,confirmedCount:confirmed,waitlistCount:waitlist,registrationChanges:[{registrationId,status:'waitlist'}]};
+   tx.create(op,{actorUid:uid,requestHash:hash,result,createdAt:now});
+   return {...result,state:s};
+  }
   if(d.action==='promote'){
    if(t.tournamentPhase!=='waiting'||pub.systemClosed||pub.archiveStatus==='completed')throw Error('bracket-locked');
    if(row.status!=='waitlist')throw Error('not-waitlist');
