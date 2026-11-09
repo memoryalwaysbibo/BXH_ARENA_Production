@@ -139,6 +139,7 @@ test('backend-managed official rosters are read back without browser reconstruct
 
 test('owner action allowlist and rendered error retry stay connected to production controls',()=>{
  assert(block('const COMMUNITY_OWNER_ACTIONS = new Set([','const COMMUNITY_OWNER_TIER_ACTIONS').includes('"load-online-roster"'));
+ assert(block('const COMMUNITY_OWNER_ACTIONS = new Set([','const COMMUNITY_OWNER_TIER_ACTIONS').includes('"people-move-to-waitlist"'));
  assert.match(fn('renderPeopleManagement'),/role="alert"/);assert.match(fn('renderPeopleManagement'),/重新同步名單/);
  assert.match(fn('render'),/reconcileRegistrationRosterContext\(\)/);
  assert.match(block('  if(action==="community-exit-room"){','  if(action==="community-copy-code")'),/stopAdminRosterWatch\(\)/);
