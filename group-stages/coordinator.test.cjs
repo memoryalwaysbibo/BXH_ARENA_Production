@@ -332,3 +332,55 @@ test('private general-room rehearsal collects a 320-player event without a ladde
     await deleteApp(app);
   }
 });
+
+test('one server transaction pre-draws four 80-player child rooms', async () => {
+  const app = initializeApp({ projectId: project });
+  const db = getFirestore(app);
+  try {
+    const parentCode = 'BXH-ONEDRW', operator = 'batch-admin';
+    const players = Array.from({ length: 320 }, (_, index) => ({
+      id: 'batch-' + index, name: 'Guest ' + index, source: 'onsite',
+      participantType: 'onsite_guest', accountLinked: false,
+      ladderEligible: false, activityEligible: false,
+    }));
+    await Promise.all([
+      db.doc('users/' + operator).set({ active: true, role: 'admin' }),
+      db.doc('systemConfig/groupStages').set({ enabled: true,
+        parentCodes: [parentCode], rehearsalParentCodes: [parentCode] }),
+      db.doc('tournaments/' + parentCode).set({
+        eventAuthority: 'official', ladderMode: 'general', createdBy: operator,
+        visibility: 'private', registrationEnabled: false,
+        data: JSON.stringify({ id: 'batch-parent', players, matches: [],
+          meta: { name: 'Batch rehearsal', ladderMode: 'general', formatType: 'single',
+            battleMode: 'individual', playMode: 'standard',
+            registrationVisibility: 'private', registrationEnabled: false } }),
+      }),
+    ]);
+    const coordinator = createCoordinator(db);
+    assert.equal((await coordinator.prepare(parentCode, operator, 4)).drawAllPending, true);
+    const opened = await coordinator.openAllGroups(parentCode, operator);
+    assert.equal(opened.current.key, 'A');
+    assert.deepEqual(opened.groups.map(group => group.count), [80, 80, 80, 80]);
+    assert.deepEqual(await coordinator.openAllGroups(parentCode, operator), opened);
+    const plan = (await db.doc('groupStagePlans/' + parentCode).get()).data();
+    const entrants = new Set();
+    for (const [key, code] of Object.entries(plan.roomCodes)) {
+      const [child, mirror] = await db.getAll(
+        db.doc('tournaments/' + code), db.doc('publicTournaments/' + code));
+      const state = JSON.parse(child.data().data);
+      assert.equal(state.groupStage.key, key);
+      assert.equal(state.matches.length, 127);
+      assert.equal(state.meta.stations, 12);
+      assert(state.drawnAt && !state.startedAt);
+      assert.equal(JSON.parse(mirror.data().bracketView).matches.length, 127);
+      for (const player of state.players) {
+        assert(!entrants.has(player.id));
+        entrants.add(player.id);
+      }
+    }
+    assert.equal(entrants.size, 320);
+    assert.equal((await db.collection('ladderTransactions').get()).size, 0);
+  } finally {
+    await deleteApp(app);
+  }
+});
