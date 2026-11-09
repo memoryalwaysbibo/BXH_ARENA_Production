@@ -3206,6 +3206,7 @@ function subscribeCommunityRoomState(code){
     if(!active || context.generation!==communityRoomSnapshotGeneration || appPhase!=="community-room" ||
       currentAuthUid()!==context.uid || state.id!==context.roomId || state.cloudCode!==context.code ||
       state.ownerUid!==context.ownerUid || !isCommunityRoomOwner() || !canManageRegistrationRoster())return;
+    if(remote?.roomMissing===true&&remote.code===String(context.code).toUpperCase()){void detachConfirmedDeletedRoom(context.code,state);return;}
     if(!remote || remote.id!==context.roomId || remote.cloudCode!=null&&remote.cloudCode!==context.code)return;
     // Old create payloads predate receipt of their generated code. Only this
     // current private subscription can supply the missing code; never infer it
@@ -3225,8 +3226,62 @@ function resumeCommunityRoomStateSubscription(context){
 }
 
 let remoteAppliedRoomId=null, remoteAppliedAt=0;
+// Called only by an acknowledged delete action or a server-confirmed missing snapshot.
+// Archives remain local history; this function never sends a cloud mutation.
+function showRefereeSeatToast(message,isErr){
+  showToast(message,isErr,{kind:'referee-seat',roomCode:String(state?.cloudCode||'').toUpperCase()});
+}
+function clearRefereeSeatToasts(code){
+  const normalized=String(code||'').toUpperCase();
+  if(!normalized)return;
+  for(const element of document.querySelectorAll('.toast[data-bxh-notice-kind="referee-seat"]')){
+    if(element.dataset.bxhRoomCode===normalized)element.remove();
+  }
+}
+async function detachConfirmedDeletedRoom(code, expectedRoom=state){
+  const normalize=value=>String(value||'').toUpperCase();
+  if(!code)return false;
+  clearRefereeSeatToasts(code);
+  if(state!==expectedRoom||normalize(state.cloudCode)!==normalize(code))return false;
+  const archived=JSON.parse(JSON.stringify(state));
+  archived.cloudDeleted=true;archived.deletedCloudCode=normalize(code);archived.cloudCode=null;
+  invalidateCommunityRoomSnapshotContext();
+  if(cloudUnsub){try{cloudUnsub();}catch(e){}cloudUnsub=null;}
+  stopAdminRosterWatch();
+  clearRefereeResumeRecord();
+  if(cloudSyncQueueTimer){clearInterval(cloudSyncQueueTimer);cloudSyncQueueTimer=null;}
+  cloudSyncPending=false;cloudStatus='local';
+  courtSwapDraft=null;viewingRecordId=null;viewingRecordData=null;
+  const replacement=defaultState();state=replacement;
+  resetSettingsFormDraft();resetRegistrationFormDraft();
+  window.BXHRefereeSeats?.bind({state:()=>state,uid:currentAuthUid,operator:()=>false,render,toast:showToast});
+  if(hasAdminAccess()){appPhase='app';activeTab='management';adminTournamentListOpen=true;}
+  else{appPhase='landing';}
+  render();
+  // Both saves update the same read-modify-write local index. Keep them serial.
+  const results=[await saveRecord(archived),await saveRecord(replacement)];
+  if(state===replacement){
+    // A custom hosted storage provider may resolve after the user switches rooms.
+    // Reconcile after each awaited write until it represents the current selection.
+    let pointerTarget=replacement;
+    while(pointerTarget?.id){
+      await setCurrentId(pointerTarget.id);
+      if(state===pointerTarget)break;
+      pointerTarget=state;
+    }
+  }
+  if(results.some(ok=>ok===false)&&state===replacement)showToast('房間已從目前畫面移除，但本機紀錄未完整儲存。',true);
+  return true;
+}
+
 function applyRemoteState(remote, authoritative=false){
   try{
+    if(remote?.roomMissing===true&&authoritative===true){
+      const selected=state;
+      if(String(selected.cloudCode||'').toUpperCase()===remote.code)void detachConfirmedDeletedRoom(remote.code,selected);
+      return;
+    }
+    if(state?.cloudDeleted===true)return;
     if(!remote || !remote.id) return;
     if(Object.hasOwn(state,"scoreStorage")&&!Object.hasOwn(remote,"scoreStorage"))return;
     if(remote.id !== state.id) return; // safety: only accept updates for the room we're actually in
@@ -6497,7 +6552,12 @@ async function deleteRecordStorage(id){
   await removeFromIndex(id);
 }
 async function setCurrentId(id){
-  try{ await window.storage.set(CURRENT_ID_KEY, id); }catch(e){}
+  // Preserve invocation order even for an asynchronous hosted storage provider.
+  // Some creation flows persist an ID before assigning state, so do not filter by state.id.
+  const write=async()=>{try{await window.storage.set(CURRENT_ID_KEY,id);}catch(e){}};
+  const pending=(setCurrentId.pending||Promise.resolve()).then(write,write);
+  setCurrentId.pending=pending;
+  return pending;
 }
 async function getCurrentId(){
   try{
@@ -7095,15 +7155,18 @@ async function importRecordsWithCollisionCheck(recordsToImport){
 }
 
 let lastToastKey="", lastToastAt=0;
-function showToast(msg, isErr){
+function showToast(msg, isErr, noticeScope=null){
   const root = document.getElementById("toast-root");
   if(!root) return;
-  const now=Date.now(), key=(isErr?"E:":"I:")+String(msg);
+  const now=Date.now(), key=(noticeScope?.kind==='referee-seat'?'seat:'+String(noticeScope.roomCode||'').toUpperCase()+':':'')+(isErr?"E:":"I:")+String(msg);
   if(key===lastToastKey && now-lastToastAt<2500) return;
   lastToastKey=key; lastToastAt=now;
   const el = document.createElement("div");
   el.className = "toast" + (isErr ? " err" : "");
   el.textContent = msg;
+  if(noticeScope?.kind==='referee-seat'&&noticeScope.roomCode){
+    el.dataset.bxhNoticeKind='referee-seat';el.dataset.bxhRoomCode=String(noticeScope.roomCode).toUpperCase();
+  }
   root.appendChild(el);
   setTimeout(()=>{ el.style.opacity="0"; el.style.transition="opacity .3s"; setTimeout(()=>el.remove(),300); }, 2400);
 }
@@ -19584,7 +19647,8 @@ function render(){
     operator:()=>canUseRefereeSeatCommands(),
     eligible:()=>canJoinRefereeSeats(),
     inviter:()=>isCommunityRoomOwner()&&!isTester(),support:()=>canSupportCommunityCourt(),
-    manager:()=>canManageRefereeSeats(),render,toast:showToast});
+    manager:()=>canManageRefereeSeats(),render,toast:showRefereeSeatToast,
+    roomMissing:({code,roomId})=>{const selected=state;if(selected.id===roomId)void detachConfirmedDeletedRoom(code,selected);}});
   window.BXHQrCheckin?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,render,qr:renderQrCodeInto,applyRemote:data=>applyRemoteState(data,true),toast:showToast});
   window.BXHCommunityRefereeInvite?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,
     inviter:()=>isCommunityRoomOwner()&&!isTester(),render,qr:renderQrCodeInto,toast:showToast,open:openCommunityRefereeRoom});
@@ -23962,15 +24026,14 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       (async ()=>{
         try{
           if(window.cloudSync && window.cloudSync.connect) await window.cloudSync.connect();
+          const deletingSelection=state;
           await window.cloudSync.deleteTournament(code);
-          if(state.cloudCode===code){
-            state.cloudCode = null;
-            await saveRecord(state);
-          }
+          const detachWork=detachConfirmedDeletedRoom(code,deletingSelection);
+          const postDeleteSelection=state;
+          await detachWork;
           showToast((isCommunity?"已刪除一般房間：":"已刪除賽事：")+name);
-          adminTournamentListOpen = true;
           adminTournamentListItems = adminTournamentListItems.filter(t=>t.code!==code);
-          await loadAdminTournamentList({force:true});
+          if(state===postDeleteSelection){adminTournamentListOpen=true;await loadAdminTournamentList({force:true});}
         }catch(e){
           console.warn("[deleteTournament] failed", e);
           const raw=String((e&&e.message)||"");

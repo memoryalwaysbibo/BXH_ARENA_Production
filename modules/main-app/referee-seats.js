@@ -3,14 +3,14 @@
  const slots=['main','backup1','backup2'],labels={main:'主裁判',backup1:'備用裁判 1',backup2:'備用裁判 2'};
  const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  let ctx,key='',unsubscribe=null,busy=false,dialog=null,scheduled=false,expiryTimer=null;
- const notified=new Set();let incomingId=null;
+ const notified=new Set(),observed=new Map(),pendingNotices=[];let incomingId=null,authoritativeReady=false,generation=0;
  const state=()=>ctx?.state(),model=()=>state()?.meta?.refereeSeatsV1,uid=()=>ctx?.uid();
- const enabled=st=>st?.meta?.refereeSeatsV1?.version===1;
+ const enabled=st=>st?.cloudDeleted!==true&&st?.meta?.refereeSeatsV1?.version===1;
  function canScore(st,station,actor){return enabled(st)&&(st.meta.eventAuthority==='community'?['main']:slots).some(slot=>st.meta.refereeSeatsV1.courts?.[station]?.[slot]?.uid===actor);}
  const eligible=()=>ctx?.eligible()===true;
  const manager=()=>ctx?.manager()===true;
- const locked=()=>!state()?.cloudCode||state()?.archiveStatus==='completed'||state()?.meta?.eventCancelled===true;
- function isCurrent(k){return k===key&&k===String(state()?.cloudCode||'')+':'+String(uid()||'');}
+ const locked=()=>state()?.cloudDeleted===true||state()?.meta?.refereeSeatAccessRevoked===true||!state()?.cloudCode||state()?.archiveStatus==='completed'||state()?.meta?.eventCancelled===true;
+ function isCurrent(k,g=generation){return g===generation&&k===key&&k===String(state()?.cloudCode||'')+':'+String(uid()||'');}
  function dismiss(){if(dialog){dialog.remove();dialog=null;}incomingId=null;}
  function modal(title,choices){
   if(dialog)return false;
@@ -27,27 +27,22 @@
  };
  async function send(data){
   if(busy||locked())return;
-  const k=key,code=state().cloudCode;busy=true;ctx.render();
+  const k=key,g=generation,code=state().cloudCode;busy=true;ctx.render();
   try{
    const operationId=root.crypto?.randomUUID?.()||'seat-'+Date.now()+'-'+Math.random().toString(36).slice(2);
    const result=await root.cloudSync?.manageRefereeSeats?.({...data,code,operationId});
-   if(!isCurrent(k))return;
+   if(!isCurrent(k,g))return;
    if(!result?.ok)throw new Error(result?.reason||'cloud-unavailable');
    ctx.toast(data.action==='invite'?'已建立裁判邀請':data.action==='request'?'已提出交接申請，等待對方確認':data.action==='respond'?(data.response==='accept'?'交接完成':'已取消交接'):data.action==='cancel'?'已取消交接申請':data.action==='enable'?'三席裁判制已啟用':data.action==='leave'?'已退出本台':data.action==='revoke'?'已撤銷該席位權限':'已加入本台');
-  }catch(error){if(isCurrent(k))ctx.toast(messages[error.message]||'裁判席位未完成變更，請確認網路或服務狀態後重試。',true);}
-  finally{if(isCurrent(k)){busy=false;ctx.render();}}
+  }catch(error){if(isCurrent(k,g))ctx.toast(messages[error.message]||'裁判席位未完成變更，請確認網路或服務狀態後重試。',true);}
+  finally{if(isCurrent(k,g)){busy=false;ctx.render();}}
  }
  function checkRequests(){
-  scheduled=false;if(!ctx||!enabled(state())||!uid()||locked()||busy)return;
+  scheduled=false;if(!ctx||!authoritativeReady||!enabled(state())||!uid()||locked()||busy)return;
   const now=Date.now(),requests=Object.values(model().requests||{});
   clearTimeout(expiryTimer);const expires= requests.filter(r=>r.status==='pending'&&r.expiresAt>now&&(r.fromUid===uid()||r.toUid===uid())).map(r=>r.expiresAt);
   if(expires.length)expiryTimer=setTimeout(()=>{checkRequests();ctx?.render();},Math.max(1,Math.min(...expires)-now+10));
-  for(const r of requests){
-   const token=key+':'+r.id+':'+r.status;
-   if(r.fromUid===uid()&&r.status!=='pending'&&!notified.has(token)){
-    notified.add(token);ctx.toast(({accepted:'交接完成',rejected:'對方取消交接',cancelled:'已取消交接申請',stale:'席位已變更，交接申請已失效',expired:'交接申請已逾時'})[r.status]||'交接申請已結束');
-   }
-  }
+  for(const message of pendingNotices.splice(0))ctx.toast(message);
   if(incomingId){const r=model().requests?.[incomingId];if(!r||r.status!=='pending'||r.expiresAt<=now)dismiss();}
   const r=requests.find(r=>r.toUid===uid()&&r.status==='pending'&&r.expiresAt>now);
   if(r&&!dialog){
@@ -57,17 +52,34 @@
  }
  function bind(next){
   ctx=next;const k=String(state()?.cloudCode||'')+':'+String(uid()||'');
-  if(k!==key){unsubscribe?.();unsubscribe=null;clearTimeout(expiryTimer);expiryTimer=null;dismiss();key=k;busy=false;
+  if(k!==key){unsubscribe?.();unsubscribe=null;clearTimeout(expiryTimer);expiryTimer=null;dismiss();key=k;busy=false;generation++;authoritativeReady=false;observed.clear();notified.clear();pendingNotices.length=0;
   }
-  if(!unsubscribe&&state()?.cloudCode&&uid()&&ctx.operator()&&root.cloudSync?.subscribeRefereeSeats){
-    const code=state().cloudCode;
+  if(!unsubscribe&&!state()?.cloudDeleted&&state()?.cloudCode&&uid()&&ctx.operator()&&root.cloudSync?.subscribeRefereeSeats){
+    const code=state().cloudCode,g=generation;
     unsubscribe=root.cloudSync.subscribeRefereeSeats(code,(canonical)=>{
-     if(!isCurrent(k))return;
-     if(canonical?.accessRevoked){state().meta={...state().meta,refereeSeatAccessRevoked:true};dismiss();ctx.render();return;}
-     if(!canonical?.model)return;
+     if(!isCurrent(k,g))return;
+     if(canonical?.missing===true){
+      generation++;const room=state();room.cloudDeleted=true; // Keep the immutable history available to the archive callback.
+      authoritativeReady=false;observed.clear();notified.clear();pendingNotices.length=0;clearTimeout(expiryTimer);expiryTimer=null;dismiss();
+      unsubscribe?.();unsubscribe=null;ctx.roomMissing?.({code,roomId:room.id});ctx.render();return;
+     }
+     if(canonical?.accessRevoked){authoritativeReady=false;clearTimeout(expiryTimer);expiryTimer=null;state().meta={...state().meta,refereeSeatAccessRevoked:true};dismiss();ctx.render();return;}
+     if(!canonical?.model||canonical.fromCache===true)return;
+     // Reject stale snapshots before they can seed or mutate notification state.
      if(Number(canonical.model.revision)<Number(model()?.revision||0))return;
+     const initial=!authoritativeReady;
+     if(initial){observed.clear();authoritativeReady=true;}
+     // Observe every accepted snapshot synchronously. Rendering may coalesce,
+     // but a pending -> terminal transition must not disappear with that render.
+     for(const r of Object.values(canonical.model.requests||{})){
+      const previous=observed.get(r.id),token=key+':'+r.id+':'+r.status;
+      observed.set(r.id,r.status);
+      if(!initial&&r.fromUid===uid()&&previous==='pending'&&r.status!=='pending'&&!notified.has(token)){
+       notified.add(token);pendingNotices.push(({accepted:'交接完成',rejected:'對方取消交接',cancelled:'已取消交接申請',stale:'席位已變更，交接申請已失效',expired:'交接申請已逾時'})[r.status]||'交接申請已結束');
+      }
+     }
      const room=state(),meta={...room.meta,...canonical.projection,refereeSeatsV1:canonical.model};
-     if(JSON.stringify(meta)===JSON.stringify(room.meta))return;
+     if(JSON.stringify(meta)===JSON.stringify(room.meta)){if(!scheduled){scheduled=true;setTimeout(checkRequests,0);}return;}
      room.meta=meta;
      ctx.render();
     });
