@@ -63,6 +63,24 @@ test('four 80-player brackets and two playoffs produce one 320-player settlement
   assert.equal(champion.pointsEarned, 10 + Math.round(90 * ladder.multiplier(320)));
 });
 
+test('custom groups can reach 96 and use actual elimination counts for shared ranks', () => {
+  const players = roster(320);
+  assert.throws(() => prepare(players, 'test-seed', [97, 96, 95, 32]), { code: 'group-invalid-sizes' });
+  assert.throws(() => prepare(players, 'test-seed', [96, 96, 96, 33]), { code: 'group-invalid-sizes' });
+  assert.throws(() => prepare(roster(384), 'test-seed', [96, 96, 96, 96]), { code: 'group-roster-size' });
+
+  let event = prepare(players, 'test-seed', [96, 96, 96, 32]);
+  assert.deepEqual(Object.values(event.groups).map(group => group.length), [96, 96, 96, 32]);
+  for (let stage = nextStage(event); stage; stage = nextStage(event)) {
+    event = collect(event, stage.key, finish(stage));
+  }
+  const input = settlementInput(event);
+  assert.equal(input.participants.length, 320);
+  assert.equal(input.matches.length, 324);
+  assert.equal(input.participants.filter(player => player.placement === 225).length, 96);
+  assert.equal(input.participants.filter(player => player.placement === 9).length, 8);
+});
+
 test('result collection rejects out-of-order, altered rosters, and invalid propagation', () => {
   const event = prepare(roster(64), 'test-seed');
   const state = finish(nextStage(event));

@@ -5,7 +5,8 @@ const ladder = require('../ladder-v1.js');
 
 const GROUPS = Object.freeze(['A', 'B', 'C', 'D']);
 const STAGES = Object.freeze([...GROUPS, 'champions', 'runners-up']);
-const MAX_PER_GROUP = 80;
+const MAX_PER_GROUP = 96;
+const MAX_ROSTER = 320;
 
 function check(condition, code) {
   if (!condition) throw Object.assign(new Error(code), { code });
@@ -17,10 +18,15 @@ function accountId(player) {
     : player.registrationUid || player.accountUid || player.playerUid || player.uid || null;
 }
 
-function prepare(players, seed) {
+function prepare(players, seed, groupSizes) {
   check(Array.isArray(players) && players.length >= GROUPS.length * 4 &&
-    players.length <= GROUPS.length * MAX_PER_GROUP, 'group-roster-size');
+    players.length <= MAX_ROSTER, 'group-roster-size');
   check(typeof seed === 'string' && seed.length > 0, 'group-draw-seed');
+  if (groupSizes !== undefined) {
+    check(Array.isArray(groupSizes) && groupSizes.length === GROUPS.length &&
+      [...groupSizes].every(size => Number.isInteger(size) && size >= 4 && size <= MAX_PER_GROUP) &&
+      groupSizes.reduce((sum, size) => sum + size, 0) === players.length, 'group-invalid-sizes');
+  }
 
   const ids = new Set(), registrations = new Set(), identities = new Set();
   const draw = players.map(player => {
@@ -42,7 +48,16 @@ function prepare(players, seed) {
   draw.sort((a, b) => a.drawKey.localeCompare(b.drawKey) || a.player.id.localeCompare(b.player.id));
 
   const groups = Object.fromEntries(GROUPS.map(group => [group, []]));
-  draw.forEach(({ player }, index) => groups[GROUPS[index % GROUPS.length]].push(player));
+  if (groupSizes === undefined) {
+    draw.forEach(({ player }, index) => groups[GROUPS[index % GROUPS.length]].push(player));
+  } else {
+    let offset = 0;
+    GROUPS.forEach((group, index) => {
+      const end = offset + groupSizes[index];
+      groups[group] = draw.slice(offset, end).map(({ player }) => player);
+      offset = end;
+    });
+  }
   return { groups, results: {} };
 }
 
@@ -162,12 +177,21 @@ function collect(event, key, roomState) {
 function settlementInput(event) {
   check(!nextStage(event), 'group-stage-incomplete');
   const places = new Map();
+  const eliminations = new Map();
   for (const key of GROUPS) {
     const { matches, finalRound } = event.results[key];
     for (const match of matches) {
-      // Four group semifinal losses tie at 9th, quarterfinal losses at 17th, and so on.
-      places.set(match.loserId, GROUPS.length * 2 ** (finalRound - match.round) + 1);
+      const distance = finalRound - match.round;
+      if (!distance) continue; // Group runners-up advance to their own playoff.
+      if (!eliminations.has(distance)) eliminations.set(distance, []);
+      eliminations.get(distance).push(match.loserId);
     }
+  }
+  let remaining = GROUPS.reduce((count, key) => count + event.groups[key].length, 0);
+  for (const distance of [...eliminations.keys()].sort((a, b) => b - a)) {
+    const eliminated = eliminations.get(distance);
+    remaining -= eliminated.length;
+    for (const id of eliminated) places.set(id, remaining + 1);
   }
   const topEight = ['champions', 'runners-up'].flatMap(key => event.results[key].places);
   topEight.forEach((id, index) => places.set(id, index + 1));
