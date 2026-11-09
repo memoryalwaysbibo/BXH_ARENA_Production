@@ -5,7 +5,7 @@
 前端基準：`d35d960e08d207a9b06a088d5de990a2f8201a1f`。
 個人／家庭規則以唯讀盤點確認的正式 `familyregistration-00041-ded` 主程式為基準，候選容量修正以 SHA-256 核對後套用。只有 V2 副本跳過 #730 的程序內排程，由資料庫佇列接手。隔離測試的相依檔沿用 #730 固定快照，正式封裝前仍須核對當前相依檔。此候選用共用資料庫租約與操作紀錄取代程序內排程，保留 handler 的帳號、資格、截止、容量、配置確認與原操作憑證。`tests/captured-family-source.json` 內每個來源逐一核對 SHA-256。
 
-取消／自動遞補測試使用儲存庫的 `qr-checkin/backend/overlays/roster-service.js`；**這不是重新讀取的當前正式 roster 來源**。本輪不能據此宣稱所有正式寫入入口已完成整合。
+Hosted CI 的取消／自動遞補使用儲存庫 overlay。隔離驗證可設定 `BXH_REGISTRATION_V2_ROSTER_SOURCE` 指向本機正式來源資料夾，使用 `backend/prepare-roster.cjs` 驗證完整必要檔案後接入名單寫入。名單主程式已比對正式 `registrationrosterservice-00009-sep`；其餘相依檔使用審查快照，發布時必須用實際來源 ZIP 逐一核對。這支介接保留既有 QR 交易防護及玩家取消憑證設定。
 
 ## 行為
 

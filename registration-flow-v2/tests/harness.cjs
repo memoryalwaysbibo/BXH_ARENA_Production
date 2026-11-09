@@ -17,10 +17,12 @@ function load(file){
  return module.exports;
 }
 const familyFactory=load('family-registration.js').createFamilyRegistration;
-// This roster implementation is a repository overlay, NOT a fresh production
-// capture. Release is blocked until both writer sources are independently read back.
-const rosterFactory=require('../../qr-checkin/backend/overlays/roster-service.js').createRosterService;
-const handlers={family:store=>familyFactory(store,Date.now,{myEventsProofEnabled:true}),roster:store=>rosterFactory(store,FieldValue)};
+// Hosted CI has the public overlay. A local release check can inject the reviewed package.
+const rosterSource=process.env.BXH_REGISTRATION_V2_ROSTER_SOURCE;
+const rosterFactory=rosterSource
+ ?require('../backend/prepare-roster.cjs').prepareRosterSource(rosterSource,FieldValue).rosterFactory
+ :store=>require('../../qr-checkin/backend/overlays/roster-service.js').createRosterService(store,FieldValue);
+const handlers={family:store=>familyFactory(store,Date.now,{myEventsProofEnabled:true}),roster:rosterFactory};
 const {createQueue}=require('../backend/queue.cjs');
 function service(options={}){return createQueue(db,{handlers,FieldValue,...options});}
 let serial=0;const prefix=crypto.randomBytes(3).toString('hex').toUpperCase();
