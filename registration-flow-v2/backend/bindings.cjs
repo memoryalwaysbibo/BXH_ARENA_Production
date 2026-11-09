@@ -20,7 +20,7 @@ function createBindings({db,FieldValue,familyFactory,rosterFactory,enabled=async
    throw new HttpsError('unavailable','registration-operation-unconfirmed');
   }
  });
- const registrationQueueV2Worker=onDocumentCreated({region:'asia-east1',document:'_registrationQueueV2/{code}/_registrationQueueJobsV2/{job}',timeoutSeconds:60,maxInstances:5,retry:true},event=>queue.drain(event.params.code,{limit:200,budgetMs:45000}));
+ const registrationQueueV2Worker=onDocumentCreated({region:'asia-east1',document:'_registrationQueueV2/{code}/_registrationQueueJobsV2/{job}',timeoutSeconds:60,maxInstances:5,retry:true},event=>queue.drainCreatedJob(event.params.code,event.params.job,{limit:200,budgetMs:45000}));
  const registrationQueueV2Sweep=onSchedule({region:'asia-east1',schedule:'every 1 minutes',timeoutSeconds:540,maxInstances:1},()=>queue.sweep());
  return {registrationQueueV2,registrationQueueV2Worker,registrationQueueV2Sweep};
 }
