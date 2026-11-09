@@ -425,3 +425,19 @@ test('ownership removed after admission stops the worker before the roster chang
  assert.equal(result.operation.reason,'registration-queue-disabled');
  assert.equal((await audit(code,0)).summary.confirmed,0);
 });
+
+test('the closed deployment rejects every callable before database access even when configured gates return true',async()=>{
+ const {createBindings}=require('../backend/bindings.cjs');
+ const unexpected=()=>{throw Error('closed deployment accessed Firestore');};
+ const db={collection:()=>({doc:unexpected}),doc:unexpected,getAll:unexpected,runTransaction:unexpected,collectionGroup:unexpected};
+ const createFamilyRegistration=Object.assign(()=>unexpected,{v2CapacityAware:true});
+ const release=createBindings({db,FieldValue,createFamilyRegistration,rosterFactory:()=>unexpected,
+  promotionFactory:()=>unexpected,authorizeManagement:unexpected,stagedOnly:true,
+  enabled:async()=>true,workersEnabled:async()=>true,startEnabled:async()=>true,drawEnabled:async()=>true});
+ for(const name of ['registrationQueueV2','registrationRosterQueueV2','registrationDrawV2','registrationStartV2']){
+  await assert.rejects(release[name].run({auth:{uid:'fixture'},data:{action:'status',code:'BXH-TEST'}}),
+   {code:'failed-precondition',message:'registration-queue-disabled'});
+ }
+ await release.registrationQueueV2Worker.run({params:{code:'BXH-TEST',job:'fixture'}});
+ await release.registrationQueueV2Sweep.run({});
+});
