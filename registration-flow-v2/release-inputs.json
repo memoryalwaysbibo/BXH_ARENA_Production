@@ -20,8 +20,8 @@
     }
   },
   "registrationRosterService": {
-    "revision": "registrationrosterservice-00009-sep",
-    "generation": "1793639756822602",
+    "revision": "registrationrosterservice-00010-gaw",
+    "generation": "1794225754757557",
     "files": {
       "_qr_checkin/admin-firestore.cjs": "3c8c2abf2cb2f4142e0e8ec727e232e703d60f0a9a2449867c25464e1d8f850e",
       "_qr_checkin/guard-firestore.cjs": "b0d0027f0b79b845eb118c585bb8104d3590c1c18729737300f6fdf32d97d43b",
@@ -35,7 +35,7 @@
       "onsite-waitlist/owned.js": "649d5b78be40b89b88743b30c9ea4181957be6e1be0c6ef28aed5015e1c60433",
       "onsite-waitlist-writer-guards.js": "d35d101cab964d9210df2159e93a49d20aed39f0bdf6f6217a3e648db4141dba",
       "package.json": "19502c399dd7cca2443edc3335c6eff046cc8dbfb8e2f0491de94d1fbc2a83b5",
-      "roster-service.js": "6458496cbaedaf0a4ff34162115301cde9e1a94b229fd16d2b13b688ecfc2acf"
+      "roster-service.js": "c1301d4ccf0c2697e90d7680ae4e935fb7aadb8c76186d0b7240950d118f7b13"
     }
   }
 }

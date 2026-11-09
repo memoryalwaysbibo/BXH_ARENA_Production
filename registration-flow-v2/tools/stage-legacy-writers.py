@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage seven V2 fences on top of immutable production source ZIPs."""
+"""Stage remaining V2 fences on top of immutable production source ZIPs."""
 
 import argparse
 import hashlib
@@ -15,11 +15,9 @@ from pathlib import Path, PurePosixPath
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {
     "familyRegistration": ("familyregistration-00041-ded", "1793854788506302", "family-registration.js"),
-    "registrationRosterService": ("registrationrosterservice-00009-sep", "1793639756822602", "roster-service.js"),
+    "registrationRosterService": ("registrationrosterservice-00010-gaw", "1794225754757557", "roster-service.js"),
     "promoteSeatedRegistration": ("promoteseatedregistration-00003-fud", "1793639431385791", "service.cjs"),
     "manageOnsiteWaitlist": ("manageonsitewaitlist-00005-nog", "1793639856049774", "onsite-waitlist/firestore-store.js"),
-    "registrationInvitations": ("registrationinvitations-00006-ruk", "1793040287895762", "registration-invitations.js"),
-    "lotteryRegistration": ("lotteryregistration-00037-zas", "1794166014527215", "registration-selection.js"),
     "manageRegistrationSelection": ("manageregistrationselection-00005-yik", "1794165925233744", "registration-selection.js"),
 }
 

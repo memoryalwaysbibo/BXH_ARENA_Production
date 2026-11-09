@@ -33,6 +33,7 @@ const writers={
  },
  registrationRosterService:{
   file:'roster-service.js',
+  sha256:'c1301d4ccf0c2697e90d7680ae4e935fb7aadb8c76186d0b7240950d118f7b13',
   anchor:"  const prestartCancellation=d.action==='cancel'&&intent==='admin'&&isManager&&!managed;",
   guard:"  if(t.registrationQueueVersion===2)throw Error('registration-queue-required');",
  },

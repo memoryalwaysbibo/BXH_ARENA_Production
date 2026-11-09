@@ -88,8 +88,8 @@ def inspect(name, export_roster=None, required_files=()):
     if describe(name) != original:
         raise ValueError("source-changed-during-read")
     if export_roster is not None:
-        expected_roster = "6458496cbaedaf0a4ff34162115301cde9e1a94b229fd16d2b13b688ecfc2acf"
-        if (revision != "registrationrosterservice-00009-sep" or generation != "1793639756822602"
+        expected_roster = "c1301d4ccf0c2697e90d7680ae4e935fb7aadb8c76186d0b7240950d118f7b13"
+        if (revision != "registrationrosterservice-00010-gaw" or generation != "1794225754757557"
                 or files.get("roster-service.js") != expected_roster
                 or re.search(rb"-----BEGIN [A-Z ]*PRIVATE KEY-----", roster)):
             raise ValueError("unverified-roster-export")
