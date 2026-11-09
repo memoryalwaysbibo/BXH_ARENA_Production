@@ -83,14 +83,16 @@ SDK errors retain their existing retry behavior.
 Tests use synthetic state/auth and injected business clocks, with real SDK/gRPC
 time. Mock tests cover the exact original/candidate legacy behavior, canonical
 scores, QR, replays, interleavings, career rules and arithmetic parity. Native
-Emulator tests exercise real transactions/QR transforms, late aborts, manual/auto
-contention and six-court 160-player awards, plus the over-limit guard. They do not
-prove real Auth/App Check, Eventarc delivery, browser or production Rules behavior.
+Emulator tests exercise real transactions and QR transforms, late aborts,
+six-court 160-player awards, and competing manual and automatic settlement for
+320 players across 12 courts. A 321-player fixture verifies rejection before
+any award. Production Auth, App Check, Eventarc and Rules require separate acceptance.
 
 The automatic entry uses the selected files read back for revision
 `ladderautosettlement-00003-kuf` and generation `1793906143803503`. Its
-`ladder-settlement-core.js` is byte-identical to the earlier fixture. The entry
-preserves the deployed real-name policy for ranking records. Both settlement
+`ladder-settlement-core.js` baseline is byte-identical to the earlier fixture.
+The candidate changes its award limit to 320 accounts, matching the manual
+bucket settlement limit. The entry preserves the deployed real-name policy for ranking records. Both settlement
 paths verify that a profile name stays out of the public room data. The
 manifest records the selected-file provenance separately from the historical
 archive. The exact current ZIP and complete dependency and metadata readback

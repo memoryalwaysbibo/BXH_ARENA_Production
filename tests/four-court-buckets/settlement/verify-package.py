@@ -10,10 +10,10 @@ def blob(p):
 m=json.loads((RELEASE/'patch-manifest.json').read_text())
 for name,digest in json.loads((TEST/'fixture-sha256.json').read_text()).items():assert sha(TEST/name)==digest,name
 assert {s['function'] for s in m['patches']}=={'ladderAutoSettlement','settleLadderTournament'}
-for s in m['patches']:
+for s in [*m['patches'],m['automaticCorePatch']]:
     source=TEST/'fixtures'/str(s['sourceSet'])/s['path']
     assert sha(source)==s['baselineFileSha256']
-    if s['function']=='ladderAutoSettlement':
+    if s.get('function')=='ladderAutoSettlement':
         readback=s['deployedSourceReadback']
         assert s['archiveSha256'] is None and readback['fullArchiveVerified'] is False
         assert readback['selectedFiles']=={

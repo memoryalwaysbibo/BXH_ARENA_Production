@@ -94,7 +94,7 @@
       "path": "ladder-settlement.js",
       "archiveSha256": "920c82c930ff1771a4593d67f3ebe7b5e1bfb8594fa69ae1a707dac1c65d837e",
       "baselineFileSha256": "1aa2c25e7c74a5d8b4f131343e15b50d2519a97ec6bbcaaebb972ce43393d348",
-      "patchedFileSha256": "be92f25c1a96697ac8b74a61d741d4d615af49363ecc57b4ebd022f74c694d01",
+      "patchedFileSha256": "144434350a17116f92ea002039e13c9f80a02655c882fc981a807399aadee593",
       "edits": [
         {
           "before": "\"use strict\";\n\nconst V1 = require(\"./ladder-v1\");\n\nfunction timestampMillis(value) {\n  if (!value) return 0;\n  if (typeof value.toMillis === \"function\") return value.toMillis();\n",
@@ -127,6 +127,10 @@
         {
           "before": "          createdAt: FieldValue.serverTimestamp(),\n        });\n        results.push({playerId: item.playerUid, playerName, placement, pointsEarned: points, scoring: item.scoring});\n      }\n      transaction.update(tournamentRef, {\n        ladderPointsAwarded: true,\n        ladderSeasonId: seasonId,\n        ladderTrialSeason: trial,\n        ladderCountsTowardCareer: !trial,\n        ladderResults: results,\n        ladderSkippedPlayers: skippedPlayers,\n        ladderAwardedAt: FieldValue.serverTimestamp(),\n        ladderAwardedBy: actor.uid,\n      });\n      return {ok: true, alreadyAwarded: false, seasonId, results, skippedPlayers, awardedAt: currentTime};\n    });\n  };\n}\n\nmodule.exports = {createLadderSettlement, buildLadderSettlementPayload, computeRoundRobinStandings, deriveDoubleElimPlacements};\n",
           "after": "          createdAt: FieldValue.serverTimestamp(),\n        });\n        results.push({playerId: item.playerUid, playerName, placement, pointsEarned: points, scoring: item.scoring});\n      }\n      if(currentInput.bucket&&results.length<2)A.fail(\"bucket-insufficient-eligible-players\");\n      transaction.update(tournamentRef, {\n        ladderPointsAwarded: true,\n        ladderSeasonId: seasonId,\n        ladderTrialSeason: trial,\n        ladderCountsTowardCareer: countsTowardCareer,\n        ladderResults: results,\n        ladderSkippedPlayers: skippedPlayers,\n        ladderAwardedAt: FieldValue.serverTimestamp(),\n        ladderAwardedBy: actor.uid,\n      });\n      if(currentInput.bucket){const patches=A.finalPatches(currentInput,currentInput.state,{now:currentTime,seasonId,results,skipped:skippedPlayers,actorUid:actor.uid});transaction.set(tournamentRef,patches.privatePatch,{merge:true});transaction.set(publicRef,patches.publicPatch,{merge:true});}\n      return {ok: true, alreadyAwarded: false, seasonId, results, skippedPlayers, awardedAt: currentTime,...(currentInput.bucket?A.publicReceipt(currentInput,currentTime):{})};\n    }).catch(e=>{if(e.bucketSettlement)return result(false,e.message,\"分桶結算資料已變更或需要人工核對\");throw e;});\n  };\n}\n\nmodule.exports = {createLadderSettlement, buildLadderSettlementPayload, computeRoundRobinStandings, deriveDoubleElimPlacements};\n"
+        },
+        {
+          "before": "profileSnapshots.filter(s=>s.exists&&A.validProfile(s.data())).length>240)",
+          "after": "profileSnapshots.filter(s=>s.exists&&A.validProfile(s.data())).length>320)"
         }
       ]
     }
@@ -156,5 +160,17 @@
       }
     ],
     "scope": "forward optional expectedRoom to factory; preserve original requireAdminTier and all unrelated exports; deploy only settleLadderTournament"
+  },
+  "automaticCorePatch": {
+    "sourceSet": 10,
+    "path": "ladder-settlement-core.js",
+    "baselineFileSha256": "9ba05fa0548bd6cb52225c18f8e52d078c70e10be3e6ef7c28a2e676abbf32a6",
+    "patchedFileSha256": "979c537e802210cf62f1b2903326cb75dced544a7c8a263e217b1407c3f9768b",
+    "edits": [
+      {
+        "before": "  if(rows.length>240)",
+        "after": "  if(rows.length>320)"
+      }
+    ]
   }
 }

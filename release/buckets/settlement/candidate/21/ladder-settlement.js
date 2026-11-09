@@ -244,7 +244,7 @@ function createLadderSettlement({db, FieldValue, now = () => Date.now(), bucketR
         return result(false, "player-season-mismatch", "玩家賽季資料尚未完成切換");
       }
 
-      if(currentInput.bucket&&profileSnapshots.filter(s=>s.exists&&A.validProfile(s.data())).length>240)return result(false,'eligible-player-limit','本場超過可一次結算的有效帳號上限');
+      if(currentInput.bucket&&profileSnapshots.filter(s=>s.exists&&A.validProfile(s.data())).length>320)return result(false,'eligible-player-limit','本場超過可一次結算的有效帳號上限');
       const results = [];
       const skippedPlayers = [...skipped];
       for (let index = 0; index < resolved.length; index += 1) {
