@@ -23,7 +23,14 @@ function memory(){
 function load(spec,candidate,m){
  const base=path.join(root,'fixtures',String(spec.sourceSet)),cache=new Map();class FixedDate extends Date{static now(){return NOW;}}
  const sdk={getFirestore:()=>m.db,FieldValue:{serverTimestamp:()=>NOW,increment:n=>({__increment:n})}};
- const actual=p=>p.includes('/bucket-settlement/')?path.join(release,'bucket-settlement',p.split('/bucket-settlement/')[1]):candidate&&p===path.join(base,spec.path)?path.join(release,'candidate',String(spec.sourceSet),spec.path):p;
+ const candidateFiles=[spec.path];
+ if(spec.sourceSet===10)candidateFiles.push('ladder-settlement-core.js');
+ function actual(p){
+  if(p.includes('/bucket-settlement/'))return path.join(release,'bucket-settlement',p.split('/bucket-settlement/')[1]);
+  const name=path.relative(base,p);
+  if(candidate&&candidateFiles.includes(name))return path.join(release,'candidate',String(spec.sourceSet),name);
+  return p;
+ }
  function moduleAt(p){if(cache.has(p))return cache.get(p).exports;const mod={exports:{}};cache.set(p,mod);
   const req=n=>{
    if(n==='firebase-admin/firestore')return sdk;
@@ -58,22 +65,22 @@ function fixture({bucket=true,qr=false,courts=6}={}){
  return {m,state,top,pub,buckets,manifest};
 }
 function normalized(m,result){return clone({result,rows:[...m.rows],writes:m.writes});}
-function bracket(count){
+function bracket(count,courts=6){
  const size=2**Math.ceil(Math.log2(count)),half=size/2,players=Array.from({length:count},(_,i)=>({id:'p'+i,name:'P'+i,registrationUid:'u'+i,source:'online'}));let slots=[];
  for(let i=0;i<half;i++)slots.push(players[i].id,players[half+i]?.id||null);
  const matches=[];let round=0;
- while(slots.length>1){const next=[];for(let j=0;j<slots.length;j+=2){const a=slots[j],b=slots[j+1],isBye=!a||!b,winnerId=a||b||null;matches.push({id:'m'+round+'-'+j,a:a?{playerId:a}:null,b:b?{playerId:b}:null,round,indexInRound:j/2,seq:matches.length,bracket:'SE',station:j/2%6+1,isBye,completed:true,winnerId,loserId:isBye?null:b,scoreA:4,scoreB:1});next.push(winnerId);}slots=next;round++;}
- const state={id:'generated',cloudCode:code,meta:{eventAuthority:'official',ladderMode:'ranked',formatType:'single',stations:6,bronzeMatch:count>=4},players,matches};
+ while(slots.length>1){const next=[];for(let j=0;j<slots.length;j+=2){const a=slots[j],b=slots[j+1],isBye=!a||!b,winnerId=a||b||null;matches.push({id:'m'+round+'-'+j,a:a?{playerId:a}:null,b:b?{playerId:b}:null,round,indexInRound:j/2,seq:matches.length,bracket:'SE',station:j/2%courts+1,isBye,completed:true,winnerId,loserId:isBye?null:b,scoreA:4,scoreB:1});next.push(winnerId);}slots=next;round++;}
+ const state={id:'generated',cloudCode:code,meta:{eventAuthority:'official',ladderMode:'ranked',formatType:'single',stations:courts,bronzeMatch:count>=4},players,matches};
  if(count>=4){const semi=matches.filter(m=>m.round===round-2);state.bronzeMatchId='bronze';matches.push({id:'bronze',a:{playerId:semi[0].loserId},b:{playerId:semi[1].loserId},winnerId:semi[0].loserId,loserId:semi[1].loserId,round:round-2,indexInRound:0,seq:matches.length,bracket:'BZ',station:5,isBye:false,completed:true,scoreA:4,scoreB:1});}
  return state;
 }
-function largeFixture(count=160){
- const f=fixture(),A=require(path.join(release,'bucket-settlement/input.cjs')),B=require(path.join(release,'bucket-settlement/state.cjs')),state=A.validateResults(bracket(count));state.startedAt=NOW-1000;
+function largeFixture(count=160,courts=6){
+ const f=fixture(),A=require(path.join(release,'bucket-settlement/input.cjs')),B=require(path.join(release,'bucket-settlement/state.cjs')),state=A.validateResults(bracket(count,courts));state.startedAt=NOW-1000;
  for(const p of [...f.m.rows.keys()])if((p.startsWith('users/')&&p!=='users/admin')||p.startsWith('ladderPlayers/')||p.includes('/registrations/')||p.includes('/matchBuckets/'))f.m.remove(p);
  for(let i=0;i<count;i++){f.m.put('users/u'+i,{active:true,role:'player',realName:'P'+i});f.m.put('ladderPlayers/u'+i,{currentSeason:'S1',seasonPoints:0,careerPoints:0});f.m.put('tournaments/'+code+'/registrations/u'+i,{status:'confirmed'});}
  const manifest=B.makeManifest(state,'epoch-1'),buckets=B.encode(state,manifest).map(b=>({...b,revision:7}));
  f.m.put('tournaments/'+code,{...f.m.rows.get('tournaments/'+code),scoreStorage:manifest,data:JSON.stringify(state)});
- f.m.put('publicTournaments/'+code,{bracketView:JSON.stringify({meta:{stations:6},players:state.players.map(p=>({id:p.id,name:p.name})),matches:[]}),scoreBucketProjection:{epoch:'epoch-1',versions:Object.fromEntries(buckets.map(b=>[b.bucketId,0]))}});
+ f.m.put('publicTournaments/'+code,{bracketView:JSON.stringify({meta:{stations:courts},players:state.players.map(p=>({id:p.id,name:p.name})),matches:[]}),scoreBucketProjection:{epoch:'epoch-1',versions:Object.fromEntries(buckets.map(b=>[b.bucketId,0]))}});
  for(const b of buckets)f.m.put('tournaments/'+code+'/matchBuckets/'+b.bucketId,b);
  return {...f,state,manifest,buckets};
 }

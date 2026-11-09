@@ -9,7 +9,7 @@
       "path": "ladder-auto-settlement.js",
       "archiveSha256": null,
       "baselineFileSha256": "334106be168bcb3c3991c88fc42e282c5a1524b39293f6d50fa05d092c660ead",
-      "patchedFileSha256": "4c55957cf3c749cd4135f7d4be5f0966db738a404d3ac71c2ebe5dc80ecc3ccd",
+      "patchedFileSha256": "12b1b1237a04e7839e15458c783847597afb7a98d60c5f891a2fb7141e9f856b",
       "edits": [
         {
           "before": "const core=require('./ladder-settlement-core');",
@@ -74,6 +74,26 @@
         {
           "before": "      if(input.bucket&&priorTxSnaps.some(s=>s.exists))",
           "after": "      if(input.bucket&&playerSnaps.some(s=>s.exists&&s.data().currentSeason&&s.data().currentSeason!==plan.seasonId))return {ok:false,reason:'player-season-mismatch',permanent:true};\n      if(input.bucket&&priorTxSnaps.some(s=>s.exists))"
+        },
+        {
+          "before": "      const [tourSnap,publicSnap,controlSnap]=await Promise.all([tx.get(tourRef),tx.get(publicRef),tx.get(controlRef)]);\n",
+          "after": "      const [tourSnap,publicSnap,controlSnap]=await tx.getAll(tourRef,publicRef,controlRef);\n"
+        },
+        {
+          "before": "      const userSnaps=await Promise.all(userRefs.map(ref=>tx.get(ref)));\n",
+          "after": "      const userSnaps=userRefs.length ? await tx.getAll(...userRefs) : [];\n"
+        },
+        {
+          "before": "      const [priorTxSnaps,playerSnaps]=await Promise.all([\n        Promise.all(txRefs.map(ref=>tx.get(ref))),\n        Promise.all(playerRefs.map(ref=>tx.get(ref)))\n      ]);\n",
+          "after": "      const snapshots=await tx.getAll(...txRefs,...playerRefs);\n      const priorTxSnaps=snapshots.slice(0,txRefs.length);\n      const playerSnaps=snapshots.slice(txRefs.length);\n"
+        },
+        {
+          "before": "      if(input.bucket){const registrations=await Promise.all(scored.players.map(row=>row.player.source==='online'&&A.playerUid(row.player)?tx.get(tourRef.collection('registrations').doc(A.playerUid(row.player))):null));if(registrations.some((s,i)=>scored.players[i].player.source==='online'&&A.playerUid(scored.players[i].player)&&(!s?.exists||s.data().status!=='confirmed')))return {ok:false,reason:'bucket-cancelled-players',permanent:true};}\n",
+          "after": "      if(input.bucket){\n        const onlineUids=scored.players.filter(row=>row.player.source==='online')\n          .map(row=>A.playerUid(row.player)).filter(Boolean);\n        const registrationRefs=onlineUids.map(uid=>tourRef.collection('registrations').doc(uid));\n        const registrations=registrationRefs.length ? await tx.getAll(...registrationRefs) : [];\n        if(registrations.some(snapshot=>snapshot.data()?.status!=='confirmed')){\n          return {ok:false,reason:'bucket-cancelled-players',permanent:true};\n        }\n      }\n"
+        },
+        {
+          "before": "core.buildPlan(top,st,profiles,control)",
+          "after": "core.buildPlan(top,st,profiles,control,{bucket:input.bucket})"
         }
       ],
       "deployedSourceReadback": {
@@ -94,7 +114,7 @@
       "path": "ladder-settlement.js",
       "archiveSha256": "920c82c930ff1771a4593d67f3ebe7b5e1bfb8594fa69ae1a707dac1c65d837e",
       "baselineFileSha256": "1aa2c25e7c74a5d8b4f131343e15b50d2519a97ec6bbcaaebb972ce43393d348",
-      "patchedFileSha256": "be92f25c1a96697ac8b74a61d741d4d615af49363ecc57b4ebd022f74c694d01",
+      "patchedFileSha256": "da9ef0b2c9b992d6bac11002d85ceb9aa5362d1da4f8c70cd0459e3a47fff334",
       "edits": [
         {
           "before": "\"use strict\";\n\nconst V1 = require(\"./ladder-v1\");\n\nfunction timestampMillis(value) {\n  if (!value) return 0;\n  if (typeof value.toMillis === \"function\") return value.toMillis();\n",
@@ -127,6 +147,26 @@
         {
           "before": "          createdAt: FieldValue.serverTimestamp(),\n        });\n        results.push({playerId: item.playerUid, playerName, placement, pointsEarned: points, scoring: item.scoring});\n      }\n      transaction.update(tournamentRef, {\n        ladderPointsAwarded: true,\n        ladderSeasonId: seasonId,\n        ladderTrialSeason: trial,\n        ladderCountsTowardCareer: !trial,\n        ladderResults: results,\n        ladderSkippedPlayers: skippedPlayers,\n        ladderAwardedAt: FieldValue.serverTimestamp(),\n        ladderAwardedBy: actor.uid,\n      });\n      return {ok: true, alreadyAwarded: false, seasonId, results, skippedPlayers, awardedAt: currentTime};\n    });\n  };\n}\n\nmodule.exports = {createLadderSettlement, buildLadderSettlementPayload, computeRoundRobinStandings, deriveDoubleElimPlacements};\n",
           "after": "          createdAt: FieldValue.serverTimestamp(),\n        });\n        results.push({playerId: item.playerUid, playerName, placement, pointsEarned: points, scoring: item.scoring});\n      }\n      if(currentInput.bucket&&results.length<2)A.fail(\"bucket-insufficient-eligible-players\");\n      transaction.update(tournamentRef, {\n        ladderPointsAwarded: true,\n        ladderSeasonId: seasonId,\n        ladderTrialSeason: trial,\n        ladderCountsTowardCareer: countsTowardCareer,\n        ladderResults: results,\n        ladderSkippedPlayers: skippedPlayers,\n        ladderAwardedAt: FieldValue.serverTimestamp(),\n        ladderAwardedBy: actor.uid,\n      });\n      if(currentInput.bucket){const patches=A.finalPatches(currentInput,currentInput.state,{now:currentTime,seasonId,results,skipped:skippedPlayers,actorUid:actor.uid});transaction.set(tournamentRef,patches.privatePatch,{merge:true});transaction.set(publicRef,patches.publicPatch,{merge:true});}\n      return {ok: true, alreadyAwarded: false, seasonId, results, skippedPlayers, awardedAt: currentTime,...(currentInput.bucket?A.publicReceipt(currentInput,currentTime):{})};\n    }).catch(e=>{if(e.bucketSettlement)return result(false,e.message,\"分桶結算資料已變更或需要人工核對\");throw e;});\n  };\n}\n\nmodule.exports = {createLadderSettlement, buildLadderSettlementPayload, computeRoundRobinStandings, deriveDoubleElimPlacements};\n"
+        },
+        {
+          "before": "profileSnapshots.filter(s=>s.exists&&A.validProfile(s.data())).length>240)",
+          "after": "profileSnapshots.filter(s=>s.exists&&A.validProfile(s.data())).length>320)"
+        },
+        {
+          "before": "        const initial=await db.runTransaction(async tx=>{const [r,p,user]=await Promise.all([tx.get(tournamentRef),tx.get(publicRef),tx.get(db.doc('users/'+actor.uid))]);if(!r.exists)A.fail('bucket-room-changed');if(!A.validProfile(user.data())||!['admin','super_admin'].includes(user.data().role))A.fail('admin-required');const input=await A.load({tx,db,root:r,pub:p,observed,runtime:bucketRuntime,env:bucketEnv});if(!input.bucket)A.fail('bucket-mode-changed');if(input.m.roomId!==expectedRoom.roomId||input.m.epoch!==expectedRoom.epoch)A.fail('bucket-room-changed');return {r,input};});\n",
+          "after": "        const initial=await db.runTransaction(async tx=>{const [r,p,user]=await tx.getAll(tournamentRef,publicRef,db.doc('users/'+actor.uid));if(!r.exists)A.fail('bucket-room-changed');if(!A.validProfile(user.data())||!['admin','super_admin'].includes(user.data().role))A.fail('admin-required');const input=await A.load({tx,db,root:r,pub:p,observed,runtime:bucketRuntime,env:bucketEnv});if(!input.bucket)A.fail('bucket-mode-changed');if(input.m.roomId!==expectedRoom.roomId||input.m.epoch!==expectedRoom.epoch)A.fail('bucket-room-changed');return {r,input};});\n"
+        },
+        {
+          "before": "      const [tournamentSnapshot, controlSnapshot,publicSnapshot] = await Promise.all([transaction.get(tournamentRef), transaction.get(controlRef),transaction.get(publicRef)]);\n",
+          "after": "      const [tournamentSnapshot, controlSnapshot,publicSnapshot] = await transaction.getAll(tournamentRef, controlRef, publicRef);\n"
+        },
+        {
+          "before": "      const [playerSnapshots, profileSnapshots, logSnapshots, registrationSnapshots] = await Promise.all([\n        Promise.all(playerRefs.map((ref) => transaction.get(ref))),\n        Promise.all(profileRefs.map((ref) => transaction.get(ref))),\n        Promise.all(logRefs.map((ref) => transaction.get(ref))),\n        Promise.all(registrationRefs.map((ref) => ref ? transaction.get(ref) : null)),\n      ]);\n",
+          "after": "      const refs = [...playerRefs, ...profileRefs, ...logRefs, ...registrationRefs.filter(Boolean)];\n      const snapshots = refs.length ? await transaction.getAll(...refs) : [];\n      const count = resolved.length;\n      const playerSnapshots = snapshots.slice(0, count);\n      const profileSnapshots = snapshots.slice(count, count * 2);\n      const logSnapshots = snapshots.slice(count * 2, count * 3);\n      const registrationSnapshots = new Map(snapshots.slice(count * 3).map(snapshot => [snapshot.ref.path, snapshot]));\n"
+        },
+        {
+          "before": "      registrationSnapshots.forEach((snapshot, index) => {\n        if (registrationRefs[index] && (!snapshot?.exists || snapshot.data()?.status !== \"confirmed\")) cancelled.push(resolved[index].playerName);\n",
+          "after": "      registrationRefs.forEach((ref, index) => {\n        if (ref && registrationSnapshots.get(ref.path)?.data()?.status !== \"confirmed\") {\n          cancelled.push(resolved[index].playerName);\n        }\n"
         }
       ]
     }
@@ -156,5 +196,21 @@
       }
     ],
     "scope": "forward optional expectedRoom to factory; preserve original requireAdminTier and all unrelated exports; deploy only settleLadderTournament"
+  },
+  "automaticCorePatch": {
+    "sourceSet": 10,
+    "path": "ladder-settlement-core.js",
+    "baselineFileSha256": "9ba05fa0548bd6cb52225c18f8e52d078c70e10be3e6ef7c28a2e676abbf32a6",
+    "patchedFileSha256": "912694bf01c19f40f90e2cdb2a5ed28d8aecc617e1b3f7d577631cb810b3362f",
+    "edits": [
+      {
+        "before": "function buildPlan(top,st,profilesByUid,control){",
+        "after": "function buildPlan(top,st,profilesByUid,control,{bucket=false}={}){"
+      },
+      {
+        "before": "  if(rows.length>240)",
+        "after": "  const accountLimit=bucket?320:240;\n  if(rows.length>accountLimit)"
+      }
+    ]
   }
 }

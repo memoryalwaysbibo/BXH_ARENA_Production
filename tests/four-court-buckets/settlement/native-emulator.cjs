@@ -9,7 +9,7 @@ const release=path.resolve(__dirname,'../../../release/buckets/settlement'),temp
 const collections=['users','tournaments','publicTournaments','systemConfig','ladderPlayers','ladderTransactions','ladderSystem'];
 function handler(spec,candidate,{production=false}={}){const key=spec.function+candidate+production;if(cache.has(key))return cache.get(key);
  const dir=path.join(temp,key);fs.mkdirSync(dir,{recursive:true});fs.cpSync(path.join(__dirname,'fixtures',String(spec.sourceSet)),dir,{recursive:true});
- if(candidate){fs.copyFileSync(path.join(release,'candidate',String(spec.sourceSet),spec.path),path.join(dir,spec.path));fs.cpSync(path.join(release,'bucket-settlement'),path.join(dir,'bucket-settlement'),{recursive:true});}
+ if(candidate){fs.cpSync(path.join(release,'candidate',String(spec.sourceSet)),dir,{recursive:true});fs.cpSync(path.join(release,'bucket-settlement'),path.join(dir,'bucket-settlement'),{recursive:true});}
  const mod=require(path.join(dir,spec.path)),guarded=require(path.join(dir,'_qr_checkin/admin-firestore.cjs')).getFirestore();
  const options={db:guarded,FieldValue,clock:()=>NOW,now:()=>NOW,serverTimestamp:()=>FieldValue.serverTimestamp(),bucketRuntime:production?'production':'emulator'};
  const fn=spec.function==='ladderAutoSettlement'?mod._ladderAutoSettlementTest.createSettlementService(options).settle:mod.createLadderSettlement(options);
@@ -58,16 +58,73 @@ async function state(){const out=[];async function walk(col){for(const ref of aw
    {await seed(fixture());const before=await state(),r=await handler(spec,true,{production:true})();assert.equal(r.ok,false);assert.match(r.reason,/runtime-disabled|project-mismatch/);assert.deepEqual(await state(),before);checks++;}
    // Preserve career totals for S0 and explicitly non-career seasons.
    for(const currentSeason of ['S0','S1']){const f=fixture();f.m.put('ladderSystem/current',{status:'active',currentSeason,countsTowardCareer:false,isTrialSeason:currentSeason==='S0'});for(let i=1;i<=4;i++)f.m.put('ladderPlayers/u'+i,{...f.m.rows.get('ladderPlayers/u'+i),currentSeason});await seed(f);const r=await handler(spec,true)();assert(r.ok,r.reason);assert.equal((await db.doc('ladderPlayers/u1').get()).data().careerPoints,10);checks++;}
+   console.log('Checking 160 and 321 player capacity for '+spec.function);
    // Six-court / 160-player transaction: real points + ledger + archive writes.
    {const f=largeFixture(160);await seed(f);const r=await handler(spec,true)();assert(r.ok,r.reason);assert.equal((await db.collection('ladderTransactions').get()).size,160);assert.equal((await db.doc('ladderPlayers/u0').get()).data().seasonPoints,246);assert.equal((await db.doc('tournaments/'+code).get()).data().archiveStatus,'completed');checks++;}
-   {const f=largeFixture(256);await seed(f);const r=await handler(spec,true)();assert.equal(r.ok,false);assert.equal(r.reason,'eligible-player-limit');assert.equal((await db.collection('ladderTransactions').get()).size,0);assert.equal((await db.doc('ladderPlayers/u0').get()).data().seasonPoints,0);checks++;}
+   {const f=largeFixture(321,12);await seed(f);const r=await handler(spec,true)();assert.equal(r.ok,false);assert.equal(r.reason,'eligible-player-limit');assert.equal((await db.collection('ladderTransactions').get()).size,0);assert.equal((await db.doc('ladderPlayers/u0').get()).data().seasonPoints,0);assert.equal((await db.doc('tournaments/'+code).get()).data().archiveStatus,'ongoing');checks++;}
   }
   // Both services read the same buckets and contend on the same ledger/root.
   for(const qr of [false,true]){await seed(fixture({qr}));const r=await Promise.all(specs.map(s=>handler(s,true)()));assert(r.every(x=>x.ok));assert.equal((await db.doc('ladderPlayers/u1').get()).data().seasonPoints,105);assert.equal((await db.collection('ladderTransactions').get()).size,4);if(qr)assert.equal((await db.doc('tournaments/'+code).get()).data().qrCheckinRevision,2);checks++;}
+  {
+   console.log('Checking concurrent manual and automatic settlement for 320 players');
+   await seed(largeFixture(320,12));
+   const results=await Promise.all(specs.map(spec=>handler(spec,true)()));
+   assert(results.every(result=>result.ok),JSON.stringify(results.map(result=>result.reason)));
+   assert.equal(results.filter(result=>result.alreadyAwarded).length,1);
+   const ledger=await db.collection('ladderTransactions').get();
+   assert.equal(ledger.size,320);
+   assert(ledger.docs.every(document=>document.data().pointsEarned>0));
+   assert.equal((await db.doc('ladderPlayers/u0').get()).data().totalEvents,1);
+   assert.equal((await db.doc('tournaments/'+code).get()).data().archiveStatus,'completed');
+   assert.equal((await db.doc('publicTournaments/'+code).get()).data().archiveStatus,'completed');
+   checks++;
+  }
+  const automatic=specs.find(spec=>spec.function==='ladderAutoSettlement');
+  {
+   const f=largeFixture(320,12);
+   const {scoreStorage,...legacyRoom}=f.m.rows.get('tournaments/'+code);
+   const {scoreBucketProjection,...legacyPublic}=f.m.rows.get('publicTournaments/'+code);
+   f.m.put('tournaments/'+code,legacyRoom);
+   f.m.put('publicTournaments/'+code,legacyPublic);
+   await seed(f);
+   const result=await handler(automatic,true)();
+   assert.equal(result.reason,'eligible-player-limit');
+   assert.equal((await db.collection('ladderTransactions').get()).size,0);
+   checks++;
+  }
+  for(const failed of specs){
+   console.log('Checking 320-player rollback and cross-service retry after '+failed.function);
+   await seed(largeFixture(320,12));
+   const room=db.doc('tournaments/'+code),publicRoom=db.doc('publicTournaments/'+code);
+   const {bracketView}=(await publicRoom.get()).data();
+   await publicRoom.update({bracketView:'{invalid'});
+   const before=await db.getAll(room,publicRoom);
+   const result=await handler(failed,true)();
+   assert.equal(result.ok,false);
+   assert.equal(result.reason,'bucket-public-corrupt');
+   const after=await db.getAll(room,publicRoom);
+   assert(before.every((snapshot,index)=>snapshot.updateTime.isEqual(after[index].updateTime)));
+   assert.equal((await db.collection('ladderTransactions').get()).size,0);
+   const unawarded=await db.collection('ladderPlayers').get();
+   assert.equal(unawarded.size,320);
+   assert(unawarded.docs.every(document=>document.data().seasonPoints===0));
+
+   await publicRoom.update({bracketView});
+   const retry=specs.find(spec=>spec!==failed);
+   const recovered=await handler(retry,true)();
+   assert(recovered.ok,recovered.reason);
+   assert.equal((await handler(failed,true)()).alreadyAwarded,true);
+   assert.equal((await db.collection('ladderTransactions').get()).size,320);
+   const awarded=await db.collection('ladderPlayers').get();
+   assert(awarded.docs.every(document=>document.data().seasonPoints>0&&document.data().totalEvents===1));
+   assert.equal((await room.get()).data().archiveStatus,'completed');
+   assert.equal((await publicRoom.get()).data().archiveStatus,'completed');
+   checks++;
+  }
   const boundManual=specs.find(s=>s.function==='settleLadderTournament');
  for(const expectedRoom of [null,{}, {roomId:'wrong',epoch:'epoch-1'}, {roomId:'room-1',epoch:'old'}, {roomId:'room-1',epoch:'epoch-1',extra:1}]){await seed(fixture());const before=await state();const r=await handler(boundManual,true)({expectedRoom});assert.equal(r.ok,false);assert.deepEqual(await state(),before);checks++;}
  {await seed(fixture());assert((await handler(boundManual,true)()).ok);await db.doc('users/admin').update({active:false});const before=await state();assert.equal((await handler(boundManual,true)()).ok,false);assert.deepEqual(await state(),before);checks++;}
  {await seed(fixture({bucket:false}));const before=await state();assert.equal((await handler(boundManual,true)({expectedRoom:{roomId:'room-1',epoch:'epoch-1'}})).ok,false);assert.deepEqual(await state(),before);checks++;}
- console.log(JSON.stringify({nativeSettlementChecks:checks,project,productionWrites:0,productionRequests:0,scope:'real SDK, QR proxy, 160-player awards and cross-service contention; synthetic auth and injected business clock'}));
+ console.log(JSON.stringify({nativeSettlementChecks:checks,project,productionWrites:0,productionRequests:0,scope:'real SDK, QR proxy, 160-player awards and 320-player cross-service contention; synthetic auth and injected business clock'}));
  }finally{await clear();await db.terminate();await deleteApp(app);fs.rmSync(temp,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -57,10 +57,72 @@
   "productionWrites": 0,
   "roomActivationPerformed": false,
   "files": {
+    ".github/workflows/bucket-activity-writer.yml": {
+      "blob": "05f7b0c1309f287aaef5d60b6ea4ae60195f00cb",
+      "components": [
+        718
+      ]
+    },
+    ".github/workflows/bucket-admission-writers.yml": {
+      "blob": "09cb2e3a39c50a0525e29aa3511d3a0551c42b33",
+      "components": [
+        711
+      ]
+    },
+    ".github/workflows/bucket-derived-title.yml": {
+      "blob": "f27b538b62369d8bc602320beeb860cc6513a193",
+      "components": [
+        723
+      ]
+    },
+    ".github/workflows/bucket-general-completion.yml": {
+      "blob": "e96ee087c32ee987c41d5d24b43915ce180e9969",
+      "components": [
+        715
+      ]
+    },
+    ".github/workflows/bucket-integrated-candidate.yml": {
+      "components": [],
+      "blob": "d86a2785f486805fca87062b4720e1e639c8fe57"
+    },
+    ".github/workflows/bucket-interaction-writers.yml": {
+      "blob": "e2ac907a033a00e471841b58c7f291d8c70f991f",
+      "components": [
+        709
+      ]
+    },
     ".github/workflows/bucket-live-release-rules.yml": {
       "blob": "d0d3aa48feff8ed5268f0b26037d5c35acd465f3",
       "components": [
         707
+      ]
+    },
+    ".github/workflows/bucket-my-events-proof.yml": {
+      "components": [],
+      "blob": "0aa4e3c3f4160b8cb0bb5a58db67fd9b42e86f4e"
+    },
+    ".github/workflows/bucket-operations-writers.yml": {
+      "blob": "2434866b9564b47f98f6a63c5dfef1d45eed2517",
+      "components": [
+        712
+      ]
+    },
+    ".github/workflows/bucket-poster-writers.yml": {
+      "blob": "a7433318483066f4bc4e291609edf2a1fbda204c",
+      "components": [
+        717
+      ]
+    },
+    ".github/workflows/bucket-settlement-ui.yml": {
+      "blob": "19d7ff8e3b05d055bfd3fa76cb2cf9b2992507be",
+      "components": [
+        714
+      ]
+    },
+    ".github/workflows/bucket-settlement.yml": {
+      "blob": "00829471800adda8ee4a80770c911901391e8968",
+      "components": [
+        713
       ]
     },
     "index.html": {
@@ -84,10 +146,202 @@
         714
       ]
     },
+    "modules/scoring/four-court-settlement.js": {
+      "blob": "d9589a7768b235afb17e53abded96bee3e96ae66",
+      "components": [
+        714
+      ]
+    },
     "release/buckets/README.md": {
       "blob": "bec8dca9600c468810f44e726e5e0ec00c0f80bb",
       "components": [
         707
+      ]
+    },
+    "release/buckets/activity/README.md": {
+      "blob": "3a0e608f65399eda7006c89a9fbe2c294835cf95",
+      "components": [
+        718
+      ]
+    },
+    "release/buckets/activity/activity-points.js": {
+      "blob": "e073fc96c63c95e05ed0f00ba753b8a056f71f75",
+      "components": [
+        718
+      ]
+    },
+    "release/buckets/activity/activity-tournament-guard.cjs": {
+      "blob": "abae41bed7cfe779b589c79e12e6848d81af4613",
+      "components": [
+        718
+      ]
+    },
+    "release/buckets/activity/certificate.cjs": {
+      "blob": "43f8e61677a3e44a94bb3d24a2e69e9a3b7a9ddf",
+      "components": [
+        718
+      ]
+    },
+    "release/buckets/activity/patch-manifest.json": {
+      "blob": "4621a00000c4cc052f697b518a212dd4a24c075d",
+      "components": [
+        718
+      ]
+    },
+    "release/buckets/activity/protocol/state.cjs": {
+      "blob": "da457b44c6694293470efa3ce71699ada100b8b1",
+      "components": [
+        718
+      ]
+    },
+    "release/buckets/admissions/README.md": {
+      "blob": "aadf010e417359b9cf6ac805af9ecc43b0c10886",
+      "components": [
+        711
+      ]
+    },
+    "release/buckets/admissions/candidate/11/registration-selection.js": {
+      "blob": "f881f3ee2b95f250d1bcfad89ba3d0b7e198a659",
+      "components": [
+        711
+      ]
+    },
+    "release/buckets/admissions/candidate/12/entry-selection.js": {
+      "blob": "bd8be24bc8c3b49352efb5e0de1e5cc9d2e8e371",
+      "components": [
+        711
+      ]
+    },
+    "release/buckets/admissions/candidate/19/registration-invitations.js": {
+      "blob": "d729c2e43df0e2b12bb8d329048a6d58a9ce8a5c",
+      "components": [
+        711
+      ]
+    },
+    "release/buckets/admissions/patch-manifest.json": {
+      "blob": "5fae3752d3dbac8045c4aef06ca7bef121fbcd5a",
+      "components": [
+        711
+      ]
+    },
+    "release/buckets/completion/README.md": {
+      "blob": "b393f6f1c948fce490c82976a9364457283428b9",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/certificate.cjs": {
+      "blob": "43f8e61677a3e44a94bb3d24a2e69e9a3b7a9ddf",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/general-completion.cjs": {
+      "blob": "24293cb1311afb07fb4cc126cd396d12ccb4a450",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/hosting-guard.cjs": {
+      "blob": "b143d56b998d0a258935ae2bf9c8c0020b6711f5",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/hosting/15/hosting-core.js": {
+      "blob": "21402b6fe8b315d85989e7319c2066e348ccc720",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/hosting/15/hosting.js": {
+      "blob": "899272ab01fc0e2013bd7c631caef44b8efbfafa",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/hosting/16/hosting-core.js": {
+      "blob": "21402b6fe8b315d85989e7319c2066e348ccc720",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/hosting/16/hosting.js": {
+      "blob": "899272ab01fc0e2013bd7c631caef44b8efbfafa",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/hosting/host-sync/hosting-core.js": {
+      "blob": "21402b6fe8b315d85989e7319c2066e348ccc720",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/hosting/host-sync/hosting.js": {
+      "blob": "899272ab01fc0e2013bd7c631caef44b8efbfafa",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/index.js": {
+      "blob": "b6f926eaadc0f496c06d7f7819b25e86a55e3cf4",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/package.json": {
+      "blob": "d977d35c97d01be65dcdfa0ff35049c2e55551df",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/patch-manifest.json": {
+      "blob": "2b74647706a594c805d06585ed31bc4d2543549f",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/protocol/core.cjs": {
+      "blob": "c4df85aa68acea59f6fa4552742e7b193b1b35da",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/protocol/event-staff-core.cjs": {
+      "blob": "666f90fb8e8abc13538dbeba249c139a0cc8f544",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/protocol/public-view.cjs": {
+      "blob": "5cff2163eef1ef8de0528285b115c0bfa7adea96",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/protocol/qr-checkin-fence.cjs": {
+      "blob": "7c7bbc1f65d652b5b169e7e3987552bdddee75e9",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/protocol/results.cjs": {
+      "blob": "1bf199ff39625e65f0a879980716db8a31bded24",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/protocol/runtime.cjs": {
+      "blob": "9d18ce79fc148c4d1b6bc56798f872496b7c6996",
+      "components": [
+        715
+      ]
+    },
+    "release/buckets/completion/protocol/state.cjs": {
+      "blob": "da457b44c6694293470efa3ce71699ada100b8b1",
+      "components": [
+        715
       ]
     },
     "release/buckets/deletion/README.md": {
@@ -126,6 +380,12 @@
         707
       ]
     },
+    "release/buckets/deletion/review-source-manifest.json": {
+      "components": [
+        707
+      ],
+      "blob": "8e6c99fddfe780943c15f55f9ccd80e87ca27335"
+    },
     "release/buckets/deletion/room-access-service.js": {
       "blob": "5246fe0658c9c9e9222027dcd54f2da89e87b81a",
       "components": [
@@ -144,16 +404,644 @@
         707
       ]
     },
+    "release/buckets/derived/README.md": {
+      "blob": "846561cc668fbbe05b363b8e66058a2bfd262452",
+      "components": [
+        723
+      ]
+    },
+    "release/buckets/derived/candidate/index.js": {
+      "blob": "e59c5c72fa96983dc4e1d1cb529179b4a32e6210",
+      "components": [
+        723
+      ]
+    },
+    "release/buckets/derived/index.patch": {
+      "blob": "ea3f8789758a2d0e51a19bf0e663debaefe8409c",
+      "components": [
+        723
+      ]
+    },
+    "release/buckets/derived/manifest.json": {
+      "blob": "1649b27d53ed1868aa6df1eb14fcd58929e0045f",
+      "components": [
+        723
+      ]
+    },
     "release/buckets/firestore.rules": {
       "blob": "1f9c8135e0597b3fa59082dc32f0922fef45e5b3",
       "components": [
         707
       ]
     },
+    "release/buckets/integration/README.md": {
+      "components": [],
+      "blob": "8ef144475071b5fbccece09119dbf6771e137b65"
+    },
+    "release/buckets/integration/close-idle-fence.patch": {
+      "blob": "f647a852b3cb733644ae22eb6bb64ad99e54aa46",
+      "components": [
+        707
+      ]
+    },
+    "release/buckets/integration/close-idle-production-lease-fence.patch": {
+      "blob": "0dc80db06363518dbc47bab0590a8f2e056bb244",
+      "components": [
+        707
+      ]
+    },
+    "release/buckets/integration/live-followup-20261105.json": {
+      "components": [],
+      "blob": "7af449506ae1287572933614cb770923d8786232"
+    },
+    "release/buckets/integration/live-priority-writers-20261105.json": {
+      "components": [],
+      "blob": "77a652551b523f3fce6656d1217a93b114c709eb"
+    },
+    "release/buckets/integration/writer-discovery-20261105.md": {
+      "components": [],
+      "blob": "801e7cfb320bd29cc25130e69530603840291e09"
+    },
+    "release/buckets/interactions/README.md": {
+      "blob": "ef4906aaa39e560547d71e2a78d6cf6d8609daff",
+      "components": [
+        709
+      ]
+    },
+    "release/buckets/interactions/candidate/23/team-lineup-service.js": {
+      "blob": "c46ee0d29941a59b87b509f7ab4b2c64d1bf1f5f",
+      "components": [
+        709
+      ]
+    },
+    "release/buckets/interactions/candidate/24/team-registration-service.js": {
+      "blob": "ae7a3760031d06450b7b95c7760b84a550a09cb3",
+      "components": [
+        709
+      ]
+    },
+    "release/buckets/interactions/candidate/25/team-scoring-service.js": {
+      "blob": "4b8535c2c3ee1bfc5d64a90e8006bad50e0b5ea5",
+      "components": [
+        709
+      ]
+    },
+    "release/buckets/interactions/candidate/3/court-call-service.js": {
+      "blob": "2170e63ba30864be9e29cf4f91c2f7775fe02f4e",
+      "components": [
+        709
+      ]
+    },
+    "release/buckets/interactions/candidate/6/enchantment-service.js": {
+      "blob": "66eb9571d3e8d9a9772e046597a7b34f79a6714d",
+      "components": [
+        709
+      ]
+    },
+    "release/buckets/interactions/candidate/9/family-registration.js": {
+      "blob": "a27e58316d9888ecd4686caa26e72f7abb58c0ec",
+      "components": [
+        709
+      ]
+    },
+    "release/buckets/interactions/patch-manifest.json": {
+      "blob": "f25962d8db26451684417b46edb7c808aafc8d26",
+      "components": [
+        709
+      ]
+    },
+    "release/buckets/my-events/patch-assembly.cjs": {
+      "components": [],
+      "blob": "a21fce1dd06881eb3cbee84a7684f63cd50c9d57"
+    },
+    "release/buckets/my-events/patch-bootstrap-start.cjs": {
+      "components": [],
+      "blob": "b53a5f9a5918fed468f6b68f80ef7ff5b24156a1"
+    },
+    "release/buckets/my-events/patch-bootstrap.cjs": {
+      "components": [],
+      "blob": "cf771734eaa3febeef31e12e6c0fd7ca0f24c229"
+    },
+    "release/buckets/my-events/patch-rebuild.cjs": {
+      "components": [],
+      "blob": "e6bd7289ce41a2875f70a940a6c1c2bfb23e8ba8"
+    },
+    "release/buckets/my-events/patch-repair-engine.cjs": {
+      "blob": "3b22ae9d8d4493b8f28b799b44269b365198d58b",
+      "components": []
+    },
+    "release/buckets/my-events/patch-service.cjs": {
+      "components": [],
+      "blob": "ce83658a6f6104e9beb529d05f92228dcb925778"
+    },
+    "release/buckets/operations/README.md": {
+      "blob": "16a8d0ebbb977b8825ddf2300b72b0b00d2779fb",
+      "components": [
+        712
+      ]
+    },
+    "release/buckets/operations/candidate/5/operations.js": {
+      "blob": "5064ae54aa4304c393361a19622eef725764d609",
+      "components": [
+        712
+      ]
+    },
+    "release/buckets/operations/candidate/7/event-staff.js": {
+      "blob": "9528ccb4240165c3439229339be54d2c65ee368c",
+      "components": [
+        712
+      ]
+    },
+    "release/buckets/operations/patch-manifest.json": {
+      "blob": "159923c1b09c35a7fb553fcf0e480cb8e00e00a0",
+      "components": [
+        712
+      ]
+    },
+    "release/buckets/poster/README.md": {
+      "blob": "65ce34152914a649f205c4924c0c324179a59030",
+      "components": [
+        717
+      ]
+    },
+    "release/buckets/poster/bucket-poster-fence.cjs": {
+      "blob": "b9cafb6e94d87a43ce039d125fdf5f6cb6464d42",
+      "components": [
+        717
+      ]
+    },
+    "release/buckets/poster/bucket-state.cjs": {
+      "blob": "da457b44c6694293470efa3ce71699ada100b8b1",
+      "components": [
+        717
+      ]
+    },
+    "release/buckets/poster/patch-manifest.json": {
+      "blob": "8e20ff26c1b396ec57b260fde18bac46d6d1b157",
+      "components": [
+        717
+      ]
+    },
+    "release/buckets/poster/room-poster-cover.js": {
+      "blob": "30656d0b089c09664f8735d91768d1fa175b1ff6",
+      "components": [
+        717
+      ]
+    },
+    "release/buckets/settlement/README.md": {
+      "blob": "15b3a6ad52af9328622d3b644b18eae0f0f81375",
+      "components": [
+        713
+      ]
+    },
+    "release/buckets/settlement/_qr_checkin/qr-checkin-fence.cjs": {
+      "blob": "7c7bbc1f65d652b5b169e7e3987552bdddee75e9",
+      "components": [
+        713
+      ]
+    },
+    "release/buckets/settlement/bucket-settlement/input.cjs": {
+      "blob": "f666cf49d3fadba6a7f0732c16a6638b75a8102d",
+      "components": [
+        713
+      ]
+    },
+    "release/buckets/settlement/bucket-settlement/public-view.cjs": {
+      "blob": "5cff2163eef1ef8de0528285b115c0bfa7adea96",
+      "components": [
+        713
+      ]
+    },
+    "release/buckets/settlement/bucket-settlement/runtime.cjs": {
+      "blob": "9d18ce79fc148c4d1b6bc56798f872496b7c6996",
+      "components": [
+        713
+      ]
+    },
+    "release/buckets/settlement/bucket-settlement/state.cjs": {
+      "blob": "da457b44c6694293470efa3ce71699ada100b8b1",
+      "components": [
+        713
+      ]
+    },
+    "release/buckets/settlement/candidate/10/ladder-auto-settlement.js": {
+      "blob": "ee4e1580c79dc245684f5b55238679c33d17de0d",
+      "components": [
+        713
+      ]
+    },
+    "release/buckets/settlement/candidate/10/ladder-settlement-core.js": {
+      "blob": "d39366858033a10f1b7f515e62cb42f4a612c8c4",
+      "components": [
+        713
+      ]
+    },
+    "release/buckets/settlement/candidate/21/index.js": {
+      "blob": "f3e868f106d55a3e07c3ab98d06af352dcb8dd62",
+      "components": [
+        713
+      ]
+    },
+    "release/buckets/settlement/candidate/21/ladder-settlement.js": {
+      "blob": "1868e91358ff176f70896a28a0ac265cf59b2639",
+      "components": [
+        713
+      ]
+    },
+    "release/buckets/settlement/patch-manifest.json": {
+      "blob": "2712dcc1480b0287da0ab85768ff732a4a2125d9",
+      "components": [
+        713
+      ]
+    },
+    "release/buckets/writer-review-20261103.md": {
+      "blob": "3bc109e4127f08621675b687dee87a9923b155e6",
+      "components": [
+        709
+      ]
+    },
+    "scripts/bucket-writer-discovery.md": {
+      "components": [],
+      "blob": "0f319fde54d394ae03d8207e5b2f58c8cefb8f3e"
+    },
+    "scripts/bucket-writer-discovery.py": {
+      "components": [],
+      "blob": "fd130d6a2d7a3c53872eea114e3a39a4612aac4d"
+    },
+    "scripts/bucket-writer-followup.py": {
+      "components": [],
+      "blob": "a436c58503ee8d5e6d0b04d7ffa8e1f85ce0e285"
+    },
+    "scripts/bucketcaptureactivitybackfill.py": {
+      "blob": "46ad2dc88daa6626fbbe35002ab91acb283a823f",
+      "components": [
+        718
+      ]
+    },
+    "scripts/bucketcapturehostsync.md": {
+      "blob": "4e69c8c8539a7eaacd27f7ec4eeed26cd3abe67a",
+      "components": [
+        715
+      ]
+    },
+    "scripts/bucketcapturehostsync.py": {
+      "blob": "ca1ccbf44a86cd97dad7821da324b87b51c0fcbc",
+      "components": [
+        715
+      ]
+    },
     "scripts/build-bucket-release-rules.py": {
       "blob": "f40c9fa4e6b586a1ed430845c2918565de8e2a5e",
       "components": [
         707
+      ]
+    },
+    "scripts/build-bucket-restore-access-review.py": {
+      "components": [
+        707
+      ],
+      "blob": "12f1048c0bb3e403f90e6c69e36e26260c96f2d8"
+    },
+    "tests/four-court-buckets/activity/backend-bridge.cjs": {
+      "blob": "aa4add635ef8921dbc5f08494d2ce3b386270193",
+      "components": [
+        718
+      ]
+    },
+    "tests/four-court-buckets/activity/backfill-probe.cjs": {
+      "blob": "cf4bf947e83cda9003e8c70b661ef9ea08ea40e6",
+      "components": [
+        718
+      ]
+    },
+    "tests/four-court-buckets/activity/capture-backfill.py": {
+      "blob": "27f4aa5dd7fce5dc8802b20e5db5bfea832c427a",
+      "components": [
+        718
+      ]
+    },
+    "tests/four-court-buckets/activity/firebase.json": {
+      "blob": "d96eff7dc1b1c46cfa2f5937c60b51151add5e38",
+      "components": [
+        718
+      ]
+    },
+    "tests/four-court-buckets/activity/fixtures/activity-points.js": {
+      "blob": "76d6775a16ab3f8d27703d0f527006d1ca5c72d4",
+      "components": [
+        718
+      ]
+    },
+    "tests/four-court-buckets/activity/fixtures/package.json": {
+      "blob": "31a906537bf3392d633f975baeea838d871c0d22",
+      "components": [
+        718
+      ]
+    },
+    "tests/four-court-buckets/activity/fixtures/release-controls.js": {
+      "blob": "5f0e3ed3ebb39f57f4f1658b14942c15d524bfb8",
+      "components": [
+        718
+      ]
+    },
+    "tests/four-court-buckets/activity/memory.cjs": {
+      "blob": "b46507013ee61cf1715f419282f78ac57241c565",
+      "components": [
+        718
+      ]
+    },
+    "tests/four-court-buckets/activity/native-emulator.cjs": {
+      "blob": "8076234ece781dba7a1ddd08923f94e43d64eb6c",
+      "components": [
+        718
+      ]
+    },
+    "tests/four-court-buckets/activity/probe.cjs": {
+      "blob": "642a1f6b3e9ee3aa3635941cda4bb348c34623fa",
+      "components": [
+        718
+      ]
+    },
+    "tests/four-court-buckets/activity/verify-package.py": {
+      "blob": "8660e1f99954972522c280224a46464dc433a4e9",
+      "components": [
+        718
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixture-sha256.json": {
+      "blob": "f1188ba534e4aedbfd60e4c2f74012248b18818c",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/11/_qr_checkin/admin-firestore.cjs": {
+      "blob": "877efb15ea0505bfddc8ebd038a9e06b880bdb5f",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/11/_qr_checkin/guard-firestore.cjs": {
+      "blob": "3b1e2b2698e30b857e3ec16a830488304704f137",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/11/_qr_checkin/qr-checkin-fence.cjs": {
+      "blob": "7c7bbc1f65d652b5b169e7e3987552bdddee75e9",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/11/onsite-waitlist-writer-guards.js": {
+      "blob": "22ad25b099b67dc641728ccd3358b399d8f6eb5b",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/11/onsite-waitlist/core.js": {
+      "blob": "8c5513d06a74df92df8257b8c2f4b13736bb997e",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/11/onsite-waitlist/owned.js": {
+      "blob": "5095ff6798760978fa6ec1ed6c654fcf447115de",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/11/operations-core.js": {
+      "blob": "db893031b3e1845d0161f4bba45ed1c8a252a312",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/11/registration-selection.js": {
+      "blob": "cf8613fa2353bf52224a462019d951e9541b84cb",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/11/room-access-core.js": {
+      "blob": "5a6abe0f4a41159e00a0610acca96a5b4e2443a8",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/12/_qr_checkin/admin-firestore.cjs": {
+      "blob": "877efb15ea0505bfddc8ebd038a9e06b880bdb5f",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/12/_qr_checkin/guard-firestore.cjs": {
+      "blob": "3b1e2b2698e30b857e3ec16a830488304704f137",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/12/_qr_checkin/qr-checkin-fence.cjs": {
+      "blob": "7c7bbc1f65d652b5b169e7e3987552bdddee75e9",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/12/entry-selection.js": {
+      "blob": "659ed553a5e5bc112f6e95ea2b2632f45cfa0b44",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/12/onsite-waitlist-writer-guards.js": {
+      "blob": "22ad25b099b67dc641728ccd3358b399d8f6eb5b",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/12/onsite-waitlist/core.js": {
+      "blob": "8c5513d06a74df92df8257b8c2f4b13736bb997e",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/12/onsite-waitlist/owned.js": {
+      "blob": "5095ff6798760978fa6ec1ed6c654fcf447115de",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/12/operations-core.js": {
+      "blob": "845d666a7daff9924e3fa506818360fd5df22fa6",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/19/_qr_checkin/admin-firestore.cjs": {
+      "blob": "877efb15ea0505bfddc8ebd038a9e06b880bdb5f",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/19/_qr_checkin/guard-firestore.cjs": {
+      "blob": "3b1e2b2698e30b857e3ec16a830488304704f137",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/19/_qr_checkin/qr-checkin-fence.cjs": {
+      "blob": "7c7bbc1f65d652b5b169e7e3987552bdddee75e9",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/19/invitation-admission-policy.js": {
+      "blob": "6c45f636b7329f42d2b4a8956fcdea3781368cbc",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/19/onsite-waitlist-writer-guards.js": {
+      "blob": "16512ab2a457ea09ffa7aa58dbdefcb72e3da448",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/19/onsite-waitlist/core.js": {
+      "blob": "8c5513d06a74df92df8257b8c2f4b13736bb997e",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/19/onsite-waitlist/owned.js": {
+      "blob": "5095ff6798760978fa6ec1ed6c654fcf447115de",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/fixtures/19/registration-invitations.js": {
+      "blob": "a5fa2eecebb10d8ba93bbc7e3de69b10a28a7a2f",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/native-emulator.cjs": {
+      "blob": "73273c72e25f11c7436bf8c90e60858b96f583d5",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/native.firebase.json": {
+      "blob": "28f0f6ab899f69dcfa56776061bff55bb36fcb17",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/probe.cjs": {
+      "blob": "a1b8fefd25e0ad4b28899b878e7f896b513d9eed",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/admissions/verify-package.py": {
+      "blob": "44ec53c5d352bdee743c62e9eb53c60c9c92d6aa",
+      "components": [
+        711
+      ]
+    },
+    "tests/four-court-buckets/completion/capture-host-sync.py": {
+      "blob": "f3b77dbb6a94837a7f3fa069a6a62f543b23e5e7",
+      "components": [
+        715
+      ]
+    },
+    "tests/four-court-buckets/completion/fixture.cjs": {
+      "blob": "6d599e2cbde054b8713d561a84a27614fceb336d",
+      "components": [
+        715
+      ]
+    },
+    "tests/four-court-buckets/completion/fixtures/15/hosting.js": {
+      "blob": "892711fa758bcc63bc69423a8f08dc73d3f99ed3",
+      "components": [
+        715
+      ]
+    },
+    "tests/four-court-buckets/completion/fixtures/16/hosting.js": {
+      "blob": "892711fa758bcc63bc69423a8f08dc73d3f99ed3",
+      "components": [
+        715
+      ]
+    },
+    "tests/four-court-buckets/completion/fixtures/host-sync/_qr_checkin/admin-firestore.cjs": {
+      "blob": "877efb15ea0505bfddc8ebd038a9e06b880bdb5f",
+      "components": [
+        715
+      ]
+    },
+    "tests/four-court-buckets/completion/fixtures/host-sync/_qr_checkin/guard-firestore.cjs": {
+      "blob": "3b1e2b2698e30b857e3ec16a830488304704f137",
+      "components": [
+        715
+      ]
+    },
+    "tests/four-court-buckets/completion/fixtures/host-sync/_qr_checkin/qr-checkin-fence.cjs": {
+      "blob": "7c7bbc1f65d652b5b169e7e3987552bdddee75e9",
+      "components": [
+        715
+      ]
+    },
+    "tests/four-court-buckets/completion/fixtures/host-sync/hosting.js": {
+      "blob": "892711fa758bcc63bc69423a8f08dc73d3f99ed3",
+      "components": [
+        715
+      ]
+    },
+    "tests/four-court-buckets/completion/fixtures/host-sync/package.json": {
+      "blob": "58f5915a533f5dc73864de1f06f227e13c879754",
+      "components": [
+        715
+      ]
+    },
+    "tests/four-court-buckets/completion/fixtures/hosting-core.js": {
+      "blob": "21402b6fe8b315d85989e7319c2066e348ccc720",
+      "components": [
+        715
+      ]
+    },
+    "tests/four-court-buckets/completion/host-sync-probe.cjs": {
+      "blob": "0a8c66d2f76c853b4e62aee9a38a50f7871b8f30",
+      "components": [
+        715
+      ]
+    },
+    "tests/four-court-buckets/completion/hosting-probe.cjs": {
+      "blob": "49d9fe9e285d533b83420dc77b045cc456bc453d",
+      "components": [
+        715
+      ]
+    },
+    "tests/four-court-buckets/completion/native-emulator.cjs": {
+      "blob": "3a98041a2d9c5b5d01e9199391612aba98a6c179",
+      "components": [
+        715
+      ]
+    },
+    "tests/four-court-buckets/completion/native.firebase.json": {
+      "blob": "d96eff7dc1b1c46cfa2f5937c60b51151add5e38",
+      "components": [
+        715
+      ]
+    },
+    "tests/four-court-buckets/completion/probe.cjs": {
+      "blob": "7a652a8f9cc84748808fa287baecda81dfeebe74",
+      "components": [
+        715
+      ]
+    },
+    "tests/four-court-buckets/completion/verify-package.py": {
+      "blob": "a7a70ba99d7f6e960e0ecacdb7d8ec19a80683b7",
+      "components": [
+        715
       ]
     },
     "tests/four-court-buckets/deletion/access-probe.cjs": {
@@ -164,6 +1052,12 @@
     },
     "tests/four-court-buckets/deletion/client-probe.cjs": {
       "blob": "f869b963f29eb80a6766a8a4060373dd2b178782",
+      "components": [
+        707
+      ]
+    },
+    "tests/four-court-buckets/deletion/close-idle-fence.test.cjs": {
+      "blob": "0ee2dc35ac84bded57a372fa4e46da9dfc16170c",
       "components": [
         707
       ]
@@ -185,6 +1079,12 @@
       "components": [
         707
       ]
+    },
+    "tests/four-court-buckets/deletion/fixtures/access/room-access.js": {
+      "components": [
+        707
+      ],
+      "blob": "8699da62776cbc9e3413087c213d2d4239525a46"
     },
     "tests/four-court-buckets/deletion/fixtures/baseline.rules": {
       "blob": "523721ceab6eb6c6e4f7b40a26c65b49814384af",
@@ -324,65 +1224,33 @@
         707
       ]
     },
-    ".github/workflows/bucket-interaction-writers.yml": {
-      "blob": "e2ac907a033a00e471841b58c7f291d8c70f991f",
+    "tests/four-court-buckets/derived/deployed-index.js": {
+      "blob": "57bbdf66b7a52bb03a0a8261a4024d0fb135d14a",
       "components": [
-        709
+        723
       ]
     },
-    "release/buckets/interactions/README.md": {
-      "blob": "ef4906aaa39e560547d71e2a78d6cf6d8609daff",
+    "tests/four-court-buckets/derived/official-match-titles-core.cjs": {
+      "blob": "5b6a86a5258ce03cd5da142d8617489404acc495",
       "components": [
-        709
+        723
       ]
     },
-    "release/buckets/interactions/candidate/23/team-lineup-service.js": {
-      "blob": "c46ee0d29941a59b87b509f7ab4b2c64d1bf1f5f",
+    "tests/four-court-buckets/derived/probe.cjs": {
+      "blob": "b44dd00876cf2c1fe009abf68a20b6fb30c6aab7",
       "components": [
-        709
+        723
       ]
     },
-    "release/buckets/interactions/candidate/24/team-registration-service.js": {
-      "blob": "ae7a3760031d06450b7b95c7760b84a550a09cb3",
+    "tests/four-court-buckets/derived/verify-package.py": {
+      "blob": "70795ab6a76987c64944400670ccdbcac74bba8c",
       "components": [
-        709
+        723
       ]
     },
-    "release/buckets/interactions/candidate/25/team-scoring-service.js": {
-      "blob": "4b8535c2c3ee1bfc5d64a90e8006bad50e0b5ea5",
-      "components": [
-        709
-      ]
-    },
-    "release/buckets/interactions/candidate/3/court-call-service.js": {
-      "blob": "2170e63ba30864be9e29cf4f91c2f7775fe02f4e",
-      "components": [
-        709
-      ]
-    },
-    "release/buckets/interactions/candidate/6/enchantment-service.js": {
-      "blob": "66eb9571d3e8d9a9772e046597a7b34f79a6714d",
-      "components": [
-        709
-      ]
-    },
-    "release/buckets/interactions/candidate/9/family-registration.js": {
-      "blob": "a27e58316d9888ecd4686caa26e72f7abb58c0ec",
-      "components": [
-        709
-      ]
-    },
-    "release/buckets/interactions/patch-manifest.json": {
-      "blob": "f25962d8db26451684417b46edb7c808aafc8d26",
-      "components": [
-        709
-      ]
-    },
-    "release/buckets/writer-review-20261103.md": {
-      "blob": "3bc109e4127f08621675b687dee87a9923b155e6",
-      "components": [
-        709
-      ]
+    "tests/four-court-buckets/integration/verify-integration.py": {
+      "components": [],
+      "blob": "ade0c223246f5e03223810f9844b73ed130392d9"
     },
     "tests/four-court-buckets/interactions/firebase.emulator.json": {
       "blob": "85865ba7ba681f6fa1b27665c191bc94d1a4fc4a",
@@ -606,6 +1474,10 @@
         709
       ]
     },
+    "tests/four-court-buckets/interactions/fixtures/9/registration-admission.cjs": {
+      "components": [],
+      "blob": "c64bdd2a4e562fdca46fbf87e164bf9edcc5944e"
+    },
     "tests/four-court-buckets/interactions/fixtures/9/room-access-core.js": {
       "blob": "5a6abe0f4a41159e00a0610acca96a5b4e2443a8",
       "components": [
@@ -630,251 +1502,65 @@
         709
       ]
     },
-    ".github/workflows/bucket-admission-writers.yml": {
-      "blob": "09cb2e3a39c50a0525e29aa3511d3a0551c42b33",
-      "components": [
-        711
-      ]
+    "tests/four-court-buckets/my-events/README.md": {
+      "blob": "1291f35057bbf5626b46bc356218b33a8e0b68e1",
+      "components": []
     },
-    "release/buckets/admissions/README.md": {
-      "blob": "aadf010e417359b9cf6ac805af9ecc43b0c10886",
-      "components": [
-        711
-      ]
+    "tests/four-court-buckets/my-events/assembly-patch.test.cjs": {
+      "components": [],
+      "blob": "49f38681966643499a9c5a594e6e9d46bf8e35ee"
     },
-    "release/buckets/admissions/candidate/11/registration-selection.js": {
-      "blob": "f881f3ee2b95f250d1bcfad89ba3d0b7e198a659",
-      "components": [
-        711
-      ]
+    "tests/four-court-buckets/my-events/bootstrap-patch.test.cjs": {
+      "components": [],
+      "blob": "643a0fcddb015fc0196e5c3567e1cb360132444d"
     },
-    "release/buckets/admissions/candidate/12/entry-selection.js": {
-      "blob": "bd8be24bc8c3b49352efb5e0de1e5cc9d2e8e371",
-      "components": [
-        711
-      ]
+    "tests/four-court-buckets/my-events/bootstrap-start-patch.test.cjs": {
+      "components": [],
+      "blob": "18340e8975928dac8a344bda8190a66de7420d24"
     },
-    "release/buckets/admissions/candidate/19/registration-invitations.js": {
-      "blob": "d729c2e43df0e2b12bb8d329048a6d58a9ce8a5c",
-      "components": [
-        711
-      ]
+    "tests/four-court-buckets/my-events/bootstrap-target.test.cjs": {
+      "blob": "0dd06d5ac57c6424560a9bcb414c99eb4de5a00b",
+      "components": []
     },
-    "release/buckets/admissions/patch-manifest.json": {
-      "blob": "5fae3752d3dbac8045c4aef06ca7bef121fbcd5a",
-      "components": [
-        711
-      ]
+    "tests/four-court-buckets/my-events/deployed-assembly.cjs": {
+      "components": [],
+      "blob": "8bf8b47340606dd57b0f9c345377ffde4134d0da"
     },
-    "tests/four-court-buckets/admissions/fixture-sha256.json": {
-      "blob": "f1188ba534e4aedbfd60e4c2f74012248b18818c",
-      "components": [
-        711
-      ]
+    "tests/four-court-buckets/my-events/deployed-bootstrap-start.cjs": {
+      "components": [],
+      "blob": "7d6dd8b166da6a991fcce7883b66e36c9120c1cd"
     },
-    "tests/four-court-buckets/admissions/fixtures/11/_qr_checkin/admin-firestore.cjs": {
-      "blob": "877efb15ea0505bfddc8ebd038a9e06b880bdb5f",
-      "components": [
-        711
-      ]
+    "tests/four-court-buckets/my-events/deployed-bootstrap.cjs": {
+      "blob": "3a72200123954a3c048e8b4d97aa834a7ea2e1c1",
+      "components": []
     },
-    "tests/four-court-buckets/admissions/fixtures/11/_qr_checkin/guard-firestore.cjs": {
-      "blob": "3b1e2b2698e30b857e3ec16a830488304704f137",
-      "components": [
-        711
-      ]
+    "tests/four-court-buckets/my-events/deployed-rebuild.cjs": {
+      "components": [],
+      "blob": "48ebc069aec29cca282a6aac1f85620e03c42d17"
     },
-    "tests/four-court-buckets/admissions/fixtures/11/_qr_checkin/qr-checkin-fence.cjs": {
-      "blob": "7c7bbc1f65d652b5b169e7e3987552bdddee75e9",
-      "components": [
-        711
-      ]
+    "tests/four-court-buckets/my-events/deployed-service.cjs": {
+      "components": [],
+      "blob": "89499cb7f7a5d154b575f4784a79dac4fb505401"
     },
-    "tests/four-court-buckets/admissions/fixtures/11/onsite-waitlist-writer-guards.js": {
-      "blob": "22ad25b099b67dc641728ccd3358b399d8f6eb5b",
-      "components": [
-        711
-      ]
+    "tests/four-court-buckets/my-events/firebase.json": {
+      "blob": "df6a220b62decef5479ee2070124922133397977",
+      "components": []
     },
-    "tests/four-court-buckets/admissions/fixtures/11/onsite-waitlist/core.js": {
-      "blob": "8c5513d06a74df92df8257b8c2f4b13736bb997e",
-      "components": [
-        711
-      ]
+    "tests/four-court-buckets/my-events/native-emulator.cjs": {
+      "blob": "1840421d8866b2eb612efbc91046872cd229bc6d",
+      "components": []
     },
-    "tests/four-court-buckets/admissions/fixtures/11/onsite-waitlist/owned.js": {
-      "blob": "5095ff6798760978fa6ec1ed6c654fcf447115de",
-      "components": [
-        711
-      ]
+    "tests/four-court-buckets/my-events/rebuild-patch.test.cjs": {
+      "components": [],
+      "blob": "02be699e31605af927df2f03b2688a3c7a2f7f03"
     },
-    "tests/four-court-buckets/admissions/fixtures/11/operations-core.js": {
-      "blob": "db893031b3e1845d0161f4bba45ed1c8a252a312",
-      "components": [
-        711
-      ]
+    "tests/four-court-buckets/my-events/repair-engine-patch.test.cjs": {
+      "blob": "29d377d8033be5e1e01658745218e5355759929a",
+      "components": []
     },
-    "tests/four-court-buckets/admissions/fixtures/11/registration-selection.js": {
-      "blob": "cf8613fa2353bf52224a462019d951e9541b84cb",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/fixtures/11/room-access-core.js": {
-      "blob": "5a6abe0f4a41159e00a0610acca96a5b4e2443a8",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/fixtures/12/_qr_checkin/admin-firestore.cjs": {
-      "blob": "877efb15ea0505bfddc8ebd038a9e06b880bdb5f",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/fixtures/12/_qr_checkin/guard-firestore.cjs": {
-      "blob": "3b1e2b2698e30b857e3ec16a830488304704f137",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/fixtures/12/_qr_checkin/qr-checkin-fence.cjs": {
-      "blob": "7c7bbc1f65d652b5b169e7e3987552bdddee75e9",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/fixtures/12/entry-selection.js": {
-      "blob": "659ed553a5e5bc112f6e95ea2b2632f45cfa0b44",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/fixtures/12/onsite-waitlist-writer-guards.js": {
-      "blob": "22ad25b099b67dc641728ccd3358b399d8f6eb5b",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/fixtures/12/onsite-waitlist/core.js": {
-      "blob": "8c5513d06a74df92df8257b8c2f4b13736bb997e",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/fixtures/12/onsite-waitlist/owned.js": {
-      "blob": "5095ff6798760978fa6ec1ed6c654fcf447115de",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/fixtures/12/operations-core.js": {
-      "blob": "845d666a7daff9924e3fa506818360fd5df22fa6",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/fixtures/19/_qr_checkin/admin-firestore.cjs": {
-      "blob": "877efb15ea0505bfddc8ebd038a9e06b880bdb5f",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/fixtures/19/_qr_checkin/guard-firestore.cjs": {
-      "blob": "3b1e2b2698e30b857e3ec16a830488304704f137",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/fixtures/19/_qr_checkin/qr-checkin-fence.cjs": {
-      "blob": "7c7bbc1f65d652b5b169e7e3987552bdddee75e9",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/fixtures/19/invitation-admission-policy.js": {
-      "blob": "6c45f636b7329f42d2b4a8956fcdea3781368cbc",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/fixtures/19/onsite-waitlist-writer-guards.js": {
-      "blob": "16512ab2a457ea09ffa7aa58dbdefcb72e3da448",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/fixtures/19/onsite-waitlist/core.js": {
-      "blob": "8c5513d06a74df92df8257b8c2f4b13736bb997e",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/fixtures/19/onsite-waitlist/owned.js": {
-      "blob": "5095ff6798760978fa6ec1ed6c654fcf447115de",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/fixtures/19/registration-invitations.js": {
-      "blob": "a5fa2eecebb10d8ba93bbc7e3de69b10a28a7a2f",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/native-emulator.cjs": {
-      "blob": "73273c72e25f11c7436bf8c90e60858b96f583d5",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/native.firebase.json": {
-      "blob": "28f0f6ab899f69dcfa56776061bff55bb36fcb17",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/probe.cjs": {
-      "blob": "a1b8fefd25e0ad4b28899b878e7f896b513d9eed",
-      "components": [
-        711
-      ]
-    },
-    "tests/four-court-buckets/admissions/verify-package.py": {
-      "blob": "44ec53c5d352bdee743c62e9eb53c60c9c92d6aa",
-      "components": [
-        711
-      ]
-    },
-    ".github/workflows/bucket-operations-writers.yml": {
-      "blob": "2434866b9564b47f98f6a63c5dfef1d45eed2517",
-      "components": [
-        712
-      ]
-    },
-    "release/buckets/operations/README.md": {
-      "blob": "16a8d0ebbb977b8825ddf2300b72b0b00d2779fb",
-      "components": [
-        712
-      ]
-    },
-    "release/buckets/operations/candidate/5/operations.js": {
-      "blob": "5064ae54aa4304c393361a19622eef725764d609",
-      "components": [
-        712
-      ]
-    },
-    "release/buckets/operations/candidate/7/event-staff.js": {
-      "blob": "9528ccb4240165c3439229339be54d2c65ee368c",
-      "components": [
-        712
-      ]
-    },
-    "release/buckets/operations/patch-manifest.json": {
-      "blob": "159923c1b09c35a7fb553fcf0e480cb8e00e00a0",
-      "components": [
-        712
-      ]
+    "tests/four-court-buckets/my-events/service-patch.test.cjs": {
+      "components": [],
+      "blob": "abe051a7fee0e190ccfe02baa098ae413e354e76"
     },
     "tests/four-court-buckets/operations/fixture-sha256.json": {
       "blob": "a6d05cb9c70e934f8d255e56ddd8683e62f5eb50",
@@ -954,70 +1640,106 @@
         712
       ]
     },
-    ".github/workflows/bucket-settlement.yml": {
-      "blob": "00829471800adda8ee4a80770c911901391e8968",
+    "tests/four-court-buckets/poster/firebase.json": {
+      "blob": "d96eff7dc1b1c46cfa2f5937c60b51151add5e38",
       "components": [
-        713
+        717
       ]
     },
-    "release/buckets/settlement/README.md": {
-      "blob": "7efb9827ecb4879fc527693eda9ba3d18e4a1e20",
+    "tests/four-court-buckets/poster/fixtures/ai-create-core.js": {
+      "blob": "af0339c4b872aa154720846893bf2091bb4b39e1",
       "components": [
-        713
+        717
       ]
     },
-    "release/buckets/settlement/_qr_checkin/qr-checkin-fence.cjs": {
-      "blob": "7c7bbc1f65d652b5b169e7e3987552bdddee75e9",
+    "tests/four-court-buckets/poster/fixtures/ai-create-poster-core.js": {
+      "blob": "5ff6ad35eed7080e44890c2f50f20844f27ceb6d",
       "components": [
-        713
+        717
       ]
     },
-    "release/buckets/settlement/bucket-settlement/input.cjs": {
-      "blob": "f666cf49d3fadba6a7f0732c16a6638b75a8102d",
+    "tests/four-court-buckets/poster/fixtures/ai-create-provider.js": {
+      "blob": "06122f15a839c30a47f3b51d90685bac98a172d4",
       "components": [
-        713
+        717
       ]
     },
-    "release/buckets/settlement/bucket-settlement/public-view.cjs": {
-      "blob": "5cff2163eef1ef8de0528285b115c0bfa7adea96",
+    "tests/four-court-buckets/poster/fixtures/event-staff-core.js": {
+      "blob": "4f671a4f4a725836c3f17d15456123e3e99a4909",
       "components": [
-        713
+        717
       ]
     },
-    "release/buckets/settlement/bucket-settlement/runtime.cjs": {
-      "blob": "9d18ce79fc148c4d1b6bc56798f872496b7c6996",
+    "tests/four-court-buckets/poster/fixtures/package.json": {
+      "blob": "97c559324e3560c8dea39c64d7ff16d68cb2e67c",
       "components": [
-        713
+        717
       ]
     },
-    "release/buckets/settlement/bucket-settlement/state.cjs": {
-      "blob": "da457b44c6694293470efa3ce71699ada100b8b1",
+    "tests/four-court-buckets/poster/fixtures/room-poster-cover.js": {
+      "blob": "29fde37933a14900e4181ac3f47748a25481689d",
       "components": [
-        713
+        717
       ]
     },
-    "release/buckets/settlement/candidate/10/ladder-auto-settlement.js": {
-      "blob": "85d8a05a6e5042d4fc6eb8f03eed14982616e5ae",
+    "tests/four-court-buckets/poster/images.json": {
+      "blob": "73c443ae07a0184caf44b0379afec696510793bf",
       "components": [
-        713
+        717
       ]
     },
-    "release/buckets/settlement/candidate/21/index.js": {
-      "blob": "f3e868f106d55a3e07c3ab98d06af352dcb8dd62",
+    "tests/four-court-buckets/poster/memory.cjs": {
+      "blob": "b46507013ee61cf1715f419282f78ac57241c565",
       "components": [
-        713
+        717
       ]
     },
-    "release/buckets/settlement/candidate/21/ladder-settlement.js": {
-      "blob": "1b2f9c34be3e53f6785879d7ca5e22c24a65ac7f",
+    "tests/four-court-buckets/poster/native-emulator.cjs": {
+      "blob": "954091c9c6d25a7a6be93670810de57e1fa6fb92",
       "components": [
-        713
+        717
       ]
     },
-    "release/buckets/settlement/patch-manifest.json": {
-      "blob": "64f4f972c1239cce8d30545911f12ac2c65b37f7",
+    "tests/four-court-buckets/poster/probe.cjs": {
+      "blob": "3f5d2b65ccd83fd2d3c00ab50deab7430cd6e66e",
       "components": [
-        713
+        717
+      ]
+    },
+    "tests/four-court-buckets/poster/verify-package.py": {
+      "blob": "946256146d46c8efdd860a23059559a06d1d9fdd",
+      "components": [
+        717
+      ]
+    },
+    "tests/four-court-buckets/settlement-ui/README.md": {
+      "blob": "87c4401793ebed1835ff1424f3aacefd37ed8d5c",
+      "components": [
+        714
+      ]
+    },
+    "tests/four-court-buckets/settlement-ui/backend-bridge.cjs": {
+      "blob": "c8794a3e5c84432603901f0d55487163175c5029",
+      "components": [
+        714
+      ]
+    },
+    "tests/four-court-buckets/settlement-ui/browser.cjs": {
+      "blob": "d24dd992c347c1edea7af5da4c908183d8ab0b76",
+      "components": [
+        714
+      ]
+    },
+    "tests/four-court-buckets/settlement-ui/host-harness.cjs": {
+      "blob": "62803eed2ebefa134a9cff55f16e367a14988bb3",
+      "components": [
+        714
+      ]
+    },
+    "tests/four-court-buckets/settlement-ui/probe.cjs": {
+      "blob": "9289e551fe88980d158a71f9216c4cf74d78570b",
+      "components": [
+        714
       ]
     },
     "tests/four-court-buckets/settlement/fixture-sha256.json": {
@@ -1093,7 +1815,7 @@
       ]
     },
     "tests/four-court-buckets/settlement/native-emulator.cjs": {
-      "blob": "9d38dbd7c67ba0bda174b460cb300d7cd801a876",
+      "blob": "5dcfa651cb3a955c736edf5a82f4ba48aa0ffb2d",
       "components": [
         713
       ]
@@ -1105,7 +1827,7 @@
       ]
     },
     "tests/four-court-buckets/settlement/probe.cjs": {
-      "blob": "db1e651e3be00453144793329bc690478252e9bd",
+      "blob": "113cfd59ae496074413d016e0d140cb0e4eb8d70",
       "components": [
         713
       ]
@@ -1117,734 +1839,18 @@
       ]
     },
     "tests/four-court-buckets/settlement/verify-package.py": {
-      "blob": "42a4a7434add5963728a0231fd3a7201b6ec36b5",
+      "blob": "cfd6d95401710739c2f31941104d63624a7ce8c7",
       "components": [
         713
       ]
-    },
-    ".github/workflows/bucket-settlement-ui.yml": {
-      "blob": "19d7ff8e3b05d055bfd3fa76cb2cf9b2992507be",
-      "components": [
-        714
-      ]
-    },
-    "modules/scoring/four-court-settlement.js": {
-      "blob": "d9589a7768b235afb17e53abded96bee3e96ae66",
-      "components": [
-        714
-      ]
-    },
-    "tests/four-court-buckets/settlement-ui/README.md": {
-      "blob": "87c4401793ebed1835ff1424f3aacefd37ed8d5c",
-      "components": [
-        714
-      ]
-    },
-    "tests/four-court-buckets/settlement-ui/backend-bridge.cjs": {
-      "blob": "c8794a3e5c84432603901f0d55487163175c5029",
-      "components": [
-        714
-      ]
-    },
-    "tests/four-court-buckets/settlement-ui/browser.cjs": {
-      "blob": "d24dd992c347c1edea7af5da4c908183d8ab0b76",
-      "components": [
-        714
-      ]
-    },
-    "tests/four-court-buckets/settlement-ui/host-harness.cjs": {
-      "blob": "62803eed2ebefa134a9cff55f16e367a14988bb3",
-      "components": [
-        714
-      ]
-    },
-    "tests/four-court-buckets/settlement-ui/probe.cjs": {
-      "blob": "9289e551fe88980d158a71f9216c4cf74d78570b",
-      "components": [
-        714
-      ]
-    },
-    ".github/workflows/bucket-general-completion.yml": {
-      "blob": "e96ee087c32ee987c41d5d24b43915ce180e9969",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/README.md": {
-      "blob": "b393f6f1c948fce490c82976a9364457283428b9",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/certificate.cjs": {
-      "blob": "43f8e61677a3e44a94bb3d24a2e69e9a3b7a9ddf",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/general-completion.cjs": {
-      "blob": "24293cb1311afb07fb4cc126cd396d12ccb4a450",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/hosting-guard.cjs": {
-      "blob": "b143d56b998d0a258935ae2bf9c8c0020b6711f5",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/hosting/15/hosting-core.js": {
-      "blob": "21402b6fe8b315d85989e7319c2066e348ccc720",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/hosting/15/hosting.js": {
-      "blob": "899272ab01fc0e2013bd7c631caef44b8efbfafa",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/hosting/16/hosting-core.js": {
-      "blob": "21402b6fe8b315d85989e7319c2066e348ccc720",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/hosting/16/hosting.js": {
-      "blob": "899272ab01fc0e2013bd7c631caef44b8efbfafa",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/hosting/host-sync/hosting-core.js": {
-      "blob": "21402b6fe8b315d85989e7319c2066e348ccc720",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/hosting/host-sync/hosting.js": {
-      "blob": "899272ab01fc0e2013bd7c631caef44b8efbfafa",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/index.js": {
-      "blob": "b6f926eaadc0f496c06d7f7819b25e86a55e3cf4",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/package.json": {
-      "blob": "d977d35c97d01be65dcdfa0ff35049c2e55551df",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/patch-manifest.json": {
-      "blob": "2b74647706a594c805d06585ed31bc4d2543549f",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/protocol/core.cjs": {
-      "blob": "c4df85aa68acea59f6fa4552742e7b193b1b35da",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/protocol/event-staff-core.cjs": {
-      "blob": "666f90fb8e8abc13538dbeba249c139a0cc8f544",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/protocol/public-view.cjs": {
-      "blob": "5cff2163eef1ef8de0528285b115c0bfa7adea96",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/protocol/qr-checkin-fence.cjs": {
-      "blob": "7c7bbc1f65d652b5b169e7e3987552bdddee75e9",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/protocol/results.cjs": {
-      "blob": "1bf199ff39625e65f0a879980716db8a31bded24",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/protocol/runtime.cjs": {
-      "blob": "9d18ce79fc148c4d1b6bc56798f872496b7c6996",
-      "components": [
-        715
-      ]
-    },
-    "release/buckets/completion/protocol/state.cjs": {
-      "blob": "da457b44c6694293470efa3ce71699ada100b8b1",
-      "components": [
-        715
-      ]
-    },
-    "scripts/bucketcapturehostsync.md": {
-      "blob": "4e69c8c8539a7eaacd27f7ec4eeed26cd3abe67a",
-      "components": [
-        715
-      ]
-    },
-    "scripts/bucketcapturehostsync.py": {
-      "blob": "ca1ccbf44a86cd97dad7821da324b87b51c0fcbc",
-      "components": [
-        715
-      ]
-    },
-    "tests/four-court-buckets/completion/capture-host-sync.py": {
-      "blob": "f3b77dbb6a94837a7f3fa069a6a62f543b23e5e7",
-      "components": [
-        715
-      ]
-    },
-    "tests/four-court-buckets/completion/fixture.cjs": {
-      "blob": "6d599e2cbde054b8713d561a84a27614fceb336d",
-      "components": [
-        715
-      ]
-    },
-    "tests/four-court-buckets/completion/fixtures/15/hosting.js": {
-      "blob": "892711fa758bcc63bc69423a8f08dc73d3f99ed3",
-      "components": [
-        715
-      ]
-    },
-    "tests/four-court-buckets/completion/fixtures/16/hosting.js": {
-      "blob": "892711fa758bcc63bc69423a8f08dc73d3f99ed3",
-      "components": [
-        715
-      ]
-    },
-    "tests/four-court-buckets/completion/fixtures/host-sync/_qr_checkin/admin-firestore.cjs": {
-      "blob": "877efb15ea0505bfddc8ebd038a9e06b880bdb5f",
-      "components": [
-        715
-      ]
-    },
-    "tests/four-court-buckets/completion/fixtures/host-sync/_qr_checkin/guard-firestore.cjs": {
-      "blob": "3b1e2b2698e30b857e3ec16a830488304704f137",
-      "components": [
-        715
-      ]
-    },
-    "tests/four-court-buckets/completion/fixtures/host-sync/_qr_checkin/qr-checkin-fence.cjs": {
-      "blob": "7c7bbc1f65d652b5b169e7e3987552bdddee75e9",
-      "components": [
-        715
-      ]
-    },
-    "tests/four-court-buckets/completion/fixtures/host-sync/hosting.js": {
-      "blob": "892711fa758bcc63bc69423a8f08dc73d3f99ed3",
-      "components": [
-        715
-      ]
-    },
-    "tests/four-court-buckets/completion/fixtures/host-sync/package.json": {
-      "blob": "58f5915a533f5dc73864de1f06f227e13c879754",
-      "components": [
-        715
-      ]
-    },
-    "tests/four-court-buckets/completion/fixtures/hosting-core.js": {
-      "blob": "21402b6fe8b315d85989e7319c2066e348ccc720",
-      "components": [
-        715
-      ]
-    },
-    "tests/four-court-buckets/completion/host-sync-probe.cjs": {
-      "blob": "0a8c66d2f76c853b4e62aee9a38a50f7871b8f30",
-      "components": [
-        715
-      ]
-    },
-    "tests/four-court-buckets/completion/hosting-probe.cjs": {
-      "blob": "49d9fe9e285d533b83420dc77b045cc456bc453d",
-      "components": [
-        715
-      ]
-    },
-    "tests/four-court-buckets/completion/native-emulator.cjs": {
-      "blob": "3a98041a2d9c5b5d01e9199391612aba98a6c179",
-      "components": [
-        715
-      ]
-    },
-    "tests/four-court-buckets/completion/native.firebase.json": {
-      "blob": "d96eff7dc1b1c46cfa2f5937c60b51151add5e38",
-      "components": [
-        715
-      ]
-    },
-    "tests/four-court-buckets/completion/probe.cjs": {
-      "blob": "7a652a8f9cc84748808fa287baecda81dfeebe74",
-      "components": [
-        715
-      ]
-    },
-    "tests/four-court-buckets/completion/verify-package.py": {
-      "blob": "a7a70ba99d7f6e960e0ecacdb7d8ec19a80683b7",
-      "components": [
-        715
-      ]
-    },
-    ".github/workflows/bucket-poster-writers.yml": {
-      "blob": "a7433318483066f4bc4e291609edf2a1fbda204c",
-      "components": [
-        717
-      ]
-    },
-    "release/buckets/poster/README.md": {
-      "blob": "65ce34152914a649f205c4924c0c324179a59030",
-      "components": [
-        717
-      ]
-    },
-    "release/buckets/poster/bucket-poster-fence.cjs": {
-      "blob": "b9cafb6e94d87a43ce039d125fdf5f6cb6464d42",
-      "components": [
-        717
-      ]
-    },
-    "release/buckets/poster/bucket-state.cjs": {
-      "blob": "da457b44c6694293470efa3ce71699ada100b8b1",
-      "components": [
-        717
-      ]
-    },
-    "release/buckets/poster/patch-manifest.json": {
-      "blob": "8e20ff26c1b396ec57b260fde18bac46d6d1b157",
-      "components": [
-        717
-      ]
-    },
-    "release/buckets/poster/room-poster-cover.js": {
-      "blob": "30656d0b089c09664f8735d91768d1fa175b1ff6",
-      "components": [
-        717
-      ]
-    },
-    "tests/four-court-buckets/poster/firebase.json": {
-      "blob": "d96eff7dc1b1c46cfa2f5937c60b51151add5e38",
-      "components": [
-        717
-      ]
-    },
-    "tests/four-court-buckets/poster/fixtures/ai-create-core.js": {
-      "blob": "af0339c4b872aa154720846893bf2091bb4b39e1",
-      "components": [
-        717
-      ]
-    },
-    "tests/four-court-buckets/poster/fixtures/ai-create-poster-core.js": {
-      "blob": "5ff6ad35eed7080e44890c2f50f20844f27ceb6d",
-      "components": [
-        717
-      ]
-    },
-    "tests/four-court-buckets/poster/fixtures/ai-create-provider.js": {
-      "blob": "06122f15a839c30a47f3b51d90685bac98a172d4",
-      "components": [
-        717
-      ]
-    },
-    "tests/four-court-buckets/poster/fixtures/event-staff-core.js": {
-      "blob": "4f671a4f4a725836c3f17d15456123e3e99a4909",
-      "components": [
-        717
-      ]
-    },
-    "tests/four-court-buckets/poster/fixtures/package.json": {
-      "blob": "97c559324e3560c8dea39c64d7ff16d68cb2e67c",
-      "components": [
-        717
-      ]
-    },
-    "tests/four-court-buckets/poster/fixtures/room-poster-cover.js": {
-      "blob": "29fde37933a14900e4181ac3f47748a25481689d",
-      "components": [
-        717
-      ]
-    },
-    "tests/four-court-buckets/poster/images.json": {
-      "blob": "73c443ae07a0184caf44b0379afec696510793bf",
-      "components": [
-        717
-      ]
-    },
-    "tests/four-court-buckets/poster/memory.cjs": {
-      "blob": "b46507013ee61cf1715f419282f78ac57241c565",
-      "components": [
-        717
-      ]
-    },
-    "tests/four-court-buckets/poster/native-emulator.cjs": {
-      "blob": "954091c9c6d25a7a6be93670810de57e1fa6fb92",
-      "components": [
-        717
-      ]
-    },
-    "tests/four-court-buckets/poster/probe.cjs": {
-      "blob": "3f5d2b65ccd83fd2d3c00ab50deab7430cd6e66e",
-      "components": [
-        717
-      ]
-    },
-    "tests/four-court-buckets/poster/verify-package.py": {
-      "blob": "946256146d46c8efdd860a23059559a06d1d9fdd",
-      "components": [
-        717
-      ]
-    },
-    ".github/workflows/bucket-activity-writer.yml": {
-      "blob": "05f7b0c1309f287aaef5d60b6ea4ae60195f00cb",
-      "components": [
-        718
-      ]
-    },
-    "release/buckets/activity/README.md": {
-      "blob": "3a0e608f65399eda7006c89a9fbe2c294835cf95",
-      "components": [
-        718
-      ]
-    },
-    "release/buckets/activity/activity-points.js": {
-      "blob": "e073fc96c63c95e05ed0f00ba753b8a056f71f75",
-      "components": [
-        718
-      ]
-    },
-    "release/buckets/activity/activity-tournament-guard.cjs": {
-      "blob": "abae41bed7cfe779b589c79e12e6848d81af4613",
-      "components": [
-        718
-      ]
-    },
-    "release/buckets/activity/certificate.cjs": {
-      "blob": "43f8e61677a3e44a94bb3d24a2e69e9a3b7a9ddf",
-      "components": [
-        718
-      ]
-    },
-    "release/buckets/activity/patch-manifest.json": {
-      "blob": "4621a00000c4cc052f697b518a212dd4a24c075d",
-      "components": [
-        718
-      ]
-    },
-    "release/buckets/activity/protocol/state.cjs": {
-      "blob": "da457b44c6694293470efa3ce71699ada100b8b1",
-      "components": [
-        718
-      ]
-    },
-    "scripts/bucketcaptureactivitybackfill.py": {
-      "blob": "46ad2dc88daa6626fbbe35002ab91acb283a823f",
-      "components": [
-        718
-      ]
-    },
-    "tests/four-court-buckets/activity/backend-bridge.cjs": {
-      "blob": "aa4add635ef8921dbc5f08494d2ce3b386270193",
-      "components": [
-        718
-      ]
-    },
-    "tests/four-court-buckets/activity/backfill-probe.cjs": {
-      "blob": "cf4bf947e83cda9003e8c70b661ef9ea08ea40e6",
-      "components": [
-        718
-      ]
-    },
-    "tests/four-court-buckets/activity/capture-backfill.py": {
-      "blob": "27f4aa5dd7fce5dc8802b20e5db5bfea832c427a",
-      "components": [
-        718
-      ]
-    },
-    "tests/four-court-buckets/activity/firebase.json": {
-      "blob": "d96eff7dc1b1c46cfa2f5937c60b51151add5e38",
-      "components": [
-        718
-      ]
-    },
-    "tests/four-court-buckets/activity/fixtures/activity-points.js": {
-      "blob": "76d6775a16ab3f8d27703d0f527006d1ca5c72d4",
-      "components": [
-        718
-      ]
-    },
-    "tests/four-court-buckets/activity/fixtures/package.json": {
-      "blob": "31a906537bf3392d633f975baeea838d871c0d22",
-      "components": [
-        718
-      ]
-    },
-    "tests/four-court-buckets/activity/fixtures/release-controls.js": {
-      "blob": "5f0e3ed3ebb39f57f4f1658b14942c15d524bfb8",
-      "components": [
-        718
-      ]
-    },
-    "tests/four-court-buckets/activity/memory.cjs": {
-      "blob": "b46507013ee61cf1715f419282f78ac57241c565",
-      "components": [
-        718
-      ]
-    },
-    "tests/four-court-buckets/activity/native-emulator.cjs": {
-      "blob": "8076234ece781dba7a1ddd08923f94e43d64eb6c",
-      "components": [
-        718
-      ]
-    },
-    "tests/four-court-buckets/activity/probe.cjs": {
-      "blob": "642a1f6b3e9ee3aa3635941cda4bb348c34623fa",
-      "components": [
-        718
-      ]
-    },
-    "tests/four-court-buckets/activity/verify-package.py": {
-      "blob": "8660e1f99954972522c280224a46464dc433a4e9",
-      "components": [
-        718
-      ]
-    },
-    ".github/workflows/bucket-derived-title.yml": {
-      "blob": "f27b538b62369d8bc602320beeb860cc6513a193",
-      "components": [
-        723
-      ]
-    },
-    "release/buckets/derived/README.md": {
-      "blob": "846561cc668fbbe05b363b8e66058a2bfd262452",
-      "components": [
-        723
-      ]
-    },
-    "release/buckets/derived/candidate/index.js": {
-      "blob": "e59c5c72fa96983dc4e1d1cb529179b4a32e6210",
-      "components": [
-        723
-      ]
-    },
-    "release/buckets/derived/index.patch": {
-      "blob": "ea3f8789758a2d0e51a19bf0e663debaefe8409c",
-      "components": [
-        723
-      ]
-    },
-    "release/buckets/derived/manifest.json": {
-      "blob": "1649b27d53ed1868aa6df1eb14fcd58929e0045f",
-      "components": [
-        723
-      ]
-    },
-    "tests/four-court-buckets/derived/deployed-index.js": {
-      "blob": "57bbdf66b7a52bb03a0a8261a4024d0fb135d14a",
-      "components": [
-        723
-      ]
-    },
-    "tests/four-court-buckets/derived/official-match-titles-core.cjs": {
-      "blob": "5b6a86a5258ce03cd5da142d8617489404acc495",
-      "components": [
-        723
-      ]
-    },
-    "tests/four-court-buckets/derived/probe.cjs": {
-      "blob": "b44dd00876cf2c1fe009abf68a20b6fb30c6aab7",
-      "components": [
-        723
-      ]
-    },
-    "tests/four-court-buckets/derived/verify-package.py": {
-      "blob": "70795ab6a76987c64944400670ccdbcac74bba8c",
-      "components": [
-        723
-      ]
-    },
-    "tests/four-court-buckets/my-events/README.md": {
-      "blob": "1291f35057bbf5626b46bc356218b33a8e0b68e1",
-      "components": []
-    },
-    "release/buckets/my-events/patch-repair-engine.cjs": {
-      "blob": "3b22ae9d8d4493b8f28b799b44269b365198d58b",
-      "components": []
-    },
-    "tests/four-court-buckets/my-events/repair-engine-patch.test.cjs": {
-      "blob": "29d377d8033be5e1e01658745218e5355759929a",
-      "components": []
-    },
-    "tests/four-court-buckets/my-events/deployed-bootstrap.cjs": {
-      "blob": "3a72200123954a3c048e8b4d97aa834a7ea2e1c1",
-      "components": []
-    },
-    "tests/four-court-buckets/my-events/bootstrap-target.test.cjs": {
-      "blob": "0dd06d5ac57c6424560a9bcb414c99eb4de5a00b",
-      "components": []
-    },
-    "release/buckets/my-events/patch-rebuild.cjs": {
-      "components": [],
-      "blob": "e6bd7289ce41a2875f70a940a6c1c2bfb23e8ba8"
-    },
-    "tests/four-court-buckets/my-events/deployed-rebuild.cjs": {
-      "components": [],
-      "blob": "48ebc069aec29cca282a6aac1f85620e03c42d17"
-    },
-    "tests/four-court-buckets/my-events/rebuild-patch.test.cjs": {
-      "components": [],
-      "blob": "02be699e31605af927df2f03b2688a3c7a2f7f03"
-    },
-    ".github/workflows/bucket-my-events-proof.yml": {
-      "components": [],
-      "blob": "0aa4e3c3f4160b8cb0bb5a58db67fd9b42e86f4e"
-    },
-    ".github/workflows/bucket-integrated-candidate.yml": {
-      "components": [],
-      "blob": "d86a2785f486805fca87062b4720e1e639c8fe57"
-    },
-    "release/buckets/my-events/patch-bootstrap.cjs": {
-      "components": [],
-      "blob": "cf771734eaa3febeef31e12e6c0fd7ca0f24c229"
-    },
-    "tests/four-court-buckets/my-events/bootstrap-patch.test.cjs": {
-      "components": [],
-      "blob": "643a0fcddb015fc0196e5c3567e1cb360132444d"
-    },
-    "release/buckets/my-events/patch-service.cjs": {
-      "components": [],
-      "blob": "ce83658a6f6104e9beb529d05f92228dcb925778"
-    },
-    "tests/four-court-buckets/my-events/deployed-service.cjs": {
-      "components": [],
-      "blob": "89499cb7f7a5d154b575f4784a79dac4fb505401"
-    },
-    "tests/four-court-buckets/my-events/service-patch.test.cjs": {
-      "components": [],
-      "blob": "abe051a7fee0e190ccfe02baa098ae413e354e76"
-    },
-    "release/buckets/my-events/patch-assembly.cjs": {
-      "components": [],
-      "blob": "a21fce1dd06881eb3cbee84a7684f63cd50c9d57"
-    },
-    "release/buckets/my-events/patch-bootstrap-start.cjs": {
-      "components": [],
-      "blob": "b53a5f9a5918fed468f6b68f80ef7ff5b24156a1"
-    },
-    "tests/four-court-buckets/my-events/deployed-assembly.cjs": {
-      "components": [],
-      "blob": "8bf8b47340606dd57b0f9c345377ffde4134d0da"
-    },
-    "tests/four-court-buckets/my-events/deployed-bootstrap-start.cjs": {
-      "components": [],
-      "blob": "7d6dd8b166da6a991fcce7883b66e36c9120c1cd"
-    },
-    "tests/four-court-buckets/my-events/assembly-patch.test.cjs": {
-      "components": [],
-      "blob": "49f38681966643499a9c5a594e6e9d46bf8e35ee"
-    },
-    "tests/four-court-buckets/my-events/bootstrap-start-patch.test.cjs": {
-      "components": [],
-      "blob": "18340e8975928dac8a344bda8190a66de7420d24"
-    },
-    "tests/four-court-buckets/my-events/firebase.json": {
-      "blob": "df6a220b62decef5479ee2070124922133397977",
-      "components": []
-    },
-    "tests/four-court-buckets/my-events/native-emulator.cjs": {
-      "blob": "1840421d8866b2eb612efbc91046872cd229bc6d",
-      "components": []
-    },
-    "tests/four-court-buckets/deletion/fixtures/access/room-access.js": {
-      "components": [
-        707
-      ],
-      "blob": "8699da62776cbc9e3413087c213d2d4239525a46"
-    },
-    "scripts/build-bucket-restore-access-review.py": {
-      "components": [
-        707
-      ],
-      "blob": "12f1048c0bb3e403f90e6c69e36e26260c96f2d8"
-    },
-    "release/buckets/deletion/review-source-manifest.json": {
-      "components": [
-        707
-      ],
-      "blob": "8e6c99fddfe780943c15f55f9ccd80e87ca27335"
-    },
-    "scripts/bucket-writer-discovery.py": {
-      "components": [],
-      "blob": "fd130d6a2d7a3c53872eea114e3a39a4612aac4d"
-    },
-    "scripts/bucket-writer-discovery.md": {
-      "components": [],
-      "blob": "0f319fde54d394ae03d8207e5b2f58c8cefb8f3e"
     },
     "tests/four-court-buckets/writer-discovery.py": {
       "components": [],
       "blob": "5e3046b2c99c98346a4abbc22d113f86be555bd5"
     },
-    "release/buckets/integration/README.md": {
-      "components": [],
-      "blob": "8ef144475071b5fbccece09119dbf6771e137b65"
-    },
-    "scripts/bucket-writer-followup.py": {
-      "components": [],
-      "blob": "a436c58503ee8d5e6d0b04d7ffa8e1f85ce0e285"
-    },
     "tests/four-court-buckets/writer-followup.py": {
       "components": [],
       "blob": "f40fbfd0bdb543b0a71d66818ef9fc9adbce6f46"
-    },
-    "release/buckets/integration/writer-discovery-20261105.md": {
-      "components": [],
-      "blob": "801e7cfb320bd29cc25130e69530603840291e09"
-    },
-    "tests/four-court-buckets/interactions/fixtures/9/registration-admission.cjs": {
-      "components": [],
-      "blob": "c64bdd2a4e562fdca46fbf87e164bf9edcc5944e"
-    },
-    "release/buckets/integration/live-followup-20261105.json": {
-      "components": [],
-      "blob": "7af449506ae1287572933614cb770923d8786232"
-    },
-    "tests/four-court-buckets/integration/verify-integration.py": {
-      "components": [],
-      "blob": "ade0c223246f5e03223810f9844b73ed130392d9"
-    },
-    "release/buckets/integration/live-priority-writers-20261105.json": {
-      "components": [],
-      "blob": "77a652551b523f3fce6656d1217a93b114c709eb"
-    },
-    "release/buckets/integration/close-idle-fence.patch": {
-      "blob": "f647a852b3cb733644ae22eb6bb64ad99e54aa46",
-      "components": [
-        707
-      ]
-    },
-    "tests/four-court-buckets/deletion/close-idle-fence.test.cjs": {
-      "blob": "0ee2dc35ac84bded57a372fa4e46da9dfc16170c",
-      "components": [
-        707
-      ]
-    },
-    "release/buckets/integration/close-idle-production-lease-fence.patch": {
-      "blob": "0dc80db06363518dbc47bab0590a8f2e056bb244",
-      "components": [
-        707
-      ]
     }
   },
   "mainScriptQueryParameters": {
@@ -2334,6 +2340,7 @@
     "tests/four-court-buckets/settlement/fixture-sha256.json": "Pin the newly captured automatic settlement entry point.",
     "tests/four-court-buckets/settlement/fixtures/10/ladder-auto-settlement.js": "Use the independently read back automatic settlement entry point.",
     "tests/four-court-buckets/settlement/probe.cjs": "Check the real-name policy and public data boundary for both settlement paths.",
-    "tests/four-court-buckets/settlement/verify-package.py": "Validate selected-file readback independently from full archive provenance."
+    "tests/four-court-buckets/settlement/verify-package.py": "Validate selected-file readback independently from full archive provenance.",
+    "release/buckets/settlement/candidate/10/ladder-settlement-core.js": "Raise the automatic bucket award limit to 320 accounts and preserve the legacy limit and the original source fixture."
   }
 }
