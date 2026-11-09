@@ -589,7 +589,7 @@
       ]
     },
     "release/buckets/settlement/README.md": {
-      "blob": "15b3a6ad52af9328622d3b644b18eae0f0f81375",
+      "blob": "61ee51322a3cdbe58b2399e9ef61449cd6142588",
       "components": [
         713
       ]
@@ -601,7 +601,7 @@
       ]
     },
     "release/buckets/settlement/bucket-settlement/input.cjs": {
-      "blob": "f666cf49d3fadba6a7f0732c16a6638b75a8102d",
+      "blob": "e89b44cf128d8864d6ebea75108211ae4a0e1450",
       "components": [
         713
       ]
@@ -649,7 +649,7 @@
       ]
     },
     "release/buckets/settlement/patch-manifest.json": {
-      "blob": "2712dcc1480b0287da0ab85768ff732a4a2125d9",
+      "blob": "d92a64247421656859359d7ef7b50f8522cf046c",
       "components": [
         713
       ]
@@ -1815,7 +1815,7 @@
       ]
     },
     "tests/four-court-buckets/settlement/native-emulator.cjs": {
-      "blob": "5dcfa651cb3a955c736edf5a82f4ba48aa0ffb2d",
+      "blob": "ac1e212184cac39de2179e073067330c5fdd45f5",
       "components": [
         713
       ]
@@ -2341,6 +2341,7 @@
     "tests/four-court-buckets/settlement/fixtures/10/ladder-auto-settlement.js": "Use the independently read back automatic settlement entry point.",
     "tests/four-court-buckets/settlement/probe.cjs": "Check the real-name policy and public data boundary for both settlement paths.",
     "tests/four-court-buckets/settlement/verify-package.py": "Validate selected-file readback independently from full archive provenance.",
-    "release/buckets/settlement/candidate/10/ladder-settlement-core.js": "Raise the automatic bucket award limit to 320 accounts and preserve the legacy limit and the original source fixture."
+    "release/buckets/settlement/candidate/10/ladder-settlement-core.js": "Raise the automatic bucket award limit to 320 accounts and preserve the legacy limit and the original source fixture.",
+    "release/buckets/settlement/bucket-settlement/input.cjs": "Accept only a verified operator activation receipt for the current physical room and bucket epoch."
   }
 }

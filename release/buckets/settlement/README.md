@@ -23,6 +23,11 @@ Missing/corrupt buckets, unknown marker values, projection vectors from another
 epoch or ahead of the buckets, and changed room generations stop settlement.
 A public vector may lag: finalization repairs its scores and vector atomically.
 
+Operator activation leaves a private `bucketMigration` pointer for rollback.
+Settlement reads the referenced activation receipt in the award transaction
+and checks the physical room generation, room ID, code, and epoch. Missing,
+mismatched, or malformed records and public migration markers still block awards.
+
 The transaction awards eligible players, creates permanent event ledgers, writes
 the complete canonical private archive, updates the public view and writes a
 private settlement certificate for the exact generation/epoch/vector/state
@@ -89,6 +94,12 @@ six-court 160-player awards, and competing manual and automatic settlement for
 any award. A corrupt public view forces a late abort at 320 accounts. Repairing
 the view lets the other entry point settle once, with zero points from the
 failed attempt. Production Auth, App Check, Eventarc and Rules require separate acceptance.
+
+The 320-account rehearsal also uses the actual operator migration service.
+It verifies settlement after activation and replay after rollback. A separate
+pre-award rollback with bucket scoring disabled reconstructs the latest bucket
+score in the legacy room. A stale bucket request is rejected, and a fresh legacy
+manual request awards all 320 accounts once.
 
 The automatic entry uses the selected files read back for revision
 `ladderautosettlement-00003-kuf` and generation `1793906143803503`. Its

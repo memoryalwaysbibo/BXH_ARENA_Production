@@ -15,6 +15,10 @@ function checkSeason(control,now){
  if(ms(control.endAt)&&now>ms(control.endAt))fail('season-ended');
 }
 function identity(s){const t=s.createTime;if(!s.exists||!Number.isSafeInteger(t?.seconds)||!Number.isSafeInteger(t?.nanoseconds))fail('bucket-room-identity-missing');return t.seconds+':'+t.nanoseconds;}
+function childBelongsToRoom(child,root){
+ const t=child.createTime,r=root.createTime;
+ return child.exists&&!!t&&(t.seconds>r.seconds||t.seconds===r.seconds&&t.nanoseconds>=r.nanoseconds);
+}
 function validateResults(state){
  if(!Array.isArray(state.players)||!Array.isArray(state.matches)||!state.matches.length)fail('bucket-invalid-results');
  if(state.players.some(p=>!p||typeof p!=='object'||Array.isArray(p)))fail('bucket-invalid-results');
@@ -52,7 +56,9 @@ async function load({tx,db,root,pub,observed={},runtime='production',env=process
  const top=root.data()||{},publicData=pub.data()||{},kind=ownership(top,publicData)?'bucket':'legacy';
  if(observed.kind&&observed.kind!==kind)fail('bucket-mode-changed');observed.kind=kind;
  if(kind==='legacy')return {bucket:false,top};
- if([top,publicData].some(d=>has(d,'bucketMigration')||has(d,'deletionStatus')))fail('bucket-settlement-fenced');
+ if(has(publicData,'bucketMigration')||[top,publicData].some(d=>has(d,'deletionStatus')))fail('bucket-settlement-fenced');
+ const migration=top.bucketMigration;
+ if(has(top,'bucketMigration')&&(migration?.version!==1||typeof migration.operation!=='string'||!/^[a-f0-9]{64}$/.test(migration.operation)||typeof migration.epoch!=='string'||Object.keys(migration).length!==3))fail('bucket-settlement-fenced');
  if(!has(top,'scoreStorage')||!pub.exists)fail('bucket-context');
  if(top.systemClosed||top.eventCancelled||top.testMode||top.createdByRole==='partner_organizer')fail('bucket-room-read-only');
  if((top.qrCheckinManaged===true)!==(publicData.qrCheckinManaged===true)||top.qrCheckinManaged===true&&(!Number.isSafeInteger(top.qrCheckinRevision)||top.qrCheckinRevision<1||publicData.qrCheckinRevision!==top.qrCheckinRevision))fail('bucket-qr-mirror-stale');
@@ -68,9 +74,14 @@ async function load({tx,db,root,pub,observed={},runtime='production',env=process
  const config=await tx.get(db.doc('systemConfig/fourCourtScoreBuckets'));
  if(config.data()?.settlementEnabled!==true)fail('bucket-settlement-disabled');
  try{gate.assertRoom(config.data(),m);}catch(e){fail(e.message);}
+ if(migration){
+  if(migration.epoch!==m.epoch)fail('bucket-settlement-fenced');
+  const activation=await tx.get(root.ref.collection('bucketMigrationOperations').doc(migration.operation));
+  const record=activation.data();
+  if(!childBelongsToRoom(activation,root)||record?.version!==1||record.action!=='activate'||record.code!==m.code||record.roomId!==m.roomId||record.epoch!==m.epoch||record.result?.ok!==true||record.result.operation!==migration.operation)fail('bucket-settlement-fenced');
+ }
  const refs=Array.from({length:m.bucketCount},(_,i)=>root.ref.collection('matchBuckets').doc('court-'+(i+1))),snaps=await Promise.all(refs.map(r=>tx.get(r)));
- const rootTime=root.createTime;
- if(snaps.some(s=>s.exists&&(!s.createTime||s.createTime.seconds<rootTime.seconds||s.createTime.seconds===rootTime.seconds&&s.createTime.nanoseconds<rootTime.nanoseconds)))fail('bucket-room-changed');
+ if(snaps.some(s=>s.exists&&!childBelongsToRoom(s,root)))fail('bucket-room-changed');
  if(Buffer.byteLength(JSON.stringify([top,publicData,...snaps.map(s=>s.data())]))>5000000)fail('bucket-read-size-budget');
  let state;try{state=B.materialize(base,m,snaps.map(s=>s.exists?s.data():null));}catch(e){fail(e.message);}
  for(const match of state.matches){const old=base.matches.find(x=>x.id===match.id);if(!old||['bracket','round','indexInRound','seq'].some(k=>old[k]!==match[k])||!!old.isBye!==!!match.isBye)fail('bucket-structure-stale');}
