@@ -16,6 +16,8 @@ test('320-player master routes six Firestore child rooms and reads a single sett
   const app = initializeApp({ projectId: project });
   const db = getFirestore(app);
   try {
+    const { groupStageCommand } = require('./firebase-entry.cjs');
+    assert(groupStageCommand.__endpoint.callableTrigger);
     const parentCode = 'BXH-PARENT';
     const parent = db.doc('tournaments/' + parentCode);
     const players = [...roster(320), {
@@ -52,6 +54,8 @@ test('320-player master routes six Firestore child rooms and reads a single sett
     const command = createGroupStageCommand(coordinator);
     await assert.rejects(command({ data: { action: 'prepare', parentCode, actorUid: operator } }),
       { code: 'group-auth-required' });
+    await assert.rejects(groupStageCommand.run({ data: { action: 'prepare', parentCode, actorUid: operator } }),
+      { code: 'unauthenticated' });
     await assert.rejects(coordinator.prepare(parentCode, operator), { code: 'group-room-disabled' });
     await gate.set({ enabled: true, parentCodes: [parentCode] });
     await assert.rejects(coordinator.prepare(parentCode, 'outside'), { code: 'group-permission-denied' });
@@ -64,6 +68,9 @@ test('320-player master routes six Firestore child rooms and reads a single sett
     const routing = db.doc('groupStageRoutes/' + parentCode);
     assert.equal((await routing.collection('players').get()).size, 320);
     assert(JSON.stringify((await routing.get()).data()).length < 1000);
+    const clientRead = await fetch('http://127.0.0.1:8199/v1/projects/' + project +
+      '/databases/(default)/documents/' + routing.path);
+    assert.equal(clientRead.status, 403);
     assert.deepEqual(await coordinator.prepare(parentCode, operator), prepared);
     await assert.rejects(coordinator.openNext(parentCode, 'B', operator), { code: 'group-stage-order' });
     await assert.rejects(db.runTransaction(tx => coordinator.readSettlement(tx, parentCode)),
@@ -87,6 +94,9 @@ test('320-player master routes six Firestore child rooms and reads a single sett
 
       const viewer = await coordinator.readRouting(parentCode, state.players[0].registrationUid);
       assert.equal(viewer.roomCode, code);
+      assert.deepEqual(await groupStageCommand.run({
+        auth: { uid: state.players[0].registrationUid }, data: { action: 'routing', parentCode },
+      }), viewer);
       assert.equal(viewer.assignedGroups.length, 1);
       assert.equal((await coordinator.readRouting(parentCode, 'outside')).roomCode, null);
       await assert.rejects(coordinator.collect(parentCode, key, code, operator), { code: 'group-stage-not-complete' });
