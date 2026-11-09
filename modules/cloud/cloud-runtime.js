@@ -3955,8 +3955,9 @@ if(testerSession){
     subscribeRefereeSeats(code,callback){
       if(fourCourtLifecycle?.isBucket(String(code).toUpperCase()))return fourCourtLifecycle.subscribe(String(code).toUpperCase(),state=>callback({model:state.meta.refereeSeatsV1,projection:state.meta}),{primary:false});
       if(!cloudEnabled||!code)return ()=>{};
-      return fx.onSnapshot(fx.doc(dbHandle,"tournaments",String(code).toUpperCase()),snap=>{
-        if(!snap.exists()||snap.metadata.hasPendingWrites)return;
+      return fx.onSnapshot(fx.doc(dbHandle,"tournaments",String(code).toUpperCase()),{includeMetadataChanges:true},snap=>{
+        if(snap.metadata.hasPendingWrites||snap.metadata.fromCache)return;
+        if(!snap.exists()){callback({missing:true});return;}
         const d=snap.data();if(Object.hasOwn(d,'scoreStorage'))return;if(d.refereeSeatsV1?.version!==1)return;
         callback({model:d.refereeSeatsV1,projection:{
           ...(d.createdByRole==='partner_organizer'?{refereeSeatActivityAssignment:d.eventStaffAssignments?.[authHandle?.currentUser?.uid]||null,refereeSeatAccessRevoked:false}:{}),
@@ -4168,7 +4169,9 @@ if(testerSession){
       try{
         const ref = fx.doc(dbHandle,"tournaments",String(code).toUpperCase());
         const unsub = fx.onSnapshot(ref, { includeMetadataChanges:true }, (snap)=>{
-          if(!active||!snap.exists()) return;
+          if(!active) return;
+          if(snap.metadata.hasPendingWrites||snap.metadata.fromCache) return;
+          if(!snap.exists()){callback({roomMissing:true,code:String(code).toUpperCase()},true);return;}
           if(snap.metadata.hasPendingWrites||snap.metadata.fromCache) return; // 略過自己剛寫入、尚未確認的本地回音
           const d = snap.data();
           if(Number.isSafeInteger(d.updatedAt)){if(d.updatedAt<lastRootVersion)return;lastRootVersion=d.updatedAt;}
