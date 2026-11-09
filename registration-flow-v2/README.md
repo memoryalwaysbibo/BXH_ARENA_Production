@@ -32,6 +32,8 @@
 
 `tests/start-320.cjs` 以 320 位選手和 12 台設定演練開賽。執行實際名單核對、抽籤、開賽前驗證與開賽按鈕流程。Firestore Emulator 注入佇列重試和晚報到，並量測各讀寫階段及切到裁判分頁狀態的時間。報到寫入、開賽交易接線及畫面渲染由測試環境替代，裁判台實際計分可用時間仍須瀏覽器驗收。CI 將報告收錄在隔離壓測產物。
 
+`tests/ownership-rules.cjs` 在隔離 Firestore Emulator 先用 2026-11-04 的正式規則快照重現舊版寫入，再驗證候選規則。持有 V2 標記時，瀏覽器無法改寫或刪除私有房、公開鏡像和名單；玩家仍能查自己的報名與公開賽事。操作紀錄只對伺服器可見。伺服器移除標記後，一般管理操作可按原權限執行。此測試載入完整規則，放在其他佇列測試後執行。
+
 工作者模擬是同一 Node 程序中的五個獨立 service 物件，共用真正的本機 Firestore Emulator；不是五台實體 Cloud Run。測試使用合成 Auth，沒有驗證正式 Auth／App Check、行動網路、跨區延遲或正式觸發器／排程器交付。
 
 前端模擬完成交易後會主動讀回，將測試時鐘前移 4 秒以越過手動查詢限頻；報告時間是這個隔離測試的實際牆鐘時間，不代表正式站自動輪詢的延遲上限。
@@ -42,7 +44,7 @@
 NODE_PATH=/path/to/test-deps/node_modules GCLOUD_PROJECT=demo-bxh-registration-v2 \
   /path/to/test-deps/node_modules/.bin/firebase emulators:exec --only firestore \
   --project demo-bxh-registration-v2 --config registration-flow-v2/emulator.json \
-  'node --test registration-flow-v2/tests/recovery.test.cjs && node registration-flow-v2/tests/frontend-waves.cjs && node registration-flow-v2/tests/waves.cjs && node registration-flow-v2/tests/start-320.cjs'
+  'node --test registration-flow-v2/tests/recovery.test.cjs && node registration-flow-v2/tests/frontend-waves.cjs && node registration-flow-v2/tests/waves.cjs && node registration-flow-v2/tests/start-320.cjs && node --test registration-flow-v2/tests/ownership-rules.cjs'
 node --test tests/registration-feedback.test.cjs tests/family-roster-checkin.test.cjs tests/community-quick-registration-cloud.test.cjs tests/public-pages-artifact.test.cjs
 node scripts/verify-production-frontend.cjs
 ```
@@ -55,8 +57,9 @@ CI 安裝固定 firebase-tools@13.35.1、firebase-admin@14.4.0、firebase-functi
 - 將**所有**相關名額寫入入口接至同一協調規則，包括舊版客戶端與直接 Firestore 管理寫入。此候選已接入本人／家庭報名、玩家與管理端取消、線上備取升正取、官方個人賽的線上降備取和自動補位設定。一般官方個人賽的現場手動升正取與批次新增也已接入候選。現場專用備取流程與舊版客戶端寫入仍待查核與整合。有限額遞補目前只驗證官方個人賽候選；不限額社群房由既有 roster handler 處理。
 - 先部署並驗證新函式、文件觸發器、恢復排程與 indexes，確認自動交付及中斷接手。`backend/bindings.cjs` 尚未加入正式 entrypoint，並要求由 `node backend/prepare-family.cjs <核對後的原始 family-registration.js>` 產生的容量候選。若目前正式來源與擷取版本不同，先重新審查差異並更新候選，再產出部署套件。
 - V2 佇列在接受新操作的交易內要求私有房間的 `registrationQueueVersion === 2`。現有 callable 的寫入入口須以 `createGuardedLegacyWriter` 包裝，並在同一寫入交易拒絕已切換的房間。名額預查及名單讀取可以保留。正式入口尚未安裝此包裝。停用 V2 時先關閉新操作，再確認原佇列排空，最後移除房間所有權標記。
+- 儲存庫的 `manageOnsiteWaitlist` 候選在同一交易讀取 V2 所有權，保留預覽及舊操作回執，拒絕新的專用備取寫入。此防護須以當前正式來源核對後接入。啟用檢查也必須拒絕由專用備取掌管的房間。
 - 舊瀏覽器可直接更新 JSON 字串 `tournaments.data` 及 `publicTournaments.bracketView`。Firestore Rules 無法逐欄辨識字串內的名單、報到、對戰內容。啟用前需先把允許的狀態寫入移到受信任函式，或隔離成可由 Rules 辨識的欄位，再封鎖瀏覽器對 V2 房的直接名單寫入。只改前端開關無法封鎖舊頁面。
-- 讀取完整當前 Rules，確認私有 queue 文件不能被客戶端讀寫。`queue-rules.fragment` 只供整合審查，不能單獨部署；新增 deny 不能推翻其他重疊 allow。
+- `backend/compose-rules.cjs` 對 2026-11-04 已審查快照產出完整隔離候選，來源雜湊不符就停止。候選規則在 `registrationQueueVersion === 2` 時會封鎖私有房與公開鏡像的所有瀏覽器寫入，也封鎖名單子集合。任何仍依賴瀏覽器寫入的報到、抽籤、開賽、計分或房間設定須先改走可信任入口。發布前要重新讀取當前正式 Rules 並審查差異。`queue-rules.fragment` 不能單獨部署，新增 deny 不能推翻其他重疊 allow。
 - 檢查 My Events 操作憑證、分桶、現場備取、抽籤與團體模式的相容性。抽籤／團體不在本候選的可啟用範圍。
 - 正式 Auth、App Check、實體瀏覽器及小範圍活動驗收，並準備來源／設定 readback 與 rollback。
 

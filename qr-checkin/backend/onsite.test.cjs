@@ -25,6 +25,26 @@ test('internal check-in delegation grants no configure, draw or promotion author
   const req=request();req.data.action=action;assert.throws(()=>O.transition(fixture(),req,{now,authorizedCheckin:true}),/permission-denied/);
  }
 });
+test('onsite mutations reject V2 ownership while previews and original receipts stay readable',()=>{
+ const a=fixture();a.user.role='admin';
+ const original=request(),completed=O.transition(a,original,{now});
+ const marked=O.applyCommit(a,completed.commit);
+ marked.tournament.registrationQueueVersion=2;
+ const preview=O.transition(marked,{uid:'u1',data:{code,action:'preview'}},{now});
+ assert.equal(preview.result.ok,true);
+ assert.equal(preview.commit,undefined);
+ const replay=O.transition(marked,original,{now});
+ assert.equal(replay.result.replayed,true);
+ assert.equal(replay.commit,undefined);
+ for(const data of [
+  {action:'configure',enabled:true},
+  {action:'increaseCapacity',capacity:3},
+  {action:'checkIn',playerId:'p1',checkedIn:false},
+ ]){
+  const next={uid:'u1',data:{code,expectedRevision:2,operationId:'new-onsite-operation',...data}};
+  assert.throws(()=>O.transition(marked,next,{now}),/registration-queue-required/);
+ }
+});
 test('a client cannot pass the internal delegation option through the callable payload',()=>{
  assert.throws(()=>O.normalizeRequest({auth:{uid:'u1'},data:{...request().data,authorizedCheckin:true}}),/invalid-operation/);
 });
