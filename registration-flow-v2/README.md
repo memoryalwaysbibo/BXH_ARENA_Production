@@ -58,7 +58,7 @@ CI 安裝固定 firebase-tools@13.35.1、firebase-admin@14.4.0、firebase-functi
 - 將**所有**相關名額寫入入口接至同一協調規則，包括舊版客戶端與直接 Firestore 管理寫入。此候選已接入本人／家庭報名、玩家與管理端取消、線上備取升正取、官方個人賽的線上降備取和自動補位設定。一般官方個人賽的現場手動升正取與批次新增也已接入候選。現場專用備取流程與舊版客戶端寫入仍待查核與整合。有限額遞補目前只驗證官方個人賽候選；不限額社群房由既有 roster handler 處理。
 - 先部署並驗證新函式、文件觸發器、恢復排程與 indexes，確認自動交付及中斷接手。`backend/bindings.cjs` 尚未加入正式 entrypoint，並要求由 `node backend/prepare-family.cjs <核對後的原始 family-registration.js>` 產生的容量候選。若目前正式來源與擷取版本不同，先重新審查差異並更新候選，再產出部署套件。
 - V2 佇列在接受新操作的交易內要求私有房間的 `registrationQueueVersion === 2`。`backend/prepare-legacy-writers.cjs` 以 `release-inputs.json` 核對正式家庭報名與名單服務的 handler 雜湊，再於各自的寫入交易中讀取既有的房間快照。兩支服務保留切換前的回執重查，家庭報名也保留名額預查及名單讀取。工具輸出候選 handler 到 stdout，正式發布前須以完整部署來源重新核對版本、入口與相依檔。其他會寫名額的舊入口仍須逐一核對隔離。首次部署時，worker 與 sweep 的獨立開關也預設關閉。先驗證索引與背景入口，再開背景處理及指定房間的新請求。停用 V2 時先關閉新操作，維持背景處理直到原佇列排空，再移除房間所有權標記。工作者也會在寫入交易內重查私有房間所有權，防止舊任務跨越回切。
-- 儲存庫的 `manageOnsiteWaitlist` 候選在同一交易讀取 V2 所有權，保留預覽及舊操作回執，拒絕新的專用備取寫入。此防護須以當前正式來源核對後接入。啟用檢查也必須拒絕由專用備取掌管的房間。
+- `backend/prepare-legacy-writers.cjs` 也固定 `promoteseatedregistration-00003-fud` 的 `service.cjs` 與 `manageonsitewaitlist-00005-nog` 的 `onsite-waitlist/firestore-store.js` 雜湊。手動升正取在回執分支後擋下新寫入，現場備取在交易提交及 QR 適配前擋下有寫入的結果。已核對並測試正式 handler，正式發布仍須核對完整來源、相依檔與部署配置。啟用檢查也必須拒絕由專用備取掌管的房間。
 - `lotteryRegistration` 和 `manageRegistrationSelection` 的雜湊固定候選沿用各入口原有的交易防護，遇 V2 房間所有權時拒絕抽選操作。啟用檢查須在寫入 V2 所有權的同一交易排除已配置、抽選中或刪除中的抽選房，包含公私房間任一處的抽選標記。兩支正式入口尚待完整部署來源核對。
 - `registrationInvitations` 的雜湊固定候選在交易內拒絕 V2 房的新邀請及舊入口新增名額，保留拒絕邀請、過期處理、既有報名及原回執。正式入口仍須完整部署來源核對。
 - 舊瀏覽器可直接更新 JSON 字串 `tournaments.data` 及 `publicTournaments.bracketView`。Firestore Rules 無法逐欄辨識字串內的名單、報到、對戰內容。啟用前需先把允許的狀態寫入移到受信任函式，或隔離成可由 Rules 辨識的欄位，再封鎖瀏覽器對 V2 房的直接名單寫入。只改前端開關無法封鎖舊頁面。

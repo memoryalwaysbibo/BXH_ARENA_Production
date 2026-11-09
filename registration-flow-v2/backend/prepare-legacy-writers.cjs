@@ -16,6 +16,16 @@ function assertLegacyRosterWritable(room,pub,state){
 }`;
 
 const writers={
+ promoteSeatedRegistration:{
+  sha256:'ef07b2c70fe61b984a50bc2d5f27142f8cec927eb8e57aaac7711702f0881de5',
+  anchor:"  if(!local&&reg.status!=='waitlist')fail('not-waitlist');",
+  guard:"  if(t.registrationQueueVersion===2)fail('registration-queue-required');",
+ },
+ manageOnsiteWaitlist:{
+  sha256:'099abfc664d3821ffa96d22116c2fc3b66f2453c52a9ea3c4a67d970f3db59fa',
+  anchor:'      const attendance=await prepare({tx,ref:tr,aggregate,output,uid,code});',
+  guard:"      if (change && aggregate.tournament?.registrationQueueVersion === 2) throw new DrawError('registration-queue-required', 409);",
+ },
  familyRegistration:{
   file:'family-registration.js',
   anchor:'  const onsiteOwned=Onsite.onsiteWaitlistOwned(t,pub,s);',
@@ -51,8 +61,8 @@ function prepareLegacyWriterSource(name,source){
   return source.replace(selectionImport,guardedSelectionImport);
  }
  if(!Object.hasOwn(writers,name))throw Error('unsupported-legacy-writer');
- const {file,anchor,guard}=writers[name];
- const expected=releaseInputs[name].files[file];
+ const {file,anchor,guard,sha256}=writers[name];
+ const expected=sha256??releaseInputs[name].files[file];
  verifySource(name,source,expected,anchor);
  // The handlers have already authenticated the request and returned any
  // matching receipt. Check the room read in the transaction before a new write.
@@ -66,7 +76,7 @@ function verifySource(name,source,expected,anchor){
 }
 
 if(require.main===module){
- if(process.argv.length!==4)throw Error('Usage: node prepare-legacy-writers.cjs <function-name> <original-handler>');
+ if(process.argv.length!==4)throw Error('Usage: node prepare-legacy-writers.cjs <function-name> <original-source-file>');
  const [, ,name,file]=process.argv;
  process.stdout.write(prepareLegacyWriterSource(name,readFileSync(file,'utf8')));
 }
