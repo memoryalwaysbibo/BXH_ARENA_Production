@@ -1,6 +1,7 @@
 {
   "functions": [
     "activeSingleElimSchedulePhase",
+    "applyChallongeSingleElimOrder",
     "applyCompletedMatchCorrection",
     "applyCourtSwapMutation",
     "applyIdleCourtClaim",
@@ -18,10 +19,12 @@
     "computeRoundRobinStandings",
     "correctionProbe",
     "createHunterRoundEvent",
+    "eligiblePlayers",
     "ensureMatchScoringFields",
     "ensureMatchStatusFields",
     "evaluateMatchCompletion",
     "evaluateQuickDecision",
+    "generateSingleElim",
     "getMatch",
     "idleCourtCandidates",
     "isInActiveSingleElimPhase",
@@ -39,6 +42,7 @@
     "rebuildPropagationSingle",
     "refereeMatches",
     "resolveScoringModeForRound",
+    "shuffle",
     "singleElimBronzeBeforeFinalBlocked",
     "singleElimBronzeGatePhase",
     "singleElimScheduleTier",
@@ -47,7 +51,7 @@
     "tournamentEligiblePlayers",
     "validateHunterRoundLedger"
   ],
-  "sourceFunctionSha256": "25fc1a490acd80b8c143c6b6cbb8284bd09de197db8aaef03f4f31aa1197512d",
+  "sourceFunctionSha256": "061cca476b3a2c6968b1816bb52dda0751ec414d4d4d109fe710ca1cba3bd46d",
   "modules": {
     "double-elimination-core.js": "db9a6b0d815a10c2853c2d48794f297385b23798ce441e904c24246ddf32ab1c",
     "referee-fault-core.js": "26da0500abd88622bf9f49555287dd5ed7a7e311f232dc5adae027fce6e25266",

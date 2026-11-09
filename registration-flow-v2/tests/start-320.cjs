@@ -4,13 +4,12 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
-const {randomUUID}=require('node:crypto');
 const {db,FieldValue,handlers,service,seed}=require('./harness.cjs');
 const bracket=require('../../modules/main-app/bracket-commit.js');
 const {createQueuedPromotion}=require('../backend/management.cjs');
 const {createPromotionHandler}=require('../../registration-promotion/functions/service.cjs');
 const {createCheckinHandler}=require('../../qr-checkin/backend/firebase-callable.cjs');
-const {createStartHandler}=require('../backend/start.cjs');
+const {createStartHandler,createDrawHandler}=require('../backend/lifecycle.cjs');
 
 const root=path.resolve(__dirname,'../..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
@@ -35,12 +34,13 @@ async function run(){
  const runtime={id:'start-320',cloudCode:code,updatedAt:now,meta:{
   name:'Start fixture',formatType:'single',battleMode:'individual',stations:12,registrationEnabled:true,
   registrationCapacity:320,registrationAutoFillEnabled:false,checkinRequired:true
- },players,waitlistPlayers:[],matches:[],archiveStatus:'ongoing',registrationRosterRevision:0};
+ },players,waitlistPlayers:[],matches:[],archiveStatus:'ongoing',registrationRosterRevision:0,
+ courtAssignments:{court1:{currentMatchId:null,nextMatchId:null,status:'idle',lockedBy:admin,lockedAt:now}}};
  const publicMirror=vm.runInNewContext(block(cloud,'  function buildPublicMirrorFields(state){','\n  function currentUserUidForWrites()')+'\nbuildPublicMirrorFields',{buildPublicEventInfo:()=>({})});
  const common={eventAuthority:'official',confirmedCount:319,waitlistCount:1};
  const batch=db.batch();
  batch.update(tr,{...common,data:JSON.stringify(runtime),ownerUid:admin,registrationQueueVersion:2});
- batch.update(pr,{...common,bracketView:JSON.stringify(publicMirror(runtime))});
+ batch.update(pr,{...common,bracketView:JSON.stringify(publicMirror(runtime)),registrationRosterSyncBackendEnabled:true});
  batch.update(db.doc('users/'+admin),{role:'admin'});
  batch.set(db.doc('systemConfig/qrCheckin'),{enabled:true,writerGuardsVerified:true,roomCodes:[code]});
  entrants.forEach((id,index)=>batch.set(reg(id),{uid:id,displayName:'Fixture '+index,status:index<319?'confirmed':'waitlist',createdAt:now}));
@@ -62,9 +62,12 @@ async function run(){
  const configure={code,route:'roster',operationId:'start320-retry-config',payload:{code,action:'configure',intent:'admin',enabled:true,operationId:'start320-retry-config'}};
  const promotion={code,route:'promotion',operationId:'start320-late-promotion',payload:{code,action:'promote',intent:'admin',registrationId:promoted,expandBy:0,operationId:'start320-late-promotion'}};
 
- const timings=[],notices=[],storage=new Map();
- let startWrites=0, drawn=0, next=0, modal, controller, eventResolve, startRequest;
- const start=createStartHandler({db,enabled:async requested=>requested===code});
+ const timings=[],notices=[];
+ let startWrites=0, drawn=0, modal, eventResolve, startRequest, firstDrawRequest;
+ const options={db,enabled:async requested=>requested===code};
+ const start=createStartHandler(options), draw=createDrawHandler(options);
+ const drawData=snapshot=>({code,roomId:snapshot.id,baseDrawId:snapshot.bracketDraw?.id??null,
+  rosterRevision:snapshot.registrationRosterRevision,operationId:'draw-320-operation-'+(drawn+1)});
  const startData=snapshot=>({code,roomId:snapshot.id,drawId:snapshot.bracketDraw.id,
   rosterRevision:snapshot.registrationRosterRevision,operationId:'start-320-operation'});
  const observed=()=>new Promise(resolve=>{eventResolve=resolve;});
@@ -78,19 +81,21 @@ async function run(){
   const [a,b]=await db.getAll(tr,pr);
   return {ok:true,data:JSON.parse(a.data().data),publicData:JSON.parse(b.data().bracketView)};
  });
- async function write(snapshot,options,label){
-  return measure(label,()=>db.runTransaction(async tx=>{
-   const current=JSON.parse((await tx.get(tr)).data().data);
-   if(options){
-    if(bracket.assertWrite(current,snapshot,options)==='already-committed')return true;
-   }
-   if(Number(current.registrationRosterRevision||0)!==Number(snapshot.registrationRosterRevision||0))throw Error('registration-roster-stale');
-   const publicData=publicMirror(snapshot), phase=snapshot.startedAt?'live':'waiting';
-   tx.update(tr,{data:JSON.stringify(snapshot),tournamentPhase:phase});
-   tx.update(pr,{bracketView:JSON.stringify(publicData),tournamentPhase:phase});
-   return {ok:true,committed:true,data:snapshot,publicData};
-  }));
- }
+ const verifier=bracket.create({key:code,state:()=>c.state,cloud:()=>true,current:()=>true,read:readBracket});
+ const controller={verify:verifier.verify,begin:async()=>{
+  const request={auth:{uid:admin},data:drawData(c.state)};
+  const replayed=await Promise.all([draw(request),draw(request)]);
+  assert.equal(replayed.filter(result=>result.replayed===true).length,1);
+  assert.equal(replayed[0].drawId,replayed[1].drawId);
+  if(!drawn)firstDrawRequest=request;
+  const latest=await readBracket();
+  assert.equal(bracket.signature(latest.data),bracket.signature(latest.publicData));
+  assert.equal(latest.publicData.bracketDraw,undefined);
+  assert.equal(latest.data.courtAssignments.court1.lockedBy,admin);
+  assert.equal(latest.publicData.courtAssignments.court1.lockedBy,undefined);
+  assert.equal(latest.data.bracketDraw.id,replayed[0].drawId);
+  c.state=latest.data;drawn++;
+ }};
  const c=vm.createContext({
   state:clone(runtime),window:{BXHBracketCommit:bracket,cloudSync:{
    getPublicTournamentFull:()=>measure('roster-room-read',async()=> (await pr.get()).data()),
@@ -101,8 +106,9 @@ async function run(){
   BATTLE_MODE_LABELS:{individual:'個人戰'},FORMAT_LABELS:{single:'單淘汰'},PLAY_MODE_LABELS:{},Date,
   cloneStateForSave:clone,captureRegistrationRosterContext:()=>({code,roomId:runtime.id}),requireRegistrationRosterContext(){},
   registrationRosterContextIsCurrent:()=>true,peopleOnsiteWaitlistManaged:()=>false,isCommunityQuickRegistration:()=>false,
-  computeRegistrationStatus:()=> 'open',touchCommunityActivity(){},cloudAvailable:()=>true,uid:prefix=>prefix+'_'+(++next),
-  enqueueCloudStateWrite:(room,snapshot)=>write(snapshot,null,'roster-write').then(r=>r.ok),
+  isCommunityRoomOwner:()=>false,
+  computeRegistrationStatus:()=> 'open',touchCommunityActivity(){},cloudAvailable:()=>true,
+  enqueueCloudStateWrite:()=>{throw Error('unexpected-browser-write');},
   applyRemoteState:snapshot=>{c.state=snapshot;},
   scheduledTournamentStartMs:()=>null,offerAdminOperationalOverride:()=>false,mapRegistrationError:e=>e.message,
   noteAdminOperationalFailure(){},resetAdminRegistrationsCache(){},render(){},saveRecord:async()=>true,
@@ -126,31 +132,30 @@ async function run(){
  });
  const family=read('family-ui.js'), utilities=read('modules/main-app/match-utils.js');
  vm.runInContext([
-  block(utilities,'function nextPow2(','\nfunction sameStringSet('),
   utilities.split('\n').find(line=>line.startsWith('function sameStringSet(')),
   block(family,'function mergeFamilyOnlineRoster(','async function chooseFamilyRegistrationToCancel('),
   block(core,'function currentBracketParticipantIds(','/* ==== render helpers ==== */'),
-  block(core,'function singleElimScheduleTier(','function singleElimBronzeGatePhase('),
-  block(core,'function eligiblePlayers(','function rebuildPropagationSingle('),
-  'const shuffle=items=>items.slice(), orderedMatches=()=>state.matches.slice().sort((a,b)=>a.seq-b.seq);',
+  block(core,'function tournamentEligiblePlayers(','function isPlayerInBracket('),
+  block(core,'async function refreshBackendRegistrationRoster(','async function loadAdminRegistrationRows('),
   block(core,'async function verifyBracketBeforeStart(','function currentRoundLabelForBoard('),
   'function clickStart(){const action="start-tournament";'+block(core,'  if(action==="start-tournament"){','  if(action==="reset-bracket"){')+'}'
  ].join('\n'),c);
- controller=bracket.create({key:code,actorUid:admin,storage:{
-  getItem:key=>storage.get(key),setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)
- },current:()=>true,state:()=>c.state,cloud:()=>true,operationId:randomUUID,generate:()=>{
-  const prior=c.state;c.state=clone(prior);
-  try{return c.generateSingleElim()?clone(c.state):null;}finally{c.state=prior;}
- },read:readBracket,waitForWrites:async()=>true,write:(snapshot,options)=>write(snapshot,options,'draw-write'),
- apply:snapshot=>{c.state=clone(snapshot);},changed(){},success(){drawn++;}});
  // The production promotion handler owns the last waitlist seat before drawing.
  await worker.enqueue(admin,promotion);
  await measure('promotion-before-draw',()=>worker.drain(code));
  const promotedResult=(await worker.status(admin,code,promotion.operationId)).operation;
  assert.equal(promotedResult.state,'completed',JSON.stringify(promotedResult));
  c.state=(await readBracket()).data;
+ const beforeDraw={auth:{uid:admin},data:drawData(c.state)};
+ await assert.rejects(createDrawHandler({db})(beforeDraw),/registration-queue-disabled/);
+ await assert.rejects(draw({...beforeDraw,data:{...beforeDraw.data,matches:[]}}),/invalid-operation/);
+ await assert.rejects(draw({...beforeDraw,auth:{uid:promoted}}),/permission-denied/);
  await measure('initial-draw',()=>controller.begin());
  assert.equal(c.currentBracketParticipantIds().size,318);
+ assert.equal(c.state.matches.length,511);
+ assert.equal((await tr.get()).data().bracketSize,512);
+ assert.equal(c.state.matches.filter(match=>match.isBye).length,194);
+ assert.equal(new Set(c.state.matches.map(match=>match.id)).size,511);
 
  const tooLate={...promotion,operationId:'start320-locked-promotion',payload:{...promotion.payload,operationId:'start320-locked-promotion'}};
  await worker.enqueue(admin,configure);
@@ -162,6 +167,7 @@ async function run(){
  assert.equal((await worker.drain(code)).processed,0);
  const staleStart={auth:{uid:admin},data:startData(c.state)};
  await assert.rejects(start(staleStart),/registration-queue-pending/);
+ await assert.rejects(draw({auth:{uid:admin},data:drawData(c.state)}),/registration-queue-pending/);
 
  let event=observed();
  await measure('first-start-click-to-confirmation',async()=>{c.clickStart();assert.equal((await event).title,'確認開始賽事');});
@@ -191,6 +197,11 @@ async function run(){
  await measure('redraw',()=>controller.begin());
  assert.equal(drawn,2);
  assert.equal(c.currentBracketParticipantIds().size,320);
+ assert.equal(c.state.matches.filter(match=>match.isBye).length,192);
+ const firstDraw=await createDrawHandler({db})(firstDrawRequest);
+ assert.equal(firstDraw.replayed,true);
+ assert.notEqual(firstDraw.drawId,c.state.bracketDraw.id);
+ await assert.rejects(draw({auth:{uid:admin},data:{...drawData(c.state),baseDrawId:firstDraw.drawId}}),/bracket-version-conflict/);
  const validStart={auth:{uid:admin},data:startData(c.state)};
  await assert.rejects(start({...validStart,auth:{uid:late[0]}}),/permission-denied/);
  await assert.rejects(start({...validStart,data:{...validStart.data,drawId:'another-draw'}}),/bracket-version-conflict/);
@@ -225,10 +236,11 @@ async function run(){
  assert.deepEqual(replay,{ok:true,startedAt:started.startedAt,drawId:started.bracketDraw.id,replayed:true});
  await assert.rejects(start({...startRequest,data:{...startRequest.data,drawId:'modified-draw'}}),/operation-conflict/);
  await assert.rejects(start({...startRequest,data:{...startRequest.data,operationId:'another-start-operation'}}),/bracket-started/);
- assert.equal((await tr.collection('operationLog').get()).size,1);
+ assert.equal((await tr.collection('operationLog').get()).size,3);
+ await assert.rejects(draw({auth:{uid:admin},data:drawData(started)}),/bracket-started/);
  await assert.rejects(worker.enqueue(admin,{...configure,operationId:'after-start-config',payload:{...configure.payload,operationId:'after-start-config'}}),/tournament-started/);
  assert.equal(notices.filter(x=>x.error).length,1);
- return {scope:'Firestore Emulator with V2 ownership, QR and trusted start handlers; draw writes and UI state simulated by the test, no browser Auth, App Check, production Rules or referee DOM',
+ return {scope:'Firestore Emulator with V2 ownership and trusted QR, draw and start handlers; UI state simulated, no browser Auth, App Check, production Rules or referee DOM',
   players:320,courtsConfigured:12,matchedEntrants:c.currentBracketParticipantIds().size,draws:drawn,startWrites,lateQrAudits:audits.length,
   pendingOperationsDuringFirstClick:2,postDrawPromotion:refused.reason,staleStartMessage:notices.find(x=>x.error).message,timings};
 }

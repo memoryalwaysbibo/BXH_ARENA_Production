@@ -5,8 +5,8 @@
 const {createQueue}=require('./queue.cjs');
 const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
-const {createStartHandler}=require('./start.cjs');
-function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,enabled=async()=>false,startEnabled=async()=>false}){
+const {createStartHandler,createDrawHandler}=require('./lifecycle.cjs');
+function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,enabled=async()=>false,startEnabled,drawEnabled}){
  if(createFamilyRegistration?.v2CapacityAware!==true)throw Error('queue-family-capacity-source-required');
  const familyFactory=store=>createFamilyRegistration(store,Date.now,{myEventsProofEnabled:true});
  if(typeof promotionFactory!=='function')throw Error('queue-promotion-factory-required');
@@ -28,13 +28,15 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
  });
  const registrationQueueV2=bind(api);
  const registrationRosterQueueV2=bind(managementApi);
- const registrationStartV2=bind(createStartHandler({db,enabled:startEnabled}),{
+ const lifecycleOptions={
   options:{enforceAppCheck:true},
-  preconditions:['bracket-room-changed','bracket-started','start-mode-not-supported','early-start-confirmation-required',
+  preconditions:['bracket-room-changed','bracket-started','draw-mode-not-supported','start-mode-not-supported','early-start-confirmation-required',
    'registration-roster-stale','bracket-version-conflict','qr-checkin-state-stale','registration-queue-pending','bracket-roster-changed'],
- });
+ };
+ const registrationStartV2=bind(createStartHandler({db,enabled:startEnabled}),lifecycleOptions);
+ const registrationDrawV2=bind(createDrawHandler({db,enabled:drawEnabled}),lifecycleOptions);
  const registrationQueueV2Worker=onDocumentCreated({region:'asia-east1',document:'_registrationQueueV2/{code}/_registrationQueueJobsV2/{job}',timeoutSeconds:60,maxInstances:5,retry:true},event=>queue.drainCreatedJob(event.params.code,event.params.job,{limit:200,budgetMs:45000}));
  const registrationQueueV2Sweep=onSchedule({region:'asia-east1',schedule:'every 1 minutes',timeoutSeconds:540,maxInstances:1},()=>queue.sweep());
- return {registrationQueueV2,registrationRosterQueueV2,registrationQueueV2Worker,registrationQueueV2Sweep,registrationStartV2};
+ return {registrationQueueV2,registrationRosterQueueV2,registrationQueueV2Worker,registrationQueueV2Sweep,registrationStartV2,registrationDrawV2};
 }
 module.exports={createBindings};
