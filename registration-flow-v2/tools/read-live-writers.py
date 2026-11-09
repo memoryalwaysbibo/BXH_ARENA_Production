@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Report source hashes for the existing bxh-arena registration writers."""
 
+import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -67,7 +69,7 @@ def source_hashes(archive):
     return result
 
 
-def inspect(name):
+def inspect(name, export_roster=None):
     original = describe(name)
     revision, bucket, obj, generation = original
     with tempfile.TemporaryDirectory(prefix="bxh746-writer-", dir="/tmp") as staging:
@@ -76,12 +78,44 @@ def inspect(name):
         with archive.open("rb") as stream:
             digest = hashlib.file_digest(stream, "sha256").hexdigest()
         files = source_hashes(archive)
+        if export_roster is not None:
+            with zipfile.ZipFile(archive) as package:
+                roster = package.read('roster-service.js')
     if describe(name) != original:
         raise ValueError("source-changed-during-read")
+    if export_roster is not None:
+        expected_roster = "6458496cbaedaf0a4ff34162115301cde9e1a94b229fd16d2b13b688ecfc2acf"
+        if (revision != "registrationrosterservice-00009-sep" or generation != "1793639756822602"
+                or files.get("roster-service.js") != expected_roster
+                or re.search(rb"-----BEGIN [A-Z ]*PRIVATE KEY-----", roster)):
+            raise ValueError("unverified-roster-export")
+        with os.fdopen(os.open(export_roster, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as output:
+            output.write(roster)
     return {"revision": revision, "generation": generation, "archiveSha256": digest, "files": files}
 
 
+def waitlist_inventory():
+    try:
+        rows = json.loads(gcloud("functions", "list", "--regions=" + REGION, "--format=json(name,environment,state,status)"))
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return {"status": "REGIONAL_LIST_UNAVAILABLE"}
+    matches = [row for row in rows if row.get("name", "").rsplit("/", 1)[-1] == "autoPromoteWaitlist"]
+    return {"status": "LISTED" if matches else "NOT_LISTED_IN_REGION", "functions": matches}
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--export-roster", type=Path, help="Write the reviewed roster handler to a new local file.")
+    args = parser.parse_args()
+    if args.export_roster is not None:
+        try:
+            row = inspect("registrationRosterService", args.export_roster)
+        except (OSError, subprocess.SubprocessError, ValueError, KeyError, zipfile.BadZipFile) as error:
+            print(json.dumps({"status": "ROSTER_EXPORT_STOPPED", "reason": str(error) if type(error) is ValueError else type(error).__name__}))
+            return 1
+        print(json.dumps({"status": "ROSTER_EXPORTED", "revision": row["revision"],
+                          "autoPromoteWaitlist": waitlist_inventory(), "productionWrites": 0}, indent=2))
+        return 0
     results = {}
     for name in WRITERS:
         try:
