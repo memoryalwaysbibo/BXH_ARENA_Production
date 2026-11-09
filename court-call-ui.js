@@ -256,9 +256,10 @@ function courtCallCommon(c){
  return `${c.error?`<p class="auth-error" role="alert">${esc(c.error)}</p>`:''}${c.pending?`<button class="btn btn-ghost" data-action="court-call-retry" data-code="${esc(c.code)}" ${c.busy?'disabled':''}>重試待確認操作</button>`:''}`;
 }
 
-function courtCallStationLabel(station){
+function courtCallStationLabel(station,code){
  const n=Number(station||0);
- return n>0?`${n}號台`:'戰鬥台';
+ if(n<1)return '戰鬥台';
+ return window.BXHCourtDisplayNames?.label(n,code)||`${n}號台`;
 }
 
 function courtCallPlayerResponseLabel(response){
@@ -301,7 +302,7 @@ function courtCallRow(c,r,ref){
  const legacyActions=ref&&r.canApprove?`<button class="btn btn-primary" data-action="court-call-approve" ${attrs} ${disabled}>核准舊版 PASS</button><button class="btn btn-ghost" data-action="court-call-reject" ${attrs} ${disabled}>拒絕</button>`:'';
  return `<div class="panel court-call-row">
    <div class="court-call-row-head">
-     <strong>${esc(courtCallStationLabel(r.station))}｜第 ${Number(r.round)+1} 輪</strong>
+     <strong>${esc(courtCallStationLabel(r.station,c.code))}｜第 ${Number(r.round)+1} 輪</strong>
      <span class="court-call-time">叫號 ${esc(new Date(r.calledAt).toLocaleTimeString("zh-TW",{hour12:false}))}</span>
    </div>
    <div class="court-call-people">${playerStatus}</div>
@@ -583,16 +584,16 @@ function syncCourtCallGlobalOverlay(){
  const html=x.type==='deferred'
   ? `<div class="bxh-call-modal" role="dialog" aria-modal="true" aria-label="PASS 已生效">
       <div class="bxh-call-kicker">BXH CALL｜PASS</div>
-      <div class="bxh-call-court">${esc(courtCallStationLabel(x.r.station))}</div>
+      <div class="bxh-call-court">${esc(courtCallStationLabel(x.r.station,x.c.code))}</div>
       <div class="bxh-call-vs"><span>${esc(a)}</span><b>VS</b><span>${esc(b)}</span></div>
       <div class="bxh-call-message"><strong>${requesterIsMe?'PASS 已接受':'對手使用 PASS'}</strong><br>本場已自動延後 1 場，完成前置場次後系統會再次叫號。</div>
       <div class="bxh-call-actions one"><button class="btn btn-primary" data-action="court-call-dismiss-delay" data-stamp="${esc(x.stamp)}">知道了</button></div>
      </div>`
   : `<div class="bxh-call-modal" role="dialog" aria-modal="true" aria-label="裁判叫號">
       <div class="bxh-call-kicker">🔔 裁判叫號</div>
-      <div class="bxh-call-court">${esc(courtCallStationLabel(x.r.station))}</div>
+      <div class="bxh-call-court">${esc(courtCallStationLabel(x.r.station,x.c.code))}</div>
       <div class="bxh-call-vs"><span>${esc(a)}</span><b>VS</b><span>${esc(b)}</span></div>
-      <div class="bxh-call-message">請前往 <strong>${x.r.station} 號戰鬥台</strong> 準備比賽。<br>請選擇目前狀態。${passUnavailable?`<br><span style="display:inline-block;margin-top:8px;font-size:12px;color:#aeb1ba">⚠️ ${esc(passUnavailable)}</span>`:''}</div>
+      <div class="bxh-call-message">請前往 <strong>${esc(courtCallStationLabel(x.r.station,x.c.code))}</strong> 準備比賽。<br>請選擇目前狀態。${passUnavailable?`<br><span style="display:inline-block;margin-top:8px;font-size:12px;color:#aeb1ba">⚠️ ${esc(passUnavailable)}</span>`:''}</div>
       <div class="bxh-call-actions">
        <button class="btn btn-primary" data-action="court-call-coming" ${attrs} ${x.c.busy||x.c.pending?'disabled':''}>OK｜正在前往</button>
        <button class="btn btn-ghost" data-action="court-call-pass" ${attrs} ${passAllowed?'':'disabled'}>${passAllowed?'PASS｜延後一場':esc(courtCallPassButtonText(x.r,x.mePlayer))}</button>
@@ -617,12 +618,12 @@ function courtCallNotifyChanges(c,newRows,oldRows,newPrepares=[],oldPrepares=[])
   if(!p.me)continue;
   const before=oldPrepareById.get(p.matchId);
   if(before&&Number(before.sequence)===Number(p.sequence))continue;
-  showToast(`⏳ BXH CALL｜你是 ${courtCallStationLabel(p.station)} 下一場，請先到附近準備`);
+  showToast(`⏳ BXH CALL｜你是 ${courtCallStationLabel(p.station,c.code)} 下一場，請先到附近準備`);
   courtCallVibrate([90,60,90]);
   courtCallSystemNotify(
    `bxh-prepare:${c.code}:${p.matchId}:${p.sequence}`,
    `⏳ BXH CALL｜下一場準備`,
-   `${p.players?.map(x=>x.name).join(' VS ')||'下一場'}｜請先到 ${p.station} 號戰鬥台附近準備。`
+   `${p.players?.map(x=>x.name).join(' VS ')||'下一場'}｜請先到 ${courtCallStationLabel(p.station,c.code)}附近準備。`
   );
  }
  const oldById=new Map((oldRows||[]).map(r=>[r.matchId,r]));
@@ -632,35 +633,35 @@ function courtCallNotifyChanges(c,newRows,oldRows,newPrepares=[],oldPrepares=[])
   const isMine=mePlayers.length>0;
   const newSequence=!prev||Number(prev.sequence)!==Number(r.sequence);
   if(isMine&&newSequence&&mePlayers.some(p=>p.response==='unanswered')){
-   showToast(`🔔 BXH CALL｜${courtCallStationLabel(r.station)} 裁判叫號，請立即回覆`);
+   showToast(`🔔 BXH CALL｜${courtCallStationLabel(r.station,c.code)} 裁判叫號，請立即回覆`);
    courtCallVibrate();
    const names=(r.players||[]).map(p=>p.name||'選手');
    courtCallSystemNotify(
     `bxh-call:${c.code}:${r.matchId}:${r.sequence}`,
-    `🔔 BXH CALL｜${courtCallStationLabel(r.station)}`,
-    `${names[0]||'選手 A'} VS ${names[1]||'選手 B'}｜請前往 ${r.station} 號戰鬥台，開啟 ARENA 回覆 OK 或 PASS。`
+    `🔔 BXH CALL｜${courtCallStationLabel(r.station,c.code)}`,
+    `${names[0]||'選手 A'} VS ${names[1]||'選手 B'}｜請前往 ${courtCallStationLabel(r.station,c.code)}，開啟 ARENA 回覆 OK 或 PASS。`
    );
   }
   if(prev){
    const oldPass=prev.pass?.status||'',newPass=r.pass?.status||'';
    if(newPass==='approved'&&oldPass!=='approved'){
     if(isMine){
-     const passMessage=r.pass?.requester?`PASS 已接受｜${courtCallStationLabel(r.station)} 本場延後 1 場`:`對手使用 PASS｜${courtCallStationLabel(r.station)} 本場延後 1 場`;
+     const passMessage=r.pass?.requester?`PASS 已接受｜${courtCallStationLabel(r.station,c.code)} 本場延後 1 場`:`對手使用 PASS｜${courtCallStationLabel(r.station,c.code)} 本場延後 1 場`;
      showToast(passMessage);
      courtCallVibrate([120,70,120]);
      courtCallSystemNotify(
       `bxh-pass:${c.code}:${r.matchId}:${r.sequence}:${r.pass?.approvedAt||r.pass?.requestedAt||0}`,
-      `BXH CALL｜${courtCallStationLabel(r.station)}`,
+      `BXH CALL｜${courtCallStationLabel(r.station,c.code)}`,
       `${passMessage}，完成前置場次後系統會再次叫號。`
      );
     }
-    if(r.isReferee)showToast(`${courtCallStationLabel(r.station)}｜${r.pass?.playerName||'選手'} 使用 PASS，已自動延後 1 場`);
+    if(r.isReferee)showToast(`${courtCallStationLabel(r.station,c.code)}｜${r.pass?.playerName||'選手'} 使用 PASS，已自動延後 1 場`);
    }
    for(const p of r.players||[]){
     const before=(prev.players||[]).find(x=>x.id===p.id)?.response||'unanswered';
     if(before===p.response)continue;
-    if(r.isReferee&&p.response==='coming')showToast(`${courtCallStationLabel(r.station)}｜${p.name} 已回覆：正在前往`);
-    if(isMine&&!p.me&&p.response==='coming')showToast(`對手 ${p.name} 已回覆：正在前往 ${courtCallStationLabel(r.station)}`);
+    if(r.isReferee&&p.response==='coming')showToast(`${courtCallStationLabel(r.station,c.code)}｜${p.name} 已回覆：正在前往`);
+    if(isMine&&!p.me&&p.response==='coming')showToast(`對手 ${p.name} 已回覆：正在前往 ${courtCallStationLabel(r.station,c.code)}`);
    }
   }
  }
