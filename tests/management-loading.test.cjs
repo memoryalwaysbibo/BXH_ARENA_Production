@@ -12,7 +12,7 @@ const row=(i=0,extra={})=>({code:'BXH-'+String(i).padStart(6,'0'),name:'Room '+i
 const page=(start=0,size=5,hasMore=true)=>({ok:true,items:Array.from({length:size},(_,i)=>row(start+i)),pageSize:5,hasMore,nextCursor:hasMore?'cursor-'+(start+size):null,counts:{all:13,open:10,upcoming:2,closed:1,draft:0}});
 function setup(query=async()=>page()){
  const timer=clock(),calls=[];const s={console:{log(){},warn(){}},setTimeout:timer.setTimeout,clearTimeout:timer.clearTimeout,
- firebaseUser:{uid:'owner'},userProfile:{role:'admin',active:true},currentRole:'admin',activeMode:'admin',state:{cloudCode:null},pendingModal:null,
+ firebaseUser:{uid:'owner'},userProfile:{role:'admin',active:true},currentRole:'admin',activeMode:'admin',appPhase:'app',activeTab:'management',document:{hidden:false,addEventListener(){}},state:{cloudCode:null},pendingModal:null,
  currentAuthUid:()=>s.firebaseUser?.uid||'',hasAdminAccess:()=>!!s.firebaseUser&&s.currentRole==='admin',isAdminTierOrAbove:()=>['admin','super_admin'].includes(s.userProfile?.role),isPartnerOrganizerMode:()=>s.activeMode==='partner_organizer',isEventStaffMode:()=>s.activeMode==='event_staff',partnerOrganizerGrant:()=>s.userProfile?.partnerOrganizer||{},cloudAvailable:()=>true,canCreateOfficialTournament:()=>false,
  registrationStatusLabel:status=>({open:'報名中',full:'額滿',scheduled:'即將開放',closed:'已關閉'})[status]||status,esc:value=>String(value??''),
  window:{cloudSync:{connect:async()=>true,queryAdminTournamentSummaries:request=>{calls.push(JSON.parse(JSON.stringify(request)));return query(request);},queryAdminTournaments:()=>{throw Error('full tournament downloads forbidden');},repairTournamentLifecycle:()=>{throw Error('list must not repair room state');},enrichAdminTournamentCreatorNames:()=>{throw Error('optional user-profile reads forbidden');}}},
@@ -20,9 +20,26 @@ function setup(query=async()=>page()){
  vm.createContext(s);vm.runInContext(source,s);const evaluate=code=>vm.runInContext(code,s);s.reconcileAdminTournamentListContext();
  return{s,calls,timer,evaluate,state:()=>JSON.parse(JSON.stringify(evaluate('({items:adminTournamentListItems,busy:adminTournamentListBusy,loaded:adminTournamentListLoaded,error:adminTournamentListError,cursor:adminTournamentListCursor,more:adminTournamentListHasMore,counts:adminTournamentListCounts,filter:adminTournamentListFilter,search:adminTournamentListSearch})'))),view:()=>s.renderTournamentManagementTab(),load:options=>s.loadAdminTournamentList(options),query:fn=>{query=fn;}};
 }
-test('initial view fetches only five summaries and remains idle until another explicit action',async()=>{
+test('management cards refresh their counts while visible without downloading full rooms',async()=>{
  const t=setup();await t.load();assert.equal(t.state().items.length,5);assert.equal(t.calls.length,1);assert.equal(t.calls[0].cursor,null);
- t.view();t.view();await t.timer.advance(60000);assert.equal(t.calls.length,1);assert.match(t.view(),/再載入 5 場/);assert.match(t.view(),/其餘尚未下載/);
+ t.view();t.view();await t.timer.advance(30000);assert.equal(t.calls.length,2);assert.match(t.view(),/再載入 5 場/);assert.match(t.view(),/其餘尚未下載/);
+});
+test('background refresh updates a six-room list without losing the second page',async()=>{
+ let count=2;
+ const t=setup(async request=>{
+   const result=request.cursor?page(5,1,false):page();
+   result.items=result.items.map(item=>item.code==='BXH-000005'?{...item,confirmedCount:count,capacity:60}:item);
+   return result;
+ });
+ await t.load();await t.load({append:true});t.view();count=3;
+ await t.timer.advance(30000);
+ assert.equal(t.state().items.length,6);assert.equal(t.state().items[5].confirmedCount,3);
+ assert.equal(t.calls.at(-2).cursor,null);assert.equal(t.calls.at(-1).cursor,'cursor-5');
+ assert.match(t.view(),/3 \/ 60/);assert.equal(t.state().more,false);
+});
+test('background refresh pauses when management is hidden',async()=>{
+ const t=setup();await t.load();t.view();t.s.document.hidden=true;
+ await t.timer.advance(30000);assert.equal(t.calls.length,1);
 });
 test('multiple initial render callbacks cannot refetch an already completed first page',async()=>{
  const t=setup();t.view();t.view();t.view();await t.timer.advance(0);assert.equal(t.calls.length,1);assert.equal(t.state().items.length,5);
