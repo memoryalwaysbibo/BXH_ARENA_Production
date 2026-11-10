@@ -153,11 +153,11 @@ test('a cancellation rejection ends waiting only for the matching operation',asy
  await assert.rejects(f.api.run(CODE,p=>{p.submitting([cancelRequest.registrationId],cancelRequest);return {ok:true,operation:{state:'queued'}};},'cancel'),/cancel-deadline-passed/);
  assert.equal(f.api.snapshot()[0].state,'failed');assert.equal(f.storage.length,0);f.api.dispose();
 });
-test('only the pilot room uses the current server ownership marker',async()=>{
+test('only the pilot rooms use their current server ownership markers',async()=>{
  const cloud=fs.readFileSync(require.resolve('../modules/cloud/cloud-runtime.js'),'utf8');
  const start=cloud.indexOf('  async function registrationFlowV2Enabled(');
  const end=cloud.indexOf('  const managementQueueOperations=',start);
- const pilot='BXH-BZ2JW6',reads=[];
+ const pilot='BXH-BZ2JW6',nextPilot='BXH-XJ7WJ5',reads=[];
  let marker,missing=false,changeAccount=false;
  const context=vm.createContext({
   window:{},dbHandle:{},authHandle:{currentUser:{uid:'user1'}},engagementSessionEpoch:1,
@@ -171,8 +171,10 @@ test('only the pilot room uses the current server ownership marker',async()=>{
  const enabled=vm.runInContext(cloud.slice(start,end)+'\nregistrationFlowV2Enabled;',context);
  assert.equal(await enabled('BXH-OTHER1'),false);
  assert.deepEqual(reads,[]);
+ assert.equal(await enabled(nextPilot),false);
  assert.equal(await enabled(pilot),false);
  marker=2;
+ assert.equal(await enabled(nextPilot),true);
  assert.equal(await enabled(pilot),true);
  marker=undefined;
  assert.equal(await enabled(pilot),false);
@@ -180,7 +182,7 @@ test('only the pilot room uses the current server ownership marker',async()=>{
  await assert.rejects(enabled(pilot),/registration-route-unavailable/);
  changeAccount=true;
  await assert.rejects(enabled(pilot),/stale-session/);
- assert.deepEqual(reads,Array(5).fill('publicTournaments/'+pilot));
+ assert.deepEqual(reads,[nextPilot,pilot,nextPilot,pilot,pilot,pilot,pilot].map(code=>'publicTournaments/'+code));
 });
 test('the shipped cancellation action uses the V2 queue and avoids a legacy resend after rollback',async()=>{
  let response=null;

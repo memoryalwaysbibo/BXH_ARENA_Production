@@ -908,7 +908,7 @@
   }
   async function registrationFlowV2Enabled(code){
     if(Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code))return true;
-    if(code!=='BXH-BZ2JW6')return false;
+    if(code!=='BXH-BZ2JW6'&&code!=='BXH-XJ7WJ5')return false;
     if(!dbHandle||!fx?.getDocFromServer)throw Error('registration-route-unavailable');
     const uid=authHandle?.currentUser?.uid,epoch=engagementSessionEpoch;
     const snapshot=await withTimeout(fx.getDocFromServer(fx.doc(dbHandle,'publicTournaments',code)),8000,null);
