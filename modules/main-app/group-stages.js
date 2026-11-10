@@ -112,7 +112,8 @@
     const countByGroup = new Map((status.groups || []).map(group => [group.key, group.count]));
     const groups = groupKeys.filter(group => countByGroup.has(group));
     const groupCount = groups.length;
-    const stages = [...groups, 'champions', 'runners-up'];
+    const playoffs = groupCount === 4 ? ['runners-up', 'champions'] : ['champions', 'runners-up'];
+    const stages = [...groups, ...playoffs];
     const titles = Object.fromEntries(groups.map(group => [group, group + ' 組']));
     titles.champions = '第 1～' + groupCount + ' 名賽';
     titles['runners-up'] = '第 ' + (groupCount + 1) + '～' + (groupCount * 2) + ' 名賽';
@@ -123,8 +124,8 @@
         (drawPending ? '待抽籤' : '進行中') : '待開放';
       return '<li>' + titles[stage] + (Number.isInteger(count) ? '（' + count + ' 人）' : '') + ' · ' + label + '</li>';
     }).join('') + '</ol>';
-    const waitingForFinals = groups.every(stage => completed.includes(stage)) &&
-      !completed.includes('champions') && (!key || drawPending);
+    const waitingForFinals = !key && groups.every(stage => completed.includes(stage)) &&
+      playoffs.every(stage => !completed.includes(stage));
     const message = status.readyForSettlement
       ? (status.rehearsal ? '測試賽果已收齊，本場不發放天梯積分。' : '各階段賽果已收齊，等待全場結算。') :
       waitingForFinals ? (groupCount * 2) + ' 位晉級者已確認｜名次賽待抽籤' :
@@ -141,6 +142,12 @@
       actions = roomButton(status.current.code, view, '開啟' + titles[key] + (drawPending ? '抽籤' : '房間')) +
         (drawPending ? commandButton('publish-draw', '公布名次賽籤表', busy) :
           commandButton('collect', '回收' + titles[key] + '賽果', busy)) + refresh;
+    } else if (operator && status.openChoices?.length > 1) {
+      actions = status.openChoices.filter(stage => playoffs.includes(stage)).map((stage, index) =>
+        '<button type="button" class="btn ' + (index === 0 ? 'btn-primary' : 'btn-ghost') +
+        '" data-group-stage-action="open" data-group-stage-choice="' + stage + '"' +
+        (busy ? ' disabled' : '') + '>先開放' + titles[stage] + (index === 0 ? '（預設）' : '') + '</button>'
+      ).join('') + refresh;
     } else if (operator && next) {
       actions = commandButton('open', '開放' + next, busy) + refresh;
     } else if (!operator && titles[key] && !drawPending) {
@@ -187,13 +194,13 @@
     }
   }
 
-  async function send(model, action) {
+  async function send(model, action, choice) {
     if (active !== model || model.busy) return;
     const current = model.status?.current;
     const payload = { action, parentCode: model.code };
     if (action === 'refresh') payload.action = model.view === 'operator' ? 'status' : 'routing';
     if (action === 'prepare') payload.groupCount = model.groupCount;
-    if (action === 'open') payload.stage = model.status?.next;
+    if (action === 'open') payload.stage = choice || model.status?.next;
     if (action === 'collect' || action === 'publish-draw') {
       payload.stage = current?.key;
       payload.roomCode = current?.code;
@@ -251,9 +258,9 @@
       if (root.confirm('確認將本場有效參賽名單平均分成 ' + model.groupCount + ' 組？')) void send(model, 'prepare');
     });
     node.addEventListener('click', event => {
-      const action = event.target.closest('[data-group-stage-action]')?.dataset.groupStageAction;
-      if (active !== model || !action) return;
-      void send(model, action);
+      const button = event.target.closest('[data-group-stage-action]');
+      if (active !== model || !button || button.disabled) return;
+      void send(model, button.dataset.groupStageAction, button.dataset.groupStageChoice);
     });
     if (model.loaded || model.busy || model.error) render(model);
     else void send(model, 'refresh');
