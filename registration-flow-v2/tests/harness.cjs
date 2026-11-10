@@ -6,20 +6,23 @@ const {initializeApp}=require('firebase-admin/app');
 initializeApp({projectId:process.env.GCLOUD_PROJECT});
 const {getFirestore,FieldValue}=require('firebase-admin/firestore');
 const db=getFirestore();
+const {prepareFamilySource}=require('../backend/prepare-family.cjs');
 const fixture=require('./captured-family-source.json'),cache=new Map();
 function load(file){
  if(cache.has(file))return cache.get(file).exports;
  const digest=fixture.files[file],source=fixture.blobs[digest];assert(source,file);
  assert.equal(crypto.createHash('sha256').update(source).digest('hex'),digest,file);
  const module={exports:{}};cache.set(file,module);
- new Function('require','module','exports',source)(name=>name.startsWith('.')?load(path.posix.normalize(path.posix.join(path.posix.dirname(file),name))+(/\.(?:js|cjs)$/.test(name)?'':'.js')):require(name),module,module.exports);
+ new Function('require','module','exports',file==='family-registration.js'?prepareFamilySource(source):source)(name=>name.startsWith('.')?load(path.posix.normalize(path.posix.join(path.posix.dirname(file),name))+(/\.(?:js|cjs)$/.test(name)?'':'.js')):require(name),module,module.exports);
  return module.exports;
 }
 const familyFactory=load('family-registration.js').createFamilyRegistration;
-// This roster implementation is a repository overlay, NOT a fresh production
-// capture. Release is blocked until both writer sources are independently read back.
-const rosterFactory=require('../../qr-checkin/backend/overlays/roster-service.js').createRosterService;
-const handlers={family:store=>familyFactory(store,Date.now,{myEventsProofEnabled:true}),roster:store=>rosterFactory(store,FieldValue)};
+// Hosted CI has the public overlay. A local release check can inject the reviewed package.
+const rosterSource=process.env.BXH_REGISTRATION_V2_ROSTER_SOURCE;
+const rosterFactory=rosterSource
+ ?require('../backend/prepare-roster.cjs').prepareRosterSource(rosterSource,FieldValue).rosterFactory
+ :store=>require('../../qr-checkin/backend/overlays/roster-service.js').createRosterService(store,FieldValue);
+const handlers={family:store=>familyFactory(store,Date.now,{myEventsProofEnabled:true}),roster:rosterFactory};
 const {createQueue}=require('../backend/queue.cjs');
 function service(options={}){return createQueue(db,{handlers,FieldValue,...options});}
 let serial=0;const prefix=crypto.randomBytes(3).toString('hex').toUpperCase();

@@ -20,6 +20,15 @@ test('activation refuses unrelated orphan buckets, unsupported modes and duplica
  const draining=JSON.parse(x.room.data);draining.courtRetirementPlan={targetCount:4};assert.throws(()=>P.prepare({...x,room:{...x.room,data:JSON.stringify(draining)}}),/unsupported-migration-room/);
  assert.throws(()=>P.prepare({...x,room:{...x.room,scoreStorage:null}}),/already-bucketed/);
 });
+test('activation refuses active lottery draw and deletion but accepts a completed draw',()=>{
+ const x=input();
+ for(const status of ['drawing','deleting']){
+  const room={...x.room,registrationSelection:{status}};
+  assert.throws(()=>P.prepare({...x,room}),/migration-registration-operation-active/);
+ }
+ const room={...x.room,registrationSelection:{status:'drawn'}};
+ assert.equal(P.prepare({...x,room}).plan.buckets,2);
+});
 test('rollback planning materializes complete bucket scores and ledger instead of stale root JSON',()=>{
  const x=input('rollback'),state=JSON.parse(x.room.data),m=B.makeManifest(state,x.epoch);x.room.scoreStorage=m;
  const buckets=B.encode(state,m),rows=JSON.parse(buckets[0].matches);rows[0].scoreA=3;rows[0].log=[{points:3}];rows[0].refereeSeatScoreRevision=1;buckets[0]={...buckets[0],revision:1,matches:JSON.stringify(rows)};

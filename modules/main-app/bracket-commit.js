@@ -258,7 +258,68 @@ function create(ctx){
   try{const latest=await deadline(ctx.read());return ctx.current()&&!busy&&!pending&&signature(ctx.state())===signature(snapshot)&&latest?.ok===true&&!latest.data.startedAt&&signature(latest.data)===signature(snapshot)&&signature(latest.publicData)===signature(snapshot);}catch{return false;}
  }};
 }
-const api={signature,assertWrite,create};if(typeof module==='object'&&module.exports)module.exports=api;else root.BXHBracketCommit=api;
+function createServer(ctx){
+ const key='bxh-v2-lifecycle:'+ctx.key;
+ let pending=null,busy=false,error='',result='',phase='',action='draw';
+ try{
+  const saved=JSON.parse(ctx.storage?.getItem(key)||'null');
+  if(['draw','start'].includes(saved?.action)&&saved.data?.operationId&&saved.data.code===ctx.code&&saved.data.roomId===ctx.roomId){
+   pending=saved;action=saved.action;error='confirmation-timeout';
+  }
+ }catch{}
+ function clear(){pending=null;try{ctx.storage?.removeItem(key);}catch{}}
+ async function readPair(){
+  let timer;
+  const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('confirmation-timeout')),ctx.readTimeoutMs??15000);});
+  const latest=await Promise.race([Promise.resolve().then(ctx.read),timeout]).finally(()=>clearTimeout(timer));
+  if(!ctx.current()||!latest?.ok||latest.data?.id!==ctx.roomId||!latest.publicData||
+     signature(latest.data)!==signature(latest.publicData))throw Error('confirmation-timeout');
+  return latest;
+ }
+ async function retry(){
+  if(busy||!pending||!ctx.current())return false;
+  const {action:kind,data}=pending;
+  busy=true;error='';result='';phase='writing';ctx.changed();
+  try{
+   const receipt=await ctx.send(kind,data);
+   if(!ctx.current())return false;
+   if(!receipt?.ok||!receipt.drawId||(kind==='start'&&!receipt.startedAt))throw Error('confirmation-timeout');
+   phase='confirming';ctx.changed();
+   const latest=await readPair();
+   if(latest.data.bracketDraw?.id!==receipt.drawId||
+      (kind==='start'&&(latest.data.startedAt!==receipt.startedAt||latest.publicData.startedAt!==receipt.startedAt))){
+    if(Number(latest.data.bracketDraw?.revision||0)<=Number(receipt.revision||0)||kind==='start')throw Error('confirmation-timeout');
+    ctx.apply(latest.data);clear();throw Error('bracket-version-conflict');
+   }
+   ctx.apply(latest.data);clear();result='success';ctx.success(kind);return true;
+  }catch(e){
+   if(!ctx.current())return false;
+   if(['functions/failed-precondition','functions/invalid-argument','functions/not-found'].includes(e.code))clear();
+   error=pending?'confirmation-timeout':e.message;result='failed';return false;
+  }finally{busy=false;if(ctx.current())ctx.changed();}
+ }
+ async function submit(kind,options={}){
+  if(busy||!ctx.current()||options.adminOperationalOverride)return false;
+  if(pending)return pending.action===kind?retry():false;
+  const snapshot=ctx.state();action=kind;
+  const data={code:ctx.code,roomId:ctx.roomId,rosterRevision:options.rosterRevision??snapshot.registrationRosterRevision??0,
+   operationId:ctx.operationId(),...(kind==='draw'?{baseDrawId:options.baseDrawId===undefined?(snapshot.bracketDraw?.id??null):options.baseDrawId}:
+    {drawId:snapshot.bracketDraw?.id,confirmEarlyStart:options.confirmEarlyStart===true})};
+  try{
+   if(!ctx.storage)throw Error('pending-storage-unavailable');
+   ctx.storage.setItem(key,JSON.stringify({action:kind,data}));pending={action:kind,data};
+  }catch(e){error='pending-storage-unavailable';result='failed';ctx.changed();return false;}
+  return retry();
+ }
+ return {server:true,begin:options=>submit('draw',options),start:confirmEarlyStart=>submit('start',{confirmEarlyStart}),
+  retry,submit:()=>pending?retry():submit('draw'),blocked:()=>busy||!!pending,
+  status:()=>({action,busy,pending:!!pending,error,result,phase}),async verify(snapshot){
+   if(busy||pending)return false;
+   try{const latest=await readPair();return !busy&&!pending&&!latest.data.startedAt&&latest.data.bracketDraw?.id===snapshot.bracketDraw?.id&&signature(ctx.state())===signature(snapshot)&&signature(latest.data)===signature(snapshot);}
+   catch{return false;}
+  }};
+}
+const api={signature,assertWrite,create,createServer};if(typeof module==='object'&&module.exports)module.exports=api;else root.BXHBracketCommit=api;
 })(typeof window==='object'?window:globalThis);
 
 

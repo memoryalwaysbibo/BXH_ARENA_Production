@@ -890,7 +890,7 @@
     if(!allowAnonymous&&(!authReady || !authHandle || !authHandle.currentUser)) throw new Error("auth-required");
     if(!functionsHandle || !fnx) throw new Error("service-unavailable");
     try{
-      if(['hunterClashCommand','groupStageCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','adminOverrideRoster','adminRecoverOnsiteWaitlist','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload','ladderTeamDisplay'].includes(name)){
+      if(['hunterClashCommand','groupStageCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','adminOverrideRoster','adminRecoverOnsiteWaitlist','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload','ladderTeamDisplay','registrationDrawV2','registrationStartV2'].includes(name)){
         const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);
         if(!verified){const err=new Error('網站驗證未完成，請重新嘗試。');err.code='functions/permission-denied';err.details={reason:'app-check-unavailable'};throw err;}
         if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
@@ -906,7 +906,78 @@
       const err=new Error(normalized); err.code=String((e&&e.code)||"functions/unknown"); err.details=e&&e.details; throw err;
     }
   }
+  const managementQueueOperations=new Map();
+  async function registrationManagementOperation(payload,requestedId){
+    const {code,action,registrationId,localId,expandBy,enabled:requestedEnabled,names}=payload;
+    const actor=authHandle?.currentUser?.uid;
+    const enabled=Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code);
+    let targetKey=registrationId||localId;
+    if(action==='addLocal'){
+      if(!globalThis.crypto?.subtle){
+        if(!enabled)return null;
+        throw Error('registration-operation-id-unavailable');
+      }
+      const bytes=new TextEncoder().encode(JSON.stringify(names));
+      const digest=await crypto.subtle.digest('SHA-256',bytes);
+      targetKey=Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
+      if(actor!==authHandle?.currentUser?.uid)throw Error('stale-session');
+    }
+    const key='bxh.registrationManagement.'+[actor,code,action,targetKey,expandBy??0,...(action==="configure"?[requestedEnabled]:[])].join('.');
+    let storedId=managementQueueOperations.get(key);
+    if(!storedId){try{storedId=window.sessionStorage.getItem(key);}catch{}}
+    if(!enabled&&!storedId)return null;
+    if(!authReady||!actor)throw Error('auth-required');
+    const operationId=storedId||requestedId||crypto.randomUUID();
+    const finish=()=>{
+      managementQueueOperations.delete(key);
+      try{window.sessionStorage.removeItem(key);}catch{}
+    };
+    managementQueueOperations.set(key,operationId);
+    try{window.sessionStorage.setItem(key,operationId);}catch{}
+    const invoke=data=>callEngagementFunction('registrationRosterQueueV2',{...data,code,operationId},8000);
+    const status=()=>invoke({action:'status'});
+    const pending=()=>Object.assign(new Error('registration-management-pending'),{code:'registration-management-pending'});
+    let reply=storedId?await status().catch(()=>{throw pending();}):null;
+    if(enabled&&(!reply||reply.operation?.state==='not-found')){
+      try{reply=await invoke(payload);}
+      catch(error){
+        if(['functions/permission-denied','functions/invalid-argument','functions/unauthenticated','functions/failed-precondition','functions/not-found'].includes(error?.code)){
+          finish();
+          throw error;
+        }
+        throw pending();
+      }
+    }
+    const deadline=Date.now()+22000;
+    while(true){
+      const operation=reply?.operation;
+      if(operation?.operationId===operationId){
+        const result=operation.result;
+        const target=registrationId||localId;
+        const expectedStatus={cancel:'cancelled',promote:'confirmed',promoteLocal:'confirmed',demote:'waitlist'}[action];
+        const matches=action==='addLocal'?result?.status==='added'&&result.addedCount===names.length&&typeof result.checkedIn==='boolean':
+          action==='configure'?result?.enabled===requestedEnabled:
+          result?.status===expectedStatus&&(registrationId?result?.registrationId:result?.localId)===target;
+        if(operation.state==='completed'&&result?.ok===true&&matches){
+          finish();
+          return {...result,verified:true,registrationChanges:[]};
+        }
+        if(operation.state==='rejected'){
+          finish();
+          throw Object.assign(new Error(operation.reason),{code:operation.reason});
+        }
+      }
+      if(Date.now()>=deadline||!['queued','running'].includes(operation?.state))break;
+      await new Promise(resolve=>setTimeout(resolve,1000));
+      reply=await status().catch(()=>{throw pending();});
+    }
+    throw pending();
+  }
   let playerRegistrationFeedback=null;
+  function submitRegistrationCancellation(payload){
+    const {code,operationId}=payload;
+    return callEngagementFunction('registrationQueueV2',{action:'submit',code,operation:{code,route:'roster',operationId,payload}},20000);
+  }
   function getPlayerRegistrationFeedback(){
     if(!window.BXHRegistrationFeedback)return null;
     if(!playerRegistrationFeedback){
@@ -915,10 +986,12 @@
       playerRegistrationFeedback=window.BXHRegistrationFeedback.create({
         getUid:()=>authReady&&authHandle?.currentUser?.uid===firebaseUser?.uid?firebaseUser?.uid:null,
         storage,visible:()=>!document.hidden,
-        read:(code,operation)=>window.engagementService.familyRegistration({action:'mine',code,...operation}),
-        retry:request=>window.engagementService.familyRegistration(request),
+        read:(code,operation)=>operation?.action==='cancel'
+          ?callEngagementFunction('registrationQueueV2',{action:'status',code,operationId:operation.operationId},20000)
+          :window.engagementService.familyRegistration({action:'mine',code,...operation}),
+        retry:request=>request.action==='cancel'?submitRegistrationCancellation(request):window.engagementService.familyRegistration(request),
         onChange:rows=>draw(rows),
-        onRecovered:({code})=>window.dispatchEvent(new CustomEvent('bxh-registration-recovered',{detail:{code}}))
+        onRecovered:({code,result})=>window.dispatchEvent(new CustomEvent('bxh-registration-recovered',{detail:{code,queueCancellation:result?.queueCancellation===true}}))
       });
       draw=window.BXHRegistrationFeedback.mount(playerRegistrationFeedback,document);
       document.addEventListener('visibilitychange',()=>{if(!document.hidden)playerRegistrationFeedback.resume();});
@@ -933,6 +1006,7 @@
     return window.BXHMyEventsPlayerOperation.execute({route,code,send});
   }
   window.engagementService={
+    registrationManagementOperation,
     async myEventOperationStatus(payload){
       if(!payload||typeof payload!=='object'||Array.isArray(payload)||Object.keys(payload).some(k=>!['route','operationId','code','nonce'].includes(k)))throw Error('unsupported-operation-status-input');
       return callEngagementFunction('queryMyEventOperationStatus',payload,10000);
@@ -1432,10 +1506,13 @@
     },
 
     restoreRegistrationFeedback(){getPlayerRegistrationFeedback()?.restore();},
+    hasPendingRegistrationCancellation(code){return getPlayerRegistrationFeedback()?.cancellationPending(code)===true;},
 
     async cancelRegistrationAsPlayer(code){
       const uid = (authReady && authHandle && authHandle.currentUser) ? authHandle.currentUser.uid : null;
       if(!uid) throw { code: "auth-required" };
+      const feedback=getPlayerRegistrationFeedback();
+      if(feedback?.cancellationPending(code)){void feedback.recheck(code);throw Error('registration-cancellation-pending');}
       const selectionDoc=await fx.getDoc(fx.doc(dbHandle,"publicTournaments",code));
       if(selectionDoc.exists()&&selectionDoc.data().registrationSelection)return window.engagementService.lotteryRegistration({code,action:'cancel'});
       const mine=await window.engagementService.familyRegistration({action:'mine',code});
@@ -1463,10 +1540,31 @@
     },
     async cancelRoster(code,registrationId="",localId="",intent="admin"){
       const request={action:"cancel",code,registrationId,localId,intent};
-      if(intent!=="player")return callEngagementFunction("registrationRosterService",{...request,operationId:crypto.randomUUID()},60000);
+      if(intent!=="player"){
+        const result=await window.engagementService.registrationManagementOperation({action:"cancel",code,registrationId,localId});
+        if(result){
+          const latest=await this.joinRoom(code,{serverOnly:true});
+          return latest.ok?{...result,state:latest.data}:result;
+        }
+        return callEngagementFunction("registrationRosterService",{...request,operationId:crypto.randomUUID()},60000);
+      }
+      if(Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code)){
+        const feedback=getPlayerRegistrationFeedback();
+        if(!feedback)throw Error('registration-feedback-unavailable');
+        return feedback.run(code,progress=>{
+          const payload={...request,operationId:crypto.randomUUID()};
+          progress.submitting([registrationId],payload);
+          return submitRegistrationCancellation(payload);
+        },'cancel');
+      }
       return runMyEventsPlayerOperation('roster',code,operationId=>callEngagementFunction("registrationRosterService",{...request,operationId},60000));
     },
     async configureAutoFill(code,enabled){
+      const result=await window.engagementService.registrationManagementOperation({action:"configure",code,enabled});
+      if(result){
+        const latest=await this.joinRoom(code,{serverOnly:true});
+        return latest.ok?{...result,state:latest.data}:result;
+      }
       return callEngagementFunction("registrationRosterService",{action:"configure",code,enabled,intent:"admin",operationId:crypto.randomUUID()},60000);
     },
 
@@ -1506,12 +1604,25 @@
       };
     },
 
+    async addLocalRosterPlayers(code,names){
+      const queued=await window.engagementService.registrationManagementOperation({action:"addLocal",code,names});
+      if(!queued)return null;
+      const latest=await this.joinRoom(code,{serverOnly:true});
+      return latest.ok?{...queued,state:latest.data}:queued;
+    },
+
     async promoteLocalWaitlistRoster(code,waitId,options={}){
       const eventCode=String(code||"").trim().toUpperCase(),candidateId=String(waitId||"");
       if(!eventCode||!candidateId)throw Object.assign(new Error("not-found"),{code:"not-found"});
       if(!authReady||!authHandle?.currentUser)throw Object.assign(new Error("auth-required"),{code:"auth-required"});
       const expandBy=Number(options.expandBy||0);
       if(expandBy!==0&&expandBy!==8)throw Object.assign(new Error("invalid-capacity-step"),{code:"invalid-capacity-step"});
+      const runQueued=typeof window!=='undefined'&&window.engagementService?.registrationManagementOperation;
+      const queued=runQueued&&await runQueued({action:"promoteLocal",code:eventCode,localId:candidateId,expandBy},options.operationId);
+      if(queued){
+        const latest=await this.joinRoom(eventCode,{serverOnly:true});
+        return latest.ok?{...queued,state:latest.data}:queued;
+      }
       const tourRef=fx.doc(dbHandle,"tournaments",eventCode);
       const pubRef=fx.doc(dbHandle,"publicTournaments",eventCode);
       const result=await fx.runTransaction(dbHandle,async tx=>{
@@ -1611,6 +1722,12 @@
       const pubRef=fx.doc(dbHandle,"publicTournaments",eventCode);
       const regRef=fx.doc(dbHandle,"tournaments",eventCode,"registrations",regId);
 
+      const runQueued=typeof window!=='undefined'&&window.engagementService?.registrationManagementOperation;
+      const queued=runQueued&&await runQueued({action,code:eventCode,registrationId:regId,...(action==="promote"?{expandBy}:{})},options.operationId);
+      if(queued){
+        const latest=await this.joinRoom(eventCode,{serverOnly:true});
+        return latest.ok?{...queued,state:latest.data}:queued;
+      }
       let communityOwnerDemotion=false;
       if(action==="demote"){
         const tourSnap=await fx.getDoc(tourRef);
@@ -3286,6 +3403,11 @@
       return callEngagementFunction('adminOverrideCheckin',payload,30000);
     },
 
+    async commitRegistrationLifecycle(kind,payload){
+      if(!['draw','start'].includes(kind)||!window.BXH_REGISTRATION_LIFECYCLE_V2_ROOMS?.includes(payload?.code))throw Error('registration-queue-disabled');
+      return callEngagementFunction(kind==='draw'?'registrationDrawV2':'registrationStartV2',payload,30000);
+    },
+
     async readBracketFromServer(code){
       if(!cloudEnabled||!fx.getDocFromServer)return {ok:false};
       try{
@@ -4178,9 +4300,8 @@ if(testerSession){
         const ref = fx.doc(dbHandle,"tournaments",String(code).toUpperCase());
         const unsub = fx.onSnapshot(ref, { includeMetadataChanges:true }, (snap)=>{
           if(!active) return;
-          if(snap.metadata.hasPendingWrites||snap.metadata.fromCache) return;
-          if(!snap.exists()){callback({roomMissing:true,code:String(code).toUpperCase()},true);return;}
           if(snap.metadata.hasPendingWrites||snap.metadata.fromCache) return; // 略過自己剛寫入、尚未確認的本地回音
+          if(!snap.exists()){callback({roomMissing:true,code:String(code).toUpperCase()},true);return;}
           const d = snap.data();
           if(Number.isSafeInteger(d.updatedAt)){if(d.updatedAt<lastRootVersion)return;lastRootVersion=d.updatedAt;}
           if(Object.hasOwn(d,'scoreStorage')){

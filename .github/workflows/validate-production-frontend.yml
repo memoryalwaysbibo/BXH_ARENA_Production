@@ -361,11 +361,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Java for Firestore Emulator
-        shell: bash
-        run: |
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openjdk-21-jre-headless
-          java -version
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
 
       - name: Install E2E dependencies
         run: npm install --no-package-lock --ignore-scripts
@@ -415,11 +414,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Java for Firestore Emulator
-        shell: bash
-        run: |
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openjdk-21-jre-headless
-          java -version
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
       - name: Install Deep E2E dependencies
         run: npm install --no-package-lock --ignore-scripts
       - name: Run Deep Emulator E2E (one controlled retry)
