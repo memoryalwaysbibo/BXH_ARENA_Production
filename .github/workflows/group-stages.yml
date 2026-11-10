@@ -37,7 +37,7 @@ jobs:
           NODE_PATH: /tmp/bxh-group-stages/node_modules
           GCLOUD_PROJECT: demo-bxh-group-stages
       - name: Verify read-only group history with Firestore Emulator
-        run: /tmp/bxh-group-stages/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-group-history --config group-history/emulator.json 'node --test group-history/emulator.test.cjs'
+        run: /tmp/bxh-group-stages/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-group-history --config group-stages/emulator.json 'node --test group-history/emulator.test.cjs'
         env:
           NODE_PATH: /tmp/bxh-group-stages/node_modules
           GCLOUD_PROJECT: demo-bxh-group-history

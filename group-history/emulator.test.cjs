@@ -7,7 +7,7 @@ const { createHistoryReader } = require('./read.cjs');
 
 const project = 'demo-bxh-group-history';
 assert.equal(process.env.GCLOUD_PROJECT, project);
-assert.equal(process.env.FIRESTORE_EMULATOR_HOST, '127.0.0.1:8200');
+assert.equal(process.env.FIRESTORE_EMULATOR_HOST, '127.0.0.1:8199');
 const { initializeApp, deleteApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 
@@ -39,7 +39,7 @@ test('isolated SDK history is private, authenticated, archived-readable, and rea
     assert.equal((await db.collection('ladderTransactions').get()).size, 0);
     for (const target of ['groupStagePlans/' + item.parentCode, 'tournaments/' + item.parentCode,
       'tournaments/' + item.parentCode + '/registrations/reg-1']) {
-      const response = await fetch('http://127.0.0.1:8200/v1/projects/' + project + '/databases/(default)/documents/' + target);
+      const response = await fetch('http://127.0.0.1:8199/v1/projects/' + project + '/databases/(default)/documents/' + target);
       assert.equal(response.status, 403, target + ' must remain private');
     }
     await db.doc('tournaments/' + item.parentCode + '/registrations/reg-1').update({ guardianUid: 'outside' });
