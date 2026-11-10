@@ -9746,8 +9746,7 @@ async function publishRegistrationConfig(){
   await publishPendingPosterCover(state.cloudCode);
   publicTournamentsCache = null; publicTournamentsError = null;
   render();
-  showToast("賽事設定已更新");
-  if(syncResult===false) showToast("設定已儲存到雲端，但本機快取未完成，請重新整理確認", true);
+  showToast(syncResult===false?"賽事設定已更新到雲端，但本機快取未完成，請重新整理確認":"賽事設定已更新",syncResult===false);
 }
 
 function tournamentStatus(){
@@ -17034,8 +17033,10 @@ function renderTournamentDetailScreen(){
   } else if(effStatus==="cancelled" || t.eventCancelled){
     actionHtml = `<div class="hint">此賽事已取消。</div><button class="btn btn-ghost" disabled>不可報名</button>`;
   } else if(effStatus==="closed"){
-    const noOnlineRegistration=isCommunityQuickRegistration(t)?t.registrationEnabled!==true:!t.registrationSelection || Number(t.capacity||0)<=0 || !normalizeDateTime(t.registrationOpenAt) || !normalizeDateTime(t.registrationCloseAt);
-    actionHtml = noOnlineRegistration
+    const enabled=t.registrationEnabled??t.parsedData?.meta?.registrationEnabled;
+    const legacyOnlineRegistration=!isCommunityQuickRegistration(t)&&Number(t.capacity||0)>0
+      && !!normalizeDateTime(t.registrationOpenAt)&&!!normalizeDateTime(t.registrationCloseAt);
+    actionHtml = !(enabled??legacyOnlineRegistration)
       ? `<div class="hint">本場目前未開放線上報名，請依主辦公告參加。</div><button class="btn btn-ghost" disabled>未開放線上報名</button>`
       : `<div class="hint">報名已截止。</div><button class="btn btn-ghost" disabled>不可報名</button>`;
   } else if(effStatus==="scheduled"){
@@ -19276,7 +19277,7 @@ function renderModal(){
       ${body}
       <div class="btn-row ${(mm.type==="confirm-result"||mm.type==="confirm-quick")?"result-confirm-actions":""}">
         <button id="modal-cancel-btn" class="btn btn-ghost btn-block" data-action="modal-cancel" type="button">${esc(mm.cancelLabel||"取消")}</button>
-        <button id="modal-confirm-btn" class="btn ${mm.danger?'btn-danger-solid':'btn-primary'} btn-block" data-action="modal-confirm" type="button" ${(mm.confirmDisabled||mm.confirmBusy)?'disabled':''}>${mm.confirmBusy?'處理中……':esc(mm.confirmLabel||"確認")}</button>
+        <button id="modal-confirm-btn" class="btn ${mm.danger?'btn-danger-solid':'btn-primary'} btn-block" data-action="modal-confirm" type="button" ${mm.type==="registration-publish-preview"?'style="-webkit-user-select:none;user-select:none;-webkit-touch-callout:none"':""} ${(mm.confirmDisabled||mm.confirmBusy)?'disabled':''}>${mm.confirmBusy?'處理中……':esc(mm.confirmLabel||"確認")}</button>
       </div>
     </div>
   </div>`;
@@ -25596,69 +25597,54 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(managedRegistrationSettingsChanged(rd)){reportManagedRegistrationSettings();return;}
     if(!aiCreateReviewGate("進入發布預覽")) return;
 
-    if(isTester()){
-      d.name=ensureTestName(d.name);
-      // Preserve the tester's ranked choice in the draft. Official meta.ladderMode
-      // remains general; testLadderEnabled is the isolated test-ladder switch.
-      markTesterSandboxState(state);
-    }
-
     if(d.playMode==="enchantment"&&!(isSuperAdmin()&&d.battleMode!=="team"&&d.formatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked")){
       showToast("附魔測試目前限最高管理員建立一般單淘賽，且不開季軍賽。",true);return;
     }
     if(d.googleMapsUrl && !normalizeGoogleMapsUrl(d.googleMapsUrl)){showToast("Google Maps 連結格式不支援，請確認連結是否來自 Google Maps",true);return;}
-    state.meta.name=(d.name||"").trim()||"未命名賽事";
-    state.meta.date=d.date||"";
-    applyVenueDraftToState(d,state);
-    state.meta.checkin=d.checkin||"";
-    state.meta.startTime=d.startTime||"";
-    state.meta.battleMode=d.battleMode==="team"?"team":"individual";
-    state.meta.teamSize=state.meta.battleMode==="team"?Math.max(3,parseInt(d.teamSize,10)||3):3;
-    state.meta.formatType=d.formatType||"single";
-    state.meta.playMode=d.playMode==="enchantment"?"enchantment":"standard";
-    state.meta.enchantmentPilot=state.meta.playMode==="enchantment";
-    state.meta.format=FORMAT_LABELS[state.meta.formatType]||"單淘汰賽";
-    state.meta.stations=Math.max(1,parseInt(d.stations,10)||1);
-    state.testLadderEnabled=isTester()?(d.ladderMode==="ranked"):false;
-    state.meta.ladderMode=isTester()?"general":(d.ladderMode==="ranked"?"ranked":"general");
-    state.meta.scoringMode="standard";
-    state.meta.bronzeMatch=!!d.bronzeMatch;
-    if(state.meta.ladderMode==="ranked" && state.meta.formatType==="single") state.meta.bronzeMatch=true;
-    state.meta.checkinRequired=!!d.checkinRequired;
-    state.meta.checkinLeadMinutes=d.checkinLeadMinutes===30?30:60;
+    const roomId=state.id, roomCode=state.cloudCode, actor=currentAuthUid();
+    const tester=isTester();
+    const testLadderEnabled=tester&&d.ladderMode==="ranked";
+    const sm={};
+    const preview={meta:sm,eventInfo:state.eventInfo};
+    sm.name=((tester?ensureTestName(d.name):d.name)||"").trim()||"未命名賽事";
+    sm.date=d.date||"";
+    applyVenueDraftToState(d,preview);
+    sm.checkin=d.checkin||"";
+    sm.startTime=d.startTime||"";
+    sm.battleMode=d.battleMode==="team"?"team":"individual";
+    sm.teamSize=sm.battleMode==="team"?Math.max(3,parseInt(d.teamSize,10)||3):3;
+    sm.formatType=d.formatType||"single";
+    sm.playMode=d.playMode==="enchantment"?"enchantment":"standard";
+    sm.enchantmentPilot=sm.playMode==="enchantment";
+    sm.format=FORMAT_LABELS[sm.formatType]||"單淘汰賽";
+    sm.stations=Math.max(1,parseInt(d.stations,10)||1);
+    sm.ladderMode=tester?"general":(d.ladderMode==="ranked"?"ranked":"general");
+    sm.scoringMode="standard";
+    sm.bronzeMatch=!!d.bronzeMatch;
+    if(sm.ladderMode==="ranked" && sm.formatType==="single") sm.bronzeMatch=true;
+    sm.checkinRequired=!!d.checkinRequired;
+    sm.checkinLeadMinutes=d.checkinLeadMinutes===30?30:60;
 
-    state.meta.registrationEnabled=!!rd.registrationEnabled;
-    state.meta.registrationOpenAt=rd.registrationOpenAt;
-    state.meta.registrationCloseAt=rd.registrationCloseAt;
-    state.meta.cancellationDeadline=onsiteRegistrationSettingsLocked()?state.meta.cancellationDeadline:(rd.registrationCloseAt ? rd.registrationCloseAt+3*60*60*1000 : null);
-    state.meta.registrationCapacity=rd.registrationCapacity;
-    state.meta.registrationFee=rd.registrationFee;
-    state.meta.targetGroup=rd.targetGroup;
-    state.meta.participantNameMode=registrationParticipantNameMode(rd.participantNameMode);
-    state.meta.waitlistCapacity=Math.max(0,parseInt(rd.waitlistCapacity,10)||0);
-    state.meta.waitlistEnabled=state.meta.waitlistCapacity>0;
-    state.meta.eventDescription=rd.eventDescription;
-    state.meta.registrationNotes="";
-    state.meta.registrationVisibility=rd.registrationVisibility;
+    sm.registrationEnabled=!!rd.registrationEnabled;
+    sm.registrationOpenAt=rd.registrationOpenAt;
+    sm.registrationCloseAt=rd.registrationCloseAt;
+    sm.cancellationDeadline=onsiteRegistrationSettingsLocked()?state.meta.cancellationDeadline:(rd.registrationCloseAt ? rd.registrationCloseAt+3*60*60*1000 : null);
+    sm.registrationCapacity=rd.registrationCapacity;
+    sm.registrationFee=rd.registrationFee;
+    sm.targetGroup=rd.targetGroup;
+    sm.participantNameMode=registrationParticipantNameMode(rd.participantNameMode);
+    sm.waitlistCapacity=Math.max(0,parseInt(rd.waitlistCapacity,10)||0);
+    sm.waitlistEnabled=sm.waitlistCapacity>0;
+    sm.eventDescription=rd.eventDescription;
+    sm.registrationNotes="";
+    sm.registrationVisibility=rd.registrationVisibility;
 
-    const sm=state.meta;
     const errs=publicationValidationErrors(sm);
     if(errs.length>0){
       openModal({ type:"generic", title:"資料不完整，無法發布", message:"請先完成以下項目：\\n"+errs.join("\\n"), confirmLabel:"我知道了", onConfirm:()=>{} });
       return;
     }
 
-    // Staff-created official tournaments are automatically self-assigned.
-    // This is the server-side authorization anchor for later updates: staff can
-    // manage only tournaments they created themselves or were explicitly assigned.
-    if(isStaffTier() && !state.cloudCode && firebaseUser && state.meta.eventAuthority!=="community"){
-      const ownUid=firebaseUser.uid;
-      // A staff-created official event starts assigned to its creator only.
-      // Admins can add other staff later through the normal assignment UI.
-      state.meta.assignedStaffUids=[ownUid];
-    }
-
-    saveRecord(state);
     const previewRows=[
       ["賽事名稱", sm.name],
       ["對戰形式", (BATTLE_MODE_LABELS[sm.battleMode]||"個人戰")+(sm.battleMode==="team"?"｜"+sm.teamSize+"V"+sm.teamSize:"")],
@@ -25670,7 +25656,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       ["開賽時間", sm.startTime||"未設定"],
       ["報名開放", new Date(sm.registrationOpenAt).toLocaleString()],
       ["報名截止", new Date(sm.registrationCloseAt).toLocaleString()],
-      ["取消期限", new Date(sm.registrationCloseAt+3*60*60*1000).toLocaleString()+"（截止後 3 小時）"],
+      ["取消期限", sm.cancellationDeadline?new Date(sm.cancellationDeadline).toLocaleString()+(onsiteRegistrationSettingsLocked()?"":"（截止後 3 小時）"):"未設定"],
       ["正取上限", sm.registrationCapacity+(sm.battleMode==="team"?" 隊":" 人")],
       ["備取上限", (Number(sm.waitlistCapacity)||0)+(sm.battleMode==="team"?" 隊":" 人")],
       ["報名費", sm.registrationFee!=null?(sm.registrationFee+" 元"):"未設定"],
@@ -25683,7 +25669,25 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       previewRows.splice(3,0,["報名方式","現場報名（不開放線上報名）"]);
     }
     const previewHtml=`<div class="publish-preview-card">${previewRows.map(([label,value])=>`<div class="publish-preview-row"><div class="publish-preview-label">${esc(label)}</div><div class="publish-preview-value">${esc(String(value??""))}</div></div>`).join("")}</div>`;
-    openModal({ type:"generic", title:"發布前預覽", message:previewHtml, messageIsHtml:true, confirmLabel:"確認發布", onConfirm:()=>{
+    openModal({ type:"registration-publish-preview", title:"發布前預覽", message:previewHtml, messageIsHtml:true, confirmLabel:"確認發布", onConfirm:()=>{
+      if(state.id!==roomId||state.cloudCode!==roomCode||currentAuthUid()!==actor){
+        showToast("目前房間或帳號已變更，請重新開啟發布預覽。",true);
+        return;
+      }
+      if(managedRegistrationSettingsChanged(sm)||(onsiteRegistrationSettingsLocked()&&state.onsiteWaitlistFinalized!==true)){
+        reportManagedRegistrationSettings();
+        return;
+      }
+      // The room listener can replace state while the preview is open.
+      // Apply only the reviewed settings to the current room and roster.
+      if(tester)markTesterSandboxState(state);
+      Object.assign(state.meta,sm);
+      state.eventInfo=normalizeEventInfoV2(state.eventInfo);
+      state.eventInfo.venue=preview.eventInfo.venue;
+      state.testLadderEnabled=testLadderEnabled;
+      if(isStaffTier()&&!roomCode&&actor&&state.meta.eventAuthority!=="community"){
+        state.meta.assignedStaffUids=[actor];
+      }
       resetSettingsFormDraft(); resetRegistrationFormDraft();
       publishRegistrationConfig();
     }});
