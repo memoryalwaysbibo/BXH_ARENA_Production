@@ -5303,6 +5303,7 @@ const PUBLIC_TOURNAMENTS_ERROR_MESSAGES = {
 // 不再籠統翻譯成單一句話。
 const REGISTRATION_ERROR_MESSAGES = {
   "registration-result-pending":"報名結果尚未確認，請使用畫面上的「查詢報名結果」，不要重新送出。",
+  "registration-cancellation-pending":"取消結果尚未確認，請使用畫面上的「查詢取消報名結果」。",
   "registration-preparation-timeout":"報名前置確認等候過久，尚未送出報名，請稍後重試。",
   "registration-state-conflict": "報名設定或人數尚未同步，請聯絡主辦重新儲存設定。",
   "invalid-registration-capacity": "報名人數上限設定無效，請聯絡主辦修正。",
@@ -5360,7 +5361,7 @@ function mapRegistrationError(e){
 }
 window.addEventListener('bxh-registration-recovered',event=>{
   const code=event.detail?.code;
-  publicTournamentsCache=null;invalidateMyRegistrationsCache();
+  publicTournamentsCache=null;invalidateMyRegistrationsCache(event.detail?.queueCancellation?{queueCancellation:true}:undefined);
   if(appPhase==='tournament-detail'&&tournamentDetailCode===code)void loadTournamentDetail(code);
   else requestLobbyRender();
 });
@@ -5466,7 +5467,10 @@ function markLobbySourceUnknown(){
   if(publicTournamentsFreshness!=="unknown"){publicTournamentsFreshness="unknown";requestLobbyRender();}
 }
 function invalidateMyRegistrationsCache(result){
-  if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true)myEventsPlayerSlice?.invalidate(result);
+  if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true){
+    if(result?.queueCancellation===true)myEventsPlayerSlice?.invalidateConfirmedCancellation();
+    else myEventsPlayerSlice?.invalidate(result);
+  }
   myRegistrationsRequest++;myRegistrationsCache=null;myRegistrationsLoading=false;
 }
 function shouldBindLobbyInput(element,key,retained=false){
@@ -9815,6 +9819,10 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
   if(!window.cloudSync||!window.cloudSync.listRegistrationsForAdmin) throw new Error("registration api unavailable");
   const publicRoom=await window.cloudSync.getPublicTournamentFull(context.code);
   requireRegistrationRosterContext(context);
+  if(window.BXH_REGISTRATION_LIFECYCLE_V2_ROOMS?.includes(context.code)){
+    if(publicRoom?.registrationRosterSyncBackendEnabled!==true)throw Error('backend-roster-sync-required');
+    return refreshBackendRegistrationRoster(context,false,true);
+  }
   if(publicRoom?.registrationRosterSyncBackendEnabled===true) return refreshBackendRegistrationRoster(context);
   const regs=Array.isArray(registrationRows)?registrationRows:await window.cloudSync.listRegistrationsForAdmin(context.code);
   requireRegistrationRosterContext(context);
@@ -9861,8 +9869,11 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
     if(ok!==true)throw new Error(window.__BXH_LAST_CLOUD_ERROR_CODE||'roster-cloud-write-failed');
   }
   if(needsWrite||base!==state){
-    const expectedQrRevision=Number(candidate.qrCheckinManaged===true?candidate.qrCheckinRevision||0:0);
-    const verified=await readVerifiedOnlineRoster(context,expectedQrRevision);
+    const expectedQrRevision=Math.max(Number(state.qrCheckinRevision||0),Number(candidate.qrCheckinManaged===true?candidate.qrCheckinRevision||0:0));
+    // No roster write occurred. The validated server-only QR snapshot is
+    // already authoritative unless a newer revision reached this client.
+    const reuseServerRead=!needsWrite&&base.qrCheckinManaged===true&&Number.isSafeInteger(base.qrCheckinRevision)&&base.qrCheckinRevision>=expectedQrRevision;
+    const verified=reuseServerRead?base:await readVerifiedOnlineRoster(context,expectedQrRevision);
     applyRemoteState(verified,true);
     if(Number(state.qrCheckinRevision||0)<Number(verified.qrCheckinRevision||0))throw new Error('roster-readback-failed');
   }
@@ -10766,6 +10777,7 @@ function currentAdminOperationalFailure(){
 function adminOverrideCurrent(approval){return window.BXHAdminOverride?.current(approval,adminOverrideContext(),userProfile)===true;}
 function canOfferAdminOperationalOverride(){
  return window.BXHAdminOverride?.allowed(userProfile)===true&&!!currentAuthUid()&&!!state.cloudCode&&
+  !window.BXH_REGISTRATION_LIFECYCLE_V2_ROOMS?.includes(state.cloudCode)&&
   state.meta?.battleMode!=='team'&&!state.startedAt&&state.archiveStatus!=='completed';
 }
 function adminOverrideButtonsHtml(){
@@ -11078,11 +11090,28 @@ function rebaseOrdinaryBracketRosterFence(fresh,snapshot){
 }
 function bracketCommitController(){
  if(!window.BXHBracketCommit)return null;
- const key=String(firebaseUser?.uid||currentRole||'local')+':'+String(state.cloudCode||state.id);
- if(bracketCommitContext?.key===key)return bracketCommitContext.controller;
  const roomId=state.id,code=state.cloudCode,actorUid=firebaseUser?.uid||null;
+ const server=!!code&&Array.isArray(window.BXH_REGISTRATION_LIFECYCLE_V2_ROOMS)&&window.BXH_REGISTRATION_LIFECYCLE_V2_ROOMS.includes(code);
+ const key=String(actorUid||currentRole||'local')+':'+String(code||roomId)+(server?':v2:'+roomId:'');
+ if(bracketCommitContext?.key===key)return bracketCommitContext.controller;
  const current=()=>state.id===roomId&&state.cloudCode===code&&(firebaseUser?.uid||null)===actorUid;
  let storage;try{storage=window.sessionStorage;}catch{}
+ if(server){
+  const controller=window.BXHBracketCommit.createServer({key,code,roomId,storage,current,state:()=>state,
+   operationId:()=>window.crypto.randomUUID(),
+   send:(kind,payload)=>window.cloudSync.commitRegistrationLifecycle(kind,payload),
+   read:()=>window.cloudSync.readBracketFromServer(code),
+   apply:snapshot=>{state=snapshot;void saveRecord(state).catch(e=>console.warn('[bracket local cache]',e));},
+   changed:()=>{if(current())renderPreservingScroll();},
+   success:kind=>{
+    adminOperationalFailure=null;
+    if(state.startedAt){publicTournamentsCache=null;myRegistrationsCache=null;resetAdminRegistrationsCache();}
+    activeTab=state.startedAt?'referee':'people';render();
+    showToast(kind==='start'?'賽事正式開始｜參賽名單與報名功能已鎖定':'上傳成功');
+   }
+  });
+  bracketCommitContext={key,controller};return controller;
+ }
  const controller=window.BXHBracketCommit.create({key,actorUid,storage,current,
   state:()=>state,cloud:()=>!!code,
   operationId:()=>window.crypto.randomUUID(),
@@ -11138,13 +11167,15 @@ function bracketCommitStatusHtml(inRosterOverview=false){
  if(inRosterOverview&&s.pending)return rosterUpdate+'<section class="panel" role="status"><p>本次配對已保留，儲存結果待確認。</p><button class="btn btn-ghost" data-action="bracket-commit-manage" data-section="bracket">查看配對狀態</button></section>';
  const queued=s.error==='queue-wait-timeout',uncertain=s.error==='confirmation-timeout',preflightTimeout=uncertain&&s.phase==='checking';
  const phaseLabels={waiting:'等待前一筆儲存完成…',checking:'核對雲端配對中…',writing:'提交本次配對中…',confirming:'確認雲端儲存結果中…'};
- const title=s.busy?(cloud?(phaseLabels[s.phase]||'資料上傳中…'):'儲存中…'):uploaded?(cloud?'上傳成功':'儲存成功'):queued?'等待儲存，尚未送出':preflightTimeout?'雲端核對逾時，尚未送出':uncertain?'儲存結果尚未確認':(cloud?'上傳失敗':'儲存失敗');
+ const title=s.action==='start'?(uploaded?'開賽已確認':s.busy?'正在確認開賽…':uncertain?'開賽結果尚未確認':'開賽未完成'):
+  s.busy?(cloud?(phaseLabels[s.phase]||'資料上傳中…'):'儲存中…'):uploaded?(cloud?'上傳成功':'儲存成功'):queued?'等待儲存，尚未送出':preflightTimeout?'雲端核對逾時，尚未送出':uncertain?'儲存結果尚未確認':(cloud?'上傳失敗':'儲存失敗');
  const message=s.busy?'請稍候，本次配對已保留，完成後會自動顯示結果。':uploaded?'對戰表已確認儲存。':queued?'前一筆儲存仍在處理，本次配對尚未重新送出。稍後按重試會沿用相同配對。':preflightTimeout?'送出前未能讀取完整雲端資料，本次配對尚未送出。請保留此頁，稍後按重試會沿用相同配對。':uncertain?'尚未取得完整雲端確認，不能判定上傳失敗。請保留此頁；提交回覆後會自動查證，重試也會沿用相同配對。':s.error==='bracket-version-conflict'?'已同步雲端最新資料，請確認後再抽籤。':'本次配對已保留，重試時不會重新抽籤。';
  const failureDetail=!s.busy&&!uploaded&&s.error?'<p>原因：'+esc(s.error)+'</p>':'';
- return rosterUpdate+'<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+message+'</p>'+
+ const detail=c.server?(uploaded?(s.action==='start'?'已讀回正式開賽狀態。':'已核對公私對戰表。'):s.pending?'重試會沿用同一筆操作，並重新核對雲端結果。':'請依下列原因核對名單或對戰表，再重新操作。'):message;
+ return rosterUpdate+'<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+detail+'</p>'+
  failureDetail+
  (s.pending&&(appPhase==='app'||appPhase==='community-room')?'<button class="btn btn-ghost" data-action="bracket-commit-manage" data-section="confirmed">停止等待，返回管理</button>':'')+
- (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存'))+'</button>':'')+
+ (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.action==='start'?(s.busy?'確認開賽中…':'重試確認開賽'):(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存')))+'</button>':'')+
  (cloud&&s.canDiscard?'<button class="btn btn-ghost" data-action="bracket-commit-discard">取消上傳</button>':'')+
  (s.pending&&!s.busy&&s.result==='failed'&&canOfferAdminOperationalOverride()&&!adminOperationalOverrideBusy?'<button class="btn btn-danger" data-action="admin-force-reconfirm">管理員強制提交原配對</button>':'')+'</section>';
 }
@@ -13270,6 +13301,7 @@ function peopleMutationErrorMessage(e){
   if(code.includes("call-state-stale")||code.includes("entry-selection-stale")) return "雲端賽事狀態已更新，請重新整理後再試。";
   if(code.includes("not-waitlist")) return "這位玩家目前已不是備取，名單可能已被其他裝置更新。";
   if(code.includes("not-confirmed")) return "這位玩家目前已不是正取，名單可能已被其他裝置更新。";
+  if(code.includes("registration-management-pending")) return "名單異動尚待確認；請重試同一操作以查詢原請求。";
   if(code.includes("roster-sync-mismatch")) return "雲端已收到操作，但讀回資料尚未完全一致；請重新整理名單確認。";
   if(code.includes("permission-denied")) return "目前帳號沒有異動這場賽事名單的權限。";
   return mapRegistrationError(e)||"名單更新失敗，請重新整理後再試。";
@@ -13396,6 +13428,7 @@ async function peoplePromoteOnline(registrationId,name,expandBy=0){
       render();
       return;
     }
+    if(e?.code==="registration-management-pending"){showToast(peopleMutationErrorMessage(e),true);render();return;}
     await peopleRecoverPromotion(context,name,e);
   }
 }
@@ -13426,8 +13459,22 @@ async function peopleQuickAddPlayers(lines,guestConfirmed=false,expectedRoom=sta
     return false;
   }
   const room=state,code=state.cloudCode,addedIds=new Set(),defaultChecked=!state.meta.checkinRequired;
+  const names=lines.map(name=>name.replace(/（現場）$/,""));
+  const context={roomId:room.id,code,uid:typeof currentAuthUid==="function"?currentAuthUid():""};
   peopleRosterBusy=true;
   try{
+    if(code&&window.cloudSync?.addLocalRosterPlayers){
+      const result=await window.cloudSync.addLocalRosterPlayers(code,names);
+      if(!peoplePromotionContextCurrent(context))return false;
+      if(result){
+        await peopleApplyCloudRosterResult(result,"已新增 "+result.addedCount+" 位選手"+(result.checkedIn?"，已完成報到":"，尚未報到"));
+        if(peoplePromotionContextCurrent(context)){
+          const input=document.getElementById("quick-add-textarea");if(input)input.value="";
+        }
+        return true;
+      }
+      if(state!==room)return false;
+    }
     lines.forEach(name=>{const id=uid("guest");addedIds.add(id);room.players.push({id,name:name.replace(/（現場）$/,""),checkedIn:defaultChecked,source:"onsite",participantType:"onsite_guest",accountLinked:false,playerUid:null,playerId:null,ladderEligible:false,activityEligible:false});});
     room.testDataDismissed=true;
     render();
@@ -13445,7 +13492,13 @@ async function peopleQuickAddPlayers(lines,guestConfirmed=false,expectedRoom=sta
     const input=document.getElementById("quick-add-textarea");if(input)input.value="";
     showToast("已新增 "+lines.length+" 位選手"+(defaultChecked?"，已完成報到":"，尚未報到"));
     return true;
-  }catch(e){showToast("現場新增未完成，請同步名單確認。",true);return false;}
+  }catch(e){
+    if(state!==room)return false;
+    const reason=String(e?.code||e?.message||"");
+    const message=reason.includes("capacity-full")?"剩餘正取名額不足，這一批現場選手未新增。":
+      reason.includes("registration-management-pending")?"現場新增尚待確認。請保留原名單，重試同一筆以查詢結果。":"現場新增未完成，請同步名單確認。";
+    showToast(message,true);return false;
+  }
   finally{peopleRosterBusy=false;render();}
 }
 async function peopleDemoteOnline(player){
@@ -13458,25 +13511,29 @@ async function peopleDemoteOnline(player){
   }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e),true);render();}
 }
 function peopleCancellationMessage(result,name){
-  return "已取消「"+name+"」"+(result?.autoPromoted?"；「"+result.promotedName+"」已自動遞補正取":"");
+  return "已取消「"+name+"」"+(result?.autoPromoted?(result.promotedName?"；「"+result.promotedName+"」已自動遞補正取":"；備取已自動遞補正取"):"");
 }
 async function peopleCancelOnline(registrationId,name){
   if(peopleRosterBusy)return;
+  const context={roomId:state.id,code:state.cloudCode,uid:typeof currentAuthUid==="function"?currentAuthUid():""};
   peopleRosterBusy=true;render();
   try{
     const result=state.meta.battleMode==="team"
       ? await window.cloudSync.staffCancelRegistration(state.cloudCode,registrationId)
       : await window.cloudSync.cancelRoster(state.cloudCode,registrationId,"","admin");
+    if(!peoplePromotionContextCurrent(context)){peopleRosterBusy=false;return;}
     await peopleApplyCloudRosterResult(result,peopleCancellationMessage(result,name));
-  }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e),true);render();}
+  }catch(e){peopleRosterBusy=false;if(!peoplePromotionContextCurrent(context))return;showToast(peopleMutationErrorMessage(e),true);render();}
 }
 async function peopleCancelLocal(localId,name){
   if(peopleRosterBusy)return;
+  const context={roomId:state.id,code:state.cloudCode,uid:typeof currentAuthUid==="function"?currentAuthUid():""};
   peopleRosterBusy=true;render();
   try{
     const result=await window.cloudSync.cancelRoster(state.cloudCode,"",localId,"admin");
+    if(!peoplePromotionContextCurrent(context)){peopleRosterBusy=false;return;}
     await peopleApplyCloudRosterResult(result,peopleCancellationMessage(result,name));
-  }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e),true);render();}
+  }catch(e){peopleRosterBusy=false;if(!peoplePromotionContextCurrent(context))return;showToast(peopleMutationErrorMessage(e),true);render();}
 }
 async function peopleToggleAutoFill(){
   if(peopleRosterBusy)return;
@@ -13502,20 +13559,23 @@ async function peoplePromoteLocal(waitId,name,expandCapacity){
   }
   if(state.cloudCode){
     if(peopleRosterBusy)return;
+    const context={roomId:state.id,code:state.cloudCode,uid:typeof currentAuthUid==="function"?currentAuthUid():""};
     peopleRosterBusy=true;render();
     try{
       if(!window.cloudSync?.promoteLocalWaitlistRoster)throw Object.assign(new Error("network"),{code:"network"});
       const result=await window.cloudSync.promoteLocalWaitlistRoster(state.cloudCode,waitId,{expandBy:expandCapacity?8:0});
+      if(!peoplePromotionContextCurrent(context)){peopleRosterBusy=false;return;}
       await peopleApplyCloudRosterResult(result,(result.expanded?"已加開至 "+result.capacity+" 人；":"")+name+" 已升為正取");
     }catch(e){
       peopleRosterBusy=false;
+      if(!peoplePromotionContextCurrent(context))return;
       if(String(e?.code||e?.message||"").includes("capacity-full")&&!expandCapacity){
         const cap=Number(e.capacity||state.meta.registrationCapacity||0);
         openModal({
           type:"generic",title:"正取名額已滿",
           message:"目前正取上限為 "+cap+" 人。\n\n是否增加 8 個名額，並將「"+name+"」升為正取？\n調整後上限："+(cap+8)+" 人。\n\n每次固定增加 8 人，可重複加開。",
           confirmLabel:"增加 8 名並升正取",
-          onConfirm:()=>peoplePromoteLocal(waitId,name,true)
+          onConfirm:()=>peoplePromotionContextCurrent(context)&&peoplePromoteLocal(waitId,name,true)
         });
         render();return;
       }
@@ -16591,8 +16651,10 @@ async function staffRosterPromote(target){
     }
     staffPromotionBusy=true;render();
     try{
-      const result=await window.engagementService.tournamentOperation('promoteSeatedRegistration',{
-       code:context.code,...(registrationId?{registrationId}:{playerId}),operationId,expandBy:0});
+      const request={code:context.code,...(registrationId?{registrationId}:{playerId}),expandBy:0};
+      const queueRequest=registrationId?{action:'promote',...request}:{action:'promoteLocal',code:context.code,localId:playerId,expandBy:0};
+      const queued=await window.engagementService.registrationManagementOperation?.(queueRequest,operationId);
+      const result=queued||await window.engagementService.tournamentOperation('promoteSeatedRegistration',{...request,operationId});
       if(!current())return;
       if(result?.ok!==true||result.verified!==true)throw Error('promotion-unconfirmed');
       const fresh=await window.cloudSync.readStaffRegistrationRoster(context.code);
@@ -16606,7 +16668,7 @@ async function staffRosterPromote(target){
       adminRegistrationsError=null;showToast('已升為正取');
     }catch(error){if(current()){
       const reason=[error?.message,error?.code,error?.details].map(String).join(' ');
-      if(/not-waitlist|operation-outdated|bracket-locked|promotion-state-changed|capacity-full/.test(reason)){
+      if(/not-waitlist|operation-outdated|bracket-locked|promotion-state-changed|capacity-full|permission-denied/.test(reason)){
        staffPromotionOperations.delete(intent);try{sessionStorage.removeItem('bxh.staffPromotion.'+intent);}catch{}
       }
       adminRegistrationsError=reason.includes('capacity-full')?'正取名額已滿，請由房主調整名額後重新同步。':
@@ -16693,7 +16755,7 @@ function registrationRosterContextIsCurrent(context){
 function requireRegistrationRosterContext(context){
   if(!registrationRosterContextIsCurrent(context)) throw new Error("room-context-changed");
 }
-async function refreshBackendRegistrationRoster(context,catchup=false){
+async function refreshBackendRegistrationRoster(context,catchup=false,serverOnly=false){
   requireRegistrationRosterContext(context);
   if(catchup){
     // Quick COMMUNITY rosters are projected by the owner-only callable. Never
@@ -16702,7 +16764,7 @@ async function refreshBackendRegistrationRoster(context,catchup=false){
     await window.cloudSync.syncCommunityRegistrationSummary(context.code);
     requireRegistrationRosterContext(context);
   }
-  const result=await window.cloudSync.joinRoom(context.code);
+  const result=serverOnly?await window.cloudSync.joinRoom(context.code,{serverOnly:true}):await window.cloudSync.joinRoom(context.code);
   requireRegistrationRosterContext(context);
   if(result?.ok!==true||result.data?.id!==context.roomId) throw new Error(result?.reason||"roster-readback-failed");
   if(isCommunityRoomOwner() && (result.data.ownerUid!==firebaseUser.uid||result.data.createdBy!==firebaseUser.uid)) throw new Error("permission-denied");
@@ -17225,6 +17287,7 @@ function currentMyEventsPlayerSlice(){
       storage:(()=>{try{return window.localStorage;}catch{return null;}})(),
       queryStatus:payload=>window.engagementService.myEventOperationStatus(payload),
       renderCard:(row,info,options)=>renderPlayerRegistrationCard(row,info,options),
+      cancellationPending:code=>window.cloudSync?.hasPendingRegistrationCancellation(code)===true,
       ledgerOptions:{visible:()=>!document.hidden},
       changed:()=>{if(appPhase==='player-center'&&playerActiveTab==='registered')renderPreservingScroll();else if(isTournamentLobbyVisible())requestLobbyRender();}
     });
@@ -21560,7 +21623,7 @@ function handleAction(action, target){
   }
   if(action==='bracket-commit-submit'){void bracketCommitController()?.submit();return;}
   if(action==='bracket-commit-retry'){void bracketCommitController()?.retry();return;}
-  if(action==='bracket-commit-discard'){void bracketCommitController()?.discard();return;}
+  if(action==='bracket-commit-discard'){void bracketCommitController()?.discard?.();return;}
   if(['draw-bracket','reset-bracket','start-tournament','admin-force-draw','admin-force-start'].includes(action)&&typeof adminRosterBusyOrPending==='function'&&adminRosterBusyOrPending()){showToast('請先核實上一筆名單覆核，再操作對戰表',true);return;}
   if(['draw-bracket','reset-bracket','start-tournament'].includes(action)&&window.BXHBracketCommit&&bracketCommitBlocked()){showToast('對戰表尚未上傳成功，請先重試上傳',true);return;}
   if(peopleOnsiteWaitlistManaged()){
@@ -25891,9 +25954,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         const scheduledStart=scheduledTournamentStartMs(state.meta);
         const now=Date.now();
         const isEarly=scheduledStart!=null && now<scheduledStart;
+        const lifecycle=window.BXHBracketCommit?bracketCommitController():null;
+        const confirmedDrawId=state.bracketDraw?.id;
 
         const actuallyStart=()=>{
           (async ()=>{
+            if(lifecycle?.server&&lifecycle!==bracketCommitController())return;
             // Re-check immediately before committing the lock. This narrows the
             // race window between the confirmation dialog and the final start.
             try{
@@ -25909,6 +25975,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
               return;
             }
             if(window.BXHBracketCommit&&!(await verifyBracketBeforeStart()))return;
+            if(lifecycle?.server){
+              if(lifecycle!==bracketCommitController())return;
+              if(state.bracketDraw?.id!==confirmedDrawId){showToast('對戰表已更新，請核對後重新確認開賽。',true);return;}
+              await lifecycle.start(isEarly);
+              return;
+            }
             const beforeStart=JSON.parse(JSON.stringify(state));
             state.startedAt=Date.now();
             rebuildCourtAssignments();
@@ -25973,6 +26045,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="reset-bracket"){
+    if(window.BXH_REGISTRATION_LIFECYCLE_V2_ROOMS?.includes(state.cloudCode)){showToast("請使用重新抽籤更新對戰表。",true);return;}
     if(state.startedAt){ showToast("賽事開始後無法重設對戰表", true); return; }
     if(!state.bracketSize && !(state.matches&&state.matches.length)){ showToast("目前尚未產生對戰表"); return; }
     openModal({
@@ -25991,8 +26064,17 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="draw-bracket"){
-    const doDraw = ()=>{adminOperationalFailure=null;void bracketCommitController()?.begin();};
+    const lifecycle=bracketCommitController();
     const doCheckThenDraw = ()=>{
+      if(lifecycle?.server&&lifecycle!==bracketCommitController())return;
+      const rosterRevision=state.registrationRosterRevision??0;
+      const baseDrawId=state.bracketDraw?.id??null;
+      const doDraw=()=>{
+        if(lifecycle?.server&&lifecycle!==bracketCommitController())return;
+        adminOperationalFailure=null;
+        if(lifecycle?.server)void lifecycle.begin({rosterRevision,baseDrawId});
+        else void bracketCommitController()?.begin();
+      };
       if(state.meta.battleMode==="team"){doDraw();return;}
       const total = state.players.length;
       const checkedCount = eligiblePlayers().length;
@@ -26008,6 +26090,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       }
     };
     const syncThenDraw=async()=>{
+      if(lifecycle?.server&&lifecycle!==bracketCommitController())return;
       const rosterSyncStartedAt=Date.now();
       let rosterSynced=false;
       try{

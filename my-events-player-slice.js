@@ -274,7 +274,7 @@ const {createReadEntry}=require('./read-entry.cjs');
 const {createLedger}=require('./operation-ledger.js');
 const {roomView,freshCancellationMetadata}=require('./room-contract.cjs');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function create({call,summary,changed=()=>{},cooldown,storage,queryStatus,renderCard,ledgerOptions={},now=Date.now}={}){
+function create({call,summary,changed=()=>{},cooldown,storage,queryStatus,renderCard,cancellationPending=()=>false,ledgerOptions={},now=Date.now}={}){
  let entry=null,key=null,owner=null,generation=0,started=false,ledger=null,untracked=false,trackedResults=new WeakSet(),loading=null,lastReadAt=0,refreshing=false,previousView=null;
  function notify(){const g=generation;queueMicrotask(()=>{if(g===generation)changed();});}
  function fresh(){entry=createReadEntry({call,summary:async code=>roomView(code,await summary(code),now()),cooldown});entry.setAccount(owner);started=false;loading=null;lastReadAt=0;refreshing=false;previousView=null;}
@@ -325,7 +325,7 @@ function create({call,summary,changed=()=>{},cooldown,storage,queryStatus,render
  function registration(code){const room=entry?.snapshot().rooms.find(r=>r.card.code===code);return room?.status==='ready'?room.rows.find(r=>['confirmed','waitlist'].includes(r.status))||null:null;}
  function cancellationContext(code){
   const receipt=receipts(),s=entry?.snapshot(),room=s?.rooms.find(r=>r.card.code===code);
-  if(!owner||!ledger||untracked||refreshing||receipt.pending.length||receipt.corrupt||receipt.storageError||!room||room.status!=='ready'||!room.rows.length||room.nextCursor||room.notices.length||s.membership.notices.length||(room.info?.queueSyncFailed||!freshCancellationMetadata(room.info,code,now())))return null;
+  if(!owner||!ledger||untracked||refreshing||receipt.pending.length||receipt.corrupt||receipt.storageError||!room||room.status!=='ready'||!room.rows.length||room.nextCursor||room.notices.length||s.membership.notices.length||cancellationPending(code)||(room.info?.queueSyncFailed||!freshCancellationMetadata(room.info,code,now())))return null;
   return {info:room.info,owner,key};
  }
  function retryReceipts(){if(!ledger)return;ledger.retryStatus();notify();}
@@ -348,7 +348,7 @@ function create({call,summary,changed=()=>{},cooldown,storage,queryStatus,render
   }).join('');
   return `<section data-my-events-read-slice="true"><h3>目前個人／家庭報名</h3><p role="status">歷史、團體與抽籤不在此清單範圍。候選尚未通過正式瀏覽器驗收；叫號為已讀取的快照。</p><p>${body}</p>${m?.notices?.length?'<p>仍有同步提醒，清單不可視為完整。</p>':''}${rooms}${receipt.pending.length?'<button class="btn" data-action="my-events-receipt-recheck">重新查詢操作同步狀態</button>':''}<button class="btn" data-action="my-events-refresh">重新確認</button>${m?.nextCursor?'<button class="btn" data-action="my-events-more">讀取下一頁報名</button>':''}${m&&!m.complete?'<p>清單尚未完整，未出現不代表未報名。</p>':''}</section>`;
  }
- return Object.freeze({bind,reset,ensure,action,render,execute,refreshSummary,invalidate:result=>invalidate(false,result),storageChanged:event=>ledger?.storageChanged(event),visibilityChanged:()=>ledger?.visibilityChanged(),discovery,registration,cancellationContext,receiptSnapshot:receipts,pollReceipts:()=>ledger?.poll(),snapshot:()=>entry?.snapshot()||null});
+ return Object.freeze({bind,reset,ensure,action,render,execute,refreshSummary,invalidate:result=>invalidate(false,result),invalidateConfirmedCancellation:()=>invalidate(true),storageChanged:event=>ledger?.storageChanged(event),visibilityChanged:()=>ledger?.visibilityChanged(),discovery,registration,cancellationContext,receiptSnapshot:receipts,pollReceipts:()=>ledger?.poll(),snapshot:()=>entry?.snapshot()||null});
 }
 module.exports={create};
 

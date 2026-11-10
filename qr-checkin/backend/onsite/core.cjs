@@ -451,6 +451,7 @@ function transition(aggregate, request, {now = Date.now(), randomInt = cryptoRan
     if (prior.actorUid !== uid || prior.requestHash !== requestHash) fail('operation-conflict');
     return {result: {...prior.result, state: publicState(aggregate), candidateHash: x.candidateHash, replayed: true}};
   }
+  if (x.t.registrationQueueVersion === 2) fail('registration-queue-required');
   if (d.action === 'draw' && !d.lockId) fail('lock-required', 400);
   if (d.expectedRevision !== x.revision) fail('stale-revision', 409, {currentRevision: x.revision});
   assertMutable(x.t, x.pub, x.s, {allowPendingBracket: d.action === 'checkIn'});

@@ -117,7 +117,28 @@ async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode
  // Clicking self registration submits once. The join transaction decides the
  // current confirmed/waitlist slot and returns a definitive full error.
  if(mode!=='children'){
-  return {childIds:[null]};
+  const queued=Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code)&&event.battleMode!=='team';
+  if(!queued)return {childIds:[null]};
+  // Use the already-read display allocation as consent; the authoritative
+  // queued transaction still rejects any allocation change. Do not silently
+  // convert a confirmed expectation to waitlist or weaken capacity checks.
+  if(Number.isSafeInteger(event.confirmedCount)&&event.confirmedCount>=0){
+   const unlimited=window.BXHDomainUtils?.isUnlimitedCommunityRegistration(event)===true;
+   const capacity=event.capacity;
+   // The public roster omits player provenance. A populated or unreadable
+   // projection needs the authoritative mixed-capacity preview.
+   let noRoster=false;
+   try{
+    const mirror=typeof event.bracketView==='string'?JSON.parse(event.bracketView):event.bracketView;
+    noRoster=Array.isArray(mirror?.players)&&mirror.players.length===0;
+   }catch{}
+   if(unlimited||noRoster&&Number.isSafeInteger(capacity)&&capacity>0&&event.confirmedCount<capacity)return {childIds:[null],allocation:[{registrationId:owner,status:'confirmed'}]};
+   if(noRoster&&Number.isSafeInteger(capacity)&&capacity>0&&event.confirmedCount>=capacity&&event.waitlistEnabled===true&&Number.isSafeInteger(event.waitlistCount)&&event.waitlistCount>=0&&event.waitlistCount<event.waitlistCapacity)return {childIds:[null],allocation:[{registrationId:owner,status:'waitlist'}]};
+  }
+  const preview=await window.engagementService.familyRegistration({action:'preview',code,childIds:[null],childEligibilityConfirmed:childEligibilityConfirmed===true});
+  if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)throw Error('auth-required');
+  if(!preview?.ok)throw Error('preview-failed');
+  return {childIds:[null],allocation:preview.allocation||[]};
  }
  const r=await window.engagementService.family({action:'list'});
  if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)throw Error('auth-required');

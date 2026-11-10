@@ -1,23 +1,32 @@
 'use strict';
 const {createHash, randomUUID}=require('node:crypto');
+const {registrationQueueOwnsRoom}=require('./legacy-writer.cjs');
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const canonical=value=>JSON.stringify(value===null||typeof value!=='object'?value:Array.isArray(value)?value.map(x=>JSON.parse(canonical(x))):Object.fromEntries(Object.keys(value).sort().map(k=>[k,JSON.parse(canonical(value[k]))])));
 const active=u=>u?.active===true&&!u.deleted&&!['deleted','disabled','frozen'].includes(u.accountStatus);
 const millis=t=>t?.toMillis?t.toMillis():Number(t)||0;
-const businessRejections=new Set(('auth-required not-found room-password-required operation-conflict onsite-waitlist-managed corrupt-state family-lottery-unavailable tournament-started registration-state-conflict permission-denied not-enabled not-open-yet closed profile-incomplete invalid-participants child-not-found roster-locked child-eligibility-required already-registered full allocation-changed invalid-operation cancel-deadline-passed not-registered nothing-to-cancel bracket-locked selection-managed team-roster-managed bucket-scoring-required unlimited-quick-registration-required not-waitlist invalid-registration-capacity invalid-registration-schedule').split(' '));
+const businessRejections=new Set(('auth-required not-found room-password-required operation-conflict registration-queue-disabled onsite-waitlist-managed corrupt-state family-lottery-unavailable tournament-started registration-state-conflict permission-denied not-enabled not-open-yet closed profile-incomplete invalid-participants child-not-found roster-locked child-eligibility-required already-registered full allocation-changed invalid-operation cancel-deadline-passed not-registered nothing-to-cancel bracket-locked selection-managed team-roster-managed bucket-scoring-required unlimited-quick-registration-required not-waitlist invalid-registration-capacity invalid-registration-schedule capacity-full invalid-capacity-step promotion-route-not-supported operation-outdated qr-checkin-stale court-lifecycle-stale roster-too-large online-registration-required invalid-request unauthenticated public-mirror-stale not-confirmed call-state-stale entry-selection-stale').split(' '));
 const fail=reason=>Object.assign(Error(reason),{reason});
-function safeResult(result){
+function safeResult(result,job){
  const out={};
  for(const key of ['ok','status','registrationId','autoPromoted','alreadyCancelled','replayed','confirmedCount','waitlistCount','capacity','communityParticipantCount','enabled'])if(result?.[key]!==undefined)out[key]=result[key];
+ if(job?.payload.intent==='admin'&&result?.localId){
+  out.localId=result.localId;
+  if(result.expanded!==undefined)out.expanded=result.expanded;
+ }
+ if(job?.payload.action==='addLocal'&&job.payload.intent==='admin'){
+  out.addedCount=result.addedCount;
+  out.checkedIn=result.checkedIn;
+ }
  if(Array.isArray(result?.rows))out.rows=result.rows.map(row=>Object.fromEntries(['registrationId','childId','status','participantName'].filter(k=>row[k]!==undefined).map(k=>[k,row[k]])));
  return out;
 }
 function validate(uid,input){
  if(!uid)throw fail('auth-required');
  const code=String(input?.code||'').toUpperCase();
- if(!/^BXH-[A-Z0-9]{4,16}$/.test(code)||!['family','roster'].includes(input?.route)||!/^[A-Za-z0-9_-]{8,100}$/.test(input?.operationId||''))throw fail('invalid-operation');
+ if(!/^BXH-[A-Z0-9]{4,16}$/.test(code)||!['family','roster','promotion'].includes(input?.route)||!/^[A-Za-z0-9_-]{8,100}$/.test(input?.operationId||''))throw fail('invalid-operation');
  const d=JSON.parse(JSON.stringify(input.payload||{}));
- const allowed=input.route==='family'?['join','cancel','syncSummary']:['cancel','promote','configure'];
+ const allowed={family:['join','cancel','syncSummary'],roster:['cancel','promote','configure'],promotion:['promote','demote','promoteLocal','addLocal']}[input.route];
  if(!allowed.includes(d.action)||d.code!==code||d.operationId!==input.operationId)throw fail('invalid-operation');
  if(Buffer.byteLength(JSON.stringify(d))>12000)throw fail('invalid-operation');
  return {uid,code,route:input.route,operationId:input.operationId,payload:d};
@@ -26,18 +35,25 @@ function validate(uid,input){
 // Private server-only operation journal. This is a candidate, not an installed
 // Cloud Tasks deployment. onCreate + a scheduled sweep must both be wired before
 // rollout. Queue acceptance is NOT a reservation or proof of registration.
-function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAttempts=5,workerId=randomUUID(),beforeExecute=async()=>{}}={}){
+function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAttempts=5,requireRoomOwnership=false,authorizeIntake,workerId=randomUUID(),beforeExecute=async()=>{}}={}){
  if(!handlers?.family||!handlers?.roster||!FieldValue)throw Error('queue-dependencies-required');
  const rooms=db.collection('_registrationQueueV2');
  const roomRef=code=>rooms.doc(code);
- const jobRef=(code,uid,operationId)=>roomRef(code).collection('_registrationQueueJobsV2').doc(digest(uid+'|'+operationId));
+ const jobsRef=code=>roomRef(code).collection('_registrationQueueJobsV2');
+ const jobRef=(code,uid,operationId)=>jobsRef(code).doc(digest(uid+'|'+operationId));
  const checkLease=(lease,token)=>{if(lease?.owner!==workerId||lease?.token!==token||millis(lease.until)<=clock())throw fail('queue-lease-lost');};
- async function enqueue(uid,input){
+ async function enqueue(uid,input,authorize){
   const value=validate(uid,input),ref=jobRef(value.code,uid,value.operationId),hash=digest(canonical({route:value.route,payload:value.payload}));
   await db.runTransaction(async tx=>{
-   const [user,existing]=await tx.getAll(db.doc('users/'+uid),ref);
+   const roomReads=requireRoomOwnership?[db.doc('tournaments/'+value.code)]:[];
+   const [user,existing,room]=await tx.getAll(db.doc('users/'+uid),ref,...roomReads);
    if(!active(user.data()))throw fail('auth-required');
    if(existing.exists){if(existing.data().requestHash!==hash)throw fail('operation-conflict');return;}
+   const roomData=room?.data();
+   if(requireRoomOwnership&&!registrationQueueOwnsRoom(roomData))throw fail('registration-queue-disabled');
+   if(requireRoomOwnership&&(roomData.startedAt||roomData.tournamentPhase==='live'))throw fail('tournament-started');
+   if(authorizeIntake&&!await authorizeIntake(value.code,tx))throw fail('registration-queue-disabled');
+   if(authorize)await authorize(tx,user.data(),value,roomData);
    tx.create(ref,{...value,requestHash:hash,state:'queued',attempts:0,acceptedAt:FieldValue.serverTimestamp(),updatedAt:clock()});
   });
   return status(uid,value.code,value.operationId);
@@ -78,13 +94,15 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
    if(key==='runTransaction')return (callback,options)=>{
     if(options?.readOnly)throw fail('queue-unexpected-readonly');
     return target.runTransaction(async tx=>{
-     const [ls,js]=await tx.getAll(roomRef(code),ref);checkLease(ls.data(),token);
+     const roomReads=requireRoomOwnership?[target.doc('tournaments/'+code)]:[];
+     const [ls,js,room]=await tx.getAll(roomRef(code),ref,...roomReads);checkLease(ls.data(),token);
      if(js.data()?.state!=='running'||js.data()?.workerToken!==token)throw fail('queue-lease-lost');
+     if(requireRoomOwnership&&!registrationQueueOwnsRoom(room?.data()))throw fail('registration-queue-disabled');
      // The operation result and all registration mutations commit atomically.
      // A lost response cannot leave a committed registration with an absent
      // completion marker. A new lease invalidates the old transaction's read.
      const result=await callback(tx);
-     tx.update(ref,{state:'completed',result:safeResult(result),updatedAt:clock(),completedAt:clock()});
+     tx.update(ref,{state:'completed',result:safeResult(result,js.data()),updatedAt:clock(),completedAt:clock()});
      return result;
     },options);
    };
@@ -107,7 +125,7 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
   const token=await acquire(code);if(!token)return {busy:true,processed:0};
   const started=clock();let processed=0;
   try{
-   const snapshots=await roomRef(code).collection('_registrationQueueJobsV2').where('state','in',['queued','running']).orderBy('acceptedAt').limit(limit).get();
+   const snapshots=await jobsRef(code).where('state','in',['queued','running']).orderBy('acceptedAt').limit(limit).get();
    for(const snap of snapshots.docs){
     if(clock()-started>=budgetMs)break;
     const job=await claim(code,snap.ref,token);if(!job)break;
@@ -124,13 +142,28 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
    return {busy:false,processed};
   }finally{await release(code,token);}
  }
- async function sweep(){
+ async function drainCreatedJob(code,jobId,options){
+  const ref=jobsRef(code).doc(jobId);
+  const pending=async()=>['queued','running'].includes((await ref.get()).data()?.state);
+  if(!await pending())return;
+  await drain(code,options);
+  // Another worker may already have read its batch, or this batch may have
+  // stopped early. Leave the event retryable until its own job is settled.
+  if(await pending())throw fail('queue-delivery-pending');
+ }
+ async function sweep(pilotRoom=null){
+  if(pilotRoom!==null){
+   const pending=await jobsRef(pilotRoom).where('state','in',['queued','running']).limit(1).get();
+   if(pending.empty)return {rooms:0};
+   await drain(pilotRoom);
+   return {rooms:1};
+  }
   // A sweeper is a recovery path, not an unbounded scan of every tournament.
   const pending=await db.collectionGroup('_registrationQueueJobsV2').where('state','in',['queued','running']).limit(200).get();
   const codes=[...new Set(pending.docs.filter(s=>s.ref.parent.parent?.parent.path==='_registrationQueueV2').map(s=>s.data().code))];
   for(const code of codes)await drain(code);
   return {rooms:codes.length};
  }
- return {enqueue,status,drain,sweep,jobRef};
+ return {enqueue,status,drain,drainCreatedJob,sweep,jobRef};
 }
 module.exports={createQueue,validate,businessRejections,safeResult};
