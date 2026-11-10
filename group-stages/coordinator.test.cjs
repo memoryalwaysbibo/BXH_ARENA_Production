@@ -88,6 +88,8 @@ test('group-stage rehearsal covers two and four groups', async t => {
         await assert.rejects(coordinator.openNext(parentCode, 'B', operator), { code: 'group-stage-order' });
         await assert.rejects(db.runTransaction(tx => coordinator.readSettlement(tx, parentCode)),
           { code: 'group-stage-incomplete' });
+        await assert.rejects(command({ auth: { uid: operator },
+          data: { action: 'settlement-preview', parentCode } }), { code: 'group-stage-incomplete' });
 
         const lateCheckIn = JSON.parse(parentData.data);
         lateCheckIn.players.at(-1).checkedIn = true;
@@ -222,6 +224,19 @@ test('group-stage rehearsal covers two and four groups', async t => {
         assert.equal((await childRooms.get()).size, steps.length);
         assert.equal(input.participants.filter(player => player.placement === groupCount * 2 + 1).length, groupCount * 2);
         assert.equal((await db.collection('ladderTransactions').get()).size, 0);
+        const preview = await command({ auth: { uid: operator },
+          data: { action: 'settlement-preview', parentCode } });
+        assert.equal(preview.eventCode, parentCode);
+        assert.equal(preview.eligibleCount, eligibleCount);
+        assert.equal(preview.effectiveCount, eligibleCount);
+        assert.equal(preview.matchCount, input.matches.length);
+        assert.equal(Object.values(preview.placements).reduce((a, b) => a + b, 0), eligibleCount);
+        assert.equal(preview.pointsTotal, input.participants.reduce((a, p) => a + p.pointsEarned, 0));
+        assert.equal(preview.credited, false);
+        assert(!JSON.stringify(preview).includes('user-'));
+        await assert.rejects(command({ auth: { uid: 'outside' },
+          data: { action: 'settlement-preview', parentCode } }), { code: 'group-permission-denied' });
+        assert.equal((await db.collection('ladderTransactions').get()).size, 0);
         t.diagnostic(JSON.stringify({
           eligibleCount,
           groupSizes: expectedSizes,
@@ -339,6 +354,8 @@ test('private general-room rehearsal collects a 320-player event without a ladde
     assert.equal(status.readyForSettlement, true);
     assert.equal(status.completed.length, 6);
     await assert.rejects(db.runTransaction(tx => coordinator.readSettlement(tx, parentCode)),
+      { code: 'group-rehearsal-no-ladder' });
+    await assert.rejects(coordinator.previewSettlement(parentCode, operator),
       { code: 'group-rehearsal-no-ladder' });
     assert.deepEqual((await parent.get()).data(), parentData);
     assert.equal((await db.collection('ladderTransactions').get()).size, 0);

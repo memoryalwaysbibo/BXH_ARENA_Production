@@ -450,6 +450,28 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
       await checkRegistrations(tx, parent.room, Object.values(current.event.groups).flat());
       return input;
     },
+
+    async previewSettlement(parentCode, actorUid) {
+      return db.runTransaction(async tx => {
+        await authorize(tx, parentCode, actorUid, true);
+        const input = await this.readSettlement(tx, parentCode);
+        const placements = {};
+        for (const row of input.participants) {
+          const place = String(row.placement);
+          placements[place] = (placements[place] || 0) + 1;
+        }
+        return {
+          eventCode: parentCode,
+          effectiveCount: input.effectiveCount,
+          multiplier: input.multiplier,
+          eligibleCount: input.participants.length,
+          matchCount: input.matches.length,
+          placements,
+          pointsTotal: input.participants.reduce((sum, row) => sum + row.pointsEarned, 0),
+          credited: false,
+        };
+      }, { readOnly: true });
+    },
   };
 }
 

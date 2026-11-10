@@ -17,6 +17,7 @@ function createGroupStageCommand(coordinator, readHistory) {
       case 'open': return coordinator.openNext(parentCode, stage, actorUid);
       case 'publish-draw': return coordinator.publishDraw(parentCode, stage, roomCode, actorUid);
       case 'collect': return coordinator.collect(parentCode, stage, roomCode, actorUid);
+      case 'settlement-preview': return coordinator.previewSettlement(parentCode, actorUid);
       default: throw Object.assign(new Error('group-invalid-action'), { code: 'group-invalid-action' });
     }
   };
