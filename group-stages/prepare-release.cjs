@@ -8,6 +8,7 @@ const sourceFiles = [
   'group-stages/command.cjs',
   'group-history/read.cjs',
   'group-stages/coordinator.cjs',
+  'group-stages/settlement.cjs',
   'group-stages/core.cjs',
   'group-stages/draw.cjs',
   'referee-seats/functions/bucket-state.cjs',

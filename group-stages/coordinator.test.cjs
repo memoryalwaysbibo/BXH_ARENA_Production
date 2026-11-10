@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const { createCoordinator } = require('./coordinator.cjs');
 const { createGroupStageCommand } = require('./command.cjs');
+const { createGroupSettlement } = require('./settlement.cjs');
 const { roster, finish } = require('./test-fixtures.cjs');
 const buckets = require('../referee-seats/functions/bucket-state.cjs');
 
@@ -88,6 +89,8 @@ test('group-stage rehearsal covers two and four groups', async t => {
         await assert.rejects(coordinator.openNext(parentCode, 'B', operator), { code: 'group-stage-order' });
         await assert.rejects(db.runTransaction(tx => coordinator.readSettlement(tx, parentCode)),
           { code: 'group-stage-incomplete' });
+        await assert.rejects(command({ auth: { uid: operator },
+          data: { action: 'settlement-preview', parentCode } }), { code: 'group-stage-incomplete' });
 
         const lateCheckIn = JSON.parse(parentData.data);
         lateCheckIn.players.at(-1).checkedIn = true;
@@ -221,7 +224,20 @@ test('group-stage rehearsal covers two and four groups', async t => {
         assert.equal(input.topEight.length, groupCount * 2);
         assert.equal((await childRooms.get()).size, steps.length);
         assert.equal(input.participants.filter(player => player.placement === groupCount * 2 + 1).length, groupCount * 2);
-        assert.equal((await db.collection('ladderTransactions').get()).size, 0);
+        assert.equal((await db.collection('ladderTransactions').where('eventCode', '==', parentCode).get()).size, 0);
+        const preview = await command({ auth: { uid: operator },
+          data: { action: 'settlement-preview', parentCode } });
+        assert.equal(preview.eventCode, parentCode);
+        assert.equal(preview.eligibleCount, eligibleCount);
+        assert.equal(preview.effectiveCount, eligibleCount);
+        assert.equal(preview.matchCount, input.matches.length);
+        assert.equal(Object.values(preview.placements).reduce((a, b) => a + b, 0), eligibleCount);
+        assert.equal(preview.pointsTotal, input.participants.reduce((a, p) => a + p.pointsEarned, 0));
+        assert.equal(preview.previewOnly, true);
+        assert(!JSON.stringify(preview).includes('user-'));
+        await assert.rejects(command({ auth: { uid: 'outside' },
+          data: { action: 'settlement-preview', parentCode } }), { code: 'group-permission-denied' });
+        assert.equal((await db.collection('ladderTransactions').where('eventCode', '==', parentCode).get()).size, 0);
         t.diagnostic(JSON.stringify({
           eligibleCount,
           groupSizes: expectedSizes,
@@ -237,6 +253,42 @@ test('group-stage rehearsal covers two and four groups', async t => {
         await parent.update({ data: JSON.stringify({ ...JSON.parse(parentData.data), players: players.slice(1) }) });
         await assert.rejects(db.runTransaction(tx => coordinator.readSettlement(tx, parentCode)),
           { code: 'group-parent-roster-changed' });
+        await parent.set(parentData);
+        if (eligibleCount === 384) {
+          const mirror = db.doc('publicTournaments/' + parentCode);
+          await mirror.set({ bracketView: '{invalid' });
+          await db.doc('ladderSystem/current').set({ status: 'active', currentSeason: 'S1' });
+          const settle = createGroupSettlement(db, coordinator, {
+            clock: () => 1000, serverTimestamp: () => 1000,
+          });
+          await assert.rejects(settle(parentCode, 'outside'), { code: 'group-permission-denied' });
+          await assert.rejects(settle(parentCode, operator), { code: 'group-public-view-invalid' });
+          assert.equal((await db.collection('ladderTransactions').where('eventCode', '==', parentCode).get()).size, 0);
+          assert.equal((await db.collection('ladderPlayers').get()).size, 0);
+          assert.equal((await parent.get()).data().ladderPointsAwarded, undefined);
+          await mirror.set({ bracketView: JSON.stringify({ status: 'ready' }) });
+          const [awarded, repeated] = await Promise.all([
+            settle(parentCode, operator), settle(parentCode, operator),
+          ]);
+          assert.equal(awarded.ok, true);
+          assert.equal(awarded.effectiveCount, 384);
+          assert.equal(awarded.creditedCount, 384);
+          assert.equal((await db.collection('ladderTransactions').where('eventCode', '==', parentCode).get()).size, 384);
+          assert.equal((await db.collection('ladderPlayers').get()).size, 384);
+          const champion = input.participants.find(row => row.placement === 1);
+          const championUid = champion.player.registrationUid;
+          const ledger = (await db.doc('ladderTransactions/' + parentCode + '_' + championUid).get()).data();
+          assert.equal(ledger.pointsEarned, champion.pointsEarned);
+          assert.equal(ledger.eventCode, parentCode);
+          assert.equal((await db.doc('ladderPlayers/' + championUid).get()).data().seasonPoints, champion.pointsEarned);
+          assert.equal((await db.doc('groupStagePlans/' + parentCode).get()).data().settlement.creditedCount, 384);
+          assert.equal((await parent.get()).data().archiveStatus, 'completed');
+          assert.equal(JSON.parse((await mirror.get()).data().bracketView).archiveStatus, 'completed');
+          assert.equal(awarded.alreadyAwarded || repeated.alreadyAwarded, true);
+          const replay = await settle(parentCode, operator);
+          assert.equal(replay.alreadyAwarded, true);
+          assert.equal((await db.collection('ladderTransactions').where('eventCode', '==', parentCode).get()).size, 384);
+        }
       });
     }
   } finally {
@@ -340,8 +392,10 @@ test('private general-room rehearsal collects a 320-player event without a ladde
     assert.equal(status.completed.length, 6);
     await assert.rejects(db.runTransaction(tx => coordinator.readSettlement(tx, parentCode)),
       { code: 'group-rehearsal-no-ladder' });
+    await assert.rejects(coordinator.previewSettlement(parentCode, operator),
+      { code: 'group-rehearsal-no-ladder' });
     assert.deepEqual((await parent.get()).data(), parentData);
-    assert.equal((await db.collection('ladderTransactions').get()).size, 0);
+    assert.equal((await db.collection('ladderTransactions').where('eventCode', '==', parentCode).get()).size, 0);
   } finally {
     await deleteApp(app);
   }
@@ -408,7 +462,7 @@ test('one server transaction pre-draws four 80-player child rooms', async () => 
     const chosen = await coordinator.openNext(parentCode, 'champions', operator);
     assert.equal(chosen.current.key, 'champions');
     assert.equal(chosen.current.drawPending, true);
-    assert.equal((await db.collection('ladderTransactions').get()).size, 0);
+    assert.equal((await db.collection('ladderTransactions').where('eventCode', '==', parentCode).get()).size, 0);
   } finally {
     await deleteApp(app);
   }
