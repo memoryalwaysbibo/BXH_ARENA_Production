@@ -12,10 +12,15 @@ then update time descending, with a stable code tie-breaker.
 
 `listManagementTournamentSummaries` is an independent read-only callable codebase.
 It checks the current user, organization/contract or effective activity-staff
-invitation inside a Firestore read-only transaction. It uses Firestore `select()`
-to read only a field allowlist; it never fetches runtime `data`, `bracketView`,
-registration subcollections, matches or scores. It returns five sanitized display
-rows, counts and a query-scoped cursor. It never writes, repairs or grants access.
+invitation inside a Firestore read-only transaction. Scope-wide search uses
+Firestore `select()` with a metadata allowlist. After pagination, one masked
+read fetches the runtime field for the individual rooms on that page only.
+The response uses the size of each room's confirmed player list as the
+displayed count, including manually added players. Team cards keep their
+registration count in teams, and missing or malformed legacy rosters fall back
+to the registration counter. Runtime data, player details and registration
+documents are never returned. The callable returns five sanitized display
+rows, counts and a query-scoped cursor and never writes, repairs or grants access.
 Opening a room or explicitly expanding its roster continues to use the existing
 authorized detail APIs.
 
