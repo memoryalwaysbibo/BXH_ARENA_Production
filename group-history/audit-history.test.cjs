@@ -80,17 +80,22 @@ for (const mutation of [{ active: false }, { deleted: true }, { accountStatus: '
   await assert.rejects(f.read(parentCode, 'user-0'), { code: 'group-permission-denied' });
 });
 
-test('independent audit: undrawn/predrawn but unopened stages reveal no details and are never fetched', async () => {
+test('independent audit: locked group draws reveal opponents, but unseeded playoffs remain private', async () => {
   const f = fixture({ complete: false }); f.plan.groupDrawAll = true;
   const result = await f.read(parentCode, 'user-0');
   assert.equal(result.stages[0].status, 'in-progress');
-  for (const stage of result.stages.slice(1)) {
+  for (const stage of result.stages.slice(1, 4)) {
+    assert.equal(stage.status, 'scheduled'); assert(stage.players.length); assert(stage.matches.length);
+    assert.equal(f.reads.includes('tournaments/' + f.plan.roomCodes[stage.key]), true);
+  }
+  for (const stage of result.stages.slice(4)) {
     assert.equal(stage.status, 'unpublished'); assert.deepEqual(stage.players, []); assert.deepEqual(stage.matches, []);
     assert.equal(f.reads.includes('tournaments/' + f.plan.roomCodes[stage.key]), false);
   }
+  assert.deepEqual(result.assignedGroups, [Object.keys(f.plan.event.groups).find(key => f.plan.event.groups[key]
+    .some(player => player.registrationUid === 'user-0'))]);
   f.plan.active.drawPending = true;
-  const hidden = await f.read(parentCode, 'user-0');
-  assert(hidden.stages.every(stage => stage.status === 'unpublished'));
+  await assert.rejects(f.read(parentCode, 'user-0'), { code: 'group-stage-source' });
 });
 
 test('independent audit: guardian receives both stable child identities and no namesake identity', async () => {

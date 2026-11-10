@@ -37,22 +37,30 @@ test('authenticated history returns six safe trees and only viewer matches, with
   assert(item.db.reads.every(target => !target.startsWith('publicTournaments/') && !target.startsWith('ladderTransactions/')));
 });
 
-test('pre-drawn future groups are hidden and not read even for admins', async () => {
+test('one draw publishes all group brackets and the viewer assignment before each child opens', async () => {
   const item = await fixture();
   for (const uid of ['user-0', 'operator']) {
     item.db.reads.length = 0;
     const result = await createHistoryReader(item.db)(item.parentCode, uid);
     assert.equal(result.stages[0].status, 'ready');
-    assert(result.stages.slice(1).every(stage => stage.status === 'unpublished' && !stage.matches.length && !stage.players.length));
-    for (const key of ['B', 'C', 'D']) assert(!item.db.reads.includes('tournaments/' + item.plan().roomCodes[key]));
+    assert(result.stages.slice(1, 4).every(stage => stage.status === 'scheduled' && stage.matches.length && stage.players.length));
+    assert(result.stages.slice(4).every(stage => stage.status === 'unpublished' && !stage.matches.length));
+    for (const key of ['B', 'C', 'D']) assert(item.db.reads.includes('tournaments/' + item.plan().roomCodes[key]));
+    const ownKey = Object.keys(item.plan().event.groups).find(key => item.plan().event.groups[key]
+      .some(player => player.registrationUid === uid));
+    assert.deepEqual(result.assignedGroups, ownKey ? [ownKey] : []);
   }
+  const bPlayer = item.players.find(player => item.plan().event.groups.B.some(row => row.id === player.id));
+  const bResult = await createHistoryReader(item.db)(item.parentCode, bPlayer.registrationUid);
+  assert.deepEqual(bResult.assignedGroups, ['B']);
+  assert.equal(bResult.stages[1].status, 'scheduled');
 });
 
-test('explicit drawPending false and matching active key are required', async () => {
+test('draw-all plan rejects an inconsistent pending active stage and mismatched room', async () => {
   const item = await fixture();
   for (const drawPending of [true, undefined]) {
     item.plan().active.drawPending = drawPending;
-    assert((await read(item)).stages.every(stage => stage.status === 'unpublished'));
+    await assert.rejects(read(item), { code: 'group-stage-source' });
   }
   item.plan().active = { key: 'A', code: item.plan().roomCodes.B, drawPending: false };
   await assert.rejects(read(item), { code: 'group-stage-source' });

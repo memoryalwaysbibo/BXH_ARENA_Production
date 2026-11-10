@@ -70,6 +70,24 @@ test('unknown scores remain dashes, zero is displayed only when actually provide
   data.ownMatches[0].scoreA = undefined; data.ownMatches[0].scoreB = null;
   assert.ok(view.ownHistory(data).includes('比分 —：—'));
 });
+test('player sees locked group and upcoming opponents without premature zero scores', () => {
+  const data = fixture();
+  data.assignedGroups = ['B'];
+  data.stages[1].status = 'scheduled';
+  data.stages[1].matches[0].completed = false;
+  data.stages[1].matches[0].scoreA = 0;
+  data.stages[1].matches[0].scoreB = 0;
+  data.ownMatches = [{ ...data.stages[1].matches[0], stageKey: 'B' }];
+  const html = view.previews(data, 'B');
+  assert.ok(html.includes('你的抽籤組別'));
+  assert.ok(html.includes('B 組'));
+  assert.ok(html.includes('已抽籤 · 待開賽'));
+  assert.ok(html.includes('&lt;本人&gt;'));
+  assert.equal((html.match(/<b>—<\/b>/g) || []).length, 2);
+  const own = view.ownHistory(data);
+  assert.ok(own.includes('你的抽籤組別'));
+  assert.ok(own.includes('比分 —：—'));
+});
 test('authoritative core identity reset wipes retained group DOM and unbinds scheduler before next render', () => {
   const core = fs.readFileSync('modules/main-app/core.js', 'utf8');
   const start = core.indexOf('function syncEngagementIdentity('), end = core.indexOf('\n}', start) + 2;
