@@ -27,8 +27,9 @@
         (Number.isFinite(score) ? esc(score) : '—') + '</b></div>';
     };
     const result = match.isBye ? '輪空' : match.completed ? (match.forfeit ? '棄權判定' : '已完成') : '尚未完成';
-    return '<article class="group-history-match">' + side(match.a, match.scoreA) + side(match.b, match.scoreB) +
-      '<small class="hint">' + result + '</small></article>';
+    return '<article class="group-history-match' + (match.completed ? ' is-complete' : '') + '" data-index="' +
+      esc(match.indexInRound ?? 0) + '" data-bye="' + !!match.isBye + '"><div class="group-history-match-meta">' +
+      result + '</div>' + side(match.a, match.scoreA) + side(match.b, match.scoreB) + '</article>';
   }
   function tree(data, key) {
     const stage = stageFor(data, key);
@@ -47,22 +48,23 @@
     }
     const ownIds = new Set(list(data.ownPlayerIds));
     return (stage.needsReview ? '<p class="hint" role="status">此階段資料尚待核對，暫不據此確認名次。</p>' : '') +
-      '<div class="group-history-tree" tabindex="0" aria-label="' + esc(stageLabel(data, key)) + '對戰樹，可左右捲動">' +
+      '<p class="group-history-scroll-hint">← 左右滑動查看各輪 →</p><div class="group-history-tree" tabindex="0" aria-label="' + esc(stageLabel(data, key)) + '對戰樹，可左右捲動">' +
       [...rounds.values()].sort((a, b) => (a.bracket === b.bracket ? 0 : a.bracket === 'main' ? -1 : 1) || a.round - b.round).map(round =>
-        '<section class="group-history-round"><h4>' + (round.bracket === 'bronze' ? '季軍賽' : '第 ' + (round.round + 1) + ' 輪') +
+        '<section class="group-history-round" data-round="' + round.round + '" data-bracket="' + round.bracket + '"><h4>' + (round.bracket === 'bronze' ? '季軍賽' : round.matches.length === 1 ? '冠亞' : '第 ' + (round.round + 1) + ' 輪') +
         '</h4><div class="group-history-round-matches">' + round.matches.sort((a, b) => (a.indexInRound || 0) - (b.indexInRound || 0))
-          .map(match => matchCard(match, stage.players, ownIds)).join('') + '</div></section>').join('') + '</div>';
+          .filter(match => !match.isBye).map(match => matchCard(match, stage.players, ownIds)).join('') + '</div></section>').join('') + '</div>';
   }
   function previews(data, selected = 'A') {
     if (!keys.includes(selected)) selected = 'A';
-    return '<p class="hint">舊版回收紀錄未保存比分快照，本頁比分為目前伺服器資料；回收結果不一致時暫停顯示並標示待核對。</p><div class="group-history-tabs" role="tablist" aria-label="選擇分組對戰表">' + keys.map(key => {
+    return '<div class="group-history-tabs" role="tablist" aria-label="選擇分組對戰表">' + keys.map(key => {
       const stage = stageFor(data, key);
       return '<button type="button" class="btn ' + (selected === key ? 'btn-primary' : 'btn-ghost') + '" role="tab"' +
         ' id="group-history-tab-' + key + '" aria-selected="' + (selected === key) + '" aria-controls="group-history-tree-panel"' +
         ' tabindex="' + (selected === key ? '0' : '-1') + '" data-group-history-stage="' + key + '"><strong>' +
         esc(stageLabel(data, key)) + '</strong><small>' + esc(statuses[stage?.status] || '尚未公布') + '</small></button>';
     }).join('') + '</div><section id="group-history-tree-panel" role="tabpanel" aria-labelledby="group-history-tab-' + selected +
-      '"><h3>' + esc(stageLabel(data, selected)) + '</h3>' + tree(data, selected) + '</section>';
+      '"><div class="group-history-board-heading"><span>對戰表</span><h3>' + esc(stageLabel(data, selected)) + '</h3></div>' + tree(data, selected) + '</section>' +
+      '<details class="group-history-disclaimer"><summary>比分資料說明</summary><p>舊版回收紀錄未保存比分快照，本頁比分為目前伺服器資料；回收結果不一致時暫停顯示並標示待核對。</p></details>';
   }
   function ownHistory(data) {
     const ids = new Set(list(data?.ownPlayerIds).filter(id => typeof id === 'string' && id));

@@ -25,7 +25,75 @@
   }
   function resetSession() { const old = active; active = null; clear(old); }
   function suspendSession(uid, epoch) { suspendedSession = { uid, epoch }; resetSession(); }
-  function paint(model) { if (current(model)) model.node.innerHTML = view().content(model); }
+  function layoutTree(model) {
+    if (!current(model) || model.mode !== 'preview') return;
+    const tree = model.node.querySelector('.group-history-tree');
+    if (!tree) return;
+    tree.querySelector('.group-history-lines')?.remove();
+    const columns = [...tree.querySelectorAll('.group-history-round[data-bracket="main"]')];
+    if (!columns.length) return;
+    const cards = columns.map(col => new Map([...col.querySelectorAll('.group-history-match')]
+      .map(card => [Number(card.dataset.index), card])));
+    const anchor = cards.reduce((best, map, index) => map.size > cards[best].size ? index : best, 0);
+    const positions = cards.map(() => new Map());
+    const rowHeight = Math.max(65, ...cards.flatMap(map => [...map.values()].map(card => card.offsetHeight))) + 10;
+    let cursor = 0;
+    for (const [index, card] of cards[anchor]) { positions[anchor].set(index, cursor + card.offsetHeight / 2); cursor += rowHeight; }
+    for (let round = anchor + 1; round < cards.length; round++) {
+      for (const [index, card] of cards[round]) {
+        const a = positions[round - 1].get(index * 2), b = positions[round - 1].get(index * 2 + 1);
+        positions[round].set(index, a != null && b != null ? (a + b) / 2 : (a ?? b ?? card.offsetHeight / 2));
+      }
+    }
+    for (let round = anchor - 1; round >= 0; round--) {
+      for (const [index, card] of cards[round]) {
+        const sibling = cards[round].has(index ^ 1);
+        const target = positions[round + 1].get(Math.floor(index / 2));
+        positions[round].set(index, (target ?? card.offsetHeight / 2) + (sibling ? (index % 2 ? rowHeight / 2 : -rowHeight / 2) : 0));
+      }
+    }
+    let height = 0;
+    cards.forEach((map, round) => {
+      const holder = columns[round].querySelector('.group-history-round-matches');
+      let previous = 0;
+      for (const [index, card] of map) {
+        const top = Math.max(previous, (positions[round].get(index) || 0) - card.offsetHeight / 2);
+        card.style.position = 'absolute'; card.style.top = top + 'px'; card.style.left = '0'; card.style.right = '0';
+        positions[round].set(index, top + card.offsetHeight / 2);
+        previous = top + card.offsetHeight + 5;
+      }
+      height = Math.max(height, previous);
+      holder.style.minHeight = Math.ceil(Math.max(height, rowHeight)) + 'px';
+    });
+    columns.forEach(col => { col.querySelector('.group-history-round-matches').style.minHeight = Math.ceil(height) + 'px'; });
+    // Lines only connect real matches. Hidden BYEs cannot create phantom branches.
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('group-history-lines');
+    svg.setAttribute('aria-hidden', 'true');
+    tree.appendChild(svg);
+    const origin = tree.getBoundingClientRect();
+    const x = card => card.getBoundingClientRect().right - origin.left + tree.scrollLeft;
+    const y = card => card.getBoundingClientRect().top - origin.top + card.offsetHeight / 2;
+    for (let round = 1; round < cards.length; round++) {
+      for (const [index, target] of cards[round]) {
+        const sources = [cards[round - 1].get(index * 2), cards[round - 1].get(index * 2 + 1)].filter(Boolean);
+        for (const source of sources) {
+          const start = x(source), end = target.getBoundingClientRect().left - origin.left + tree.scrollLeft;
+          const mid = (start + end) / 2;
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', `M ${start} ${y(source)} H ${mid} V ${y(target)} H ${end}`);
+          svg.appendChild(path);
+        }
+      }
+    }
+    svg.setAttribute('width', String(tree.scrollWidth)); svg.setAttribute('height', String(tree.scrollHeight));
+  }
+  function paint(model) {
+    if (!current(model)) return;
+    model.node.innerHTML = view().content(model);
+    if (model.mode === 'preview' && typeof root.requestAnimationFrame === 'function')
+      root.requestAnimationFrame(() => { if (current(model)) layoutTree(model); });
+  }
   function errorText(error) {
     const code = String(error?.code || '') + ' ' + String(error?.message || '');
     if (/permission-denied|unauthenticated|auth-required/.test(code)) return '請確認登入帳號及此賽事的查閱權限。';

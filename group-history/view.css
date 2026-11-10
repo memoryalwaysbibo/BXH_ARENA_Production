@@ -1,21 +1,29 @@
-.group-history{min-width:0;max-width:100%;overflow:hidden}
-.group-history-tabs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin:16px 0}
-.group-history-tabs button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;white-space:normal;min-height:72px;padding:10px 6px}
-.group-history-tabs small{font-size:11px;opacity:.8}
-.group-history-placeholder{padding:32px 12px;text-align:center;border:1px dashed var(--border,#555);border-radius:12px;color:var(--muted,#aaa)}
-.group-history-tree{display:flex;gap:28px;max-width:100%;overflow-x:auto;padding:4px 12px 20px 0;overscroll-behavior-x:contain}
-.group-history-round{display:flex;flex-direction:column;flex:0 0 220px;min-width:0}
-.group-history-round h4{margin:8px 0 16px;text-align:center}
-.group-history-round-matches{display:flex;flex:1;flex-direction:column;justify-content:space-around;gap:18px}
-.group-history-match{position:relative;padding:10px;border:1px solid var(--border,#555);border-radius:10px;background:var(--panel-2,#1d2028)}
-.group-history-round:not(:last-child) .group-history-match:after{content:"";position:absolute;width:28px;right:-29px;top:50%;border-top:1px solid var(--border,#555)}
-.group-history-side{display:flex;justify-content:space-between;gap:8px;padding:7px 0;overflow-wrap:anywhere}
-.group-history-side>span{min-width:0}.group-history-side>b{flex-shrink:0}
-.group-history-side small{font-size:11px;margin-left:6px}.group-history-side.is-own{color:var(--gold,#e5c479)}
-.group-history-side.is-winner{font-weight:800}.group-history-side+.group-history-side{border-top:1px solid var(--border,#555)}
+.group-history{min-width:0;max-width:100%;overflow:hidden;background:#111216!important;border-color:#4c3c23!important;color:#f4f1e9}
+.group-history>.panel-title{font-size:18px;letter-spacing:.06em;color:#e7c473}
+.group-history>h3{font-size:17px;margin:8px 0 14px;line-height:1.4}
+.group-history-tabs{display:flex;gap:7px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;padding:3px 2px 12px;margin:4px 0 8px;scrollbar-width:thin}
+.group-history-tabs button{flex:0 0 auto;scroll-snap-align:start;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:76px;min-height:52px;padding:7px 12px;border:1px solid #3f4148;border-radius:8px;background:#1b1c21;color:#c5c6c8;box-shadow:none;white-space:nowrap;font-size:13px}
+.group-history-tabs button:nth-last-child(-n+2){min-width:112px}
+.group-history-tabs button[aria-selected=true]{background:#3a301d;color:#f5d68c;border-color:#d8b461;box-shadow:inset 0 0 0 1px #6a542b}
+.group-history-tabs button strong{font-size:13px}.group-history-tabs small{font-size:10px;font-weight:400;opacity:.78}
+.group-history-board-heading{display:flex;align-items:baseline;gap:10px;border-bottom:1px solid #50452f;padding:7px 0 10px}
+.group-history-board-heading span{font-size:11px;letter-spacing:.2em;color:#b99d64}.group-history-board-heading h3{margin:0;font-size:19px;color:#f2da9c}
+.group-history-scroll-hint{font-size:11px;color:#aaa;letter-spacing:.08em;margin:10px 0}
+.group-history-placeholder{padding:32px 12px;text-align:center;border:1px dashed #555;border-radius:8px;color:#aaa}
+.group-history-tree{position:relative;display:flex;gap:18px;max-width:100%;overflow-x:auto;overflow-y:hidden;padding:3px 4px 16px 1px;overscroll-behavior-x:contain;background:#111216;scrollbar-width:thin}
+.group-history-round{display:flex;flex-direction:column;flex:0 0 176px;min-width:0}
+.group-history-round h4{margin:0 0 11px;padding:8px 0;text-align:center;font-size:12px;color:#d8bd78;letter-spacing:.1em;border-bottom:1px solid #51472e}
+.group-history-round-matches{position:relative;display:flex;flex:1;flex-direction:column;justify-content:space-around;gap:12px}
+.group-history-match{position:relative;flex:none;min-width:0;overflow:visible;border:1px solid #353940;border-radius:4px;background:#1b1e23;color:#e5e7eb}
+.group-history-match.is-complete{border-color:#645437}
+.group-history-lines{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}.group-history-lines path{fill:none;stroke:#7d7767;stroke-width:1}
+.group-history-match-meta{padding:3px 7px;background:#24272d;color:#aeb2ba;font-size:9px;line-height:1.2}
+.group-history-side{display:flex;align-items:center;justify-content:space-between;gap:5px;min-height:24px;padding:3px 7px;font-size:11px;line-height:1.25}
+.group-history-side+.group-history-side{border-top:1px solid #30343b}
+.group-history-side>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.group-history-side>b{flex-shrink:0;min-width:20px;text-align:center;padding-left:5px;border-left:1px solid #363a42;font-variant-numeric:tabular-nums}
+.group-history-side small{display:block;font-size:9px;color:#d4b976}.group-history-side.is-own{background:#282619}.group-history-side.is-winner{color:#f4d078;font-weight:800}
+.group-history-disclaimer{margin-top:13px;color:#aeb0b7;font-size:11px}.group-history-disclaimer summary{cursor:pointer}.group-history-disclaimer p{line-height:1.5}
 .group-history-search{display:flex;gap:8px;margin:8px 0 12px}.group-history-search input{min-width:0;flex:1}
-.group-history-own{padding:14px 0;border-top:1px solid var(--border,#555)}
-.group-history-own ol{margin:0;padding-left:22px}.group-history-own li{padding:8px 0;overflow-wrap:anywhere}
-.group-history-own li span{display:block;font-size:13px;color:var(--muted,#aaa);margin-top:3px}
-.group-history [role=tab]:focus-visible,.group-history-tree:focus-visible{outline:2px solid var(--gold,#e5c479);outline-offset:2px}
-@media(max-width:650px){.group-history-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}.group-history-round{flex-basis:190px}.group-history{padding:14px}}
+.group-history-own{padding:14px 0;border-top:1px solid #555}.group-history-own ol{margin:0;padding-left:22px}.group-history-own li{padding:8px 0;overflow-wrap:anywhere}.group-history-own li span{display:block;font-size:13px;color:#aaa;margin-top:3px}
+.group-history [role=tab]:focus-visible,.group-history-tree:focus-visible{outline:2px solid #e5c479;outline-offset:2px}
+@media(max-width:650px){.group-history{padding:12px!important}.group-history-round{flex-basis:154px}.group-history-tree{gap:15px}}
