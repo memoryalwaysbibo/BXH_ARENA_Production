@@ -232,7 +232,7 @@ test('group-stage rehearsal covers two and four groups', async t => {
         assert.equal(preview.matchCount, input.matches.length);
         assert.equal(Object.values(preview.placements).reduce((a, b) => a + b, 0), eligibleCount);
         assert.equal(preview.pointsTotal, input.participants.reduce((a, p) => a + p.pointsEarned, 0));
-        assert.equal(preview.credited, false);
+        assert.equal(preview.previewOnly, true);
         assert(!JSON.stringify(preview).includes('user-'));
         await assert.rejects(command({ auth: { uid: 'outside' },
           data: { action: 'settlement-preview', parentCode } }), { code: 'group-permission-denied' });

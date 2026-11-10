@@ -468,7 +468,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
           matchCount: input.matches.length,
           placements,
           pointsTotal: input.participants.reduce((sum, row) => sum + row.pointsEarned, 0),
-          credited: false,
+          previewOnly: true,
         };
       }, { readOnly: true });
     },
