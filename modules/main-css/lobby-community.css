@@ -995,11 +995,15 @@ body .celebration-overlay{z-index:3000!important;}
     white-space:normal;
   }
   .community-settings-grid:not(.community-settings-pair){grid-template-columns:minmax(0,1fr)}
+  main:has(>.community-settings){
+    padding-bottom:calc(52px + max(8px,env(safe-area-inset-bottom)));
+  }
   .community-settings-save{
-    position:sticky;
+    position:fixed;
+    inset-inline:0;
     bottom:0;
     z-index:4;
-    padding:8px 0 max(8px,env(safe-area-inset-bottom));
+    padding:8px 16px max(8px,env(safe-area-inset-bottom));
     background:var(--panel-2);
   }
   .community-settings-save>.btn{width:100%;min-height:44px}

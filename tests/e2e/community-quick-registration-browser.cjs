@@ -108,9 +108,20 @@ const styles=['core-competition','auth-player','player-center-hunter','lobby-com
    });
    assert.equal(bounds,true,'Native date and time fields must stay inside the settings card');
    if(size.width<=640){
-     await page.evaluate(()=>window.scrollTo(0,0));
-     const saveBounds=await page.locator('.community-settings-save').boundingBox();
-     assert(saveBounds&&saveBounds.y>=0&&saveBounds.y+saveBounds.height<=size.height+1,'Save must remain visible while viewing expanded mobile settings');
+     const saveButton=page.locator('[data-action="community-save-settings"]');
+     for(const scrollToBottom of [false,true]){
+       await page.evaluate(bottom=>window.scrollTo(0,bottom?document.documentElement.scrollHeight:0),scrollToBottom);
+       const reachable=await saveButton.evaluate(button=>{
+         const rect=button.getBoundingClientRect();
+         return rect.top>=0&&rect.bottom<=innerHeight+1&&
+           button.contains(document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2));
+       });
+       assert(reachable,'Save must stay visible and tappable when scrolling expanded mobile settings');
+     }
+     const accessBounds=await page.locator('#community-settings-access').boundingBox();
+     const saveBarBounds=await page.locator('.community-settings-save').boundingBox();
+     assert(accessBounds&&saveBarBounds&&accessBounds.y+accessBounds.height<=saveBarBounds.y,
+       'The last settings section must scroll clear of the save bar');
    }
    // Settings fields survive background renders, including invalid native input.
    await page.locator('#cset-name').fill('尚未儲存的房間名稱');
@@ -130,7 +141,7 @@ const styles=['core-competition','auth-player','player-center-hunter','lobby-com
    if(size.name==='narrow-mobile'){
      assert.deepEqual(errors,[]);
      await page.screenshot({path:path.join(output,size.name+'-settings.png'),animations:'disabled'});
-     checks.push(size.name+': overview, native input bounds, sticky save, and settings draft PASS');
+     checks.push(size.name+': overview, native input bounds, fixed save, and settings draft PASS');
      continue;
    }
    await page.getByRole('button',{name:'儲存一般賽事設定',exact:true}).click();
