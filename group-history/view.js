@@ -2,8 +2,8 @@
   'use strict';
   const keys = ['A', 'B', 'C', 'D', 'runners-up', 'champions'];
   const labels = { A: 'A 組', B: 'B 組', C: 'C 組', D: 'D 組', 'runners-up': '第 5～8 名', champions: '第 1～4 名' };
-  const statuses = { unpublished: '尚未公布', 'not-applicable': '本場不適用', ready: '已公布', 'in-progress': '進行中', completed: '已完成', 'needs-review': '資料待核對' };
-  const published = stage => stage && ['ready', 'in-progress', 'completed', 'needs-review'].includes(stage.status);
+  const statuses = { unpublished: '尚未公布', 'not-applicable': '本場不適用', scheduled: '已抽籤 · 待開賽', ready: '已公布', 'in-progress': '進行中', completed: '已完成', 'needs-review': '資料待核對' };
+  const published = stage => stage && ['scheduled', 'ready', 'in-progress', 'completed', 'needs-review'].includes(stage.status);
   const verifiedStage = stage => published(stage) && stage.needsReview !== true && stage.status !== 'needs-review';
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const codeValid = code => /^BXH-[A-Z0-9]{6}$/.test(code || '');
@@ -16,7 +16,7 @@
       (mode === 'own' ? 'own' : 'preview') + '" data-code="' + esc(code || '') + '" data-auto="' + (auto ? 'true' : 'false') +
       '" aria-label="' + (mode === 'own' ? '我的分組賽紀錄' : '分組賽對戰表') + '"></section>';
   }
-  function matchCard(match, players, ownIds) {
+  function matchCard(match, players, ownIds, stageStatus) {
     const names = new Map(list(players).map(player => [player.id, player.name]));
     const side = (entry, score) => {
       const id = entry?.playerId;
@@ -24,7 +24,7 @@
       const winner = !!id && match.completed && match.winnerId === id;
       return '<div class="group-history-side' + (winner ? ' is-winner' : '') + (ownIds.has(id) ? ' is-own' : '') + '"><span>' +
         esc(name) + (ownIds.has(id) ? '<small>本人／代報名</small>' : '') + '</span><b>' +
-        (Number.isFinite(score) ? esc(score) : '—') + '</b></div>';
+        (stageStatus !== 'scheduled' && stageStatus !== 'ready' && Number.isFinite(score) ? esc(score) : '—') + '</b></div>';
     };
     const result = match.isBye ? '輪空' : match.completed ? (match.forfeit ? '棄權判定' : '已完成') : '尚未完成';
     return '<article class="group-history-match' + (match.completed ? ' is-complete' : '') + '" data-index="' +
@@ -52,11 +52,14 @@
       [...rounds.values()].sort((a, b) => (a.bracket === b.bracket ? 0 : a.bracket === 'main' ? -1 : 1) || a.round - b.round).map(round =>
         '<section class="group-history-round" data-round="' + round.round + '" data-bracket="' + round.bracket + '"><h4>' + (round.bracket === 'bronze' ? '季軍賽' : round.matches.length === 1 ? '冠亞' : '第 ' + (round.round + 1) + ' 輪') +
         '</h4><div class="group-history-round-matches">' + round.matches.sort((a, b) => (a.indexInRound || 0) - (b.indexInRound || 0))
-          .filter(match => !match.isBye).map(match => matchCard(match, stage.players, ownIds)).join('') + '</div></section>').join('') + '</div>';
+          .filter(match => !match.isBye).map(match => matchCard(match, stage.players, ownIds, stage.status)).join('') + '</div></section>').join('') + '</div>';
   }
   function previews(data, selected = 'A') {
     if (!keys.includes(selected)) selected = 'A';
-    return '<div class="group-history-tabs" role="tablist" aria-label="選擇分組對戰表">' + keys.map(key => {
+    const assigned = list(data?.assignedGroups).filter(key => ['A', 'B', 'C', 'D'].includes(key));
+    const assignment = assigned.length ? '<div class="group-history-assignment" role="status"><span>你的抽籤組別</span><strong>' +
+      assigned.map(key => esc(stageLabel(data, key))).join('、') + '</strong><small>可先查看對位；開賽及裁判台依主辦安排。</small></div>' : '';
+    return assignment + '<div class="group-history-tabs" role="tablist" aria-label="選擇分組對戰表">' + keys.map(key => {
       const stage = stageFor(data, key);
       return '<button type="button" class="btn ' + (selected === key ? 'btn-primary' : 'btn-ghost') + '" role="tab"' +
         ' id="group-history-tab-' + key + '" aria-selected="' + (selected === key) + '" aria-controls="group-history-tree-panel"' +
@@ -82,12 +85,16 @@
           const opponentId = match.a?.playerId === id ? match.b?.playerId : match.a?.playerId;
           const opponent = list(stage.players).find(player => player.id === opponentId)?.name || '待定';
           const outcome = match.isBye ? '輪空' : !match.completed ? '尚未完成' : match.winnerId === id ? '勝' : match.loserId === id ? '敗' : '結果待核對';
+          const scoreVisible = stage.status !== 'scheduled' && stage.status !== 'ready';
           return '<li><strong>' + esc(stageLabel(data, match.stageKey)) + ' · ' + (match.bracket === 'BZ' ? '季軍賽' : '第 ' + ((Number(match.round) || 0) + 1) + ' 輪') + ' · ' + outcome +
             '</strong><span>' + (match.isBye ? '輪空不計勝敗' : '對手：' + esc(opponent)) + '</span><span>比分 ' +
-            (Number.isFinite(match.scoreA) ? esc(match.scoreA) : '—') + '：' + (Number.isFinite(match.scoreB) ? esc(match.scoreB) : '—') + '</span></li>';
+            (scoreVisible && Number.isFinite(match.scoreA) ? esc(match.scoreA) : '—') + '：' + (scoreVisible && Number.isFinite(match.scoreB) ? esc(match.scoreB) : '—') + '</span></li>';
         }).join('') + '</ol>' : '<p class="hint">尚無已公布的本人對戰。</p>') + '</article>';
     }).join('');
-    return '<p class="hint">積分尚未核對入帳；子房不另計天梯積分。舊版回收紀錄未保存比分快照，比分依目前伺服器資料顯示。</p>' + cards;
+    const assigned = list(data.assignedGroups).filter(key => ['A', 'B', 'C', 'D'].includes(key));
+    return (assigned.length ? '<div class="group-history-assignment" role="status"><span>你的抽籤組別</span><strong>' +
+      assigned.map(key => esc(stageLabel(data, key))).join('、') + '</strong><small>組別已確定；等待主辦依序開賽。</small></div>' : '') +
+      '<p class="hint">積分尚未核對入帳；子房不另計天梯積分。舊版回收紀錄未保存比分快照，比分依目前伺服器資料顯示。</p>' + cards;
   }
   function content(model) {
     const own = model.mode === 'own';

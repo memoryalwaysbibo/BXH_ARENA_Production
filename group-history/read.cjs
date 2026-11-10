@@ -261,6 +261,13 @@ function createHistoryReader(db) {
       check(!plan.parallel || rehearsal && Array.isArray(settings.parallelRehearsalParentCodes) &&
         settings.parallelRehearsalParentCodes.includes(parentCode), 'group-room-disabled');
       const count = Object.keys(plan.event.groups).length;
+      // A single draw locks all group opponents at once. Opening a child room
+      // controls scoring, not whether its already-drawn bracket can be seen.
+      if (plan.groupDrawAll === true) check(!plan.active || !GROUPS.includes(plan.active.key) ||
+        plan.active.drawPending === false,
+        'group-stage-source');
+      const assignedGroups = plan.groupDrawAll === true
+        ? GROUPS.filter(key => plan.event.groups[key]?.some(player => ownPlayerIds.includes(player.id))) : [];
       const stages = [], ownMatches = [];
       for (const key of STAGES) {
         const stage = { key, label: GROUPS.includes(key) ? key + ' 組' : key === 'champions'
@@ -269,7 +276,7 @@ function createHistoryReader(db) {
         if (GROUPS.includes(key) && !plan.event.groups[key]) { stage.status = 'not-applicable'; stages.push(stage); continue; }
         const collected = Object.hasOwn(plan.event.results, key);
         const published = collected || plan.active?.key === key && plan.active.drawPending === false ||
-          plan.parallel === true && plan.groupDrawAll === true && GROUPS.includes(key);
+          plan.groupDrawAll === true && GROUPS.includes(key);
         if (!published) { stages.push(stage); continue; }
         const code = plan.roomCodes[key];
         check(ROOM_CODE.test(code), 'group-stage-source');
@@ -301,7 +308,10 @@ function createHistoryReader(db) {
         const invalidScore = child.matches.some(match => ['scoreA', 'scoreB'].some(field =>
           match[field] != null && score(match[field]) === null));
         stage.needsReview = invalidScore || !outcomesConsistent(stage.matches) || !scoresConsistent(stage.matches) || collected && !verifyCollected(plan, key, child, stage.matches);
-        stage.status = stage.needsReview ? 'needs-review' : collected ? 'completed' : child.startedAt ? 'in-progress' : 'ready';
+        const waitingToOpen = plan.groupDrawAll === true && !plan.parallel && GROUPS.includes(key) &&
+          !collected && plan.active?.key !== key;
+        stage.status = stage.needsReview ? 'needs-review' : collected ? 'completed' :
+          waitingToOpen ? 'scheduled' : child.startedAt ? 'in-progress' : 'ready';
         for (const match of stage.matches) if (ownPlayerIds.includes(match.a?.playerId) || ownPlayerIds.includes(match.b?.playerId)) {
           ownMatches.push({ stageKey: key, ...match });
         }
@@ -310,7 +320,7 @@ function createHistoryReader(db) {
       const needsReview = stages.some(stage => stage.needsReview);
       return opaqueResponse({ parent: { code: parentCode, name: text(state.meta.name || parent.name),
         archiveStatus: ['completed', 'archived'].includes(state.archiveStatus) ? state.archiveStatus : 'ongoing', rehearsal },
-      stages, ownPlayerIds, ownMatches, placements: needsReview ? [] : placementsFor(plan, ownPlayerIds),
+      stages, ownPlayerIds, assignedGroups, ownMatches, placements: needsReview ? [] : placementsFor(plan, ownPlayerIds),
       points: null, pointsStatus: 'unverified', needsReview }, players, parentCode, plan.parentRoomId);
     }, { readOnly: true });
   };

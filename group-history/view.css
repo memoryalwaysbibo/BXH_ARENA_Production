@@ -1,6 +1,8 @@
 .group-history{min-width:0;max-width:100%;overflow:hidden;background:#111216!important;border-color:#4c3c23!important;color:#f4f1e9}
 .group-history>.panel-title{font-size:18px;letter-spacing:.06em;color:#e7c473}
 .group-history>h3{font-size:17px;margin:8px 0 14px;line-height:1.4}
+.group-history-assignment{display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 10px;padding:10px 12px;margin:6px 0 12px;border:1px solid #a9843b;border-radius:8px;background:#2b2418;color:#f4dfab}
+.group-history-assignment span{font-size:11px}.group-history-assignment strong{font-size:17px}.group-history-assignment small{width:100%;font-size:11px;color:#c6bda9}
 .group-history-tabs{display:flex;gap:7px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;padding:3px 2px 12px;margin:4px 0 8px;scrollbar-width:thin}
 .group-history-tabs button{flex:0 0 auto;scroll-snap-align:start;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:76px;min-height:52px;padding:7px 12px;border:1px solid #3f4148;border-radius:8px;background:#1b1c21;color:#c5c6c8;box-shadow:none;white-space:nowrap;font-size:13px}
 .group-history-tabs button:nth-last-child(-n+2){min-width:112px}
