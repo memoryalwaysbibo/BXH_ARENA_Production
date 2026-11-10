@@ -9,6 +9,9 @@ const root=path.join(__dirname,'../..'),cloud=fs.readFileSync(path.join(root,'mo
 function method(name){const start=cloud.indexOf('    async '+name+'('),end=cloud.indexOf('\n    },',start);assert(start>=0&&end>start);return cloud.slice(start,end+6).trim().replace(/,$/,'');}
 const chooser=family.slice(family.indexOf('async function chooseFamilyParticipant('),family.indexOf('// v13.40.0',family.indexOf('async function chooseFamilyParticipant(')));
 const helperStart=cloud.indexOf('  function runMyEventsPlayerOperation('),helperEnd=cloud.indexOf('\n  }',helperStart),helper=cloud.slice(helperStart,helperEnd+4);
+const routeStart=cloud.indexOf('  async function registrationFlowV2Enabled('),routeEnd=cloud.indexOf('\n  }',routeStart);
+assert(routeStart>=0&&routeEnd>routeStart);
+const route=cloud.slice(routeStart,routeEnd+4);
 function memory(){const data=new Map();return {get length(){return data.size;},key:i=>[...data.keys()][i],getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)};}
 const percentile=(a,p)=>a.slice().sort((x,y)=>x-y)[Math.min(a.length-1,Math.ceil(a.length*p)-1)]||0;
 const waveSizes=[50,100,150,320];
@@ -32,7 +35,7 @@ const report={scope:'Actual frontend self-registration functions + feedback cont
     if(payload.action==='submit'){traffic.submit++;if(++accepted===n)release();}
     return r;
    }});
-   vm.runInContext(chooser+'\n'+helper+'\nwindow.engagementService={'+method('familyRegistration')+'};api={'+method('joinTournamentAsPlayer')+'};',ctx);
+   vm.runInContext(chooser+'\n'+helper+'\n'+route+'\nwindow.engagementService={registrationFlowV2Enabled,'+method('familyRegistration')+'};api={'+method('joinTournamentAsPlayer')+'};',ctx);
    return ctx.api.joinTournamentAsPlayer(code,true,'self').then(r=>{times.push(performance.now()-start);return r;});
   });
   // Attach rejection handlers immediately, then release the independent workers

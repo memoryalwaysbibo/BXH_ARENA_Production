@@ -117,7 +117,9 @@ async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode
  // Clicking self registration submits once. The join transaction decides the
  // current confirmed/waitlist slot and returns a definitive full error.
  if(mode!=='children'){
-  const queued=Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code)&&event.battleMode!=='team';
+  const queued=event.battleMode!=='team'&&await (window.engagementService?.registrationFlowV2Enabled?.(code) ??
+   (Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code)));
+  if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)throw Error('auth-required');
   if(!queued)return {childIds:[null]};
   // Use the already-read display allocation as consent; the authoritative
   // queued transaction still rejects any allocation change. Do not silently

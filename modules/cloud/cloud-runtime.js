@@ -906,11 +906,21 @@
       const err=new Error(normalized); err.code=String((e&&e.code)||"functions/unknown"); err.details=e&&e.details; throw err;
     }
   }
+  async function registrationFlowV2Enabled(code){
+    if(Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code))return true;
+    if(code!=='BXH-BZ2JW6')return false;
+    if(!dbHandle||!fx?.getDocFromServer)throw Error('registration-route-unavailable');
+    const uid=authHandle?.currentUser?.uid,epoch=engagementSessionEpoch;
+    const snapshot=await withTimeout(fx.getDocFromServer(fx.doc(dbHandle,'publicTournaments',code)),8000,null);
+    if(uid!==authHandle?.currentUser?.uid||epoch!==engagementSessionEpoch)throw Error('stale-session');
+    if(!snapshot?.exists())throw Error('registration-route-unavailable');
+    return snapshot.data().registrationQueueVersion===2;
+  }
   const managementQueueOperations=new Map();
   async function registrationManagementOperation(payload,requestedId){
     const {code,action,registrationId,localId,expandBy,enabled:requestedEnabled,names}=payload;
     const actor=authHandle?.currentUser?.uid;
-    const enabled=Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code);
+    const enabled=await registrationFlowV2Enabled(code);
     let targetKey=registrationId||localId;
     if(action==='addLocal'){
       if(!globalThis.crypto?.subtle){
@@ -1006,6 +1016,7 @@
     return window.BXHMyEventsPlayerOperation.execute({route,code,send});
   }
   window.engagementService={
+    registrationFlowV2Enabled,
     registrationManagementOperation,
     async myEventOperationStatus(payload){
       if(!payload||typeof payload!=='object'||Array.isArray(payload)||Object.keys(payload).some(k=>!['route','operationId','code','nonce'].includes(k)))throw Error('unsupported-operation-status-input');
@@ -1038,11 +1049,7 @@
     async signPartnerContract(payload){return callEngagementFunction("signPartnerContract",payload,60000);},
     async activatePartnerContract(payload){return callEngagementFunction("activatePartnerContract",payload,60000);},
     async familyRegistration(payload){
-      // Candidate opt-in only. A client flag never bypasses the server rollout
-      // gate. This allowlist must remain empty until ALL writers are routed and
-      // fresh production source/config/rules readback is approved.
-      const enabled=Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(payload?.code);
-      if(enabled&&['join','mine','preview'].includes(payload?.action)){
+      if(['join','mine','preview'].includes(payload?.action)&&await registrationFlowV2Enabled(payload.code)){
         if(payload.action==='join')return callEngagementFunction('registrationQueueV2',{action:'submit',code:payload.code,operation:{code:payload.code,route:'family',operationId:payload.operationId,payload}},20000);
         return callEngagementFunction('registrationQueueV2',payload,20000);
       }
@@ -1548,7 +1555,7 @@
         }
         return callEngagementFunction("registrationRosterService",{...request,operationId:crypto.randomUUID()},60000);
       }
-      if(Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code)){
+      if(await registrationFlowV2Enabled(code)){
         const feedback=getPlayerRegistrationFeedback();
         if(!feedback)throw Error('registration-feedback-unavailable');
         return feedback.run(code,progress=>{

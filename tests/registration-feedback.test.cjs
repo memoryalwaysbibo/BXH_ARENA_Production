@@ -153,12 +153,42 @@ test('a cancellation rejection ends waiting only for the matching operation',asy
  await assert.rejects(f.api.run(CODE,p=>{p.submitting([cancelRequest.registrationId],cancelRequest);return {ok:true,operation:{state:'queued'}};},'cancel'),/cancel-deadline-passed/);
  assert.equal(f.api.snapshot()[0].state,'failed');assert.equal(f.storage.length,0);f.api.dispose();
 });
+test('only the pilot room uses the current server ownership marker',async()=>{
+ const cloud=fs.readFileSync(require.resolve('../modules/cloud/cloud-runtime.js'),'utf8');
+ const start=cloud.indexOf('  async function registrationFlowV2Enabled(');
+ const end=cloud.indexOf('  const managementQueueOperations=',start);
+ const pilot='BXH-BZ2JW6',reads=[];
+ let marker,missing=false,changeAccount=false;
+ const context=vm.createContext({
+  window:{},dbHandle:{},authHandle:{currentUser:{uid:'user1'}},engagementSessionEpoch:1,
+  withTimeout:promise=>promise,
+  fx:{doc:(_db,...path)=>path,getDocFromServer:async path=>{
+   reads.push(path.join('/'));
+   if(changeAccount)context.authHandle.currentUser={uid:'user2'};
+   return missing?null:{exists:()=>true,data:()=>({registrationQueueVersion:marker})};
+  }}
+ });
+ const enabled=vm.runInContext(cloud.slice(start,end)+'\nregistrationFlowV2Enabled;',context);
+ assert.equal(await enabled('BXH-OTHER1'),false);
+ assert.deepEqual(reads,[]);
+ assert.equal(await enabled(pilot),false);
+ marker=2;
+ assert.equal(await enabled(pilot),true);
+ marker=undefined;
+ assert.equal(await enabled(pilot),false);
+ missing=true;
+ await assert.rejects(enabled(pilot),/registration-route-unavailable/);
+ changeAccount=true;
+ await assert.rejects(enabled(pilot),/stale-session/);
+ assert.deepEqual(reads,Array(5).fill('publicTournaments/'+pilot));
+});
 test('the shipped cancellation action uses the V2 queue and avoids a legacy resend after rollback',async()=>{
  let response=null;
  const f=fixture({read:async()=>response}),requests=[];
  const cloud=fs.readFileSync(require.resolve('../modules/cloud/cloud-runtime.js'),'utf8');
  function source(marker,end){const start=cloud.indexOf(marker),stop=cloud.indexOf(end,start);assert(start>=0&&stop>start);return cloud.slice(start,stop+end.length);}
  const submit=source('  function submitRegistrationCancellation(','\n  }');
+ const route=source('  async function registrationFlowV2Enabled(','\n  }');
  const cancel=source('    async cancelRoster(','\n    },');
  const playerCancel=source('    async cancelRegistrationAsPlayer(','\n    },');
  const context=vm.createContext({window:{BXH_REGISTRATION_FLOW_V2_ROOMS:[CODE],engagementService:{familyRegistration:async()=>({ok:true,rows:[{registrationId:cancelRequest.registrationId,status:'confirmed'}]})}},
@@ -167,7 +197,7 @@ test('the shipped cancellation action uses the V2 queue and avoids a legacy rese
   crypto:{randomUUID:()=>cancelRequest.operationId},runMyEventsPlayerOperation:()=>assert.fail('legacy mutation'),
   callEngagementFunction:async(name,payload)=>{requests.push({name,payload});return {ok:true,operation:{state:'queued'}};}
  });
- const cloudSync=vm.runInContext(`${submit}\n({${cancel}${playerCancel}})`,context);
+ const cloudSync=vm.runInContext(`${route}\n${submit}\n({${cancel}${playerCancel}})`,context);
  const flight=cloudSync.cancelRegistrationAsPlayer(CODE);await flush();
  assert.equal(requests.length,1);
  assert.deepEqual(JSON.parse(JSON.stringify(requests[0])),{name:'registrationQueueV2',payload:{action:'submit',code:CODE,operation:{code:CODE,route:'roster',operationId:cancelRequest.operationId,payload:cancelRequest}}});
@@ -198,7 +228,7 @@ test('My Events blocks a pending room and refreshes from the verified cancellati
 
 test('management queue restores the same promotion receipt after a lost response and rollout close',async()=>{
  const cloud=fs.readFileSync(require.resolve('../modules/cloud/cloud-runtime.js'),'utf8');
- const helper=cloud.slice(cloud.indexOf('  const managementQueueOperations='),cloud.indexOf('  let playerRegistrationFeedback='));
+ const helper=cloud.slice(cloud.indexOf('  async function registrationFlowV2Enabled('),cloud.indexOf('  let playerRegistrationFeedback='));
  const sessionStorage=memory(),requests=[];
  const payload={code:CODE,action:'promote',registrationId:'candidate',expandBy:0};
  function open(enabled){
@@ -226,7 +256,7 @@ test('management queue restores the same promotion receipt after a lost response
 
 test('management queue matches the requested auto-fill value and the demotion receipt',async()=>{
  const cloud=fs.readFileSync(require.resolve('../modules/cloud/cloud-runtime.js'),'utf8');
- const helper=cloud.slice(cloud.indexOf('  const managementQueueOperations='),cloud.indexOf('  let playerRegistrationFeedback='));
+ const helper=cloud.slice(cloud.indexOf('  async function registrationFlowV2Enabled('),cloud.indexOf('  let playerRegistrationFeedback='));
  const sessionStorage=memory(),requests=[];
  const context={
   window:{sessionStorage,BXH_REGISTRATION_FLOW_V2_ROOMS:[CODE]},
@@ -274,7 +304,7 @@ test('self signup previews a populated or unreadable public roster in a finite V
 
 test('onsite batch recovery reuses the submitted operation without storing guest names in its key',async()=>{
  const cloud=fs.readFileSync(require.resolve('../modules/cloud/cloud-runtime.js'),'utf8');
- const helper=cloud.slice(cloud.indexOf('  const managementQueueOperations='),cloud.indexOf('  let playerRegistrationFeedback='));
+ const helper=cloud.slice(cloud.indexOf('  async function registrationFlowV2Enabled('),cloud.indexOf('  let playerRegistrationFeedback='));
  const sessionStorage=memory(),requests=[];
  function open(){
   const context={
