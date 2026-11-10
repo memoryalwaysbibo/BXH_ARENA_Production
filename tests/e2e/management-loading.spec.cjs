@@ -160,12 +160,13 @@ async function settle(page) { await expect.poll(() => getState(page).then(state 
 
 // All tests stay inside Management identity → Events → Tournament Management.
 const manyRows=()=>Array.from({length:12},(_,i)=>row('Paged room '+i,{code:'BXH-'+String(i).padStart(6,'0')}));
-test('only five cards load until the explicit expansion; each click adds five',async({page})=>{
+test('only five cards load before expansion; background count refresh preserves pagination',async({page})=>{
  await page.clock.install();const errors=await openManagement(page,{rows:manyRows()});await settle(page);
  await expect(cards(page)).toHaveCount(5);await page.clock.fastForward(30000);
- expect(await page.evaluate(()=>fixture.queries.length)).toBe(1);
+ await expect.poll(()=>page.evaluate(()=>fixture.queries.length)).toBe(2);
+ await expect(cards(page)).toHaveCount(5);
  await page.locator('[data-action="admin-tournament-load-more"]').click();await settle(page);await expect(cards(page)).toHaveCount(10);
- expect(await page.evaluate(()=>fixture.queries.length)).toBe(2);expect(errors).toEqual([]);
+ expect(await page.evaluate(()=>fixture.queries.length)).toBe(3);expect(errors).toEqual([]);
 });
 test('a later-page timeout preserves cards and retry requests the same cursor',async({page})=>{
  await page.clock.install();await openManagement(page,{rows:manyRows()});await settle(page);
