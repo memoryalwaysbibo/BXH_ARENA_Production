@@ -350,6 +350,9 @@ const ADMIN_TOURNAMENT_LIST_TIMEOUT_MS = 10000;
 let adminTournamentListPromise = null;
 let adminTournamentListGeneration = 0;
 let adminTournamentListContextKey = "";
+let adminTournamentListRefreshTimer = null;
+let adminTournamentListRefreshBusy = false;
+const ADMIN_TOURNAMENT_LIST_REFRESH_MS = 30000;
 let refereeDirectoryUsers = null;
 let refereeShowAllAccounts = false;
 let refereeDirectoryLoading = false;
@@ -20473,6 +20476,7 @@ function renderTournamentManagementTab(){
   if(!adminTournamentListLoaded && !adminTournamentListBusy){
     setTimeout(()=>{ if(!adminTournamentListLoaded&&!adminTournamentListBusy)loadAdminTournamentList(); }, 0);
   }
+  scheduleAdminTournamentListRefresh();
 
   const myUid=(firebaseUser&&firebaseUser.uid)||"";
   const isMine=t=>!!(myUid && t.createdBy===myUid);
@@ -20632,6 +20636,8 @@ function adminTournamentListIdentityKey(){
     grant&&grant.organizationId,grant&&grant.orderCode,grant&&grant.contractOrderCode,userProfile&&userProfile.partnerContractOrderCode,hasAdminAccess()]);
 }
 function resetAdminTournamentListContext(){
+  if(adminTournamentListRefreshTimer)clearTimeout(adminTournamentListRefreshTimer);
+  adminTournamentListRefreshTimer=null;
   adminTournamentListGeneration++;
   adminTournamentListPromise=null;
   adminTournamentListBusy=false;
@@ -20645,6 +20651,50 @@ function resetAdminTournamentListContext(){
 function reconcileAdminTournamentListContext(){
   if(adminTournamentListContextKey!==adminTournamentListIdentityKey()) resetAdminTournamentListContext();
 }
+function adminTournamentListVisible(){
+  return appPhase==="app"&&activeTab==="management"&&!document.hidden&&hasAdminAccess();
+}
+function scheduleAdminTournamentListRefresh(){
+  if(adminTournamentListRefreshTimer||!adminTournamentListLoaded||!adminTournamentListVisible())return;
+  adminTournamentListRefreshTimer=setTimeout(()=>{
+    adminTournamentListRefreshTimer=null;
+    void refreshAdminTournamentListVisibleItems().finally(scheduleAdminTournamentListRefresh);
+  },ADMIN_TOURNAMENT_LIST_REFRESH_MS);
+}
+async function refreshAdminTournamentListVisibleItems(){
+  reconcileAdminTournamentListContext();
+  if(!adminTournamentListVisible()||!adminTournamentListLoaded||adminTournamentListBusy||adminTournamentListRefreshBusy||!adminTournamentListItems.length)return;
+  const generation=adminTournamentListGeneration,key=adminTournamentListContextKey;
+  const current=()=>generation===adminTournamentListGeneration&&key===adminTournamentListIdentityKey()&&adminTournamentListVisible();
+  const pageCount=Math.ceil(adminTournamentListItems.length/5);
+  const request={mode:isPartnerOrganizerMode()?"partner_organizer":isEventStaffMode()?"event_staff":"admin",
+    status:adminTournamentListFilter,kind:adminTournamentListKind,search:adminTournamentListSearch,cursor:null};
+  adminTournamentListRefreshBusy=true;
+  try{
+    if(window.cloudSync?.connect)await adminTournamentListDeadline(window.cloudSync.connect(),"refresh-connect");
+    if(!current()||!cloudAvailable()||!window.cloudSync?.queryAdminTournamentSummaries)return;
+    const fresh=[];
+    for(let page=0;page<pageCount;page++){
+      const result=await adminTournamentListDeadline(window.cloudSync.queryAdminTournamentSummaries(request),"refresh-summaries");
+      if(!current())return;
+      if(!result||result.ok!==true||!Array.isArray(result.items)||result.items.length>5||result.pageSize!==5||typeof result.hasMore!=="boolean")return;
+      fresh.push(...result.items);
+      if(!result.hasMore)break;
+      if(typeof result.nextCursor!=="string")return;
+      request.cursor=result.nextCursor;
+    }
+    if(!current())return;
+    const latest=new Map(fresh.map(item=>[item.code,item]));
+    adminTournamentListItems=adminTournamentListItems.map(item=>latest.get(item.code)||item);
+    render();
+  }catch(error){
+    if(current())console.warn("[adminTournamentList] background refresh failed",{code:error?.code||"unknown"});
+  }finally{adminTournamentListRefreshBusy=false;}
+}
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){if(adminTournamentListRefreshTimer)clearTimeout(adminTournamentListRefreshTimer);adminTournamentListRefreshTimer=null;}
+  else if(adminTournamentListVisible()&&adminTournamentListLoaded){void refreshAdminTournamentListVisibleItems().finally(scheduleAdminTournamentListRefresh);}
+});
 function adminTournamentListDeadline(work,stage="query"){
   let timer;
   const startedAt=Date.now();
