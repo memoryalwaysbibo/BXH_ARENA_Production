@@ -38,6 +38,9 @@ async function mount(page){
     window.adminTournamentListSearch='';window.adminTournamentListSearchDraft='';window.adminTournamentListKind='official';window.adminTournamentListCounts=null;window.adminTournamentListHasMore=false;
     window.esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     window.registrationStatusLabel=()=>'';
+    // This fixture only renders the overview; summary refresh is exercised by
+    // the management-loading browser suite.
+    window.scheduleAdminTournamentListRefresh=()=>{};
     window.mock={calls:0,used:2,fail:false,pending:false};
     window.engagementService={getPartnerContract:async()=>{
       window.mock.calls++;
