@@ -28,6 +28,7 @@ function deferred() {
 }
 
 function authHarness(getUserProfile) {
+  const communityHostAccountChanges = [];
   const start = core.indexOf('let authStateGeneration=0;');
   const end = core.indexOf('\n          processAuthStateChange = processAuthStateChangeImpl;', start);
   assert(start >= 0 && end > start, 'auth state implementation source boundary exists');
@@ -62,6 +63,7 @@ function authHarness(getUserProfile) {
     pendingExistingAccountProfile: null,
     pendingNewPlayerProfile: null,
     syncEngagementIdentity() {},
+    resetCommunityHostOnAccountChange(uid) { communityHostAccountChanges.push(uid); },
     captureCommunityRoomStateContext: () => null,
     resumeCommunityRoomStateSubscription() {},
     clearVerifyingTimeout() {},
@@ -80,6 +82,7 @@ function authHarness(getUserProfile) {
   vm.runInContext(read('modules/main-app/profile-reminder.js'), context);
   context.playerProfileReminder = context.window.BXHProfileReminder.create({ storage: () => null, gameId: p => p.gameId || p.nickname || '' });
   vm.runInContext(source, context);
+  context.communityHostAccountChanges = communityHostAccountChanges;
   return context;
 }
 
@@ -287,6 +290,7 @@ test('a delayed login result cannot restore an account after logout', async () =
   assert.equal(context.userProfile, null);
   assert.equal(context.currentRole, null);
   assert.equal(context.appPhase, 'landing');
+  assert.deepEqual(context.communityHostAccountChanges, ['stale-user', null]);
 });
 
 test('a late Admin auth callback cannot replace the newer authenticated route', async () => {
@@ -304,6 +308,7 @@ test('a late Admin auth callback cannot replace the newer authenticated route', 
   assert.equal(context.currentRole, 'admin');
   assert.equal(context.appPhase, 'app');
   assert.equal(context.activeTab, 'management');
+  assert.deepEqual(context.communityHostAccountChanges, ['stale-admin', 'current-admin']);
 });
 
 test('an old Admin room read cannot update state after switching rooms', async () => {

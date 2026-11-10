@@ -15,12 +15,20 @@ function communityExpiryLabel(t){
   return new Date(ms).toLocaleString()+" 前保留完整房間";
 }
 function renderPlayerCommunityHostTab(){
-  if(communityEventsCache===null && !communityEventsLoading && !communityEventsError){ setTimeout(()=>handleAction("community-load-events",{getAttribute:()=>null}),0); }
-  if(communityEventsLoading && communityEventsCache===null) return `<div class="panel community-host-loading">
-    <div class="empty-state"><div class="big">正在讀取房間資料…</div><div class="hint">正在同步房間與主辦紀錄，手機網路第一次讀取可能需要數秒。</div></div>
+  const ownerUid=currentAuthUid();
+  resetCommunityHostOnAccountChange(ownerUid);
+  if(ownerUid && communityEventsCache===null && !communityEventsLoading && !communityEventsError){
+    setTimeout(()=>{
+      if(appPhase==="player-center" && playerActiveTab==="host" && currentAuthUid()===ownerUid && communityEventsCache===null && !communityEventsError){
+        handleAction("community-load-events",{getAttribute:()=>null});
+      }
+    },0);
+  }
+  if(ownerUid && communityEventsCache===null && !communityEventsError) return `<div class="panel community-host-loading">
+    <div class="empty-state"><div class="big">正在讀取房間資料…</div></div>
   </div>`;
   if(communityEventsError && communityEventsCache===null) return `<div class="panel community-host-loading">
-    <div class="empty-state"><div class="big">房間資料讀取逾時</div><div class="hint">${esc(communityEventsError)}</div></div>
+    <div class="empty-state"><div class="big">房間讀取未完成</div><div class="hint">${esc(communityEventsError)}</div></div>
     <div class="btn-row" style="justify-content:center;margin-top:12px;"><button class="btn btn-primary" data-action="community-load-events">重新連線</button></div>
   </div>`;
   const rooms=communityEventsCache||[],history=communityHistoryCache||[];
@@ -28,7 +36,7 @@ function renderPlayerCommunityHostTab(){
   return `<div class="panel community-host-hero"><div class="panel-title">我的房間</div><p class="hint">建立你的陀螺賽事，自訂賽制、邀請朋友一起對戰。</p><div class="room-create-action"><button class="btn btn-primary" data-action="community-create-open">＋ 建立房間</button></div><p class="room-policy">房間屬於一般賽事，不計入 BXH 天梯。只有房主、尚無其他參賽者且未建立賽程的空白房，連續 6 小時無操作後清理；已有名單／賽程或進行中的房間連續 24 小時無操作後清理。已排定未來活動且有名單或對戰架構者，至少保留至活動日後 14 天。已完成房間持續保留，可自行刪除；完賽摘要保留於「我的主辦紀錄」。</p></div>
   ${communityEventsError?`<div class="auth-error">${esc(communityEventsError)}</div>`:''}
   ${scheduleGroups('rooms',rooms,card)}
-  ${foldSection('host-history','我的主辦紀錄',history.length,`<p class="hint">完成主辦場數（一般＋正式）：${hostAchievementCount===null?'同步中':hostAchievementCount<0?'暫時無法同步，請重新整理':hostAchievementCount}（經伺服器驗證；測試與系統關閉不計入）</p>`+history.map(h=>`<div class="community-history-card"><b>${esc(h.name||'未命名賽事')}</b><div class="hint">${esc(h.eventDate||'')}｜${Number(h.playerCount||0)} 人｜${esc(h.format||'')}</div><div class="hint">冠軍：${esc(h.championName||'—')}　亞軍：${esc(h.runnerUpName||'—')}</div></div>`).join(''),false)}`;
+  ${foldSection('host-history','我的主辦紀錄',communityHistoryCache===null?'…':history.length,`<p class="hint">完成主辦場數（一般＋正式）：${hostAchievementCount===null?'同步中':hostAchievementCount<0?'暫時無法同步，請重新整理':hostAchievementCount}（經伺服器驗證；測試與系統關閉不計入）</p>`+history.map(h=>`<div class="community-history-card"><b>${esc(h.name||'未命名賽事')}</b><div class="hint">${esc(h.eventDate||'')}｜${Number(h.playerCount||0)} 人｜${esc(h.format||'')}</div><div class="hint">冠軍：${esc(h.championName||'—')}　亞軍：${esc(h.runnerUpName||'—')}</div></div>`).join(''),false)}`;
 }
 
 
