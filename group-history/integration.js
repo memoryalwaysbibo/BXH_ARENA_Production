@@ -91,7 +91,8 @@
   function paint(model) {
     if (!current(model)) return;
     model.node.innerHTML = view().content(model);
-    if (model.mode === 'preview') requestAnimationFrame(() => { if (current(model)) layoutTree(model); });
+    if (model.mode === 'preview' && typeof root.requestAnimationFrame === 'function')
+      root.requestAnimationFrame(() => { if (current(model)) layoutTree(model); });
   }
   function errorText(error) {
     const code = String(error?.code || '') + ' ' + String(error?.message || '');
