@@ -2906,13 +2906,13 @@
     },
     async queryMyCommunityEvents(){
       const uid=currentUserUidForWrites(); if(!uid) return [];
-      // v13.23.8: player-owned room discovery must use the public mirror.
-      // A list query against private tournaments must prove ALL owner rule
-      // predicates (createdBy + ownerUid + eventAuthority) and can otherwise
-      // be rejected/blocked by Firestore query authorization or composite-index
-      // requirements. publicTournaments already has the safe room metadata and
-      // supports the same single-field visibility query used by the lobby.
-      const q=fx.query(fx.collection(dbHandle,"publicTournaments"),fx.where("visibility","==","public"));
+      // Keep the visibility constraint required by the public mirror's list rule.
+      // Filter on the server and keep the existing client-side sort for older rooms.
+      const q=fx.query(fx.collection(dbHandle,"publicTournaments"),
+        fx.where("visibility","==","public"),
+        fx.where("eventAuthority","==","community"),
+        fx.where("ownerUid","==",uid)
+      );
       const snap=await fx.getDocs(q); const items=[];
       snap.forEach(ds=>{
         const d=ds.data()||{};

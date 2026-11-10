@@ -68,7 +68,30 @@ test('player can create account and open a community room on isolated emulators'
 
   await expect(page.locator('.community-room-notice')).toBeVisible({ timeout: 30000 });
   const notice = await page.locator('.community-room-notice').innerText();
-  expect(notice).toMatch(/BXH-[A-Z0-9]{6}/);
+  const code = notice.match(/BXH-[A-Z0-9]{6}/)?.[0];
+  expect(code).toBeTruthy();
+
+  // Fail the first room read, then use the real Firestore query. Keep the
+  // optional history pending to verify it does not hold up the room list.
+  await page.evaluate(() => {
+    const cloud = window.cloudSync;
+    const readRooms = cloud.queryMyCommunityEvents.bind(cloud);
+    const readHistory = cloud.queryMyCommunityHistory.bind(cloud);
+    let roomAttempts = 0;
+    cloud.queryMyCommunityEvents = async () => {
+      if (++roomAttempts === 1) throw Object.assign(new Error('temporary test outage'), { code: 'unavailable' });
+      return readRooms();
+    };
+    cloud.queryMyCommunityHistory = () => new Promise(resolve => {
+      window.releaseRoomHistoryForTest = () => resolve(readHistory());
+    });
+  });
+  await page.locator('[data-action="community-exit-room"]').click();
+  await expect(page.locator(`[data-action="community-open-room"][data-code="${code}"]`)).toBeAttached();
+  const historyBadge = page.locator('[data-fold-key="host-history"] summary .badge');
+  await expect(historyBadge).toHaveText('…');
+  await page.evaluate(() => window.releaseRoomHistoryForTest());
+  await expect(historyBadge).toHaveText('0');
 
   expect(externalFirebaseRequests).toEqual([]);
 });

@@ -5972,6 +5972,20 @@ let communityEventsCache = null;
 let communityHistoryCache = null;
 let communityEventsLoading = false;
 let communityEventsError = "";
+let communityEventsOwnerUid = null;
+let communityEventsRequestId = 0;
+let hostAchievementCount = null;
+
+function resetCommunityHostOnAccountChange(uid){
+  if(communityEventsOwnerUid===uid) return;
+  communityEventsOwnerUid=uid;
+  communityEventsRequestId++;
+  communityEventsCache=null;
+  communityHistoryCache=null;
+  communityEventsLoading=false;
+  communityEventsError="";
+  hostAchievementCount=null;
+}
 
 function communityReadWithTimeout(promise, ms=6500, label="community-read"){
   return new Promise((resolve,reject)=>{
@@ -15883,7 +15897,6 @@ function renderPlayerHomeTab(p){
   return `<div class="panel"><button class="btn btn-primary btn-block" data-action="open-qr-scanner">掃碼報到</button><p class="hint">掃描現場報到 QR，使用目前帳號直接報到，無需重新登入。</p></div>${renderMoodStation()}${renderTournamentLobby({ loggedIn:true, profile:p })}`;
 }
 
-let hostAchievementCount=null;
 function schedulePhase(t){
  const st=t?.parsedData||{},phase=t?.tournamentPhase;
  if(t?.systemClosed || (st.systemClosure&&!st.systemClosure.restoredAt))return 'closed';
@@ -22419,7 +22432,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="community-load-events"){
-    if(communityEventsLoading) return;
+    const hostActor=currentAuthUid();
+    resetCommunityHostOnAccountChange(hostActor);
+    if(!hostActor||communityEventsLoading) return;
+    const requestId=++communityEventsRequestId;
+    const isCurrent=()=>currentAuthUid()===hostActor&&communityEventsRequestId===requestId;
+    const renderHost=()=>{if(appPhase==="player-center"&&playerActiveTab==="host")renderPreservingScroll();};
     communityEventsLoading=true; communityEventsError=""; hostAchievementCount=null; render();
     (async()=>{
       try{
@@ -22428,46 +22446,63 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         if(!cloudAvailable() && window.cloudSync&&window.cloudSync.connect){
           await communityReadWithTimeout(window.cloudSync.connect(),7000,"community-connect");
         }
+        if(!isCurrent()) return;
         if(!cloudAvailable()) throw new Error("network");
 
-        const hostActor=currentAuthUid();
-        window.engagementService.syncMyHostingProgress({}).then(r=>{if(currentAuthUid()===hostActor){hostAchievementCount=r.completedHostedCount;renderPreservingScroll();}}).catch(e=>{console.warn('[host progress]',e);if(currentAuthUid()===hostActor){hostAchievementCount=-1;renderPreservingScroll();}});
-        // Active rooms are the primary content. Load them first from the safe
-        // public mirror; do not let history/maintenance block this screen.
-        communityEventsCache=await communityReadWithTimeout(
+        const readRooms=()=>communityReadWithTimeout(
           window.cloudSync.queryMyCommunityEvents(),
           9000,
           "community-events"
         );
-        if(!Array.isArray(communityEventsCache)) communityEventsCache=[];
-
+        let rooms;
         try{
-          communityHistoryCache=await communityReadWithTimeout(
-            window.cloudSync.queryMyCommunityHistory(),
-            7000,
-            "community-history"
-          );
-          if(!Array.isArray(communityHistoryCache)) communityHistoryCache=[];
-        }catch(historyErr){
-          console.warn("[community history] optional read failed",historyErr);
-          communityHistoryCache=[];
+          rooms=await readRooms();
+        }catch(e){
+          if(!isCurrent()) return;
+          if(e?.message!=="community-events-timeout"&&!["unavailable","deadline-exceeded"].includes(e?.code)) throw e;
+          rooms=await readRooms();
         }
-
-        if(window.cloudSync.cleanupMyExpiredCommunityRooms){
-          setTimeout(()=>{
-            Promise.resolve(window.cloudSync.cleanupMyExpiredCommunityRooms()).catch(e=>console.warn("[community cleanup]",e));
-          },500);
-        }
+        if(!isCurrent()) return;
+        communityEventsCache=Array.isArray(rooms)?rooms:[];
       }catch(e){
+        if(!isCurrent()) return;
         console.warn("[community] load failed",e);
         communityEventsCache=null;
-        const msg=String(e&&e.message||e);
-        communityEventsError=msg.includes("timeout")
-          ?"主辦房間讀取超過預期時間。請確認網路後再試；若賽事大廳可正常讀取，重新整理網頁後再進入我的主辦。"
-          :"讀取我的主辦賽事失敗，請確認網路或登入狀態後重試。";
+        communityEventsError=e?.message?.endsWith("-timeout")||e?.code==="deadline-exceeded"
+          ?"房間資料讀取時間較長，請點「重新連線」再試一次。"
+          :"房間資料暫時無法讀取，請點「重新連線」再試一次。";
+        return;
       }finally{
-        communityEventsLoading=false;
-        render();
+        if(isCurrent()){
+          communityEventsLoading=false;
+          renderHost();
+        }
+      }
+
+      Promise.resolve().then(()=>window.engagementService.syncMyHostingProgress({})).then(r=>{
+        if(!isCurrent()) return;
+        hostAchievementCount=r.completedHostedCount;
+        renderHost();
+      }).catch(e=>{
+        console.warn("[host progress]",e);
+        if(!isCurrent()) return;
+        hostAchievementCount=-1;
+        renderHost();
+      });
+      try{
+        const history=await communityReadWithTimeout(window.cloudSync.queryMyCommunityHistory(),7000,"community-history");
+        if(isCurrent()) communityHistoryCache=Array.isArray(history)?history:[];
+      }catch(e){
+        console.warn("[community history] optional read failed",e);
+        if(isCurrent()) communityHistoryCache=[];
+      }
+      if(isCurrent()){
+        renderHost();
+        if(window.cloudSync.cleanupMyExpiredCommunityRooms){
+          setTimeout(()=>{
+            if(isCurrent()) Promise.resolve(window.cloudSync.cleanupMyExpiredCommunityRooms()).catch(e=>console.warn("[community cleanup]",e));
+          },500);
+        }
       }
     })();
     return;
@@ -26630,6 +26665,7 @@ async function init(){
             if(typeof resetAdminTournamentListContext==="function") resetAdminTournamentListContext();
             const authStateIsCurrent=()=>authGeneration===authStateGeneration;
             syncEngagementIdentity(fbUser&&fbUser.uid);
+            resetCommunityHostOnAccountChange(fbUser?.uid||null);
             try{
               if(fbUser){
                 firebaseUser = { uid: fbUser.uid, email: fbUser.email };
