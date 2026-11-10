@@ -5,9 +5,11 @@ const { getFirestore } = require('firebase-admin/firestore');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { createCoordinator } = require('./coordinator.cjs');
 const { createGroupStageCommand } = require('./command.cjs');
+const { createHistoryReader } = require('../group-history/read.cjs');
 
 if (!getApps().length) initializeApp();
-const run = createGroupStageCommand(createCoordinator(getFirestore()));
+const db = getFirestore();
+const run = createGroupStageCommand(createCoordinator(db), createHistoryReader(db));
 const invalid = new Set(['group-room-code', 'group-invalid-action', 'group-invalid-count']);
 const forbidden = new Set(['group-permission-denied', 'group-room-disabled']);
 

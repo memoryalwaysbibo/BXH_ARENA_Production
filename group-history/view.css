@@ -1,0 +1,21 @@
+.group-history{min-width:0;max-width:100%;overflow:hidden}
+.group-history-tabs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin:16px 0}
+.group-history-tabs button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;white-space:normal;min-height:72px;padding:10px 6px}
+.group-history-tabs small{font-size:11px;opacity:.8}
+.group-history-placeholder{padding:32px 12px;text-align:center;border:1px dashed var(--border,#555);border-radius:12px;color:var(--muted,#aaa)}
+.group-history-tree{display:flex;gap:28px;max-width:100%;overflow-x:auto;padding:4px 12px 20px 0;overscroll-behavior-x:contain}
+.group-history-round{display:flex;flex-direction:column;flex:0 0 220px;min-width:0}
+.group-history-round h4{margin:8px 0 16px;text-align:center}
+.group-history-round-matches{display:flex;flex:1;flex-direction:column;justify-content:space-around;gap:18px}
+.group-history-match{position:relative;padding:10px;border:1px solid var(--border,#555);border-radius:10px;background:var(--panel-2,#1d2028)}
+.group-history-round:not(:last-child) .group-history-match:after{content:"";position:absolute;width:28px;right:-29px;top:50%;border-top:1px solid var(--border,#555)}
+.group-history-side{display:flex;justify-content:space-between;gap:8px;padding:7px 0;overflow-wrap:anywhere}
+.group-history-side>span{min-width:0}.group-history-side>b{flex-shrink:0}
+.group-history-side small{font-size:11px;margin-left:6px}.group-history-side.is-own{color:var(--gold,#e5c479)}
+.group-history-side.is-winner{font-weight:800}.group-history-side+.group-history-side{border-top:1px solid var(--border,#555)}
+.group-history-search{display:flex;gap:8px;margin:8px 0 12px}.group-history-search input{min-width:0;flex:1}
+.group-history-own{padding:14px 0;border-top:1px solid var(--border,#555)}
+.group-history-own ol{margin:0;padding-left:22px}.group-history-own li{padding:8px 0;overflow-wrap:anywhere}
+.group-history-own li span{display:block;font-size:13px;color:var(--muted,#aaa);margin-top:3px}
+.group-history [role=tab]:focus-visible,.group-history-tree:focus-visible{outline:2px solid var(--gold,#e5c479);outline-offset:2px}
+@media(max-width:650px){.group-history-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}.group-history-round{flex-basis:190px}.group-history{padding:14px}}

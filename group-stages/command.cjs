@@ -1,10 +1,15 @@
 'use strict';
 
-function createGroupStageCommand(coordinator) {
+function createGroupStageCommand(coordinator, readHistory) {
   return async request => {
     const actorUid = request.auth?.uid;
     const { action, parentCode, stage, roomCode, groupCount } = request.data || {};
     switch (action) {
+      case 'history':
+        if (typeof readHistory !== 'function') {
+          throw Object.assign(new Error('group-history-unavailable'), { code: 'group-history-unavailable' });
+        }
+        return readHistory(parentCode, actorUid);
       case 'routing': return coordinator.readRouting(parentCode, actorUid);
       case 'status': return coordinator.readOperatorStatus(parentCode, actorUid);
       case 'prepare': return coordinator.prepare(parentCode, actorUid, groupCount);

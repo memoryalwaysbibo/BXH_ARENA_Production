@@ -6,6 +6,7 @@ const path = require('node:path');
 const sourceFiles = [
   'group-stages/firebase-entry.cjs',
   'group-stages/command.cjs',
+  'group-history/read.cjs',
   'group-stages/coordinator.cjs',
   'group-stages/core.cjs',
   'group-stages/draw.cjs',

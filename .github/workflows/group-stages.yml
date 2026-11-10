@@ -4,6 +4,12 @@ on:
   pull_request:
     paths:
       - 'group-stages/**'
+      - 'group-history/**'
+      - 'modules/main-app/group-stages.js'
+      - 'modules/main-app/core.js'
+      - 'tests/group-history*'
+      - 'tests/public-pages-artifact.test.cjs'
+      - 'scripts/prepare-public-pages.cjs'
       - 'ladder-v1.js'
       - '.github/workflows/group-stages.yml'
 
@@ -23,10 +29,15 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - run: node --test group-stages/core.test.cjs
+      - run: node --test group-stages/core.test.cjs group-stages/open-all.test.cjs group-history/read.test.cjs group-history/audit-history.test.cjs group-history/stale-group-control.test.cjs tests/group-history-ui.test.cjs tests/group-history-lifecycle.test.cjs tests/public-pages-artifact.test.cjs
       - run: npm install --prefix /tmp/bxh-group-stages --no-save --ignore-scripts firebase-tools@14.27.0 firebase-admin@13.10.0 firebase-functions@6.6.0
       - name: Rehearse 384- and 383-player events against Firestore Emulator
         run: /tmp/bxh-group-stages/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-group-stages --config group-stages/emulator.json 'node --test group-stages/coordinator.test.cjs group-stages/open-all.test.cjs'
         env:
           NODE_PATH: /tmp/bxh-group-stages/node_modules
           GCLOUD_PROJECT: demo-bxh-group-stages
+      - name: Verify read-only group history with Firestore Emulator
+        run: /tmp/bxh-group-stages/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-group-history --config group-stages/emulator.json 'node --test group-history/emulator.test.cjs'
+        env:
+          NODE_PATH: /tmp/bxh-group-stages/node_modules
+          GCLOUD_PROJECT: demo-bxh-group-history

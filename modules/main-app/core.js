@@ -5742,6 +5742,8 @@ function syncEngagementIdentity(uid){
   engagementBackfillCursor=""; engagementBackfillResult=null; engagementBackfillDone=false;
   engagementTitleDraft=null;
   window.BXHRefereeLicense?.resetSession?.();
+  window.BXHGroupHistory?.resetSession();
+  window.BXHGroupStageUi?.bind(null);
   clearTimeout(engagementDayTimer);
 }
 function scheduleEngagementDayRefresh(result){
@@ -10612,11 +10614,15 @@ function renderTeamReferee(){
   return refereeBracketRoundtripNav('bracket')+'<div class="banner"><span>團體裁判模式｜排陣確認、公開與即時計分僅在此操作。</span></div>'+renderTeamMatchList(true);
 }
 function renderBracket(){
+  const groupHistory=window.BXHGroupHistoryView && !state.groupStage?.parentCode && firebaseUser?.uid &&
+    window.BXHGroupStageUi?.enabled(state.cloudCode,null,firebaseUser.uid)
+    ? window.BXHGroupHistoryView.slot(state.cloudCode) : "";
+  if(groupHistory)return groupHistory;
   if(state.meta?.battleMode==="team"&&state.bracketSize)return bracketCommitStatusHtml()+renderTeamBracket();
   const refreshBtn=bracketRefreshButtonHtml();
   if(!state.bracketSize){
     const refreshOnly=refreshBtn ? `<div class="bracket-top-controls bracket-top-controls-refresh-only">${refreshBtn}</div>` : "";
-    return refreshOnly + `<div class="panel"><div class="empty-state"><div class="big">尚未產生對戰表</div><div>請至「賽事設定」輸入選手名單後產生對戰表</div>
+    return refreshOnly + (firebaseUser?.uid&&!state.groupStage?.parentCode ? window.BXHGroupHistoryView?.slot(state.cloudCode,"preview",false)||"" : "") + `<div class="panel"><div class="empty-state"><div class="big">尚未產生對戰表</div><div>請至「賽事設定」輸入選手名單後產生對戰表</div>
     <div style="margin-top:16px;"><button class="btn btn-primary" data-action="goto-settings">前往賽事設定</button></div>
     </div></div>`;
   }
@@ -18885,7 +18891,7 @@ function renderPlayerCenterCareer(){
   const visible=groups.slice(0,playerCenterCareerVisibleCount);
   const more=groups.length>visible.length?'<button class="btn btn-ghost" data-action="player-center-career-more">載入更多賽事（'+(groups.length-visible.length)+' 場未顯示）</button>':'';
   const moreHistory=Math.max(0,prelaunch.length-playerCenterHistoryVisibleCount)+Math.max(0,undated.length-playerCenterHistoryVisibleCount)+Math.max(0,testEvents.length-playerCenterHistoryVisibleCount);
-  return '<section class="player-center-integrated"><div class="hunter-section-head"><h2>生涯賽事紀錄</h2><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">重新整理</button></div><p class="hint">正式生涯從 2026/10/1 起算；S1 前與日期待核對紀錄分開保留。展開賽事可查看每輪對戰；PK 請至獵人交鋒查看。</p>'+playerCenterDataNotice()+(['loading','error'].includes(status)?'':'<h3>正式生涯</h3>'+(groups.length?visible.map(playerCenterEventHtml).join('')+more:'<div class="panel empty-state">尚無已完成的正式對戰紀錄</div>')+history+(moreHistory?'<button class="btn btn-ghost" data-action="player-center-history-more">載入更多舊紀錄（'+moreHistory+' 場）</button>':''))+'</section>';
+  return (window.BXHGroupHistoryView?.slot("","own",false)||"")+'<section class="player-center-integrated"><div class="hunter-section-head"><h2>生涯賽事紀錄</h2><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">重新整理</button></div><p class="hint">正式生涯從 2026/10/1 起算；S1 前與日期待核對紀錄分開保留。展開賽事可查看每輪對戰；PK 請至獵人交鋒查看。</p>'+playerCenterDataNotice()+(['loading','error'].includes(status)?'':'<h3>正式生涯</h3>'+(groups.length?visible.map(playerCenterEventHtml).join('')+more:'<div class="panel empty-state">尚無已完成的正式對戰紀錄</div>')+history+(moreHistory?'<button class="btn btn-ghost" data-action="player-center-history-more">載入更多舊紀錄（'+moreHistory+' 場）</button>':''))+'</section>';
 }
 function playerCenterHunterSummaryHtml(records,status){
   const practiceAllowed=typeof hunterClashEntry!=='undefined'&&hunterClashEntry?.visible()===true;
@@ -19422,7 +19428,10 @@ function renderHistoryDetail(rec){
   let bracketHtml, stats;
   try{
     const fmt0 = rec.meta.formatType || "single";
-    if(!rec.bracketSize){ bracketHtml = '<div class="panel"><div class="empty-state">此賽事尚未產生對戰表</div></div>'; }
+    if(!rec.groupStage?.parentCode && firebaseUser?.uid && (!rec.bracketSize || window.BXHGroupStageUi?.enabled(rec.cloudCode,null,firebaseUser.uid)) && window.BXHGroupHistoryView?.codeValid(rec.cloudCode)){
+      bracketHtml=window.BXHGroupHistoryView.slot(rec.cloudCode,"preview",window.BXHGroupStageUi?.enabled(rec.cloudCode,null,firebaseUser.uid)===true);
+    }
+    else if(!rec.bracketSize){ bracketHtml = '<div class="panel"><div class="empty-state">此賽事尚未產生對戰表</div></div>'; }
     else if(fmt0==="double") bracketHtml = renderDoubleElimBracket();
     else if(fmt0==="roundrobin") bracketHtml = renderRoundRobinBracket();
     else bracketHtml = renderSingleElimBracket();
@@ -19430,6 +19439,7 @@ function renderHistoryDetail(rec){
     stats = computeStats();
   } finally { state = saved; }
 
+  const groupHistoryBracket=bracketHtml.includes('id="bxh-group-history"');
   const fmt = rec.meta.formatType || "single";
   const realMatches = (rec.matches||[]).filter(m=>!m.isBye);
   const completedMatches=realMatches.filter(m=>m.completed);
@@ -19468,7 +19478,7 @@ function renderHistoryDetail(rec){
   <div class="panel"><div class="panel-title">逐場判決紀錄</div>${matchRows?`<div class="rank-scroll"><table class="rank-table postmatch-match-table"><thead><tr><th>#</th><th>戰鬥台</th><th>比分</th><th>勝方</th><th>判決裁判</th><th>確認時間</th></tr></thead><tbody>${matchRows}</tbody></table></div>`:`<div class="empty-state">尚無可追溯的完成場次</div>`}<div class="hint" style="margin-top:10px;">v13.22.0 起的正式判定會保存實際確認裁判；更舊紀錄可能顯示「舊版未記錄」。</div></div>
   <div class="panel"><div class="panel-title">最終排名</div>${renderStandingsTableGeneric(stats, fmt)}</div>
   <div class="panel"><div class="panel-title">參賽名單與報到狀態</div><div class="rank-scroll"><table class="rank-table"><thead><tr><th>選手</th><th>報到狀態</th></tr></thead><tbody>${playerRows}</tbody></table></div></div>
-  <div class="panel"><div class="panel-title">完整最終對戰表</div><div class="hint" style="margin-bottom:12px;">以下為賽事完成後保存的唯讀對戰結果。</div>${bracketHtml}</div>
+  <div class="panel"><div class="panel-title">${groupHistoryBracket?"分組賽對戰表":"完整最終對戰表"}</div><div class="hint" style="margin-bottom:12px;">${groupHistoryBracket?"以下由分組賽紀錄服務核對後顯示；資料不一致時保留待核對狀態。":"以下為賽事完成後保存的唯讀對戰結果。"}</div>${bracketHtml}</div>
   </div>`;
 }
 
@@ -19815,6 +19825,13 @@ function render(){
       window.BXHGroupStageUi.bind(document.getElementById("bxh-group-stage-panel"),currentAuthUid(),
         requestGroupStage,document.getElementById("bxh-group-stage-draw"));
     }
+    window.BXHGroupHistory?.bind(document.getElementById("bxh-group-history"),{
+      getSession:()=>({uid:currentAuthUid(),epoch:engagementSessionEpoch}),
+      getScope:()=>appPhase+":"+activeTab+":"+playerActiveTab+":"+playerProfileSection+":"+(viewingRecordId||state.cloudCode||""),
+      request:payload=>window.engagementService.tournamentOperation("groupStageCommand",payload),
+      mine:payload=>window.engagementService.familyRegistration(payload),
+      parentCodes:window.BXH_GROUP_STAGE_PARENT_CODES
+    });
     if(__viewportSnapshot.lobbyPatched){
       __lastRenderedViewportKey=__viewportSnapshot.key;
       ++__viewportRestoreToken; // Cancel old delayed restores; stable nodes keep their own viewport.
@@ -23419,6 +23436,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="player-logout"){
+    window.BXHGroupHistory?.suspendSession(currentAuthUid(),engagementSessionEpoch);
+    window.BXHGroupStageUi?.bind(null);
     (async ()=>{
       if(window.cloudAuth && window.cloudAuth.isReady()){ await window.cloudAuth.signOutUser(); }
       currentRole=null; userProfile=null; firebaseUser=null; pendingNewPlayerProfile=null; pendingExistingAccountProfile=null;
@@ -24017,6 +24036,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="account-logout"){
     accountMenuOpen=false;
     openModal({ type:"generic", title:"登出系統", message:"確定要登出 BXH ARENA 嗎？", confirmLabel:"確認登出", onConfirm:()=>{
+      window.BXHGroupHistory?.suspendSession(currentAuthUid(),engagementSessionEpoch);
+      window.BXHGroupStageUi?.bind(null);
       (async ()=>{
         if(authAvailable()){ await window.cloudAuth.signOutUser(); }
         currentRole=null; adminDisplayName=null; userProfile=null; firebaseUser=null;
