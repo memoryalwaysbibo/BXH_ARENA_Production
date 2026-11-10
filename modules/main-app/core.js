@@ -3157,7 +3157,9 @@ function captureCommunitySettingsInputs(){
   const context=communitySettingsDraftContext();
   if(!context)return null;
   const fields=communitySettingsInputs().map(input=>({id:input.id,value:input.value,checked:input.checked,type:input.type,invalid:communitySettingBadInput(input)}));
-  return {context,fields,focusedId:document.activeElement?.id};
+  const sections=Array.from(document.querySelectorAll?.("details[id^='community-settings-']")||[])
+    .filter(section=>section.tagName==="DETAILS").map(section=>[section.id,section.open]);
+  return {context,fields,sections,focusedId:document.activeElement?.id};
 }
 function restoreCommunitySettingsInputs(draft){
   if(!draft || draft.context!==communitySettingsDraftContext())return;
@@ -3170,6 +3172,10 @@ function restoreCommunitySettingsInputs(draft){
       input.dataset.communityDraftInvalid="true";input.setCustomValidity?.("請重新輸入有效的數字或時間");
       input.addEventListener?.("input",()=>{delete input.dataset.communityDraftInvalid;input.setCustomValidity?.("");},{once:true});
     }
+  }
+  for(const [id,open] of draft.sections||[]){
+    const section=document.getElementById(id);
+    if(section)section.open=open;
   }
   if(draft.focusedId)document.getElementById(draft.focusedId)?.focus?.({preventScroll:true});
 }
@@ -22480,18 +22486,22 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(!actorUid){showToast("請先登入後再建立房間",true);return;}
     const hostProfile=userProfile||{};
     const hostName=String(hostProfile.gameId||hostProfile.displayName||hostProfile.nickname||hostProfile.realName||firebaseUser?.email||"玩家").trim();
-    const name=hostName+"的房間";
+    const name=(document.getElementById("community-name")?.value||"").trim()||hostName+"的房間";
     const taipeiParts=Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date()).map(part=>[part.type,part.value]));
     const date=`${taipeiParts.year}-${taipeiParts.month}-${taipeiParts.day}`;
     const startTime=`${taipeiParts.hour}:${taipeiParts.minute}`;
     const location="玩家即時對戰";
     const formatType=document.getElementById("community-format")?.value||"single";
-    const stations=1;
+    const stationInput=document.getElementById("community-stations");
+    const stations=Number(stationInput?.value||1);
+    if(stationInput?.validity?.badInput||!Number.isInteger(stations)||stations<1||stations>16){
+      showToast("戰鬥台數請填寫 1～16 的整數",true);return;
+    }
     const registrationEnabled=!!document.getElementById("community-registration-enabled")?.checked;
     let capacity;
     try{const input=document.getElementById("community-capacity");if(input?.validity?.badInput)throw new Error("invalid-registration-capacity");capacity=parseCommunityRegistrationCapacity(input?.value);}catch(e){showToast("人數上限請留空，或填寫大於 0 的整數",true);return;}
     const roomAccessMode="public";
-    communityCreateSaving=true;target.disabled=true;
+    communityCreateSaving=true;target.disabled=true;target.textContent="建立中…";
     (async()=>{
       try{
         if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();
@@ -22537,7 +22547,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         state=st;
         if(cloudUnsub){ try{cloudUnsub();}catch(e){} }
         cloudUnsub=subscribeCommunityRoomState(code); cloudStatus="connected";
-        communityRoomActiveTab="people"; appPhase="community-room"; communityEventsCache=null; publicTournamentsCache=null; publicTournamentsError=null; render();
+        communityRoomActiveTab="live"; peopleRosterSection="confirmed"; appPhase="community-room"; communityEventsCache=null; publicTournamentsCache=null; publicTournamentsError=null; render();
         showToast("一般賽事已建立｜代碼 "+code);
         if(st.meta.playMode!=="enchantment"&&window.cloudSync.manageRefereeSeats){
           // The room already exists. Seat activation is optional and must not
@@ -22561,7 +22571,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         }else{
           showToast("建立一般賽事失敗｜"+(code||msg||"未知錯誤"),true);
         }
-      }finally{communityCreateSaving=false;target.disabled=false;}
+      }finally{communityCreateSaving=false;target.disabled=false;target.textContent="立即開房";}
     })();
     return;
   }
@@ -22577,12 +22587,18 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         state=st; await saveRecord(state); await setCurrentId(state.id);
         if(cloudUnsub){try{cloudUnsub();}catch(e){}}
         cloudUnsub=subscribeCommunityRoomState(code); cloudStatus="connected";
-        communityRoomActiveTab="live"; appPhase="community-room"; render();
+        communityRoomActiveTab="live"; peopleRosterSection="confirmed"; appPhase="community-room"; render();
       }catch(e){ console.warn("[community open]",e); showToast("無法開啟此一般賽事房間",true); }
     })();
     return;
   }
-  if(action==="community-switch-room-tab"){ communityRoomActiveTab=target.getAttribute("data-tab")||"live"; if(communityRoomActiveTab!=="people")stopAdminRosterWatch(); render(); return; }
+  if(action==="community-switch-room-tab"){
+    communityRoomActiveTab=target.getAttribute("data-tab")||"live";
+    if(communityRoomActiveTab==="people"){
+      if(target.getAttribute("data-section")==="bracket")peopleRosterSection="bracket";
+    }else stopAdminRosterWatch();
+    render();window.scrollTo(0,0);return;
+  }
   if(action==="community-exit-room"){
     stopAdminRosterWatch();
     if(cloudUnsub){try{cloudUnsub();}catch(e){} cloudUnsub=null;}
@@ -22636,7 +22652,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(!quickRegistration&&registrationEnabled&&(openAt===null||closeAt===null)){showToast("團體賽請設定報名開放與截止時間",true);return;}
     const currentAccessMode=m.roomAccessMode==="password"?"password":"public";
     const nextAccessMode=document.getElementById("cset-access-mode")?.value==="password"?"password":"public";
-    const nextAccessPassword=(document.getElementById("cset-access-password")?.value||"").normalize("NFKC").trim();
+    const nextAccessPassword=nextAccessMode==="password"?(document.getElementById("cset-access-password")?.value||"").normalize("NFKC").trim():"";
     if(nextAccessMode==="password"&&currentAccessMode!=="password"&&(nextAccessPassword.length<4||nextAccessPassword.length>20)){showToast("切換密碼房請設定 4～20 字元房間密碼",true);return;}
     if(nextAccessPassword&&(nextAccessPassword.length<4||nextAccessPassword.length>20)){showToast("房間密碼需為 4～20 字元",true);return;}
     const accessChanged=nextAccessMode!==currentAccessMode||!!nextAccessPassword;

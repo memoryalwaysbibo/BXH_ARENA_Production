@@ -69,7 +69,7 @@ const styles=['core-competition','auth-player','player-center-hunter','lobby-com
  try{
   // CI's pinned Playwright image supplies the matching bundled Chromium.
   browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),args:['--no-sandbox']});
-  for(const size of [{name:'desktop',width:1440,height:1000},{name:'mobile',width:390,height:844}]){
+  for(const size of [{name:'desktop',width:1440,height:1000},{name:'mobile',width:390,height:844},{name:'narrow-mobile',width:320,height:700}]){
    const context=await browser.newContext({viewport:{width:size.width,height:size.height},serviceWorkers:'block'});
    await context.route('**/*',route=>route.abort('blockedbyclient'));
    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
@@ -79,7 +79,39 @@ const styles=['core-competition','auth-player','player-center-hunter','lobby-com
    for(const file of ['domain-utils','registration-utils','input-utils','community-host','admin-override'])await page.addScriptTag({content:read('modules/main-app/'+file+'.js')});
    await page.addScriptTag({content:'const {isCommunityQuickRegistration,isUnlimitedCommunityRegistration,parseCommunityRegistrationCapacity,communityRegistrationCapacity,communityRegistrationParticipantCount,communityLocalParticipantCount,communityRegistrationLocked,canCancelCommunityRegistration,publicTournamentRegistrationLocked,canonicalPublicTournamentPhase,roomStatusDescriptor}=window.BXHDomainUtils;const {normalizeDateTime,normalizeRegistrationStatusValue}=window.BXHRegistrationUtils;const {communityDateTimeValue,formatTournamentDetailDateTime,tournamentBattleMode,tournamentTeamSize}=window.BXHInputUtils;'+['onsiteRegistrationSettingsLocked','managedRegistrationSettingsChanged','managedRegistrationSettingsNotice','reportManagedRegistrationSettings','communitySettingsDraftContext','communitySettingsInputs','communitySettingBadInput','setCommunitySettingsInputsSaving','captureCommunitySettingsInputs','restoreCommunitySettingsInputs','refereeTabOpen','refereeCourtFocusActive','renderRefereeCourtView','renderCommunityRoomPreservingSettings','cloneStateForSave','computeRegistrationStatus','saveState','getEffectiveRegistrationStatus','publicEventLifecycleStatus','renderTournamentDetailScreen'].map(fn).join('\n')+'\n'+rosterSource+'\n'+action+'\nrender();'});
    assert.deepEqual(errors,[],'Settings fixture must render without missing production dependencies');
+   await page.evaluate(()=>{
+     const container=document.createElement('div');
+     container.id='overview-fixture';
+     container.innerHTML=window.BXHCommunityHostFeature.renderCommunityRoomOverview();
+     document.querySelector('main').prepend(container);
+   });
+   const overview=page.getByRole('region',{name:'房間總覽'});
+   assert.equal(await overview.getByText('LOCAL-ONLY',{exact:true}).isVisible(),true);
+   assert.equal(await overview.getByRole('button',{name:'複製代碼'}).isVisible(),true);
+   assert.equal(await overview.getByRole('button',{name:'分享／QR'}).isVisible(),true);
+   assert.equal(await overview.getByRole('button',{name:'抽籤與開賽'}).getAttribute('data-section'),'bracket');
+   await page.evaluate(()=>render());
    await page.locator('#cset-capacity').fill('');await page.locator('#cset-registration-enabled').check();
+   const schedule=page.locator('#community-settings-schedule');
+   assert.equal(await schedule.getAttribute('open'),null);
+   await schedule.locator('summary').click();
+   await page.locator('#cset-start').fill('01:25');
+   await page.locator('#community-settings-access summary').click();
+   assert.equal(await page.locator('#cset-access-password').isVisible(),false);
+   const bounds=await page.locator('.community-settings').evaluate(section=>{
+     const panel=section.getBoundingClientRect();
+     const fields=[...section.querySelectorAll('.field input,.field select')].filter(input=>input.getClientRects().length);
+     return fields.every(field=>{
+       const rect=field.getBoundingClientRect();
+       return rect.left>=panel.left&&rect.right<=panel.right;
+     });
+   });
+   assert.equal(bounds,true,'Native date and time fields must stay inside the settings card');
+   if(size.width<=640){
+     await page.evaluate(()=>window.scrollTo(0,0));
+     const saveBounds=await page.locator('.community-settings-save').boundingBox();
+     assert(saveBounds&&saveBounds.y>=0&&saveBounds.y+saveBounds.height<=size.height+1,'Save must remain visible while viewing expanded mobile settings');
+   }
    // Settings fields survive background renders, including invalid native input.
    await page.locator('#cset-name').fill('尚未儲存的房間名稱');
    await page.locator('#cset-stations').fill('2');
@@ -90,9 +122,17 @@ const styles=['core-competition','auth-player','player-center-hunter','lobby-com
    await page.evaluate(()=>render());
    assert.equal(await page.locator('#cset-name').inputValue(),'尚未儲存的房間名稱');
    assert.equal(await page.locator('#cset-stations').inputValue(),'2');
+   assert.equal(await page.locator('#cset-start').inputValue(),'01:25');
+   assert.equal(await schedule.getAttribute('open'),'');
    assert.equal(await page.locator('#cset-registration-enabled').isChecked(),true);
    assert.equal(await page.locator('#cset-access-password').inputValue(),'local-review-pass');
    assert.equal(await page.locator('#cset-capacity').evaluate(input=>input.dataset.communityDraftInvalid),'true');
+   if(size.name==='narrow-mobile'){
+     assert.deepEqual(errors,[]);
+     await page.screenshot({path:path.join(output,size.name+'-settings.png'),animations:'disabled'});
+     checks.push(size.name+': overview, native input bounds, sticky save, and settings draft PASS');
+     continue;
+   }
    await page.getByRole('button',{name:'儲存一般賽事設定',exact:true}).click();
    assert.equal(await page.evaluate(()=>fixture.saves),0,'Invalid native input must not become an intentional unlimited capacity');
    await page.locator('#cset-capacity').fill('7');await page.locator('#cset-capacity').fill('');
@@ -103,6 +143,7 @@ const styles=['core-competition','auth-player','player-center-hunter','lobby-com
    assert.equal(await page.evaluate(()=>fixture.cloud.meta.registrationCapacity),null);
    assert.equal(await page.evaluate(()=>fixture.cloud.meta.registrationStatus),'open');
    assert.equal(await page.evaluate(()=>fixture.cloud.meta.stations),2);
+   assert.equal(await page.evaluate(()=>fixture.cloud.meta.startTime),'01:25');
    assert.equal(await page.locator('#cset-access-password').inputValue(),'');
    assert.equal(await page.evaluate(()=>fixture.accessCalls),1);
    assert.equal(await page.evaluate(()=>JSON.stringify([fixture.cloud,fixture.local]).includes('local-review-pass')),false,'Password draft must never enter persistent room snapshots');
