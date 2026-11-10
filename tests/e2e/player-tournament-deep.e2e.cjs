@@ -94,6 +94,8 @@ test('four-player community event reaches first confirmed referee result', async
   await page.locator('[data-action="community-create-submit"]').click();
   await expect(page.locator('.community-room-notice')).toBeVisible({ timeout: 30000 });
 
+  await expect(page.getByRole('region', { name: '房間總覽' })).toBeVisible();
+  await page.locator('[data-action="community-switch-room-tab"][data-tab="people"]').click();
   await page.locator('[data-action="people-section"][data-section="tools"]').click();
   await expect(page.getByText('現場新增選手', { exact: true })).toBeVisible();
   await page.locator('#quick-add-textarea').fill('BOT Alpha\nBOT Beta\nBOT Gamma');
