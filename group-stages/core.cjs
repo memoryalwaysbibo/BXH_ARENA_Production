@@ -231,4 +231,4 @@ function settlementInput(event) {
   return { effectiveCount, multiplier, topEight, participants, matches };
 }
 
-module.exports = { GROUPS, groupKeys, prepare, openableStages, nextStage, collect, settlementInput };
+module.exports = { GROUPS, groupKeys, prepare, openableStages, nextStage, matchesFor, collect, settlementInput };

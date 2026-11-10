@@ -195,7 +195,7 @@
   }
 
   async function send(model, action, choice) {
-    if (active !== model || model.busy) return;
+    if (active !== model || model.busy || !model.node?.isConnected) return;
     const current = model.status?.current;
     const payload = { action, parentCode: model.code };
     if (action === 'refresh') payload.action = model.view === 'operator' ? 'status' : 'routing';
@@ -210,8 +210,10 @@
     render(model);
     try {
       let status = await model.request(payload);
+      if (active !== model || !model.node.isConnected) return;
       if (action === 'prepare' && Array.isArray(status?.groups) && status.drawAllPending) {
         status = await model.request({ action: 'open-all', parentCode: model.code });
+        if (active !== model || !model.node.isConnected) return;
       }
       if (status?.unprepared === true || status === null) model.status = null;
       else if (Array.isArray(status?.groups)) model.status = status;
@@ -265,6 +267,8 @@
     if (model.loaded || model.busy || model.error) render(model);
     else void send(model, 'refresh');
   }
+
+  root.addEventListener?.('pagehide', () => bind(null));
 
   const api = { enabled, slot, drawButton, bind, content, rehearsalProbe, discover };
   if (typeof module === 'object' && module.exports) module.exports = api;

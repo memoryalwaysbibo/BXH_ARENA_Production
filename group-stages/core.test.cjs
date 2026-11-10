@@ -177,7 +177,7 @@ test('the rehearsal release packages only the group callable codebase', () => {
     const deployedFiles = fs.readdirSync(path.join(output, 'functions'), { recursive: true, withFileTypes: true })
       .filter(item => item.isFile()).map(item => item.name).sort();
     assert.deepEqual(deployedFiles, ['bucket-state.cjs','command.cjs','coordinator.cjs','core.cjs','draw.cjs',
-      'firebase-entry.cjs','ladder-v1.js','package.json']);
+      'firebase-entry.cjs','ladder-v1.js','package.json','read.cjs']);
     assert.throws(() => prepareRelease(root, output), { code: 'EEXIST' });
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
