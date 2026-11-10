@@ -1,6 +1,6 @@
 'use strict';
 
-function createGroupStageCommand(coordinator, readHistory) {
+function createGroupStageCommand(coordinator, readHistory, settleGroup) {
   return async request => {
     const actorUid = request.auth?.uid;
     const { action, parentCode, stage, roomCode, groupCount } = request.data || {};
@@ -18,6 +18,9 @@ function createGroupStageCommand(coordinator, readHistory) {
       case 'publish-draw': return coordinator.publishDraw(parentCode, stage, roomCode, actorUid);
       case 'collect': return coordinator.collect(parentCode, stage, roomCode, actorUid);
       case 'settlement-preview': return coordinator.previewSettlement(parentCode, actorUid);
+      case 'settle':
+        if (typeof settleGroup !== 'function') throw Object.assign(new Error('group-settlement-unavailable'), { code: 'group-settlement-unavailable' });
+        return settleGroup(parentCode, actorUid);
       default: throw Object.assign(new Error('group-invalid-action'), { code: 'group-invalid-action' });
     }
   };

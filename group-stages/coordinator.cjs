@@ -53,6 +53,8 @@ function publicStatus(plan) {
     drawAllPending: !plan.active && !Object.keys(plan.roomCodes).length &&
       !Object.keys(plan.event.results).length,
     readyForSettlement: !nextStage(plan.event),
+    ...(plan.settlement ? { settled: { seasonId: plan.settlement.seasonId,
+      creditedCount: plan.settlement.creditedCount } } : {}),
     ...(plan.rehearsal ? { rehearsal: true } : {}),
   };
 }

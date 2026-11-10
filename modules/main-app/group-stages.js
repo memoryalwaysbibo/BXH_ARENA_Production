@@ -18,6 +18,10 @@
     'group-count-locked': '這場已完成分組。請更新進度查看結果。',
     'group-stage-already-open': '這場已有分組開賽，無法重新抽籤。',
     'group-roster-size': '有效參賽人數超出所選組數的範圍，請確認名單與組數。',
+    'group-season-unavailable': '目前賽季無法入帳，請先核對天梯賽季。',
+    'group-settlement-conflict': '本場已有積分紀錄或結算狀態不一致，請先核對，勿重複結算。',
+    'group-player-season-mismatch': '選手賽季資料與目前賽季不一致，請先處理賽季切換。',
+    'group-insufficient-eligible-players': '可入帳的有效玩家不足兩位，請先核對名單。',
   };
 
   let rehearsalUid = null;
@@ -126,7 +130,7 @@
     }).join('') + '</ol>';
     const waitingForFinals = !key && groups.every(stage => completed.includes(stage)) &&
       playoffs.every(stage => !completed.includes(stage));
-    const message = status.readyForSettlement
+    const message = status.settled ? '主房已完成總結算｜' + status.settled.creditedCount + ' 位玩家已入帳（' + status.settled.seasonId + '）' : status.readyForSettlement
       ? (status.rehearsal ? '測試賽果已收齊，本場不發放天梯積分。' : '各階段賽果已收齊，等待全場結算。') :
       waitingForFinals ? (groupCount * 2) + ' 位晉級者已確認｜名次賽待抽籤' :
       titles[key] ? '目前進行：' + titles[key] + (drawPending ? '待抽籤' : '') :
@@ -150,6 +154,8 @@
       ).join('') + refresh;
     } else if (operator && next) {
       actions = commandButton('open', '開放' + next, busy) + refresh;
+    } else if (operator && status.readyForSettlement && !status.rehearsal && !status.settled) {
+      actions = commandButton('settle', '核對並結算主房積分', busy) + refresh;
     } else if (!operator && titles[key] && !drawPending) {
       actions = roomButton(status.roomCode, view, '進入' + titles[key] + '戰場') + refresh;
     }
@@ -215,6 +221,10 @@
         status = await model.request({ action: 'open-all', parentCode: model.code });
         if (active !== model || !model.node.isConnected) return;
       }
+      if (action === 'settle' && status?.ok === true) {
+        status = await model.request({ action: 'status', parentCode: model.code });
+        if (active !== model || !model.node.isConnected) return;
+      }
       if (status?.unprepared === true || status === null) model.status = null;
       else if (Array.isArray(status?.groups)) model.status = status;
       else throw new Error('group-invalid-response');
@@ -262,6 +272,8 @@
     node.addEventListener('click', event => {
       const button = event.target.closest('[data-group-stage-action]');
       if (active !== model || !button || button.disabled) return;
+      if (button.dataset.groupStageAction === 'settle' &&
+        !root.confirm('六個階段都已收齊，確認結算主房並將正式天梯積分入帳？')) return;
       void send(model, button.dataset.groupStageAction, button.dataset.groupStageChoice);
     });
     if (model.loaded || model.busy || model.error) render(model);
