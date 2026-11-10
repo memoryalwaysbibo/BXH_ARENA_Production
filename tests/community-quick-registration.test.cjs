@@ -1402,3 +1402,81 @@ for (const shape of ['old-revision', 'missing-creator', 'out-of-order']) test('d
   assert.equal(h.ctx.state.registrationRosterRevision, 1); assert.equal(h.ctx.state.players[0].id, 'local-pending');
 });
 
+
+test('official general detail distinguishes expired registration from disabled online registration', () => {
+  const event = quick({ eventAuthority: 'official', communityQuickRegistration: false,
+    registrationStatus: 'closed', registrationOpenAt: NOW - 60_000,
+    registrationCloseAt: NOW - 1, capacity: 32, confirmedCount: 16 });
+  assert.match(renderDetail(event), /報名已截止。/);
+  assert.match(renderDetail({ ...event, registrationEnabled: undefined }), /報名已截止。/);
+  assert.match(renderDetail({ ...event, registrationEnabled: false }), /本場目前未開放線上報名/);
+  const extended = { ...event, registrationCloseAt: NOW + 30 * 60_000 };
+  assert.equal(activeButtons(renderDetail(extended), 'self').length, 1);
+});
+
+test('confirming publication applies the reviewed deadline after a same-room listener refresh', () => {
+  const deadline = NOW + 30 * 60_000;
+  const original = { id: 'room', cloudCode: 'BXH-ROOM', players: ['first'],
+    meta: { registrationCloseAt: NOW, assignedStaffUids: ['initial'] } };
+  let modal, published;
+  const ctx = context({
+    state: original, currentAuthUid: () => 'host', isTester: () => false, isStaffTier: () => false,
+    aiCreateReviewGate: () => true, ensureSettingsFormDraft() {}, ensureRegistrationFormDraft() {},
+    syncSettingsDraftFromDom() {}, syncRegistrationDraftFromDom() {},
+    resetSettingsFormDraft() {}, resetRegistrationFormDraft() {},
+    saveRecord: () => assert.fail('Preview must not write the room cache'),
+    settingsFormDraft: { name: 'General event', date: '2026-10-06', location: 'Venue' },
+    registrationFormDraft: { registrationEnabled: true, registrationOpenAt: NOW - 60_000,
+      registrationCloseAt: deadline, registrationCapacity: 32, registrationVisibility: 'public' },
+    applyVenueDraftToState: (draft, room) => {
+      room.meta.location = draft.location;
+      room.eventInfo = { venue: { name: draft.location } };
+    },
+    normalizeEventInfoV2: info => ({ ...info }),
+    registrationParticipantNameMode: () => 'realName', FORMAT_LABELS: {}, BATTLE_MODE_LABELS: {}, PLAY_MODE_LABELS: {},
+    publicationValidationErrors: meta => ctx.window.BXHDomainUtils.publicationValidationErrors(meta),
+    openModal: config => { modal = config; }, publishRegistrationConfig: () => { published = clone(ctx.state); },
+    showToast() {},
+  });
+  const actionStart = core.indexOf('  if(action==="open-registration-publish-preview"){');
+  const actionEnd = core.indexOf('  if(action==="set-ladder-mode"){', actionStart);
+  assert(actionStart >= 0 && actionEnd > actionStart);
+  vm.runInContext('function openPreview(action){' + core.slice(actionStart, actionEnd) + '}', ctx);
+  ctx.openPreview('open-registration-publish-preview');
+  assert.equal(original.meta.registrationCloseAt, NOW);
+  assert.match(modal.message, /報名截止/);
+  ctx.state = { ...original, players: ['first', 'new'], eventInfo: { source: 'latest' },
+    meta: { ...original.meta, registrationCloseAt: NOW, assignedStaffUids: ['latest'] } };
+  modal.onConfirm();
+  assert.equal(published.meta.registrationCloseAt, deadline);
+  assert.equal(published.meta.cancellationDeadline, deadline + 3 * 60 * 60_000);
+  assert.deepEqual(published.players, ['first', 'new']);
+  assert.deepEqual(published.meta.assignedStaffUids, ['latest']);
+  assert.deepEqual(published.eventInfo, { source: 'latest', venue: { name: 'Venue' } });
+
+  published = undefined;
+  ctx.openPreview('open-registration-publish-preview');
+  ctx.state = { ...ctx.state, id: 'different-room' };
+  modal.onConfirm();
+  assert.equal(published, undefined);
+});
+
+test('confirmed publication reports a local cache failure in a single message', async () => {
+  const toasts = [];
+  const ctx = context({
+    state: { id: 'room', cloudCode: 'BXH-ROOM', meta: { registrationEnabled: true,
+      registrationCloseAt: NOW + 30 * 60_000 } },
+    saveState: async options => {
+      assert.equal(options.registrationSettings, true);
+      options.cloudSaved = true;
+      return false;
+    },
+    publishPendingPosterCover: async () => {}, render() {},
+    showToast: (message, error) => toasts.push({ message, error }),
+  });
+  vm.runInContext(extractFunction(core, 'publishRegistrationConfig'), ctx);
+  await ctx.publishRegistrationConfig();
+  assert.equal(toasts.length, 1);
+  assert.equal(toasts[0].error, true);
+  assert.match(toasts[0].message, /已更新到雲端.*本機快取未完成/);
+});
