@@ -270,27 +270,54 @@ function createServer(ctx){
  function clear(){pending=null;try{ctx.storage?.removeItem(key);}catch{}}
  async function readPair(){
   let timer;
-  const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('confirmation-timeout')),ctx.readTimeoutMs??15000);});
+  const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('confirmation-timeout')),ctx.readTimeoutMs??8000);});
   const latest=await Promise.race([Promise.resolve().then(ctx.read),timeout]).finally(()=>clearTimeout(timer));
   if(!ctx.current()||!latest?.ok||latest.data?.id!==ctx.roomId||!latest.publicData||
      signature(latest.data)!==signature(latest.publicData))throw Error('confirmation-timeout');
   return latest;
+ }
+ async function confirm(receipt,kind){
+  // A server-only read can fail briefly even after the transaction has committed.
+  // Keep the same operation pending and retry the read, never generating a new draw.
+  const attempts=ctx.confirmationAttempts??3;
+  for(let attempt=0;attempt<attempts;attempt++){
+   try{
+    const latest=await readPair();
+    if(latest.data.bracketDraw?.id===receipt.drawId&&
+       (kind!=='start'||latest.data.startedAt===receipt.startedAt&&latest.publicData.startedAt===receipt.startedAt)){
+     return latest;
+    }
+    if(Number(latest.data.bracketDraw?.revision||0)>Number(receipt.revision||0)&&kind!=='start'){
+     ctx.apply(latest.data);clear();throw Error('bracket-version-conflict');
+    }
+   }catch(e){
+    if(e.message!=='confirmation-timeout')throw e;
+   }
+   if(!ctx.current())return null;
+   if(attempt+1<attempts)await new Promise(resolve=>setTimeout(resolve,(ctx.confirmationDelayMs??500)*(attempt+1)));
+  }
+  throw Error('confirmation-timeout');
  }
  async function retry(){
   if(busy||!pending||!ctx.current())return false;
   const {action:kind,data}=pending;
   busy=true;error='';result='';phase='writing';ctx.changed();
   try{
-   const receipt=await ctx.send(kind,data);
+   let receipt;
+   for(let attempt=0;attempt<2;attempt++){
+    try{receipt=await ctx.send(kind,data);break;}
+    catch(e){
+     if(!ctx.current())return false;
+     if(attempt||!['functions/deadline-exceeded','functions/unavailable','functions/internal','functions/unknown'].includes(e.code))throw e;
+     // The first call may have committed before its acknowledgement was lost.
+     // Replaying the identical operation ID returns the original receipt.
+    }
+   }
    if(!ctx.current())return false;
    if(!receipt?.ok||!receipt.drawId||(kind==='start'&&!receipt.startedAt))throw Error('confirmation-timeout');
    phase='confirming';ctx.changed();
-   const latest=await readPair();
-   if(latest.data.bracketDraw?.id!==receipt.drawId||
-      (kind==='start'&&(latest.data.startedAt!==receipt.startedAt||latest.publicData.startedAt!==receipt.startedAt))){
-    if(Number(latest.data.bracketDraw?.revision||0)<=Number(receipt.revision||0)||kind==='start')throw Error('confirmation-timeout');
-    ctx.apply(latest.data);clear();throw Error('bracket-version-conflict');
-   }
+   const latest=await confirm(receipt,kind);
+   if(!latest)return false;
    ctx.apply(latest.data);clear();result='success';ctx.success(kind);return true;
   }catch(e){
    if(!ctx.current())return false;
