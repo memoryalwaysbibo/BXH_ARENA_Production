@@ -8,7 +8,7 @@
   }
   function participantIdentity(meta,profile={},child=null){
     const realName=clean(child?child.name:profile.realName)||(!child?clean(profile.displayName):'')||'玩家';
-    const gameId=clean(child?child.nickname:profile.gameId)||(!child?clean(profile.nickname):'');
+    const gameId=clean(child?child.nickname:profile.gameId);
     const policy=roomNameMode(meta);
     const preference=child?.preferredNameMode??profile.preferredNameMode;
     const nameMode=policy==='any'?(preference==='gameId'?'gameId':'realName'):policy;

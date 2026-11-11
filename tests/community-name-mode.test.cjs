@@ -25,6 +25,8 @@ test('unrestricted naming respects personal preferences and trims empty IDs',()=
   assert.equal(Names.participantIdentity(metadata('any'),{...profile,preferredNameMode:'realName'}).displayName,'本人本名');
   assert.equal(Names.participantIdentity(metadata('gameId'),{...profile,gameId:'  '}).displayName,'本人本名');
   assert.equal(Names.participantIdentity(metadata('any'),{...profile,gameId:''}).displayName,'本人本名');
+  assert.equal(Names.participantIdentity(metadata('any'),{...profile,gameId:'',nickname:'舊暱稱'}).displayName,'本人本名');
+  assert.equal(Names.participantIdentity(metadata('gameId'),{...profile,gameId:' ',nickname:'舊暱稱'}).displayName,'本人本名');
 });
 test('child names never fall through to guardian IDs',()=>{
   for(const mode of ['gameId','any']){
@@ -105,7 +107,7 @@ test('family join preserves distinct child ID and account name under unrestricte
   assert.equal(players.find(p=>!p.familyPlayerId).name,'本人ID');
 });
 test('backend unrestricted fallback uses real name when account ID is absent',async()=>{
-  const h=harness('any',{gameId:'  '});const r=await h.handler(h.request());assert.equal(r.rows[0].participantName,'本人本名');
+  const h=harness('any',{gameId:'  ',nickname:'舊暱稱'});const r=await h.handler(h.request());assert.equal(r.rows[0].participantName,'本人本名');
 });
 test('official registration keeps existing name behavior',async()=>{
   const h=harness('realName',{},'official');const r=await h.handler(h.request());assert.equal(r.rows[0].participantName,'本人本名');
