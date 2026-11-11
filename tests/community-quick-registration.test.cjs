@@ -517,6 +517,7 @@ test('new default room keeps online registration closed with a null optional cap
   await h.run();
   assert.equal(h.creates.length, 1);
   const saved = h.creates[0];
+  assert.equal(saved.meta.stations, 1);
   assert.equal(saved.meta.registrationEnabled, false);
   assert.equal(saved.meta.registrationStatus, 'closed');
   assert.equal(saved.meta.registrationCapacity, null);
@@ -524,6 +525,21 @@ test('new default room keeps online registration closed with a null optional cap
   assert.equal(saved.players[0].isRoomOwner, true);
   assert.equal(saved.ownerUid, 'local-host');
   assert.equal(h.ctx.communityCreateSaving, false);
+});
+
+test('quick create uses the entered room name and battle station count', async () => {
+  const h = createHarness({ fields: { 'community-name': { value: ' Friday match ' }, 'community-stations': { value: '12' } } });
+  await h.run();
+  assert.equal(h.creates[0].meta.name, 'Friday match');
+  assert.equal(h.creates[0].meta.stations, 12);
+  assert.equal(h.ctx.communityRoomActiveTab, 'live');
+});
+
+test('quick create rejects an out-of-range station count', async () => {
+  const h = createHarness({ fields: { 'community-stations': { value: '17' } } });
+  await h.run();
+  assert.equal(h.creates.length, 0);
+  assert(h.toasts.some(t => t.error));
 });
 
 test('explicit registration checkbox opens newly created room without scheduled dates', async () => {

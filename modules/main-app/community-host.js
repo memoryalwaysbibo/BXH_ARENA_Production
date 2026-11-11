@@ -44,49 +44,90 @@ function renderCommunityCreateScreen(){
   const hostName=String(userProfile?.gameId||userProfile?.displayName||userProfile?.nickname||userProfile?.realName||firebaseUser?.email||"玩家").trim();
   return authShellOpen("","community-create-content","community-create-shell")+`<div class="community-create-topbar"><button class="btn btn-ghost" type="button" data-action="community-create-cancel">← 返回我的房間</button></div>${authBrandHeader()}<div class="auth-card community-create-card">
     <div class="auth-card-title">快速開房</div>
-    <div class="banner"><span>玩家主辦｜一般賽事｜不計 BXH 天梯積分</span></div>
-    <p class="hint">房間名稱：${esc(hostName)}的房間｜日期與時間以建立當下的台灣時間為準。</p>
-    <div class="field"><label>開房模式</label><select id="community-format"><option value="single">單淘汰賽</option><option value="double">雙敗制</option><option value="roundrobin">單循環賽</option></select></div>
-    <label class="settings-check-row"><input id="community-registration-enabled" type="checkbox"><span><b>開放線上報名</b><small style="display:block;color:var(--metal-dim)">勾選後建立房間即可報名，不用設定時間。</small></span></label>
-    <div class="field"><label>人數上限（選填）</label><input id="community-capacity" type="number" min="1" step="1" placeholder="留空不限人數"><small class="hint">沒填就沒上限；有填就依設定，包含參賽中的房主與現場選手。</small></div>
-    <button class="hoc-btn hoc-btn-primary btn-block" data-action="community-create-submit" ${communityCreateSaving?"disabled":""}>${communityCreateSaving?"建立中…":"建立房間"}</button>
-    <div class="auth-links"><button class="link-btn" data-action="community-create-cancel">返回我的房間</button></div>
+    <p class="hint">玩家一般賽事，不計 BXH 天梯積分。</p>
+    <div class="field"><label for="community-name">房間名稱</label><input id="community-name" type="text" value="${esc(hostName)}的房間"></div>
+    <div class="community-settings-grid community-settings-pair">
+      <div class="field"><label for="community-format">賽制</label><select id="community-format"><option value="single">單淘汰賽</option><option value="double">雙敗制</option><option value="roundrobin">單循環賽</option></select></div>
+      <div class="field"><label for="community-stations">戰鬥台數</label><input id="community-stations" type="number" min="1" max="16" step="1" value="1"></div>
+    </div>
+    <div class="field"><label for="community-capacity">人數上限（選填）</label><input id="community-capacity" type="number" min="1" step="1" placeholder="留空不限人數"></div>
+    <label class="settings-check-row"><input id="community-registration-enabled" type="checkbox"><span><b>開放線上報名</b><small class="hint">開房後立即開放報名。</small></span></label>
+    <button class="hoc-btn hoc-btn-primary btn-block" data-action="community-create-submit" ${communityCreateSaving?"disabled":""}>${communityCreateSaving?"建立中…":"立即開房"}</button>
   </div>`+authShellClose();
 }
 function renderCommunitySettings(){
   const m=state.meta||{},reg=!!m.registrationEnabled,quickRegistration=m.battleMode!=="team",accessLocked=!!state.startedAt||!!state.bracketSize||(state.matches||[]).some(x=>!x?.isBye)||state.archiveStatus==="completed";
-  return `<div class="panel"><div class="panel-title">一般賽事設定 <span class="badge badge-metal">COMMUNITY</span></div>
-    <div class="banner"><span>玩家一般賽事可開放線上報名；固定不計 BXH 官方天梯積分。</span></div>
+  const registrationLocked=onsiteRegistrationSettingsLocked();
+  const hasSchedule=!!(m.registrationOpenAt||m.registrationCloseAt||m.cancellationDeadline||m.waitlistCapacity);
+  return `<section class="panel community-settings">
+    <div class="panel-title">房間設定</div>
     ${window.__BXH_COMMUNITY_SUMMARY_STATUS?.[state.cloudCode]?.ok===false?'<div class="banner warn"><span>設定已儲存，參賽人數摘要尚未同步。</span><button class="btn btn-ghost btn-sm" data-action="community-sync-summary">重新同步人數</button></div>':""}
-    <div class="grid grid-2"><div class="field"><label>賽事名稱</label><input id="cset-name" value="${esc(m.name||"")}"></div><div class="field"><label>活動日期</label><input id="cset-date" type="date" value="${esc(m.date||"")}"></div><div class="field"><label>活動地點</label><input id="cset-location" value="${esc(m.location||"")}"></div><div class="field"><label>開賽時間</label><input id="cset-start" type="time" step="1800" value="${esc(m.startTime||"")}"></div></div>
-    <div class="grid grid-2"><div class="field"><label>賽制</label><select id="cset-format"><option value="single" ${m.formatType==="single"?"selected":""}>單淘汰賽</option><option value="double" ${m.formatType==="double"?"selected":""}>雙敗制</option><option value="roundrobin" ${m.formatType==="roundrobin"?"selected":""}>單循環賽</option></select></div><div class="field"><label>戰鬥台數</label><input id="cset-stations" type="number" min="1" max="16" value="${Number(m.stations||1)}"></div></div>
-    ${managedRegistrationSettingsNotice()}
-    <fieldset style="border:0;padding:0;margin:14px 0 0;min-width:0;${onsiteRegistrationSettingsLocked()?"opacity:.5;cursor:not-allowed":""}" ${onsiteRegistrationSettingsLocked()?'disabled aria-describedby="onsite-registration-lock-notice"':""}><div class="panel">
-      <label class="settings-check-row"><input id="cset-registration-enabled" type="checkbox" ${reg?"checked":""}><span><b>開放線上報名</b><small style="display:block;color:var(--metal-dim)">${quickRegistration?"勾選並儲存後即可報名；未設定時間時，持續開放到房主關閉報名或開賽。":"團體賽沿用排程報名，需設定正取隊伍上限與報名開放／截止時間。"}</small></span></label>
-      <div class="field" style="margin-top:12px"><label>${quickRegistration?"人數上限（選填）":"正取隊伍上限"}</label><input id="cset-capacity" type="number" min="1" step="1" value="${Number(m.registrationCapacity)>0?esc(String(m.registrationCapacity)):quickRegistration?"":"16"}" placeholder="${quickRegistration?"留空不限人數":"請填寫正整數"}"><small class="hint">${quickRegistration?"沒填就沒上限；有填就依設定，包含參賽中的房主與現場選手。":"團體賽名額以隊伍計算，須填寫正整數。"}</small></div>
-      <details class="settings-accordion" ${!quickRegistration||m.registrationOpenAt||m.registrationCloseAt||m.cancellationDeadline||m.waitlistCapacity?"open":""}><summary><span>${quickRegistration?"進階設定（選填）：備取與排程":"團體賽報名排程與備取"}</span></summary><div class="grid grid-2" style="margin-top:12px">
-        <div class="field"><label>備取名額</label><input id="cset-waitlist" type="number" min="0" step="1" value="${Number(m.waitlistCapacity||0)}"></div>
-        <div class="field"><label>${quickRegistration?"報名開放時間（留空立即開放）":"報名開放時間（開放報名時必填）"}</label><input id="cset-reg-open" type="datetime-local" value="${esc(communityDateTimeValue(m.registrationOpenAt))}"></div>
-        <div class="field"><label>${quickRegistration?"報名截止時間（選填）":"報名截止時間（開放報名時必填）"}</label><input id="cset-reg-close" type="datetime-local" value="${esc(communityDateTimeValue(m.registrationCloseAt))}"></div>
-        <div class="field"><label>${quickRegistration?"取消報名期限（留空可於開賽前取消）":"取消報名期限（留空沿用報名截止時間）"}</label><input id="cset-reg-cancel" type="datetime-local" value="${esc(communityDateTimeValue(m.cancellationDeadline))}"></div>
-      </div><p class="hint">${quickRegistration?"已有排程會保留；清空開放／截止時間後，改用立即開放與房主手動關閉。":"團體賽保留既有排程報名方式。"}</p></details>
+    <div class="field"><label for="cset-name">房間名稱</label><input id="cset-name" type="text" value="${esc(m.name||"")}"></div>
+    <div class="community-settings-grid community-settings-pair">
+      <div class="field"><label for="cset-format">賽制</label><select id="cset-format"><option value="single" ${m.formatType==="single"?"selected":""}>單淘汰賽</option><option value="double" ${m.formatType==="double"?"selected":""}>雙敗制</option><option value="roundrobin" ${m.formatType==="roundrobin"?"selected":""}>單循環賽</option></select></div>
+      <div class="field"><label for="cset-stations">戰鬥台數</label><input id="cset-stations" type="number" min="1" max="16" value="${Number(m.stations||1)}"></div>
     </div>
+    ${managedRegistrationSettingsNotice()}
+    <fieldset class="community-settings-fieldset" ${registrationLocked?'disabled aria-describedby="onsite-registration-lock-notice"':""}>
+      <div class="field"><label for="cset-capacity">${quickRegistration?"人數上限（選填）":"正取隊伍上限"}</label><input id="cset-capacity" type="number" min="1" step="1" value="${Number(m.registrationCapacity)>0?esc(String(m.registrationCapacity)):quickRegistration?"":"16"}" placeholder="${quickRegistration?"留空不限人數":"請填寫正整數"}"><small class="hint">${quickRegistration?"上限包含參賽的房主和現場選手。":"團體賽名額以隊伍計算，須填寫正整數。"}</small></div>
+      <details id="community-settings-registration" class="settings-accordion" ${!quickRegistration||reg||hasSchedule?"open":""}>
+        <summary><span>線上報名、備取與排程</span></summary>
+        <div class="settings-accordion-body">
+          <label class="settings-check-row"><input id="cset-registration-enabled" type="checkbox" ${reg?"checked":""}><span><b>開放線上報名</b><small class="hint">${quickRegistration?"留空開放時間，儲存後即開放報名。":"團體賽沿用排程報名。正取隊伍上限與報名開放／截止時間於開放報名時必填。"}</small></span></label>
+          <div class="community-settings-grid">
+            <div class="field"><label for="cset-waitlist">備取名額</label><input id="cset-waitlist" type="number" min="0" step="1" value="${Number(m.waitlistCapacity||0)}"></div>
+            <div class="field"><label for="cset-reg-open">${quickRegistration?"報名開放時間（選填）":"報名開放時間"}</label><input id="cset-reg-open" type="datetime-local" value="${esc(communityDateTimeValue(m.registrationOpenAt))}"></div>
+            <div class="field"><label for="cset-reg-close">${quickRegistration?"報名截止時間（選填）":"報名截止時間"}</label><input id="cset-reg-close" type="datetime-local" value="${esc(communityDateTimeValue(m.registrationCloseAt))}"></div>
+            <div class="field"><label for="cset-reg-cancel">取消報名期限（選填）</label><input id="cset-reg-cancel" type="datetime-local" value="${esc(communityDateTimeValue(m.cancellationDeadline))}"></div>
+          </div>
+          <p class="hint">${quickRegistration?"未設定截止時間時，報名開放到房主關閉報名或開賽。未設定取消期限時，玩家可在開賽前取消。":"未設定取消期限時，沿用報名截止時間。"}</p>
+        </div>
+      </details>
     </fieldset>
-    <div class="panel" style="margin-top:14px"><div class="panel-title">🔐 房間存取</div><div class="grid grid-2"><div class="field"><label>房間類型</label><select id="cset-access-mode" ${accessLocked?"disabled":""}><option value="public" ${m.roomAccessMode!=="password"?"selected":""}>公開房間</option><option value="password" ${m.roomAccessMode==="password"?"selected":""}>密碼房間</option></select></div><div class="field"><label>房間密碼</label><input id="cset-access-password" type="password" maxlength="20" autocomplete="new-password" ${accessLocked?"disabled":""} placeholder="${m.roomAccessMode==="password"?"留空保留原密碼；輸入新值可重設":"切換為密碼房時輸入 4～20 字元"}"></div></div><p class="hint">${accessLocked?"比賽已開始或已建立對戰結構，房間存取設定已鎖定。":"切換或重設密碼會撤銷舊的 Access Grant；玩家需以新密碼重新解鎖。密碼不會寫入公開房間資料。"}</p></div>
-    <div class="btn-row"><button class="btn btn-primary" data-action="community-save-settings" ${communitySettingsSaving||(onsiteRegistrationSettingsLocked()&&state.onsiteWaitlistFinalized!==true)?"disabled":""}>${communitySettingsSaving?"儲存中…":onsiteRegistrationSettingsLocked()&&state.onsiteWaitlistFinalized!==true?"候補抽選中・暫停儲存":"儲存一般賽事設定"}</button><button class="btn btn-ghost" data-action="community-copy-code" data-code="${esc(state.cloudCode||"")}">複製房間代碼</button><button class="btn btn-ghost" data-action="open-share-modal">分享賽事／QR</button></div>
-  </div>`;
+    <details id="community-settings-schedule" class="settings-accordion">
+      <summary><span>活動日期、時間與地點</span></summary>
+      <div class="settings-accordion-body community-settings-grid">
+        <div class="field"><label for="cset-date">活動日期</label><input id="cset-date" type="date" value="${esc(m.date||"")}"></div>
+        <div class="field"><label for="cset-start">開賽時間</label><input id="cset-start" type="time" value="${esc(m.startTime||"")}"></div>
+        <div class="field"><label for="cset-location">活動地點</label><input id="cset-location" type="text" value="${esc(m.location||"")}"></div>
+      </div>
+    </details>
+    <details id="community-settings-access" class="settings-accordion">
+      <summary><span>房間存取與密碼</span></summary>
+      <div class="settings-accordion-body community-settings-access">
+        <div class="community-settings-grid">
+          <div class="field"><label for="cset-access-mode">房間類型</label><select id="cset-access-mode" ${accessLocked?"disabled":""}><option value="public" ${m.roomAccessMode!=="password"?"selected":""}>公開房間</option><option value="password" ${m.roomAccessMode==="password"?"selected":""}>密碼房間</option></select></div>
+          <div class="field community-settings-password"><label for="cset-access-password">房間密碼</label><input id="cset-access-password" type="password" maxlength="20" autocomplete="new-password" ${accessLocked?"disabled":""} placeholder="${m.roomAccessMode==="password"?"留空保留原密碼":"輸入 4～20 字元"}"></div>
+        </div>
+        <p class="hint">${accessLocked?"比賽已開始或已建立對戰表，房間存取設定已鎖定。":"變更密碼後，已解鎖的玩家需重新輸入。"}</p>
+      </div>
+    </details>
+    <div class="community-settings-save"><button class="btn btn-primary" data-action="community-save-settings" ${communitySettingsSaving||(registrationLocked&&state.onsiteWaitlistFinalized!==true)?"disabled":""}>${communitySettingsSaving?"儲存中…":registrationLocked&&state.onsiteWaitlistFinalized!==true?"候補抽選中・暫停儲存":"儲存一般賽事設定"}</button></div>
+  </section>`;
+}
+function renderCommunityRoomOverview(){
+  const code=state.cloudCode;
+  const canPrepare=!state.startedAt&&!state.meta?.eventCancelled&&state.archiveStatus!=="completed"&&!(state.systemClosure&&!state.systemClosure.restoredAt);
+  const canStart=canPrepare&&state.bracketSize&&state.matches.length;
+  return `<section class="panel community-room-overview" aria-label="房間總覽">
+    <div class="hint">玩家一般賽事 · 不計天梯積分</div>
+    <h1>${esc(state.meta?.name||"未命名房間")}</h1>
+    ${code?`<div class="community-room-code"><span>房間代碼</span><strong>${esc(code)}</strong></div>
+    <div class="community-room-actions"><button class="btn btn-ghost" data-action="community-copy-code" data-code="${esc(code)}">複製代碼</button><button class="btn btn-ghost" data-action="open-share-modal">分享／QR</button></div>`:""}
+    ${canStart?`<button class="btn btn-primary btn-block" data-action="start-tournament" ${bracketCommitBlocked()?"disabled":""}>開始比賽</button>`:canPrepare?'<button class="btn btn-primary btn-block" data-action="community-switch-room-tab" data-tab="people" data-section="bracket">抽籤與開賽</button>':""}
+  </section>`;
 }
 function renderCommunityRoomApp(){
-  const tabs=[["live","即時戰況"],["bracket","對戰表"],["referee","裁判台"],["people","人員管理"],["settings","賽事設定"]];
-  let content=communityRoomActiveTab==="bracket"?renderBracket():communityRoomActiveTab==="referee"?renderReferee():communityRoomActiveTab==="people"?renderPeopleManagement():communityRoomActiveTab==="settings"?renderCommunitySettings():renderLive();
+  const tabs=[["live","房間總覽"],["bracket","對戰表"],["referee","裁判台"],["people","人員管理"],["settings","賽事設定"]];
+  let content=communityRoomActiveTab==="bracket"?renderBracket():communityRoomActiveTab==="referee"?renderReferee():communityRoomActiveTab==="people"?renderPeopleManagement():communityRoomActiveTab==="settings"?renderCommunitySettings():renderCommunityRoomOverview()+renderLive();
   const exp=communityRoomExpiryMs(state);
   return `<div class="stickytop"><header class="topbar"><button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button><div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">玩家一般賽事</span>${topbarConnectionRailHtml()}</div><div class="spacer"></div><span class="three-gods-puzzle-layer" aria-hidden="true"></span><span class="hunter-license-layer" aria-hidden="true"></span><span class="akatsuki-red-cloud-layer" aria-hidden="true"></span><span class="clow-seal-layer" aria-hidden="true"></span><span class="zeon-emblem-layer" aria-hidden="true"></span><span class="gundam-haro-layer" aria-hidden="true"></span><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true"><span class="badge badge-metal">一般賽事｜不計積分</span><button class="btn btn-ghost btn-sm" data-action="community-exit-room">返回我的房間</button></header>
   <div class="community-room-notice">主辦人：${esc((userProfile&& (userProfile.displayName||userProfile.realName))||"玩家")}　｜　代碼 ${esc(state.cloudCode||"—")}　｜　完整房間預計保留至 ${exp?new Date(exp).toLocaleString():"—"}</div>
   ${communityRoomActiveTab!=="settings"&&window.__BXH_COMMUNITY_SUMMARY_STATUS?.[state.cloudCode]?.ok===false?'<div class="banner warn"><span>設定已儲存，參賽人數摘要尚未同步。</span><button class="btn btn-ghost btn-sm" data-action="community-sync-summary">重新同步人數</button></div>':""}
-  <nav class="tabs">${tabs.map(t=>`<button class="${communityRoomActiveTab===t[0]?"active":""}" data-action="community-switch-room-tab" data-tab="${t[0]}">${t[1]}</button>`).join("")}</nav></div><main>${content}</main>${renderModal()}${celebrationOpen?renderCelebrationOverlay():""}${shareModalOpen?renderShareModal():""}${renderEventEntryModal()}${renderQrScannerModal()}`;
+  <nav class="tabs community-room-tabs" aria-label="房間管理">${tabs.map(t=>`<button class="${communityRoomActiveTab===t[0]?"active":""}" data-action="community-switch-room-tab" data-tab="${t[0]}" ${communityRoomActiveTab===t[0]?'aria-current="page"':""}>${t[1]}</button>`).join("")}</nav></div><main>${content}</main>${renderModal()}${celebrationOpen?renderCelebrationOverlay():""}${shareModalOpen?renderShareModal():""}${renderEventEntryModal()}${renderQrScannerModal()}`;
 }
 
-Object.assign(window.BXHCommunityHostFeature||(window.BXHCommunityHostFeature={}),{communityPhaseLabel,communityExpiryLabel,renderPlayerCommunityHostTab,renderCommunityCreateScreen,renderCommunitySettings,renderCommunityRoomApp});
+Object.assign(window.BXHCommunityHostFeature||(window.BXHCommunityHostFeature={}),{communityPhaseLabel,communityExpiryLabel,renderPlayerCommunityHostTab,renderCommunityCreateScreen,renderCommunitySettings,renderCommunityRoomOverview,renderCommunityRoomApp});
 
 })();
 
