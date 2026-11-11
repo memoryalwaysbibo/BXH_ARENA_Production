@@ -272,6 +272,9 @@ jobs:
           path: test-results/partner-overview/
           if-no-files-found: warn
           retention-days: 7
+      - name: Verify stable QR camera preview across app re-renders
+        if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
+        run: node tests/qr-scanner-browser.cjs
       - name: Run isolated browser smoke tests (one controlled retry)
         shell: bash
         run: |
@@ -290,9 +293,6 @@ jobs:
             echo "::error title=CODE_FAIL_OR_INFRA_FAIL::UI Smoke failed twice."
             exit "$rc"
           fi
-      - name: Verify stable QR camera preview across app re-renders
-        if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
-        run: node tests/qr-scanner-browser.cjs
       - name: Verify Hunter Clash A1 entry in Chromium
         if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
         run: |
@@ -453,4 +453,27 @@ jobs:
           retention-days: 7
 
 
+
+
+  qr_lobby_pointer:
+    needs: classify
+    if: ${{ needs.classify.outputs.run_ui == 'true' }}
+    name: QR entry - iPhone held-pointer regression
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install browser test runner
+        run: npm install --no-package-lock --ignore-scripts
+      - name: Verify lobby pointer targets above the fixed check-in bar
+        run: npx playwright test --config=playwright.config.cjs tests/e2e/lobby-stable-updates.spec.cjs --project=iphone --workers=1 --grep 'pointer down survives|removal during a held pointer'
+      - name: Upload pointer regression failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bxh-qr-lobby-pointer-${{ github.run_id }}
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
 
