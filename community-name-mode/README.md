@@ -33,3 +33,5 @@ node --check /path/to/staged/family-registration.js
 Cloud Shell npm 12 的 allowScripts 阻止 node 套件安裝腳本時，診斷曾停在 NODE22_BINARY_NOT_FOUND。新版診斷不需該安裝腳本，依官方 latest-v22.x 校驗清單選擇 Linux 架構，從固定版本 URL 下載並驗證 archive，只解出 bin/node。下載校驗錯誤或來源網域不同即停止。
 
 Node 22.23.4 實際來源比較結果：原版與候選皆可透過 Framework 5.0.5 啟動監聽，啟動時 RSS 分別約 114608／113832 kB；雲端 00042／00043 的已讀取環境變數、記憶體、啟動探測與基底映像 URI 相同，尚未重現雲端失敗。inspect-images.py 只讀兩個固定 revision 的 Artifact Registry 映像 manifest／config，逐層核對 descriptor SHA-256，輸出啟動程序、指定環境欄位與 buildpack 版本。存取憑證只送至固定 registry 主機，簽名 GCS 下載不附 Bearer，沒有映像寫入或服務更新功能。
+
+失敗 revision 的完整建置紀錄顯示 Node 22.23.4、注入 Framework 3.5.1、函式目標 familyRegistration 與預設 web 程序，建置及映像推送均完成。診斷預設 Framework 已固定為 3.5.1 並檢查安裝結果，補驗先前本機 5.0.5 與雲端版本不一致的限制。尚未取得 Framework 3.5.1 的實際啟動比較，不能把此前本機通過視為雲端環境完整重現。

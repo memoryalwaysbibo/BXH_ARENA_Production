@@ -21,6 +21,7 @@ import zipfile
 
 MANIFEST_SHA = '8b8072bbc7760ed2f5d77c9670d94b12c9b5b2e8d71a7b6e439f7af6b1b41abf'
 REVISIONS = ('familyregistration-00042-wor','familyregistration-00043-xet')
+FRAMEWORK_VERSION = '3.5.1'
 
 def need(value, reason):
     if not value:
@@ -199,9 +200,10 @@ def main():
         (baseline/'node_modules').symlink_to(candidate/'node_modules',target_is_directory=True)
         framework_root = work/'framework'
         subprocess.check_call(['npm','install','--prefix',str(framework_root),'--no-package-lock',
-            '--ignore-scripts','--no-audit','--no-fund','@google-cloud/functions-framework'],timeout=300)
+            '--ignore-scripts','--no-audit','--no-fund','@google-cloud/functions-framework@'+FRAMEWORK_VERSION],timeout=300)
         package = framework_root/'node_modules/@google-cloud/functions-framework/package.json'
         cfg = json.loads(package.read_text())
+        need(cfg['version'] == FRAMEWORK_VERSION, 'FRAMEWORK_VERSION_MISMATCH')
         framework = package.parent/cfg['bin']['functions-framework']
         need(framework.is_file(),'FRAMEWORK_CLI_NOT_FOUND')
         emit('LOCAL_FRAMEWORK_VERSION',version=cfg['version'])
