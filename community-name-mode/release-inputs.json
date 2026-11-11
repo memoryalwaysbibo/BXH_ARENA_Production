@@ -5,7 +5,7 @@
     "handlerSha256": "c3ac74f1f3e8dbb6a6632dc361ead119b28ab3fa4c3dd4087a5aaf9cfbedd6bd"
   },
   "registrationQueueV2": {
-    "archiveSha256": "e131429081496d5b7dcabf2dca2ad3dd492a599fa5f7cdd197d64ce5a54605b6",
+    "archiveSha256": "5bd05f66afbf99a42d53f27c87b993e6dc9bbca02ba1d69f7544368e0d38a72a",
     "handlerPath": "writer-inputs/familyRegistration/family-registration.js",
     "handlerSha256": "77dcbef164103cd7687fa17a76ffd4455beef6bfc73bf0f2c785d4e01e1a741a",
     "familyFiles": {
