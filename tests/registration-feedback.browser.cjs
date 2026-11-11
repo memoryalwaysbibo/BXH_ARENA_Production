@@ -21,6 +21,7 @@ async function fixture(t,options={}){
  const fixturePageId=crypto.randomUUID();
  let firebaseUser={uid:new URL(location.href).searchParams.get('account')||'user1'};
  const authHandle={currentUser:firebaseUser},fx={doc:()=>null,getDoc:async()=>({exists:()=>true,data:()=>({battleMode:'individual'})})},dbHandle={};
+ const rememberRegistrationV2Route=()=>{};
  const currentAuthUid=()=>firebaseUser.uid,userProfile={displayName:'測試玩家'},esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const originalCreate=BXHRegistrationFeedback.create;
  BXHRegistrationFeedback.create=options=>originalCreate({...options,slowMs:600,deadlineMs:1500,readTimeoutMs:250,delays:[3000]});
