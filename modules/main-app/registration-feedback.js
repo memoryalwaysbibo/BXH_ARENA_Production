@@ -100,7 +100,7 @@
       clearTimers(e);remove(e);e.state='failed';e.message=e.message||(e.action==='cancel'?'本次取消報名未完成。':failureMessage(error));e.settle?.(null,error);emit();
     }
     function queueCheck(e){
-      if(!current(e)||!ACTIVE.includes(e.state)||!e.ids||e.hidden)return;
+      if(!current(e)||!ACTIVE.includes(e.state)||!e.ids)return;
       const queuedJoin=e.action!=='cancel'&&['queued','running'].includes(e.queueState);
       if(e.attempts>delays.length+(queuedJoin?2:0)){e.autoPaused=true;emit();return;}
       if(e.autoTimer!==null){unschedule(e.autoTimer);e.timers.delete(e.autoTimer);}
@@ -233,9 +233,9 @@
         return {ok:true,status:rows[0].status,rows:rows.map(r=>({registrationId:r.registrationId,status:r.status})),recovered:true};
       },previous.action).then(result=>{if(getUid()===previous.uid&&entries.get(code)?.state==='confirmed')onRecovered({code,result});return result;});
     }
-    function dismiss(code){const e=entries.get(code);if(!e)return;if(e.state==='unconfirmed'&&!e.flight){clearTimers(e);e.hidden=true;emit();return;}if(!ACTIVE.includes(e.state)){clearTimers(e);entries.delete(code);emit();}}
+    function dismiss(code){const e=entries.get(code);if(!e)return;if(ACTIVE.includes(e.state)){e.hidden=true;emit();return;}clearTimers(e);entries.delete(code);emit();}
     function refresh(force=false){restore(force);emit();}
-    function resume(){restore();for(const e of entries.values())if(!e.hidden&&e.ids&&ACTIVE.includes(e.state)&&e.attempts<=delays.length)void recheck(e.code);emit();}
+    function resume(){restore();for(const e of entries.values())if(e.ids&&ACTIVE.includes(e.state)&&e.attempts<=delays.length)void recheck(e.code);emit();}
     function dispose(){disposed=true;for(const e of entries.values()){clearTimers(e);e.settle?.(null,Error('stale-session'));}entries.clear();}
     function cancellationPending(code){restore();const e=entries.get(code);return e?.action==='cancel'&&ACTIVE.includes(e.state);}
     return {run,recheck,retryOriginal,snapshot,restore:refresh,resume,dismiss,dispose,cancellationPending};
@@ -255,11 +255,11 @@
         const statuses=row.statuses.map(s=>({confirmed:'正取',waitlist:'備取',pending_draw:'等待抽籤',cancelled:'已取消報名'}[s]));
         const pendingText=cancelling?'正在確認取消結果，請稍候。':row.state==='preparing'?'尚未取得名額，請稍候。':row.state==='submitting'?'請勿重複點擊；送出不代表已取得名額。':'尚在確認是否已取得名額，請稍候。';
         detail.textContent=row.code+'｜'+(row.state==='confirmed'?statuses.join('、'):row.state==='failed'?row.message:row.autoPaused||row.deadlineReached?(cancelling?'目前尚未確認取消結果，可離開此提示，稍後查詢。':'目前尚未確認結果，可離開此提示，稍後查詢；離開不會取消報名。'):pendingText);
-        box.append(title,detail);
+        const heading=document.createElement('div');heading.className='registration-feedback-heading';
+        const dismissButton=document.createElement('button');dismissButton.type='button';dismissButton.className='btn btn-sm registration-feedback-dismiss';dismissButton.textContent='關閉提示';dismissButton.setAttribute('aria-label','關閉'+row.code+'的'+operation+'提示');dismissButton.onclick=()=>controller.dismiss(row.code);
+        heading.append(title,dismissButton);box.append(heading,detail);
         if(ACTIVE.includes(row.state)&&row.submitted){const button=document.createElement('button');button.type='button';button.className='btn btn-sm';button.textContent='查詢'+operation+'結果';button.disabled=row.state==='checking';button.onclick=()=>void controller.recheck(row.code);box.appendChild(button);}
         if(row.canRetry){const button=document.createElement('button');button.type='button';button.className='btn btn-sm';button.textContent=cancelling?'重送原取消請求':'重送原報名';button.onclick=()=>{void controller.retryOriginal(row.code).catch(()=>{});};box.appendChild(button);const hint=document.createElement('p');hint.textContent=cancelling?'重試會沿用原本的取消請求。':'沿用同一筆報名確認結果，不會另建新請求；名額仍依伺服器判定。';box.appendChild(hint);}
-        if(row.state==='unconfirmed'&&(row.autoPaused||row.deadlineReached)){const button=document.createElement('button');button.type='button';button.className='btn btn-sm';button.textContent='稍後查詢';button.onclick=()=>controller.dismiss(row.code);box.appendChild(button);}
-        if(!ACTIVE.includes(row.state)){const button=document.createElement('button');button.type='button';button.className='btn btn-sm';button.textContent='關閉提示';button.onclick=()=>controller.dismiss(row.code);box.appendChild(button);}
         if(row.submitted&&!row.durable&&ACTIVE.includes(row.state)){const warning=document.createElement('p');warning.textContent='此瀏覽器無法保存進度，請留在此頁確認結果。';box.appendChild(warning);}
         panel.appendChild(box);
       }

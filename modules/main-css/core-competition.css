@@ -2188,6 +2188,8 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
 .toast-wrap{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:8px;align-items:center;}
 .toast{background:var(--panel-2);border:1px solid var(--neon-dim);color:var(--white);padding:10px 18px;border-radius:8px;font-size:14px;box-shadow:0 4px 18px rgba(0,0,0,0.4);}
 .toast.err{border-color:var(--danger);}
+.toast{display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);box-sizing:border-box;overflow-wrap:anywhere}
+.toast-dismiss{flex:none;border:1px solid currentColor;border-radius:6px;background:transparent;color:inherit;padding:6px 10px;min-height:36px;cursor:pointer;font:inherit}
 
 .empty-state{text-align:center;padding:40px 20px;color:var(--metal);}
 .empty-state .big{font-family:var(--font-d);font-size:18px;color:var(--white);margin-bottom:8px;}
