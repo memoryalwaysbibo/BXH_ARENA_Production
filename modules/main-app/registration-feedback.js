@@ -101,11 +101,16 @@
     }
     function queueCheck(e){
       if(!current(e)||!ACTIVE.includes(e.state)||!e.ids||e.hidden)return;
-      if(e.attempts>delays.length){e.autoPaused=true;emit();return;}
-      if(e.autoTimer!==null){unschedule(e.autoTimer);e.timers.delete(e.autoTimer);}
       const queuedJoin=e.action!=='cancel'&&['queued','running'].includes(e.queueState);
-      const delay=queuedJoin&&e.attempts===0?1000:undefined;
-      e.autoTimer=later(e,()=>{e.autoTimer=null;void recheck(e.code);},delay??(delays[Math.max(0,e.attempts-1)]||delays.at(-1)||12000));
+      if(e.attempts>delays.length+(queuedJoin?1:0)){e.autoPaused=true;emit();return;}
+      if(e.autoTimer!==null){unschedule(e.autoTimer);e.timers.delete(e.autoTimer);}
+      // A worker that finishes around four seconds misses the first one-second
+      // read. Check once near five seconds, retaining the eight-second slow
+      // timer and the existing 32/72/132-second recovery probes.
+      const delay=queuedJoin&&e.attempts<=2
+        ?[1000,4000,4000][e.attempts]
+        :delays[Math.max(0,e.attempts-(queuedJoin?2:1))]||delays.at(-1)||12000;
+      e.autoTimer=later(e,()=>{e.autoTimer=null;void recheck(e.code);},delay);
     }
     async function recheck(code){
       restore();const e=entries.get(code);
