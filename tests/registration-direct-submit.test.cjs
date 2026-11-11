@@ -32,6 +32,7 @@ for(const [label,room,result] of [
   const context=vm.createContext({window,authReady:true,authHandle:{currentUser:{uid:'player-1'}},
    currentAuthUid:()=> 'player-1',engagementSessionEpoch:1,dbHandle:{},
    fx:{doc:()=>({}),getDoc:async()=>({exists:()=>true,data:()=>({...room,battleMode:'individual'})})},
+   rememberRegistrationV2Route:()=>{},
    getPlayerRegistrationFeedback:()=>null,runMyEventsPlayerOperation:async(_route,_code,send)=>send('operation-123'),
    crypto:{randomUUID:()=> 'operation-123'}});
   vm.runInContext(`${chooser}\nwindow.api={${join}};`,context);

@@ -45,6 +45,8 @@
   }
   function failureMessage(error){
     const text=String(error?.message||'');
+    if(/registration-route-unavailable/.test(text))return '報名入口同步失敗，尚未送出報名；請稍後再試。';
+    if(/functions\/(?:unavailable|deadline-exceeded|internal)/.test(text))return '報名前置確認暫時無法完成；請先查詢房間名單，再稍後重試。';
     if(/registration-no-longer-active/.test(text))return '目前沒有這筆有效報名，請重新確認賽事名單。';
     if(/(?:^|\s)full(?:$|\s)/.test(text))return '正取與備取皆已額滿。';
     if(/allocation-changed/.test(text))return '名額配置已變動，請重新確認名額後再報名。';

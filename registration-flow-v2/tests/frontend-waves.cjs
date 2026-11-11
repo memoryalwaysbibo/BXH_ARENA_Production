@@ -27,7 +27,7 @@ const report={scope:'Actual frontend self-registration functions + feedback cont
    const storage=memory();storages.push(storage);
    let ctx;
    const control=Feedback.create({getUid:()=>uid,storage,now:()=>Date.now()+clockOffset,read:(c,operation)=>ctx.window.engagementService.familyRegistration({action:'mine',code:c,...operation}),retry:p=>ctx.window.engagementService.familyRegistration(p)});controllers.push(control);
-   ctx=vm.createContext({window:{BXHRegistrationFeedback:Feedback,BXH_REGISTRATION_FLOW_V2_ROOMS:[code]},crypto:{randomUUID:()=>crypto.randomUUID()},authReady:true,authHandle:{currentUser:{uid}},engagementSessionEpoch:1,currentAuthUid:()=>uid,getPlayerRegistrationFeedback:()=>control,dbHandle:db,fx:{doc:(db,collection,id)=>db.doc(collection+'/'+id),getDoc:async ref=>{const s=await ref.get();return {exists:()=>s.exists,data:()=>s.data()};}},callEngagementFunction:async(name,payload)=>{
+   ctx=vm.createContext({window:{BXHRegistrationFeedback:Feedback,BXH_REGISTRATION_FLOW_V2_ROOMS:[code]},crypto:{randomUUID:()=>crypto.randomUUID()},authReady:true,authHandle:{currentUser:{uid}},engagementSessionEpoch:1,currentAuthUid:()=>uid,rememberRegistrationV2Route:()=>{},getPlayerRegistrationFeedback:()=>control,dbHandle:db,fx:{doc:(db,collection,id)=>db.doc(collection+'/'+id),getDoc:async ref=>{const s=await ref.get();return {exists:()=>s.exists,data:()=>s.data()};}},callEngagementFunction:async(name,payload)=>{
     if(payload.action==='preview')traffic.preview++;
     if(payload.action==='mine')traffic.mine++;
     if(name!=='registrationQueueV2')throw Error('unexpected legacy service '+name);

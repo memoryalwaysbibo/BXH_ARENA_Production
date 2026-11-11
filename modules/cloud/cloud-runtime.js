@@ -906,11 +906,22 @@
       const err=new Error(normalized); err.code=String((e&&e.code)||"functions/unknown"); err.details=e&&e.details; throw err;
     }
   }
+  const registrationV2RouteHints=new Map();
+  const registrationV2PilotCodes=new Set(['BXH-BZ2JW6','BXH-XJ7WJ5','BXH-XXDNAH']);
+  function rememberRegistrationV2Route(code,room){
+    if(!registrationV2PilotCodes.has(code)||room?.registrationQueueVersion!==2)return;
+    registrationV2RouteHints.set(code,{uid:authHandle?.currentUser?.uid,epoch:engagementSessionEpoch,at:Date.now()});
+  }
   async function registrationFlowV2Enabled(code){
     if(Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code))return true;
-    if(!['BXH-BZ2JW6','BXH-XJ7WJ5','BXH-XXDNAH'].includes(code))return false;
+    if(!registrationV2PilotCodes.has(code))return false;
     if(!dbHandle||!fx?.getDocFromServer)throw Error('registration-route-unavailable');
     const uid=authHandle?.currentUser?.uid,epoch=engagementSessionEpoch;
+    // The player flow has already read this public document. Reuse its V2
+    // routing hint during this submission; the callable still checks the live
+    // server rollout gate and never accepts a client-owned route as authority.
+    const hint=registrationV2RouteHints.get(code);
+    if(hint?.uid===uid&&hint.epoch===epoch&&Date.now()-hint.at<30000)return true;
     const snapshot=await withTimeout(fx.getDocFromServer(fx.doc(dbHandle,'publicTournaments',code)),8000,null);
     if(uid!==authHandle?.currentUser?.uid||epoch!==engagementSessionEpoch)throw Error('stale-session');
     if(!snapshot?.exists())throw Error('registration-route-unavailable');
@@ -1492,6 +1503,7 @@
       const assertCurrent=()=>{progress?.assertCurrent();if(authHandle?.currentUser?.uid!==uid)throw Error('auth-required');};
       const selectionDoc=await fx.getDoc(fx.doc(dbHandle,"publicTournaments",code));
       assertCurrent();
+      if(selectionDoc.exists())rememberRegistrationV2Route(code,selectionDoc.data());
       if(selectionDoc.exists()&&selectionDoc.data().roomAccessMode==="password"){
         const access=await window.engagementService.roomAccess({action:"status",code});
         if(!access?.hasAccess)throw Error("room-password-required");
