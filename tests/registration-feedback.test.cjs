@@ -57,6 +57,17 @@ test('definitive full rejection releases the operation, permitting a new attempt
  const f=fixture();await assert.rejects(f.api.run(CODE,async p=>{p.submitting(['user1']);throw Error('full functions/failed-precondition');}),/full/);
  assert.equal(f.storage.length,0);assert.equal((await f.api.run(CODE,async p=>{p.submitting(['user1']);return {ok:true,status:'waitlist'};})).status,'waitlist');f.api.dispose();
 });
+test('pre-dispatch auth and route failures cannot leave a phantom registration after refresh',async()=>{
+ for(const reason of ['auth-required','initialization-timeout','service-unavailable','registration-route-unavailable','registration-queue-disabled','functions/unauthenticated','functions/permission-denied']){
+  const storage=memory(),f=fixture({storage});
+  await assert.rejects(f.api.run(CODE,async p=>{p.submitting(['user1']);throw Error(reason);}),new RegExp(reason.replace('/','\\/')));
+  assert.equal(f.api.snapshot()[0].state,'failed',reason);
+  assert.equal(storage.length,0,reason);
+  assert.equal(f.queries.length,0,reason);
+  f.api.dispose();
+  const restored=fixture({storage});restored.api.restore();assert.equal(restored.api.snapshot().length,0,reason);restored.api.dispose();
+ }
+});
 test('failed local storage warns but allows in-page submission',async()=>{
  const storage={get length(){return 0;},getItem(){throw Error('blocked');},setItem(){throw Error('blocked');},removeItem(){throw Error('blocked');}};
  const f=fixture({storage}),p=deferred();const flight=f.api.run(CODE,async progress=>{progress.submitting(['user1']);return p.promise;});await flush();assert.equal(f.api.snapshot()[0].durable,false);p.resolve({ok:true,status:'confirmed'});await flight;f.api.dispose();

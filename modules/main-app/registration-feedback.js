@@ -40,11 +40,15 @@
   function definitive(error){
     // Only explicit backend rejections prove that this request did not commit.
     const reason=[error?.message,error?.details?.reason,error?.code].filter(Boolean).join(' ');
-    return /(?:^|[\s:])(?:full|allocation-changed|not-open-yet|closed|not-enabled|profile-incomplete|child-not-found|child-eligibility-required|roster-locked|tournament-started|onsite-waitlist-managed|family-lottery-unavailable|room-password-required|registration-state-conflict|invalid-operation|invalid-participants|registration-no-longer-active)(?:$|[\s:])/.test(reason)
-      || /\bABORTED\b|functions\/aborted/.test(reason);
+    return /(?:^|[\s:])(?:full|allocation-changed|not-open-yet|closed|not-enabled|profile-incomplete|child-not-found|child-eligibility-required|roster-locked|tournament-started|onsite-waitlist-managed|family-lottery-unavailable|room-password-required|registration-state-conflict|invalid-operation|invalid-participants|registration-no-longer-active|auth-required|initialization-timeout|service-unavailable|registration-route-unavailable|registration-queue-disabled)(?:$|[\s:])/.test(reason)
+      || /\bABORTED\b|functions\/(?:aborted|unauthenticated|permission-denied)/.test(reason);
   }
   function failureMessage(error){
     const text=String(error?.message||'');
+    if(/auth-required|functions\/unauthenticated/.test(text))return '登入狀態失效，這次沒有送出報名。請重新登入後再試。';
+    if(/initialization-timeout|service-unavailable|registration-route-unavailable/.test(text))return '報名服務尚未就緒，這次沒有送出。請稍後再試。';
+    if(/registration-queue-disabled/.test(text))return '這間房的報名入口尚未啟用，這次沒有送出。';
+    if(/functions\/permission-denied/.test(text))return '報名權限驗證失敗，這次沒有送出。請稍後再試。';
     if(/registration-no-longer-active/.test(text))return '目前沒有這筆有效報名，請重新確認賽事名單。';
     if(/(?:^|\s)full(?:$|\s)/.test(text))return '正取與備取皆已額滿。';
     if(/allocation-changed/.test(text))return '名額配置已變動，請重新確認名額後再報名。';
