@@ -36,6 +36,7 @@ function extractFunction(source, name) {
 
 function context(extra = {}) {
   const ctx = vm.createContext({ console, Date: FixedDate, window: {}, isTournamentFullyDecided: () => false, finishTournament: async () => false, publicTournamentsFreshness: "server", esc, communitySettingsSaving: false, communityCreateSaving: false, communitySettingsWriteGate: null, ...extra });
+  vm.runInContext(read('modules/main-app/participant-names.js'), ctx);
   for (const [name, source] of [['domain', domain], ['registration', registration], ['input', input]]) {
     vm.runInContext(source, ctx, { filename: name + '-utils.js' });
   }
@@ -540,6 +541,29 @@ test('quick create rejects an out-of-range station count', async () => {
   await h.run();
   assert.equal(h.creates.length, 0);
   assert(h.toasts.some(t => t.error));
+});
+
+for (const [mode, expected] of [['realName','Host Real Name'],['gameId','Host ID'],['any','Host ID']]) {
+  test('quick create applies ' + mode + ' to the host and saved room policy', async () => {
+    const h=createHarness({fields:{'community-name-mode':{value:mode}}});
+    h.ctx.userProfile={realName:'Host Real Name',gameId:'Host ID',preferredNameMode:'gameId'};
+    await h.run();
+    assert.equal(h.creates[0].meta.participantNameMode,mode);
+    assert.equal(h.creates[0].players[0].name,expected);
+    assert.equal(h.creates[0].players[0].playerUid,'local-host');
+  });
+}
+test('quick create falls back to the host real name when ID is blank',async()=>{
+  const h=createHarness({fields:{'community-name-mode':{value:'gameId'}}});
+  h.ctx.userProfile={realName:'Host Real Name',gameId:'   '};
+  await h.run();assert.equal(h.creates[0].players[0].name,'Host Real Name');
+});
+test('quick create offers all three name policies with an ID fallback explanation',()=>{
+  const ctx=context({userProfile:{realName:'Host'},firebaseUser:{uid:'host'},authShellOpen:()=>'',authShellClose:()=>'',authBrandHeader:()=>''});
+  vm.runInContext(host,ctx);
+  const html=ctx.window.BXHCommunityHostFeature.renderCommunityCreateScreen();
+  for(const [value,label]of [['realName','本名'],['gameId','ID'],['any','不限']])assert(html.includes('<option value="'+value+'">'+label+'</option>'));
+  assert.match(html,/未設定 ID 時使用本名/);
 });
 
 test('explicit registration checkbox opens newly created room without scheduled dates', async () => {
