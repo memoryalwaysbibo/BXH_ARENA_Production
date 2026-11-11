@@ -19,3 +19,9 @@ node --check /path/to/staged/family-registration.js
 `python3 -B community-name-mode/stage-live.py --output /new/private/folder` 在已登入的 Cloud Shell 執行。工具只讀取七支函式的設定及固定世代來源、在本機組裝候選，不送出雲端變更。主要兩支須吻合上述完整 archive；其他五支 V2 函式須逐檔吻合已核對的 family 模組及所有相依檔，入口與其他模組沿用各函式自己的當前來源。任何不同均停止。每份候選僅替換 family handler 名稱運算並新增同目錄 helper，其餘檔案內容完全一致。輸出包含原始包、候選包、設定快照與 manifest，供後續只更新 source 的發布與回復核對使用。此工具沒有部署功能；產生候選後仍須以現行來源與設定核對發布結果，先完成後端再發布前端。
 
 已比對 V2 00003 與 00004：只有 index.cjs 的試點房間／退役房間設定與 bindings.cjs 的多個退役房間支援改變。family handler 與相依模組全部相同。候選沿用 00004 的完整入口與 bindings，不重寫試點或退役設定。
+
+`release.py` 固定本次 Cloud Shell 組裝 manifest 的 SHA-256 `8b8072bbc7760ed2f5d77c9670d94b12c9b5b2e8d71a7b6e439f7af6b1b41abf`。`--check` 重建名稱替換並核對七份本機候選的所有檔案、線上版本／來源 archive 與服務設定，只有讀取。`--apply` 再做完整核對後逐支上傳來源，Cloud Functions API 的 PATCH 僅指定 `updateMask=buildConfig.source`。每支完成後下載已部署 archive 核對完整雜湊與服務設定，最後再核對七支狀態。原始 ZIP 與設定快照保留在組裝資料夾，前端需另行發布。
+
+發布工具以檔案鎖與同步寫入的 journal 記錄進度。中斷後使用 `--status` 查看、`--resume` 接續；已送出但回應遺失的更新不會再次送出，會先讀回來源判斷。發現外部更新、未知提交結果或不同的部署內容即停止，不自動回復或覆蓋。`--apply` 不接受已存在的發布 journal。
+
+發布狀態測試涵蓋七支正常更新、部署前版本改變、上傳後競爭、已知操作接續、提交回應遺失、未確認提交不重送、部署後來源／設定不同，以及重複執行保護。另使用本次實際來源做七份本機候選驗證與模擬 Cloud 發布／接續測試；未在本機進行正式 Cloud 更新。

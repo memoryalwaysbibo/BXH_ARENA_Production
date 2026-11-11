@@ -179,7 +179,9 @@ jobs:
       - name: Verify roster mutation and snapshot races
         run: node --test tests/roster-sync-race.test.cjs
       - name: Verify community quick registration and cloud contract
-        run: node --test tests/community-name-mode.test.cjs tests/community-quick-registration.test.cjs tests/community-quick-registration-cloud.test.cjs tests/new-room-publication.test.cjs tests/community-host-roster-sync.test.cjs tests/community-summary-fixture.test.cjs tests/community-client-cleanup-disabled.test.cjs
+        run: |
+          node --test tests/community-name-mode.test.cjs tests/community-quick-registration.test.cjs tests/community-quick-registration-cloud.test.cjs tests/new-room-publication.test.cjs tests/community-host-roster-sync.test.cjs tests/community-summary-fixture.test.cjs tests/community-client-cleanup-disabled.test.cjs
+          python3 -B tests/community-name-mode-release.test.py
       - name: Verify managed registration settings and draft save boundary
         run: node --test tests/managed-registration-settings.test.cjs tests/registration-mode-draft.test.cjs
       - name: Verify family roster check-in preservation
