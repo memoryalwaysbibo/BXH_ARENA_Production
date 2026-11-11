@@ -1,0 +1,30 @@
+{
+  "familyRegistration": {
+    "archiveSha256": "0ffed979838b3a880cd97dc7321e9a08d312cb6f6cb976c6f7c8d4c631da4ab3",
+    "handlerPath": "family-registration.js",
+    "handlerSha256": "c3ac74f1f3e8dbb6a6632dc361ead119b28ab3fa4c3dd4087a5aaf9cfbedd6bd"
+  },
+  "registrationQueueV2": {
+    "archiveSha256": "e131429081496d5b7dcabf2dca2ad3dd492a599fa5f7cdd197d64ce5a54605b6",
+    "handlerPath": "writer-inputs/familyRegistration/family-registration.js",
+    "handlerSha256": "77dcbef164103cd7687fa17a76ffd4455beef6bfc73bf0f2c785d4e01e1a741a",
+    "familyFiles": {
+      "writer-inputs/familyRegistration/room-access-core.js": "1f078e3b9a83cfd80176e4a03e1820b1b4576bfafcb95ac9ac96c68044b2ffe2",
+      "writer-inputs/familyRegistration/registration-admission.cjs": "c9a69f9ff882f160b64128994fa3c31773a8c31e65ed92bae85e2b2a9871f859",
+      "writer-inputs/familyRegistration/onsite-waitlist-writer-guards.js": "d35d101cab964d9210df2159e93a49d20aed39f0bdf6f6217a3e648db4141dba",
+      "writer-inputs/familyRegistration/my-events-writer-flags.cjs": "3ad2f56d73fe05f4034d4fe55a15c1c72a0e8913db7c028d100ff9b57e34c269",
+      "writer-inputs/familyRegistration/my-events-operation-proof.cjs": "e33b8d08f8653a546a7656fd529478f4938b258046a88a4fae3e4b337017d5a9",
+      "writer-inputs/familyRegistration/family.js": "6ffafdae502f9e94948a81fdb354f5e1fc824b7924cad030a03e5b1814d04faf",
+      "writer-inputs/familyRegistration/family-registration.js": "77dcbef164103cd7687fa17a76ffd4455beef6bfc73bf0f2c785d4e01e1a741a",
+      "writer-inputs/familyRegistration/community-registration-roster.js": "99af7082c103026e970bb7f85e02dbf8fc12ff4fda05f133c3fba71e2c43cc56",
+      "writer-inputs/familyRegistration/community-registration-policy.js": "93b6a5d2871a0f9b9908d91c0fa0d9f2a5c04b787ed50640570ad0c049d053e3",
+      "writer-inputs/familyRegistration/onsite-waitlist/owned.js": "649d5b78be40b89b88743b30c9ea4181957be6e1be0c6ef28aed5015e1c60433",
+      "writer-inputs/familyRegistration/onsite-waitlist/core.js": "0ddf2d490daf8cd416cf299bdc7acfb3f98dd02e61d3df0dbbf3b3c2f2dfa39c",
+      "writer-inputs/familyRegistration/_qr_checkin/qr-checkin-fence.cjs": "556270ff967f083182c39b6ed6a331d06909ac66891fa9e3f7cd03356a257aab",
+      "writer-inputs/familyRegistration/_qr_checkin/guard-firestore.cjs": "b0d0027f0b79b845eb118c585bb8104d3590c1c18729737300f6fdf32d97d43b",
+      "writer-inputs/familyRegistration/_qr_checkin/admin-firestore.cjs": "3c8c2abf2cb2f4142e0e8ec727e232e703d60f0a9a2449867c25464e1d8f850e"
+    }
+  },
+  "helperSha256": "d860401f97fa3aaffc8de177d4504632d163ab19f6cb2068ea4a3f4108810d91",
+  "patcherSha256": "db4cc4e5e927623bc696a64767ee08089eb3bfec37d3efa21098766b4e81aff0"
+}
