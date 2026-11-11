@@ -5,12 +5,18 @@ import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import platform
+import re
+import shutil
 import signal
 import socket
 import stat
 import subprocess
 import tempfile
+import tarfile
 import time
+from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
 import zipfile
 
 MANIFEST_SHA = '8b8072bbc7760ed2f5d77c9670d94b12c9b5b2e8d71a7b6e439f7af6b1b41abf'
@@ -28,6 +34,50 @@ def sha(value):
 
 def run(*args, cwd=None, timeout=180):
     return subprocess.check_output(list(args),cwd=cwd,timeout=timeout).decode().strip()
+
+def download_node22(work, opener=urlopen, machine=None):
+    arch = {'x86_64':'x64','amd64':'x64','aarch64':'arm64','arm64':'arm64'}.get(machine or platform.machine())
+    need(platform.system() == 'Linux' and arch, 'UNSUPPORTED_NODE_PLATFORM')
+    base = 'https://nodejs.org/download/release/'
+    def get(url):
+        response = opener(Request(url,headers={'User-Agent':'BXH-startup-diagnostic/2'}),timeout=120)
+        parsed = urlsplit(response.geturl())
+        need(parsed.scheme == 'https' and parsed.hostname == 'nodejs.org'
+             and parsed.port in (None,443), 'NODE_DOWNLOAD_ORIGIN')
+        return response
+    with get(base+'latest-v22.x/SHASUMS256.txt') as response:
+        sums = response.read(128*1024).decode('utf8')
+    matches = []
+    pattern = re.compile(r'([a-f0-9]{64})\s+(node-(v22\.[0-9]+\.[0-9]+)-linux-'+arch+r'\.tar\.xz)')
+    for line in sums.splitlines():
+        found = pattern.fullmatch(line.strip())
+        if found:
+            matches.append(found.groups())
+    need(len(matches) == 1, 'NODE22_CHECKSUM_ENTRY')
+    expected,filename,version = matches[0]
+    archive = work/'node22.tar.xz'
+    checksum = hashlib.sha256()
+    count = 0
+    with get(base+version+'/'+filename) as response, archive.open('wb') as output:
+        while True:
+            chunk = response.read(1024*1024)
+            if not chunk:
+                break
+            count += len(chunk)
+            need(count <= 150*1024*1024, 'NODE_ARCHIVE_TOO_LARGE')
+            checksum.update(chunk);output.write(chunk)
+    need(checksum.hexdigest() == expected, 'NODE22_DOWNLOAD_CHECKSUM_MISMATCH')
+    node = work/'runtime/bin/node'
+    node.parent.mkdir(parents=True,exist_ok=True)
+    with tarfile.open(archive,'r:xz') as tar:
+        entry = tar.getmember(filename[:-7]+'/bin/node')
+        need(entry.isfile() and 0 < entry.size < 200*1024*1024, 'NODE_BINARY_ENTRY')
+        with tar.extractfile(entry) as source, node.open('wb') as output:
+            shutil.copyfileobj(source,output)
+    node.chmod(0o700)
+    archive.unlink()
+    emit('NODE22_OFFICIAL_BINARY_VERIFIED',version=version,sha256=expected)
+    return node
 
 def extract(path, output, expected):
     raw = path.read_bytes()
@@ -140,11 +190,7 @@ def main():
         baseline,candidate = work/'baseline',work/'candidate'
         extract(root/'familyRegistration/original.zip',baseline,row['originalSha256'])
         extract(root/'familyRegistration/candidate.zip',candidate,row['candidateSha256'])
-        runtime = work/'runtime'
-        subprocess.check_call(['npm','install','--prefix',str(runtime),'--no-package-lock',
-            '--ignore-scripts=false','--no-audit','--no-fund','node@22'],timeout=300)
-        node = runtime/'node_modules/node/bin/node'
-        need(node.is_file(),'NODE22_BINARY_NOT_FOUND')
+        node = download_node22(work)
         version = run(str(node),'--version')
         need(version.startswith('v22.'),'NODE22_NOT_SELECTED')
         emit('EXPLICIT_NODE_VERSION',version=version)

@@ -28,4 +28,6 @@ node --check /path/to/staged/family-registration.js
 
 第一次正式發布停在 familyregistration-00043-xet 的容器啟動檢查；Cloud Run 顯示 latestReadyRevisionName 為 00042-wor、100% 流量仍指向 00042。其餘六支未開始更新。候選在 Cloud Shell Node 26 可載入並使用 Functions Framework 監聽，但該結果不能作為 Node 22 的證明。
 
-`diagnose-startup.py STAGING` 固定上述 manifest，在本機暫存目錄分別解開原始與候選來源，用相同的 SDK 依賴與 Framework，並使用 npm 安裝的 Node 22 實體執行檔做 TCP 啟動比較。它只連線本機隨機連接埠，不發出 callable 請求；測試後停止伺服器並清理暫存目錄。另唯讀輸出 00042／00043 的容器啟動設定及環境欄位變更名稱，隱藏其他環境變數值。這是啟動診斷，沒有部署或流量更新功能。
+`diagnose-startup.py STAGING` 固定上述 manifest，在本機暫存目錄分別解開原始與候選來源，用相同的 SDK 依賴與 Framework，並從 Node 官方下載 Node 22、核對官方 SHA-256 後，使用其實體執行檔做 TCP 啟動比較。它只連線本機隨機連接埠，不發出 callable 請求；測試後停止伺服器並清理暫存目錄。另唯讀輸出 00042／00043 的容器啟動設定及環境欄位變更名稱，隱藏其他環境變數值。這是啟動診斷，沒有部署或流量更新功能。
+
+Cloud Shell npm 12 的 allowScripts 阻止 node 套件安裝腳本時，診斷曾停在 NODE22_BINARY_NOT_FOUND。新版診斷不需該安裝腳本，依官方 latest-v22.x 校驗清單選擇 Linux 架構，從固定版本 URL 下載並驗證 archive，只解出 bin/node。下載校驗錯誤或來源網域不同即停止。
