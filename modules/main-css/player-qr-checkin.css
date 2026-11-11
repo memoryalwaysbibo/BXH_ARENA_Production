@@ -1,0 +1,25 @@
+/* Player check-in entry reuses the existing camera action and server flow. */
+.player-qr-checkin-dock{display:none}
+.player-qr-checkin-entry .player-qr-checkin-button{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  min-height:48px;font-size:17px;font-weight:700;
+}
+.player-qr-checkin-button svg{flex-shrink:0}
+.player-qr-checkin-entry .hint{margin:6px 0 0;text-align:center;line-height:1.5}
+@media(max-width:899px){
+  .player-qr-checkin-inline{display:none}
+  .player-main.player-main-with-checkin{
+    padding-bottom:calc(112px + env(safe-area-inset-bottom,0px));
+    scroll-padding-bottom:calc(112px + env(safe-area-inset-bottom,0px));
+  }
+  .player-qr-checkin-dock{
+    display:block;position:fixed;inset-inline:0;bottom:0;z-index:35;
+    box-sizing:border-box;margin:0;
+    padding:10px max(12px,env(safe-area-inset-right,0px)) max(8px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));
+    border-top:1px solid var(--gold-dim,#715a32);
+    background:var(--panel-1,#151515);
+    box-shadow:0 -4px 16px rgba(0,0,0,.28);
+  }
+  .player-qr-checkin-dock>*{max-width:640px;margin-inline:auto}
+  .player-qr-checkin-dock .hint{font-size:12px}
+}

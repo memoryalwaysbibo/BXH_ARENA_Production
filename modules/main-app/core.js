@@ -15879,12 +15879,13 @@ function renderPlayerCenterLoggedIn(){
     ${renderPlayerNavHtml()}
     </div>
     ${accountMenuOverlayHtml()}
-    <main class="player-main">
+    <main class="player-main player-main-with-checkin">
       ${content}
     </main>
     <nav class="player-tabs player-tabs-bottom">
       ${playerVisibleTabs().map(([key,label])=>`<button class="player-tab-btn ${playerActiveTab===key?'active':''}" data-action="player-switch-tab" data-tab="${key}">${esc(label)}</button>`).join("")}
     </nav>
+    ${renderPlayerQrCheckinEntry(true)}
     ${renderModal()}
     ${renderCloudJoinModal()}
     ${renderEventEntryModal()}
@@ -15899,8 +15900,14 @@ function renderPlayerCenterLoggedIn(){
 let moodState=null;
 const {renderMoodStation,handleMood}=window.BXHMoodFeature;
 
+function renderPlayerQrCheckinEntry(fixed=false){
+  return `<section class="player-qr-checkin-entry ${fixed?'player-qr-checkin-dock':'player-qr-checkin-inline panel'}" aria-label="現場掃描報到">
+    <button type="button" class="btn btn-primary btn-block player-qr-checkin-button" data-action="open-qr-scanner" aria-describedby="${fixed?'player-qr-checkin-dock-hint':'player-qr-checkin-inline-hint'}"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M3 12h18"/><path d="M8 8h2v2H8zm6 6h2v2h-2z"/></svg><span>掃描 QR 報到</span></button>
+    <p class="hint" id="${fixed?'player-qr-checkin-dock-hint':'player-qr-checkin-inline-hint'}">到現場後，掃描主辦提供的 QR Code。</p>
+  </section>`;
+}
 function renderPlayerHomeTab(p){
-  return `<div class="panel"><button class="btn btn-primary btn-block" data-action="open-qr-scanner">掃碼報到</button><p class="hint">掃描現場報到 QR，使用目前帳號直接報到，無需重新登入。</p></div>${renderMoodStation()}${renderTournamentLobby({ loggedIn:true, profile:p })}`;
+  return `${renderPlayerQrCheckinEntry()}${renderMoodStation()}${renderTournamentLobby({ loggedIn:true, profile:p })}`;
 }
 
 function schedulePhase(t){
