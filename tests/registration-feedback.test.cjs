@@ -49,6 +49,12 @@ test('cancelled and malformed read results remain unknown',async()=>{
 test('preflight timeout cannot submit later even when the stalled read completes',async()=>{
  const f=fixture(),p=deferred();let writes=0;const flight=f.api.run(CODE,async progress=>{await p.promise;progress.assertCurrent();progress.submitting(['user1']);writes++;return {ok:true,status:'confirmed'};});flight.catch(()=>{});await flush();await f.advance(65000);await assert.rejects(flight,/preparation-timeout/);p.resolve();await flush();assert.equal(writes,0);f.api.dispose();
 });
+test('a failed route read says that no submission was sent',async()=>{
+ const f=fixture();await assert.rejects(f.api.run(CODE,async()=>{throw Error('registration-route-unavailable');}),/registration-route-unavailable/);
+ assert.equal(f.api.snapshot()[0].state,'failed');
+ assert.match(f.api.snapshot()[0].message,/尚未送出報名/);
+ f.api.dispose();
+});
 test('unknown transport outcome does not clear the journal or allow a second write',async()=>{
  const f=fixture();let writes=0;const send=async p=>{p.submitting(['user1']);writes++;throw Error('functions/deadline-exceeded');};
  await assert.rejects(f.api.run(CODE,send),/result-pending/);await assert.rejects(f.api.run(CODE,send),/result-pending/);assert.equal(writes,1);assert.equal(f.storage.length,1);f.api.dispose();
@@ -155,7 +161,7 @@ test('a cancellation rejection ends waiting only for the matching operation',asy
 });
 test('only the pilot rooms use their current server ownership markers',async()=>{
  const cloud=fs.readFileSync(require.resolve('../modules/cloud/cloud-runtime.js'),'utf8');
- const start=cloud.indexOf('  async function registrationFlowV2Enabled(');
+ const start=cloud.indexOf('  const registrationV2RouteHints=new Map();');
  const end=cloud.indexOf('  const managementQueueOperations=',start);
  const pilot='BXH-BZ2JW6',nextPilot='BXH-XJ7WJ5',newPilot='BXH-XXDNAH',reads=[];
  let marker,missing=false,changeAccount=false;
@@ -232,7 +238,7 @@ test('My Events blocks a pending room and refreshes from the verified cancellati
 
 test('management queue restores the same promotion receipt after a lost response and rollout close',async()=>{
  const cloud=fs.readFileSync(require.resolve('../modules/cloud/cloud-runtime.js'),'utf8');
- const helper=cloud.slice(cloud.indexOf('  async function registrationFlowV2Enabled('),cloud.indexOf('  let playerRegistrationFeedback='));
+ const helper=cloud.slice(cloud.indexOf('  const registrationV2RouteHints=new Map();'),cloud.indexOf('  let playerRegistrationFeedback='));
  const sessionStorage=memory(),requests=[];
  const payload={code:CODE,action:'promote',registrationId:'candidate',expandBy:0};
  function open(enabled){
