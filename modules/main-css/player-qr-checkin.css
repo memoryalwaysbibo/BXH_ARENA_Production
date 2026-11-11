@@ -8,9 +8,11 @@
 .player-qr-checkin-entry .hint{margin:6px 0 0;text-align:center;line-height:1.5}
 @media(max-width:899px){
   .player-qr-checkin-inline{display:none}
+  html:has(.player-qr-checkin-dock),body:has(.player-qr-checkin-dock){
+    scroll-padding-bottom:calc(112px + env(safe-area-inset-bottom,0px));
+  }
   .player-main.player-main-with-checkin{
     padding-bottom:calc(112px + env(safe-area-inset-bottom,0px));
-    scroll-padding-bottom:calc(112px + env(safe-area-inset-bottom,0px));
   }
   .player-qr-checkin-dock{
     display:block;position:fixed;inset-inline:0;bottom:0;z-index:35;

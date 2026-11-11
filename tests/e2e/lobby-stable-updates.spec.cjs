@@ -225,6 +225,13 @@ test('pointer down survives an intervening update and opens the intended detail 
   await openLobby(page);
   await expandCard(page);
   await action(page).scrollIntoViewIfNeeded();
+  // A visible rectangle may still sit under the fixed mobile check-in bar.
+  // Let Playwright reveal an actionable target without clicking before the hold.
+  await action(page).click({ trial: true });
+  expect(await action(page).evaluate(button => {
+    const rect = button.getBoundingClientRect();
+    return button.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+  }), 'The held pointer must hit the lobby action, not a fixed overlay').toBe(true);
   const box = await action(page).boundingBox();
   expect(box).toBeTruthy();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -488,6 +495,13 @@ test('removal during a held pointer makes the old target inert before releasing 
   await openLobby(page);
   await expandCard(page);
   await action(page).scrollIntoViewIfNeeded();
+  // A visible rectangle may still sit under the fixed mobile check-in bar.
+  // Let Playwright reveal an actionable target without clicking before the hold.
+  await action(page).click({ trial: true });
+  expect(await action(page).evaluate(button => {
+    const rect = button.getBoundingClientRect();
+    return button.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+  }), 'The held pointer must hit the lobby action, not a fixed overlay').toBe(true);
   const box = await action(page).boundingBox();
   expect(box).toBeTruthy();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
