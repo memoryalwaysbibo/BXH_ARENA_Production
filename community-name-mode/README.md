@@ -31,3 +31,5 @@ node --check /path/to/staged/family-registration.js
 `diagnose-startup.py STAGING` 固定上述 manifest，在本機暫存目錄分別解開原始與候選來源，用相同的 SDK 依賴與 Framework，並從 Node 官方下載 Node 22、核對官方 SHA-256 後，使用其實體執行檔做 TCP 啟動比較。它只連線本機隨機連接埠，不發出 callable 請求；測試後停止伺服器並清理暫存目錄。另唯讀輸出 00042／00043 的容器啟動設定及環境欄位變更名稱，隱藏其他環境變數值。這是啟動診斷，沒有部署或流量更新功能。
 
 Cloud Shell npm 12 的 allowScripts 阻止 node 套件安裝腳本時，診斷曾停在 NODE22_BINARY_NOT_FOUND。新版診斷不需該安裝腳本，依官方 latest-v22.x 校驗清單選擇 Linux 架構，從固定版本 URL 下載並驗證 archive，只解出 bin/node。下載校驗錯誤或來源網域不同即停止。
+
+Node 22.23.4 實際來源比較結果：原版與候選皆可透過 Framework 5.0.5 啟動監聽，啟動時 RSS 分別約 114608／113832 kB；雲端 00042／00043 的已讀取環境變數、記憶體、啟動探測與基底映像 URI 相同，尚未重現雲端失敗。inspect-images.py 只讀兩個固定 revision 的 Artifact Registry 映像 manifest／config，逐層核對 descriptor SHA-256，輸出啟動程序、指定環境欄位與 buildpack 版本。存取憑證只送至固定 registry 主機，簽名 GCS 下載不附 Bearer，沒有映像寫入或服務更新功能。
