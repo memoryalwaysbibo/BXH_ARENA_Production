@@ -25,3 +25,7 @@ node --check /path/to/staged/family-registration.js
 發布工具以檔案鎖與同步寫入的 journal 記錄進度。中斷後使用 `--status` 查看、`--resume` 接續；已送出但回應遺失的更新不會再次送出，會先讀回來源判斷。發現外部更新、未知提交結果或不同的部署內容即停止，不自動回復或覆蓋。`--apply` 不接受已存在的發布 journal。
 
 發布狀態測試涵蓋七支正常更新、部署前版本改變、上傳後競爭、已知操作接續、提交回應遺失、未確認提交不重送、部署後來源／設定不同，以及重複執行保護。另使用本次實際來源做七份本機候選驗證與模擬 Cloud 發布／接續測試；未在本機進行正式 Cloud 更新。
+
+第一次正式發布停在 familyregistration-00043-xet 的容器啟動檢查；Cloud Run 顯示 latestReadyRevisionName 為 00042-wor、100% 流量仍指向 00042。其餘六支未開始更新。候選在 Cloud Shell Node 26 可載入並使用 Functions Framework 監聽，但該結果不能作為 Node 22 的證明。
+
+`diagnose-startup.py STAGING` 固定上述 manifest，在本機暫存目錄分別解開原始與候選來源，用相同的 SDK 依賴與 Framework，並使用 npm 安裝的 Node 22 實體執行檔做 TCP 啟動比較。它只連線本機隨機連接埠，不發出 callable 請求；測試後停止伺服器並清理暫存目錄。另唯讀輸出 00042／00043 的容器啟動設定及環境欄位變更名稱，隱藏其他環境變數值。這是啟動診斷，沒有部署或流量更新功能。
