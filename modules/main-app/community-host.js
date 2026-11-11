@@ -50,6 +50,7 @@ function renderCommunityCreateScreen(){
       <div class="field"><label for="community-format">賽制</label><select id="community-format"><option value="single">單淘汰賽</option><option value="double">雙敗制</option><option value="roundrobin">單循環賽</option></select></div>
       <div class="field"><label for="community-stations">戰鬥台數</label><input id="community-stations" type="number" min="1" max="16" step="1" value="1"></div>
     </div>
+    <div class="field"><label for="community-name-mode">參賽名稱</label><select id="community-name-mode" aria-describedby="community-name-mode-hint"><option value="realName">本名</option><option value="gameId">ID</option><option value="any">不限</option></select><small class="hint" id="community-name-mode-hint">不限時依個人資料的名稱偏好；未設定 ID 時使用本名。名稱於報名時保存。</small></div>
     <div class="field"><label for="community-capacity">人數上限（選填）</label><input id="community-capacity" type="number" min="1" step="1" placeholder="留空不限人數"></div>
     <label class="settings-check-row"><input id="community-registration-enabled" type="checkbox"><span><b>開放線上報名</b><small class="hint">開房後立即開放報名。</small></span></label>
     <button class="hoc-btn hoc-btn-primary btn-block" data-action="community-create-submit" ${communityCreateSaving?"disabled":""}>${communityCreateSaving?"建立中…":"立即開房"}</button>
@@ -61,6 +62,7 @@ function renderCommunitySettings(){
   const hasSchedule=!!(m.registrationOpenAt||m.registrationCloseAt||m.cancellationDeadline||m.waitlistCapacity);
   return `<section class="panel community-settings">
     <div class="panel-title">房間設定</div>
+    <p class="hint">參賽名稱：${m.participantNameMode==='any'?'不限（依個人名稱偏好）':m.participantNameMode==='gameId'?'ID（未設定時使用本名）':'本名'}。已報名選手保留報名時的名稱。</p>
     ${window.__BXH_COMMUNITY_SUMMARY_STATUS?.[state.cloudCode]?.ok===false?'<div class="banner warn"><span>設定已儲存，參賽人數摘要尚未同步。</span><button class="btn btn-ghost btn-sm" data-action="community-sync-summary">重新同步人數</button></div>':""}
     <div class="field"><label for="cset-name">房間名稱</label><input id="cset-name" type="text" value="${esc(m.name||"")}"></div>
     <div class="community-settings-grid community-settings-pair">

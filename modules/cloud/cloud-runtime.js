@@ -1605,7 +1605,7 @@
         publicSelectionPresent:!!pub&&Object.prototype.hasOwnProperty.call(pub,"registrationSelection"),
         publicSchemaValid:!!pub&&["general","ranked"].includes(pub.ladderMode||"general")&&
           ["open","children"].includes(pub.targetGroup||"open")&&
-          ["realName","gameId"].includes(pub.participantNameMode||"realName")&&
+          (["realName","gameId"].includes(pub.participantNameMode||"realName")||(pub.eventAuthority==="community"&&pub.ladderMode!=="ranked"&&pub.participantNameMode==="any"))&&
           ["individual","team"].includes(pub.battleMode||"individual")&&
           ["standard","enchantment"].includes(pub.playMode||"standard")
       };
@@ -2882,7 +2882,7 @@
           ladderMode:"general",ladderPointsAwarded:false,roomAccessMode:data.meta.roomAccessMode,roomAccessVersion:0,registrationEnabled:regEnabled,registrationStatus,visibility:"public",
           registrationOpenAt:regOpen,registrationCloseAt:regClose,capacity,waitlistEnabled:waitlistCapacity>0,waitlistCapacity,
           confirmedCount:0,waitlistCount:0,communityParticipantCount,registrationVisibility:"public",publishedAt:data.meta.publishedAt||now,
-          cancellationDeadline,targetGroup:"open",participantNameMode:(data.meta.participantNameMode==="gameId"?"gameId":"realName"),
+          cancellationDeadline,targetGroup:"open",participantNameMode:window.BXHParticipantNames.roomNameMode(data.meta),
           tournamentPhase:computeTournamentPhase(data),archiveStatus:data.archiveStatus||"ongoing",name:data.meta.name||"",eventDate:data.meta.date||"",location:data.meta.location||"",startAt:data.meta.startTime||"",battleMode:data.meta.battleMode==="team"?"team":"individual",teamSize:Math.max(3,Number(data.meta.teamSize)||3),playMode:data.meta.playMode==="enchantment"?"enchantment":"standard",formatType:data.meta.formatType||"single",bracketSize:data.bracketSize||0,
           updatedAt:now,lastActivityAt:now,expiresAt:new Date(expMs)
         };
@@ -2894,7 +2894,7 @@
           bracketView:JSON.stringify(buildPublicMirrorFields(data)),updatedAt:now,visibility:"public",eventAuthority:"community",communityQuickRegistration:true,ownerUid:uid,ladderMode:"general",roomAccessMode:data.meta.roomAccessMode,roomAccessVersion:0,roomLocked:data.meta.roomAccessMode==="password",
           registrationEnabled:regEnabled,registrationStatus,registrationOpenAt:regOpen,registrationCloseAt:regClose,
           capacity,waitlistEnabled:waitlistCapacity>0,waitlistCapacity,confirmedCount:0,waitlistCount:0,communityParticipantCount,registrationVisibility:"public",
-          publishedAt:data.meta.publishedAt||now,cancellationDeadline,targetGroup:"open",participantNameMode:(data.meta.participantNameMode==="gameId"?"gameId":"realName"),
+          publishedAt:data.meta.publishedAt||now,cancellationDeadline,targetGroup:"open",participantNameMode:window.BXHParticipantNames.roomNameMode(data.meta),
           tournamentPhase:computeTournamentPhase(data),name:data.meta.name||"",eventDate:data.meta.date||"",location:data.meta.location||"",startAt:data.meta.startTime||"",battleMode:data.meta.battleMode==="team"?"team":"individual",teamSize:Math.max(3,Number(data.meta.teamSize)||3),playMode:data.meta.playMode==="enchantment"?"enchantment":"standard",formatType:data.meta.formatType||"single",lastActivityAt:now,expiresAt:new Date(expMs)
         });
         await batch.commit();
@@ -3502,7 +3502,7 @@ if(testerSession){
           name: data.meta && data.meta.name || "",
           ladderMode: testRoom ? "general" : ((data.meta && data.meta.ladderMode==="ranked") ? "ranked" : "general"),
           targetGroup: (data.meta && (data.meta.targetGroup==="children"?"children":"open")) || "open",
-          participantNameMode: (data.meta && data.meta.participantNameMode==="gameId") ? "gameId" : "realName",
+          participantNameMode: data.meta?.eventAuthority==="community" ? window.BXHParticipantNames.roomNameMode(data.meta) : ((data.meta && data.meta.participantNameMode==="gameId") ? "gameId" : "realName"),
           eventCancelled: !!(data.meta && data.meta.eventCancelled),
           cancellationDeadline: (data.meta && data.meta.cancellationDeadline) || null,
           eventDescription: (data.meta && data.meta.eventDescription) || "",
