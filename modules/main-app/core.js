@@ -22528,6 +22528,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(!actorUid){showToast("請先登入後再建立房間",true);return;}
     const hostProfile=userProfile||{};
     const hostName=String(hostProfile.gameId||hostProfile.displayName||hostProfile.nickname||hostProfile.realName||firebaseUser?.email||"玩家").trim();
+    const participantNameMode=window.BXHParticipantNames.roomNameMode({eventAuthority:"community",ladderMode:"general",participantNameMode:document.getElementById("community-name-mode")?.value});
+    const hostIdentity=window.BXHParticipantNames.participantIdentity({eventAuthority:"community",ladderMode:"general",participantNameMode},hostProfile);
     const name=(document.getElementById("community-name")?.value||"").trim()||hostName+"的房間";
     const taipeiParts=Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date()).map(part=>[part.type,part.value]));
     const date=`${taipeiParts.year}-${taipeiParts.month}-${taipeiParts.day}`;
@@ -22551,6 +22553,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         if(!cloudAvailable()) throw new Error("network");
         const st=defaultState();
         st.meta.name=name; st.meta.date=date; st.meta.location=location; st.meta.startTime=startTime;
+        st.meta.participantNameMode=participantNameMode;
         st.meta.formatType=formatType; st.meta.format=FORMAT_LABELS[formatType]||"單淘汰賽"; st.meta.stations=stations;
         st.meta.eventAuthority="community"; st.communityQuickRegistration=true; st.meta.communityQuickRegistration=true; st.meta.ladderMode="general"; st.meta.registrationEnabled=registrationEnabled; st.meta.roomAccessMode=roomAccessMode; st.meta.publishedAt=Date.now();
         st.meta.registrationOpenAt=null; st.meta.registrationCloseAt=null; st.meta.cancellationDeadline=null;
@@ -22562,7 +22565,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         // must NOT remove room ownership or management permission.
         st.players=[{
           id:uid("player"),
-          name:hostName,
+          name:hostIdentity.displayName,
           checkedIn:true,
           source:"host",
           participantType:"account",

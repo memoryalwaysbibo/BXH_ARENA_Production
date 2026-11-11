@@ -84,6 +84,7 @@ function harness() {
     buildPublicEventInfo: () => ({}), communityRoomExpiryMs: () => NOW + 3600000,
   });
   vm.runInContext(domain + '\n' + registration, ctx);
+  vm.runInContext(fs.readFileSync(path.join(root,'modules/main-app/participant-names.js'),'utf8'),ctx);
   ctx.window.BXHQrCheckinFence = require('../modules/main-app/qr-checkin-fence.js');
   Object.assign(ctx, ctx.window.BXHDomainUtils, ctx.window.BXHRegistrationUtils);
   for (const name of ['advanceOnsiteWriteFence', 'courtLifecycleWritePatch', 'buildPublicMirrorFields', 'computeTournamentPhase', 'reconstructPublicStateFromDoc']) vm.runInContext(cloudFunction(name), ctx);
@@ -105,6 +106,18 @@ function activateQrCheckinFixture(h, revision = 3) {
   h.docs.set('tournaments/LOCAL',{...common,data:JSON.stringify(data)});
   h.docs.set('publicTournaments/LOCAL',{...common,bracketView:JSON.stringify(h.ctx.buildPublicMirrorFields(data))});
   return clone(data);
+}
+
+for(const mode of ['realName','gameId','any']){
+  test('community '+mode+' policy survives cloud create, unrelated settings save and reload',async()=>{
+    const h=harness(),data=state({participantNameMode:mode});
+    await h.api.createCommunityRoom(data);
+    for(const key of ['tournaments/LOCAL','publicTournaments/LOCAL'])assert.equal(h.docs.get(key).participantNameMode,mode);
+    data.meta.name='Updated name';
+    assert.equal(await h.api.pushUpdate('LOCAL',data,{registrationSettings:true}),true);
+    for(const key of ['tournaments/LOCAL','publicTournaments/LOCAL'])assert.equal(h.docs.get(key).participantNameMode,mode);
+    assert.equal((await h.api.joinRoom('LOCAL')).data.meta.participantNameMode,mode);
+  });
 }
 test('QR-managed ordinary push preserves canonical attendance in both mirrors',async()=>{
   const h=harness(),data=activateQrCheckinFixture(h);data.players[0].checkedIn=false;

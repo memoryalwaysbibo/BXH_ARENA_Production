@@ -20,6 +20,7 @@ function harness(overrides={}){
  ...overrides});
  ctx.window.cloudSync={connect:async()=>true,subscribeRegistrationsForAdmin:(code,next,error)=>{calls.subscribe.push({code,next,error});return ()=>{calls.unsub++;};},syncCommunityRegistrationSummary:async()=>{calls.catchup++;return {ok:true,communityParticipantCount:2};},joinRoom:async()=>{calls.read++;return {ok:true,data:clone(ctx.remote)};},getPublicTournamentFull:async()=>{calls.publicRead++;return {};},listRegistrationsForAdmin:async()=>{calls.list++;return [];}};
  vm.runInContext(domain,ctx);Object.assign(ctx,ctx.window.BXHDomainUtils);
+ vm.runInContext(fs.readFileSync(path.join(root,'modules/main-app/participant-names.js'),'utf8'),ctx);
  vm.runInContext(block('let communityRoomSnapshotGeneration=0;','let remoteAppliedRoomId=null'),ctx);
  for(const name of ['hasAdminAccess','isCommunityRoom','isCommunityRoomOwner','isTester','peopleOnsiteWaitlistManaged','peopleRosterSyncStatusHtml','applyRemoteState'])vm.runInContext(fn(name),ctx);
  vm.runInContext(block('let adminRosterUnsub=null, adminRosterCode="", adminRosterGeneration=0;','let myRegistrationsError = null;'),ctx);
