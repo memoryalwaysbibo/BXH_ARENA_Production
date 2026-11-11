@@ -115,8 +115,34 @@ test('accepted durable operation remains pending until current registration is r
 test('asynchronous queue business rejection ends waiting and permits a new operation',async()=>{
  const f=fixture({read:async()=>({ok:true,rows:[],operation:{state:'rejected',reason:'full'}})});
  const request={action:'join',code:CODE,childIds:[null],childEligibilityConfirmed:true,operationId:'queued-full-operation'};
- await assert.rejects(f.api.run(CODE,async p=>{p.submitting(['user1'],request);return {ok:true,operation:{state:'queued'}};}),/full/);
+ const flight=f.api.run(CODE,async p=>{p.submitting(['user1'],request);return {ok:true,operation:{state:'queued'}};});
+ const rejection=assert.rejects(flight,/full/);await flush();await f.advance(1000);await rejection;
  assert.equal(f.api.snapshot()[0].state,'failed');assert.equal(f.storage.length,0);f.api.dispose();
+});
+test('a queued join completed in 804ms confirms at the first one-second check with one read',async()=>{
+ let committed=false;const f=fixture({read:async()=>({ok:true,operation:{state:committed?'completed':'queued'},rows:committed?[{registrationId:'user1',status:'confirmed'}]:[]})});
+ const flight=f.api.run(CODE,async p=>{p.submitting(['user1']);return {ok:true,operation:{state:'queued'}};});
+ await flush();assert.equal(f.queries.length,0,'acceptance must not trigger an immediate empty read');
+ await f.advance(804);committed=true;assert.equal(f.api.snapshot()[0].state,'unconfirmed');
+ await f.advance(196);assert.equal((await flight).status,'confirmed');assert.equal(f.queries.length,1);f.api.dispose();
+});
+test('a slower queued join retains the eight-second fallback without extra reads or submissions',async()=>{
+ let committed=false,sends=0;const f=fixture({read:async()=>({ok:true,operation:{state:committed?'completed':'queued'},rows:committed?[{registrationId:'user1',status:'confirmed'}]:[]})});
+ const flight=f.api.run(CODE,async p=>{sends++;p.submitting(['user1']);return {ok:true,operation:{state:'queued'}};});
+ await flush();await f.advance(4000);assert.equal(f.queries.length,1);committed=true;
+ await f.advance(4000);assert.equal((await flight).status,'confirmed');assert.equal(f.queries.length,2);assert.equal(sends,1);f.api.dispose();
+});
+test('an unresolved queued join keeps the existing bounded automatic read budget',async()=>{
+ let sends=0;const f=fixture({read:async()=>({ok:true,operation:{state:'queued'},rows:[]})});
+ const flight=f.api.run(CODE,async p=>{sends++;p.submitting(['user1']);return {ok:true,operation:{state:'queued'}};});flight.catch(()=>{});
+ await flush();await f.advance(600000);await assert.rejects(flight,/result-pending/);
+ assert.equal(f.queries.length,5);assert.equal(sends,1);assert.equal(f.api.snapshot()[0].autoPaused,true);assert.equal(f.storage.length,1);f.api.dispose();
+});
+test('a long-running queued join retains late recovery after the UI deadline',async()=>{
+ let committed=false;const f=fixture({read:async()=>({ok:true,operation:{state:committed?'completed':'queued'},rows:committed?[{registrationId:'user1',status:'confirmed'}]:[]})});
+ const flight=f.api.run(CODE,async p=>{p.submitting(['user1']);return {ok:true,operation:{state:'queued'}};});flight.catch(()=>{});
+ await flush();await f.advance(130000);await assert.rejects(flight,/result-pending/);assert.equal(f.queries.length,4);
+ committed=true;await f.advance(2000);assert.equal(f.api.snapshot()[0].state,'confirmed');assert.equal(f.queries.length,5);assert.equal(f.recoveries.length,1);f.api.dispose();
 });
 test('retry acceptance is not misreported as registration-no-longer-active while worker is queued',async()=>{
  const storage=memory(),request={action:'join',code:CODE,childIds:[null],childEligibilityConfirmed:true,operationId:'queued-retry-operation'};

@@ -103,7 +103,9 @@
       if(!current(e)||!ACTIVE.includes(e.state)||!e.ids||e.hidden)return;
       if(e.attempts>delays.length){e.autoPaused=true;emit();return;}
       if(e.autoTimer!==null){unschedule(e.autoTimer);e.timers.delete(e.autoTimer);}
-      e.autoTimer=later(e,()=>{e.autoTimer=null;void recheck(e.code);},delays[Math.max(0,e.attempts-1)]||delays.at(-1)||12000);
+      const queuedJoin=e.action!=='cancel'&&['queued','running'].includes(e.queueState);
+      const delay=queuedJoin&&e.attempts===0?1000:undefined;
+      e.autoTimer=later(e,()=>{e.autoTimer=null;void recheck(e.code);},delay??(delays[Math.max(0,e.attempts-1)]||delays.at(-1)||12000));
     }
     async function recheck(code){
       restore();const e=entries.get(code);
@@ -185,7 +187,12 @@
             e.queueState=result?.operation?.state||null;e.state='unconfirmed';emit();void recheck(code);return;
           }
           if(result?.ok===true&&['queued','running','attention'].includes(result.operation?.state)){
-            e.queueState=result.operation.state;e.state='unconfirmed';emit();void recheck(code);return;
+            e.queueState=result.operation.state;e.state='unconfirmed';emit();
+            // Acceptance already proves this operation is pending. Avoid an
+            // immediate empty read, then confirm promptly while keeping the
+            // same bounded read budget and long-running backoff.
+            if(['queued','running'].includes(e.queueState))queueCheck(e);else void recheck(code);
+            return;
           }
           if(!result||result.ok===false||!STATUS.includes(result.status))throw Error('registration-empty-response');
           complete(e,result);
