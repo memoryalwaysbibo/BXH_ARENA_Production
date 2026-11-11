@@ -157,7 +157,7 @@ test('only the pilot rooms use their current server ownership markers',async()=>
  const cloud=fs.readFileSync(require.resolve('../modules/cloud/cloud-runtime.js'),'utf8');
  const start=cloud.indexOf('  async function registrationFlowV2Enabled(');
  const end=cloud.indexOf('  const managementQueueOperations=',start);
- const pilot='BXH-BZ2JW6',nextPilot='BXH-XJ7WJ5',reads=[];
+ const pilot='BXH-BZ2JW6',nextPilot='BXH-XJ7WJ5',newPilot='BXH-XXDNAH',reads=[];
  let marker,missing=false,changeAccount=false;
  const context=vm.createContext({
   window:{},dbHandle:{},authHandle:{currentUser:{uid:'user1'}},engagementSessionEpoch:1,
@@ -171,9 +171,11 @@ test('only the pilot rooms use their current server ownership markers',async()=>
  const enabled=vm.runInContext(cloud.slice(start,end)+'\nregistrationFlowV2Enabled;',context);
  assert.equal(await enabled('BXH-OTHER1'),false);
  assert.deepEqual(reads,[]);
+ assert.equal(await enabled(newPilot),false);
  assert.equal(await enabled(nextPilot),false);
  assert.equal(await enabled(pilot),false);
  marker=2;
+ assert.equal(await enabled(newPilot),true);
  assert.equal(await enabled(nextPilot),true);
  assert.equal(await enabled(pilot),true);
  marker=undefined;
@@ -182,7 +184,7 @@ test('only the pilot rooms use their current server ownership markers',async()=>
  await assert.rejects(enabled(pilot),/registration-route-unavailable/);
  changeAccount=true;
  await assert.rejects(enabled(pilot),/stale-session/);
- assert.deepEqual(reads,[nextPilot,pilot,nextPilot,pilot,pilot,pilot,pilot].map(code=>'publicTournaments/'+code));
+ assert.deepEqual(reads,[newPilot,nextPilot,pilot,newPilot,nextPilot,pilot,pilot,pilot,pilot].map(code=>'publicTournaments/'+code));
 });
 test('the shipped cancellation action uses the V2 queue and avoids a legacy resend after rollback',async()=>{
  let response=null;
