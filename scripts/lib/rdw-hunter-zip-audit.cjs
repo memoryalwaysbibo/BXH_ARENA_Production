@@ -19,18 +19,41 @@ function auditZip({archivePath,expectedSha256,expectedBlobs=SOURCE.candidateGitB
  const actualSha256=createHash('sha256').update(bytes).digest('hex');
  if(actualSha256!==expectedSha256)return blocked('archive-sha256-mismatch',{actualSha256});
  let entries;
+ // Check the central directory BEFORE any decompression to reject oversized,
+ // encrypted, symlink and suspicious members. Names come from JSON, not a
+ // newline-delimited listing, so filenames containing newlines fail safely.
  try{
-  execFileSync('unzip',['-tqq',archivePath],{timeout:30000,maxBuffer:1024*1024,stdio:'pipe'});
-  entries=execFileSync('unzip',['-Z1',archivePath],{encoding:'utf8',timeout:30000,maxBuffer:2*1024*1024})
-   .split(/\r?\n/).filter(Boolean);
+  const inspect=[
+   'import json,stat,sys,zipfile',
+   'with zipfile.ZipFile(sys.argv[1]) as z:',
+   ' print(json.dumps([{"name":i.filename,"size":i.file_size,"encrypted":bool(i.flag_bits & 1),"mode":i.external_attr >> 16} for i in z.infolist()]))'
+  ].join('\n');
+  entries=JSON.parse(execFileSync('python3',['-c',inspect,archivePath],
+   {encoding:'utf8',timeout:30000,maxBuffer:2*1024*1024}));
  }catch{return blocked('archive-invalid');}
+ if(!Array.isArray(entries)||!entries.length||entries.length>256)return blocked('archive-entry-count-invalid');
  const counts=new Map();
- for(const name of entries){
-  if(name.startsWith('/')||name.includes(String.fromCharCode(92))||(name.endsWith('/')?name.slice(0,-1):name).split('/').some(part=>part==='..'||part==='.'||part===''))
+ let totalUncompressed=0;
+ for(const entry of entries){
+  const name=entry?.name;
+  if(typeof name!=='string'||!name||name.includes('\0')||name.includes('\r')||name.includes('\n')||
+     name.startsWith('/')||name.includes(String.fromCharCode(92))||
+     (name.endsWith('/')?name.slice(0,-1):name).split('/').some(part=>part==='..'||part==='.'||part===''))
    return blocked('unsafe-zip-entry',{file:name});
+  if(entry.encrypted===true)return blocked('encrypted-zip-entry',{file:name});
+  const fileType=entry.mode & 0xf000;
+  if(fileType===0xa000)return blocked('symlink-zip-entry',{file:name});
+  if(fileType!==0 && fileType!==0x8000 && fileType!==0x4000)
+   return blocked('unsupported-zip-entry-type',{file:name});
+  if(!Number.isSafeInteger(entry.size)||entry.size<0||entry.size>4*1024*1024)
+   return blocked('zip-entry-size-invalid',{file:name});
+  totalUncompressed+=entry.size;
+  if(totalUncompressed>64*1024*1024)return blocked('zip-uncompressed-size-invalid');
   counts.set(name,(counts.get(name)||0)+1);
   if(counts.get(name)>1)return blocked('duplicate-zip-entry',{file:name});
  }
+ try{execFileSync('unzip',['-tqq',archivePath],{timeout:30000,maxBuffer:1024*1024,stdio:'pipe'});}
+ catch{return blocked('archive-invalid');}
  for(const [file,expected] of Object.entries(expectedBlobs)){
   if(counts.get(file)!==1)return blocked('candidate-file-missing',{file});
   let content;
