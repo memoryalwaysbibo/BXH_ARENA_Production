@@ -4,13 +4,14 @@
 // The createReader implementation must come from independently audited private
 // backend source; this module MUST NOT enable production writes by itself.
 const {verifiedCurrentTier}=require('./rdw-current-tier-source.cjs');
+const {createReaderCapabilities}=require('./rdw-firestore-reader-capabilities.cjs');
 const VERSION='hunter-license-v2.1';
 const SCOPE='public-official-canonical-self-history-v1';
 const UID=/^[A-Za-z0-9_-]{1,128}$/;
 function createTransactionTierResolver({db,createReader}={}){
  if(typeof db?.doc!=='function'||typeof db?.collection!=='function'||typeof createReader!=='function')
   throw Error('trusted-reader-dependencies-required');
- const readerDb=Object.freeze({doc:path=>db.doc(path),collection:name=>db.collection(name)});
+ const {readerDb,makeReadTransaction}=createReaderCapabilities(db);
  const evaluate=createReader({db:readerDb});
  if(typeof evaluate!=='function')throw Error('trusted-reader-invalid');
  async function one(tx,uid,atMs){
@@ -20,7 +21,7 @@ function createTransactionTierResolver({db,createReader}={}){
      user.role==='tester'||user.familyTransferPending===true||
      ['deleted','disabled','frozen','pending_family_transfer'].includes(user.accountStatus))
    return {ok:false,reason:'account-not-eligible'};
-  const evidence=await evaluate({tx,uid});
+  const evidence=await evaluate({tx:makeReadTransaction(tx),uid});
   if(!evidence||evidence.uid!==uid||evidence.version!==VERSION||
      evidence.complete!==true||evidence.unresolvedIdentities!==0||
      evidence.sourceScope!==SCOPE||!/^[a-f0-9]{64}$/.test(evidence.sourceDigest||''))
