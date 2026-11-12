@@ -80,3 +80,14 @@ test('rejects ZIP symlinks, encrypted flags and oversized expanded members',()=>
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
  }
 });
+
+test('empty expected manifest cannot silently approve any ZIP',()=>{
+ const z=archive([['reader.cjs','sample']]);
+ try{
+  for(const expectedBlobs of [{}, {'reader.cjs':'not-a-git-blob'}]){
+   const result=auditZip({archivePath:z.file,expectedSha256:z.expectedSha256,expectedBlobs});
+   assert.equal(result.reason,'expected-fingerprints-invalid');
+   assert.equal(result.releaseApproved,false);
+  }
+ }finally{z.cleanup();}
+});
