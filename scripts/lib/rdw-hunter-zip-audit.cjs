@@ -26,7 +26,7 @@ function auditZip({archivePath,expectedSha256,expectedBlobs=SOURCE.candidateGitB
  }catch{return blocked('archive-invalid');}
  const counts=new Map();
  for(const name of entries){
-  if(name.startsWith('/')||name.includes('\\\\')||(name.endsWith('/')?name.slice(0,-1):name).split('/').some(part=>part==='..'||part==='.'||part===''))
+  if(name.startsWith('/')||name.includes(String.fromCharCode(92))||(name.endsWith('/')?name.slice(0,-1):name).split('/').some(part=>part==='..'||part==='.'||part===''))
    return blocked('unsafe-zip-entry',{file:name});
   counts.set(name,(counts.get(name)||0)+1);
   if(counts.get(name)>1)return blocked('duplicate-zip-entry',{file:name});
