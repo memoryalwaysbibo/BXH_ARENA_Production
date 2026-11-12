@@ -407,6 +407,9 @@ jobs:
       - name: Verify RDW immutable prematch snapshots under concurrent Firestore transactions
         run: npx firebase emulators:exec --only auth,firestore --project demo-rdw-hunter-snapshot --config tests/e2e/firebase.json "node tests/rdw-hunter-snapshot-emulator.cjs"
 
+      - name: Verify RDW Hunter pair and snapshot in same Firestore transaction
+        run: npx firebase emulators:exec --only auth,firestore --project demo-rdw-pair-tx --config tests/e2e/firebase.json "node tests/rdw-hunter-pair-snapshot-emulator.cjs"
+
       - name: Upload E2E failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
