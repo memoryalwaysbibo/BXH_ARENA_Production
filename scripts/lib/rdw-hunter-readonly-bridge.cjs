@@ -6,8 +6,16 @@
 const {verifiedCurrentTier}=require('./rdw-current-tier-source.cjs');
 const VERSION='hunter-license-v2.1';
 function createReadOnlyTierResolver({db,createReader,clock}){
- if(!db||typeof db.runTransaction!=='function'||typeof createReader!=='function'||typeof clock!=='function')throw Error('trusted-reader-dependencies-required');
- const evaluate=createReader({db});
+ if(!db||typeof db.runTransaction!=='function'||typeof db.doc!=='function'||typeof db.collection!=='function'||typeof createReader!=='function'||typeof clock!=='function')throw Error('trusted-reader-dependencies-required');
+ // Current verified backend reader uses only doc(), collection(), and tx.get().
+ // Restrict constructor capabilities; do not expose runTransaction(), batch(),
+ // bulkWriter() or admin methods. Firestore refs themselves remain powerful,
+ // so provenance review / least-privilege IAM are STILL mandatory.
+ const readerDb=Object.freeze({
+  doc:(path)=>db.doc(path),
+  collection:(name)=>db.collection(name)
+ });
+ const evaluate=createReader({db:readerDb});
  if(typeof evaluate!=='function')throw Error('trusted-reader-invalid');
  return async function resolve(uid){
   if(typeof uid!=='string'||!/^[-A-Za-z0-9_]{1,128}$/.test(uid))throw Error('invalid-uid');
