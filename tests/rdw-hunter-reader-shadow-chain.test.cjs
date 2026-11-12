@@ -17,6 +17,7 @@ function fixture(){
  const writes=[];
  const db={
   doc:(path)=>({path}),
+  collection:(name)=>({name}),
   runTransaction:async(callback)=>{
    const tx={
     get:async(ref)=>{
