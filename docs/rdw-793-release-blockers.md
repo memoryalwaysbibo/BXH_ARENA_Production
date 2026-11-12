@@ -23,5 +23,12 @@ Integration PR: #793. Source PR: #557.
 5. Run real-source Firebase Emulator end-to-end cases (normal, ungraded, family/guardian, absent/stale history, duplicates, concurrency and retry) and compare all affected permanent award/audit, XP and V1 ladder records before and after.
 6. Check latest PR HEAD CI, code review, rules/IAM and operational rollback; get explicit owner approval before merging or deploying. Keep runtime flag OFF throughout.
 
+## 2026-11-12 immutable baseline reference (isolated)
+- Added `scripts/lib/rdw-hunter-snapshot-seal.cjs`, with `enabled:false` by default and no deployed callable registration.
+- Its reference transaction checks server-side authority, canonical roster/match revision, and two trusted Hunter current-tier evidences, then `tx.create`s a deterministic pre-event RDW-only baseline.
+- A repeat returns the existing baseline only when the authoritative match identity and revision agree; mismatch is blocked. Missing evidence, post-start rooms, stale revision or unauthorized actors cannot write.
+- Automated tests cover the reference contract; **this is not yet a validated production Firestore schema, server-authorized snapshot writer, or live Hunter Reader integration.** It must remain disabled until authoritative backend/Rules, idempotency and Emulator transaction tests are completed.
+- The reference does not modify V1 ladder, XP, permanent Hunter awards or the real event start action.
+
 ## Release decision
 **BLOCKED.** Passing synthetic tests is necessary but insufficient. Do not copy old #557 start-service or partner quota components into #793 merely to unblock this gate; those are separate behavior changes.
