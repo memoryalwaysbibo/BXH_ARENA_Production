@@ -33,5 +33,7 @@ test('missing and mismatched source files cannot pass provenance gate',()=>{
 test('source scope identifies candidate backend only, not deployment proof',()=>{
  assert.equal(SOURCE.repository,'memoryalwaysbibo/BXH_ARENA_Functions_Production');
  assert.equal(SOURCE.ruleVersion,'hunter-license-v2.1');
- assert.equal(Object.keys(SOURCE.candidateGitBlobs).length,5);
+ assert.equal(Object.keys(SOURCE.candidateGitBlobs).length,12);
+ for(const name of ['reader.cjs','service.cjs','evaluator.cjs','recovery-window.cjs','vendor/identity-service.cjs','vendor/canonical.js'])
+  assert.ok(SOURCE.candidateGitBlobs[name]);
 });
