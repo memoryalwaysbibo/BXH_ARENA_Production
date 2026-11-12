@@ -34,7 +34,7 @@ function render(count,loading=false){
    const page=await browser.newPage({viewport:{width,height},reducedMotion:'reduce'});
    await page.route('**/*',r=>r.abort());
    await page.setContent('<!doctype html><html data-bxh-theme="'+theme+'"><head><meta charset="utf-8"><style>'+css+'</style></head><body>'+render(count)+'</body></html>');
-   await page.evaluate(()=>document.getAnimations().forEach(a=>a.finish()));
+   await page.evaluate(()=>document.getAnimations().forEach(a=>Number.isFinite(a.effect.getComputedTiming().endTime)?a.finish():a.cancel()));
    // Demonstrate the original failure using the old flex-shrink value.
    if(theme==='three-gods'&&width===934&&count===1){
     const legacy=await page.addStyleTag({content:'.auth-content{flex-shrink:1!important}'});
