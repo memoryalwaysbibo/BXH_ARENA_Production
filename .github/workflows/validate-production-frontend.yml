@@ -404,6 +404,9 @@ jobs:
       - name: Verify RDW Hunter shadow read-only transaction and permanent ledger invariants
         run: npx firebase emulators:exec --only auth,firestore --project demo-rdw-hunter-bridge --config tests/e2e/firebase.json "node tests/rdw-hunter-firestore-emulator.cjs"
 
+      - name: Verify RDW immutable prematch snapshots under concurrent Firestore transactions
+        run: npx firebase emulators:exec --only auth,firestore --project demo-rdw-hunter-snapshot --config tests/e2e/firebase.json "node tests/rdw-hunter-snapshot-emulator.cjs"
+
       - name: Upload E2E failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
