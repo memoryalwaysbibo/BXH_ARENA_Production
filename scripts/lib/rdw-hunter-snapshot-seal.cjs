@@ -18,7 +18,7 @@ function createSealer({db,authorize,verifyCanonicalMatch,resolveTiers,clock,enab
  if(!db||typeof db.runTransaction!=='function'||typeof db.doc!=='function'||
     [authorize,verifyCanonicalMatch,resolveTiers,clock].some(fn=>typeof fn!=='function'))
   throw Error('trusted-server-dependencies-required');
- return async({code,matchId,actorUid,expectedRosterRevision}={}){
+ return async function sealHunterPrematch({code,matchId,actorUid,expectedRosterRevision}={}){
   if(!eventCode(code)||!id(matchId)||!id(actorUid)||
      !Number.isSafeInteger(expectedRosterRevision)||expectedRosterRevision<0)
    return {ok:false,code:'invalid-input'};
