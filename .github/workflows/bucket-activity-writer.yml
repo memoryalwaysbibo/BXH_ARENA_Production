@@ -1,0 +1,52 @@
+name: Bucket completion activity writer
+on:
+  pull_request:
+    paths:
+      - 'release/buckets/activity/**'
+      - 'tests/four-court-buckets/activity/**'
+      - '.github/workflows/bucket-activity-writer.yml'
+      - 'scripts/bucketcaptureactivitybackfill.py'
+permissions:
+  contents: read
+jobs:
+  activity-writer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify captured module and exact patch scope
+        run: python3 -B tests/four-court-buckets/activity/verify-package.py
+      - name: Read-only backfill capture helper offline checks
+        run: python3 -B tests/four-court-buckets/activity/capture-backfill.py
+      - name: Captured baseline, stale delivery and bucket activity regressions
+        run: |
+          node tests/four-court-buckets/activity/probe.cjs
+          node tests/four-court-buckets/activity/backfill-probe.cjs
+      - uses: actions/checkout@v4
+        with:
+          ref: c461dd031d65648524089ab6366e697ad0f296b0
+          path: .integration/completion
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: f31da1e78b1ca9319b67dad534e644955c54fba1
+          path: .integration/settlement
+          persist-credentials: false
+      - name: Actual pinned general and ranked settlement handoff
+        run: node tests/four-court-buckets/activity/backend-bridge.cjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install isolated SDK and emulator dependencies
+        run: npm install --prefix /tmp/bucket-activity --no-save --ignore-scripts firebase-tools@14 firebase-admin@14.4.0 firebase-functions@7.3.2
+      - name: Native transaction authority, generation and retry acceptance
+        env:
+          NODE_PATH: /tmp/bucket-activity/node_modules
+          GCLOUD_PROJECT: demo-bxh-bucket-activity
+        run: /tmp/bucket-activity/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-bucket-activity --config tests/four-court-buckets/activity/firebase.json 'node tests/four-court-buckets/activity/native-emulator.cjs'
