@@ -17,7 +17,7 @@ const {assessMatch}=require('../scripts/lib/rdw-hunter-match-shadow.cjs');
  const uids=['rdw-player-a','rdw-player-b'];
  const docs=[
   ...uids.map(uid=>'users/'+uid+'/hunterLicense/highest'),
-  ...uids.map(uid=>'users/'+uid+'/hunterLicense/awardAudits/initial'),
+  ...uids.map(uid=>'users/'+uid+'/hunterAwardAudits/initial'),
   ...uids.map(uid=>'rdwFixtureLadder/'+uid),
   ...uids.map(uid=>'rdwFixtureXp/'+uid)
  ];
@@ -31,7 +31,7 @@ const {assessMatch}=require('../scripts/lib/rdw-hunter-match-shadow.cjs');
     sourceScope:'public-official-canonical-self-history-v1'
    });
    await db.doc('users/'+uid+'/hunterLicense/highest').set({tier:'national',awardedAt:100,permanent:true});
-   await db.doc('users/'+uid+'/hunterLicense/awardAudits/initial').set({tier:'national',kind:'permanent-award'});
+   await db.doc('users/'+uid+'/hunterAwardAudits/initial').set({tier:'national',kind:'permanent-award'});
    await db.doc('rdwFixtureLadder/'+uid).set({season:'S1',points:500});
    await db.doc('rdwFixtureXp/'+uid).set({xp:700});
   }
