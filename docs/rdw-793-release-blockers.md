@@ -9,6 +9,12 @@ Integration PR: #793. Source PR: #557.
 - In-memory and Emulator tests use injected synthetic `createReader`, not the actual deployed `syncHunterLicenseV21` reader.
 - No RDW deployment, callable registration, or production start hook is part of #793.
 
+## 2026-11-12 source-gate hardening
+- Candidate source Git blob list expanded from 5 to **12** files, covering direct Hunter reader/service/callable/evaluator/recovery dependencies and the known vendored evaluation scripts at the backend repository `main` snapshot.
+- `verifyCandidate` now always returns `ok:false` after those candidate fingerprints match, with `reason:live-artifact-identity-unverified`; a caller-supplied `expectedLiveGeneration` equal to its `liveGeneration` is **not independent runtime evidence**.
+- These 12 Git blobs are not the same as a checked Cloud Functions source ZIP. Do not claim full source-chain verification or grant protection merely because this static source gate passes.
+- The candidate backend Reader calls into vendored evaluation logic, so the precise deployed ZIP plus immutable archive hash, internal file inventory, dependency digests, Firestore Rules/IAM and actual end-to-end behavior remain release requirements.
+
 ## Hard blockers — do not merge/enable as a production RDW feature yet
 1. Obtain the **actual deployed** Hunter 2.1 `reader.cjs` and its verified dependency bundle with immutable digests and matching deployed generation. The old #557 audit documents refer to generation `1792487233621570`; revalidate against current runtime, not a historical ZIP.
 2. The independent backend repository `memoryalwaysbibo/BXH_ARENA_Functions_Production` `release/hunter-license-v21/reader.cjs` (Git blob `4d21a650585f21a55a04759c8894c4021989ceb4`) was reviewed at source level: its Reader transaction uses `tx.get` with `db.doc`/`db.collection` queries; the separate `service.cjs` contains grant writes. In #793, the injected reader constructor now receives only `doc()` and `collection()` functions, and the evaluator receives only `tx.get()`. **This is a narrower API, not enforceable read-only IAM**: returned Firestore references may still offer write methods and dependencies must be audited. Verify the *deployed* generation and entire vendored source tree, then enforce least-privilege or an isolated trusted read service before production.
