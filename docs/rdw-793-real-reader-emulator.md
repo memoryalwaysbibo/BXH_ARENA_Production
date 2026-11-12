@@ -15,6 +15,6 @@ npx firebase emulators:exec --only auth,firestore --project demo-rdw-real-reader
   --config tests/e2e/firebase.json "node tests/rdw-hunter-real-reader-emulator.cjs"
 ```
 
-The harness uses an isolated UID and no event history to check that the *real* Reader returns a neutral ungraded current tier via the restricted read facade. It compares selected fixture permanent-award, XP and ladder documents before/after and returns `releaseApproved:false` even on success.
+The harness requires Firestore project ID `demo-rdw-real-reader` and an isolated UID. With no event history, it checks that the *real* Reader returns a neutral ungraded current tier via the restricted read facade. It compares selected fixture documents **and every document in the isolated `hunterLicenseAwards` collection** before/after, including on reader failure, and returns `releaseApproved:false` even on success. This collection-wide check is intended only for the small dedicated Emulator dataset, never a production collection.
 
 **Limitations:** This is a starter smoke test, not complete career-history E2E. It does not certify source-generation matching, IAM, Rules, concurrency, guardian/child mapping, a persisted server-sealed prematch snapshot, or all possible award ledgers. Those remain release blockers. Do not merge or deploy until complete release acceptance and explicit owner confirmation.
