@@ -6,12 +6,22 @@ const path=require('node:path');
 const {validateSourceDir}=require('./rdw-hunter-real-reader-emulator.cjs');
 const {createSealer}=require('../scripts/lib/rdw-hunter-snapshot-seal.cjs');
 const {createTransactionTierResolver}=require('../scripts/lib/rdw-hunter-transaction-tier-pair.cjs');
+async function assertEmptyDemoScope(db){
+ const collections=['publicTournaments','hunterLicenseAwards','rdwHunterShadowBaselines'];
+ for(const name of collections){
+  const snapshot=await db.collection(name).limit(1).get();
+  if(!snapshot.empty&&snapshot.size!==0)throw Error('emulator-collection-not-empty:'+name);
+ }
+}
 async function run({sourceDir,db}={}){
  if(!process.env.FIRESTORE_EMULATOR_HOST||!process.env.FIREBASE_AUTH_EMULATOR_HOST)
   throw Error('auth-and-firestore-emulators-required');
  if(!db||db.projectId!=='demo-rdw-real-reader'||typeof db.runTransaction!=='function')
   throw Error('isolated-emulator-project-required');
  const source=validateSourceDir(sourceDir);
+ // Never run a real Reader fixture in a reused demo database: previous
+ // records could make an ungraded expectation meaningless.
+ await assertEmptyDemoScope(db);
  const {createReader}=require(path.join(source.root,'reader.cjs'));
  if(typeof createReader!=='function')throw Error('real-reader-export-missing');
  const code='BXH-RDW789',uidA='rdw-realreader-test-a',uidB='rdw-realreader-test-b';
@@ -67,7 +77,7 @@ async function run({sourceDir,db}={}){
  return {ok:true,checkedFiles:source.checked.length,mode:'real-reader-pair-emulator-only',
   releaseApproved:false,liveDeploymentVerified:false,iamVerified:false};
 }
-module.exports={run};
+module.exports={run,assertEmptyDemoScope};
 if(require.main===module){
  (async()=>{
   const sourceDir=process.env.HUNTER_READER_SOURCE_DIR;
