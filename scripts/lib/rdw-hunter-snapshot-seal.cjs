@@ -13,6 +13,26 @@ function checkedEvidence(evidence,uid,atMs){
  const v=verifiedCurrentTier(evidence,{uid,atMs});
  return v.ok?{uid,tier:v.tier,sourceDigest:evidence.sourceDigest,version:v.version}:null;
 }
+function prematchRoom(room,expectedRosterRevision){
+ if(!room||typeof room!=='object')return {ok:false,reason:'room-data-invalid'};
+ let state=room;
+ if(Object.hasOwn(room,'data')){
+  if(typeof room.data==='string'){
+   try{state=JSON.parse(room.data);}catch{return {ok:false,reason:'room-data-invalid'};}
+  }else state=room.data;
+  if(!state||typeof state!=='object'||Array.isArray(state))return {ok:false,reason:'room-data-invalid'};
+ }
+ // A legacy root field cannot override a newer nested canonical room state.
+ if(room.startedAt||room.rosterLocked||state.startedAt||state.rosterLocked)
+  return {ok:false,reason:'tournament-already-started'};
+ const rootRevision=room.registrationRosterRevision,innerRevision=state.registrationRosterRevision;
+ // Require explicit, agreeing revision evidence. Missing revision is not zero.
+ if(!Number.isSafeInteger(innerRevision)||innerRevision!==expectedRosterRevision||
+    (rootRevision!==undefined&&rootRevision!==innerRevision))
+  return {ok:false,reason:'roster-revision-stale'};
+ if(state.meta?.battleMode==='team')return {ok:false,reason:'team-mode-not-audited'};
+ return {ok:true,state};
+}
 function createSealer({db,authorize,verifyCanonicalMatch,resolveTiers,clock,enabled=false}={}){
  if(!enabled)return async()=>({ok:false,code:'rdw-snapshot-disabled'});
  if(!db||typeof db.runTransaction!=='function'||typeof db.doc!=='function'||
@@ -30,16 +50,20 @@ function createSealer({db,authorize,verifyCanonicalMatch,resolveTiers,clock,enab
    const [eventDoc,priorDoc]=await Promise.all([tx.get(tournamentRef),tx.get(baselineRef)]);
    if(!eventDoc.exists)return {ok:false,code:'tournament-missing'};
    const room=eventDoc.data();
-   if(!room||room.startedAt||room.rosterLocked)return {ok:false,code:'tournament-already-started'};
+   const checked=prematchRoom(room,expectedRosterRevision);
+   if(!checked.ok)return {ok:false,code:checked.reason};
    if(await authorize({tx,actorUid,code,room})!==true)
     return {ok:false,code:'not-authorized'};
-   const match=await verifyCanonicalMatch({tx,code,matchId,room,expectedRosterRevision});
+   const match=await verifyCanonicalMatch({tx,code,matchId,room:checked.state,expectedRosterRevision});
    if(!match||match.valid!==true||match.rosterRevision!==expectedRosterRevision||
       !id(match.playerA)||!id(match.playerB)||match.playerA===match.playerB)
     return {ok:false,code:'canonical-match-invalid'};
    if(priorDoc.exists){
     const prior=priorDoc.data();
-    if(prior?.code===code&&prior.matchId===matchId&&
+    if(prior?.schemaVersion==='rdw-hunter-prematch-v1'&&prior.source==='server'&&
+       prior.verified===true&&prior.rdwOnly===true&&
+       prior.affectsLadder===false&&prior.affectsXp===false&&prior.affectsAwards===false&&
+       prior?.code===code&&prior.matchId===matchId&&
        prior.playerA===match.playerA&&prior.playerB===match.playerB&&
        prior.rosterRevision===expectedRosterRevision)
      return {ok:true,created:false,mode:'existing-immutable-baseline'};
@@ -63,4 +87,4 @@ function createSealer({db,authorize,verifyCanonicalMatch,resolveTiers,clock,enab
   });
  };
 }
-module.exports={createSealer,checkedEvidence};
+module.exports={createSealer,checkedEvidence,prematchRoom};
