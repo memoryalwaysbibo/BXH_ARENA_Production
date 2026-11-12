@@ -3,7 +3,7 @@ const {createReadOnlyTierResolver}=require('../scripts/lib/rdw-hunter-readonly-b
 function fixture({user={active:true},evidence={uid:'u1',version:'hunter-license-v2.1',complete:true,unresolvedIdentities:0,overview:{grade:{tier:'c'}},sourceDigest:'a'.repeat(64),sourceScope:'public-official-canonical-self-history-v1'}}={}){
  const writes=[];let readOnly=false;
  const tx={get:async()=>({exists:!!user,data:()=>user}),set:()=>writes.push('set'),create:()=>writes.push('create'),update:()=>writes.push('update')};
- const db={doc:p=>({path:p}),runTransaction:async(fn,options)=>{readOnly=options?.readOnly===true;return fn(tx);}};
+ const db={doc:p=>({path:p}),collection:name=>({name}),runTransaction:async(fn,options)=>{readOnly=options?.readOnly===true;return fn(tx);}};
  const resolve=createReadOnlyTierResolver({db,createReader:()=>async()=>evidence,clock:()=>1234});
  return {resolve,writes,get readOnly(){return readOnly;}};
 }
@@ -30,7 +30,7 @@ test('injected Hunter evaluator is given only transaction read capability',async
   set:()=>writes.push('set'),create:()=>writes.push('create'),
   update:()=>writes.push('update'),delete:()=>writes.push('delete')
  };
- const db={doc:path=>({path}),runTransaction:async run=>run(tx)};
+ const db={doc:path=>({path}),collection:name=>({name}),runTransaction:async run=>run(tx)};
  const createReader=()=>async({tx:readerTx,uid})=>{
   assert.equal(typeof readerTx.get,'function');
   for(const method of ['set','create','update','delete'])assert.equal(method in readerTx,false);
@@ -44,4 +44,25 @@ test('injected Hunter evaluator is given only transaction read capability',async
  const result=await resolve('u1');
  assert.equal(result.ok,true);
  assert.deepEqual(writes,[]);
+});
+
+test('Hunter reader factory cannot call Admin Firestore transaction or write API',async()=>{
+ const db={
+  doc:path=>({path}),collection:name=>({name}),
+  runTransaction:async fn=>fn({get:async()=>({exists:true,data:()=>({active:true})})}),
+  batch:()=>{throw Error('must-not-expose-batch');},
+  bulkWriter:()=>{throw Error('must-not-expose-bulk-writer');}
+ };
+ const createReader=({db:readerDb})=>{
+  assert.equal(typeof readerDb.doc,'function');
+  assert.equal(typeof readerDb.collection,'function');
+  for(const name of ['runTransaction','batch','bulkWriter','recursiveDelete','listCollections'])
+   assert.equal(name in readerDb,false);
+  assert.equal(Object.isFrozen(readerDb),true);
+  return async({uid})=>({uid,version:'hunter-license-v2.1',complete:true,
+   unresolvedIdentities:0,sourceScope:'public-official-canonical-self-history-v1',
+   sourceDigest:'a'.repeat(64),overview:{grade:{tier:'c'}}});
+ };
+ const resolve=createReadOnlyTierResolver({db,createReader,clock:()=>1234});
+ assert.equal((await resolve('u1')).tier,'c');
 });
