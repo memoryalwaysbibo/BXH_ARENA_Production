@@ -15,7 +15,12 @@ function createReadOnlyTierResolver({db,createReader,clock}){
    const userSnap=await tx.get(db.doc('users/'+uid));
    const user=userSnap.exists?userSnap.data():null;
    if(!user||user.active!==true||user.isTestAccount===true||user.role==='tester'||user.deleted===true||['deleted','disabled','frozen','pending_family_transfer'].includes(user.accountStatus)||user.familyTransferPending===true)return {ok:false,reason:'account-not-eligible'};
-   const evidence=await evaluate({tx,uid});
+   // Expose only transaction reads to the injected evaluator. A Firestore transaction
+   // remains a read/write-capable object; do not hand that object to shadow code.
+   // This limits accidental transaction writes, but does not replace server IAM,
+   // an audited createReader implementation, or full backend read-only review.
+   const readTx=Object.freeze({get:(ref)=>tx.get(ref)});
+   const evidence=await evaluate({tx:readTx,uid});
    if(!evidence||evidence.uid!==uid||evidence.version!==VERSION||evidence.complete!==true||evidence.unresolvedIdentities!==0||evidence.sourceScope!=='public-official-canonical-self-history-v1'||!(/^[a-f0-9]{64}$/.test(evidence.sourceDigest||'')))return {ok:false,reason:'incomplete-server-history'};
    const grade=evidence.overview?.grade;
    const atMs=clock();
