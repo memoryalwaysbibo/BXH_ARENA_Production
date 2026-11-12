@@ -3,8 +3,6 @@
 // This DOES NOT attest a deployed runtime by itself. A trusted operator must
 // independently obtain the live function source generation and match its bytes.
 const {createHash}=require('node:crypto');
-const {readFileSync}=require('node:fs');
-const {join,resolve,sep}=require('node:path');
 const SOURCE=Object.freeze({
  repository:'memoryalwaysbibo/BXH_ARENA_Functions_Production',
  directory:'release/hunter-license-v21',
@@ -19,7 +17,7 @@ const SOURCE=Object.freeze({
 });
 function gitBlobHash(bytes){
  const buf=Buffer.isBuffer(bytes)?bytes:Buffer.from(bytes);
- const head=Buffer.from('blob '+buf.length+'\\0');
+ const head=Buffer.from('blob '+buf.length+'\0');
  return createHash('sha1').update(head).update(buf).digest('hex');
 }
 function verifyCandidate({files,liveGeneration,expectedLiveGeneration}={}){
