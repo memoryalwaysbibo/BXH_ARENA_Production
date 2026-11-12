@@ -101,14 +101,16 @@
     }
     function queueCheck(e){
       if(!current(e)||!ACTIVE.includes(e.state)||!e.ids)return;
-      const queuedJoin=e.action!=='cancel'&&['queued','running'].includes(e.queueState);
-      if(e.attempts>delays.length+(queuedJoin?2:0)){e.autoPaused=true;emit();return;}
+      const queuedOperation=['queued','running'].includes(e.queueState);
+      if(e.attempts>delays.length+(queuedOperation?2:0)){e.autoPaused=true;emit();return;}
       if(e.autoTimer!==null){unschedule(e.autoTimer);e.timers.delete(e.autoTimer);}
       // Real pilot jobs have completed at 3.52 and 4.15 seconds. A fourth-second
       // probe catches the former; retain five and eight seconds for the latter
-      // and for slower workers. Only queued joins use this bounded extra read.
+      // and for slower workers. Cancellation uses one- and two-second probes
+      // so a completed cancellation does not wait for the eight-second timer.
       const queuedDelays=[1000,3000,1000,3000,24000,40000,60000];
-      const delay=queuedJoin?queuedDelays[e.attempts]
+      const cancellationDelays=[1000,1000,2000,4000,24000,40000,60000];
+      const delay=queuedOperation?(e.action==='cancel'?cancellationDelays:queuedDelays)[e.attempts]
         :delays[Math.max(0,e.attempts-1)]||delays.at(-1)||12000;
       e.autoTimer=later(e,()=>{e.autoTimer=null;void recheck(e.code);},delay);
     }
@@ -117,7 +119,7 @@
       if(!e||!current(e)||!e.ids||!ACTIVE.includes(e.state))return null;
       if(e.query)return e.query;
       if(!visible())return null;
-      if(e.lastCheckAt!==null&&now()-e.lastCheckAt<(['queued','running'].includes(e.queueState)&&e.action!=='cancel'?900:3000))return null;
+      if(e.lastCheckAt!==null&&now()-e.lastCheckAt<(['queued','running'].includes(e.queueState)?900:3000))return null;
       if(e.autoTimer!==null){unschedule(e.autoTimer);e.timers.delete(e.autoTimer);e.autoTimer=null;}
       e.state='checking';e.attempts++;emit();
       e.query=(async()=>{
@@ -189,7 +191,9 @@
             const outcome=cancellationOutcome(e,result);
             if(outcome?.error){fail(e,outcome.error);return;}
             if(outcome?.result){complete(e,outcome.result);return;}
-            e.queueState=result?.operation?.state||null;e.state='unconfirmed';emit();void recheck(code);return;
+            e.queueState=result?.operation?.state||null;e.state='unconfirmed';emit();
+            if(['queued','running'].includes(e.queueState))queueCheck(e);else void recheck(code);
+            return;
           }
           if(result?.ok===true&&['queued','running','attention'].includes(result.operation?.state)){
             e.queueState=result.operation.state;e.state='unconfirmed';emit();

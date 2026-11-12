@@ -181,6 +181,28 @@ test('retry acceptance is not misreported as registration-no-longer-active while
 });
 const cancelRequest={action:'cancel',code:CODE,operationId:'cancel-operation-01',registrationId:'family_child1',intent:'player',localId:''};
 const cancelReceipt=(result={},operation={})=>({ok:true,operation:{state:'completed',operationId:cancelRequest.operationId,result:{ok:true,status:'cancelled',registrationId:cancelRequest.registrationId,autoPromoted:true,...result},...operation}});
+test('a queued cancellation completed in 804ms confirms at one second without resubmission',async()=>{
+ let committed=false,sends=0;
+ const f=fixture({read:async()=>committed?cancelReceipt():{ok:true,operation:{state:'queued'}}});
+ const flight=f.api.run(CODE,p=>{sends++;p.submitting([cancelRequest.registrationId],cancelRequest);return {ok:true,operation:{state:'queued'}};},'cancel');
+ await flush();assert.equal(f.queries.length,0);
+ await f.advance(804);committed=true;await f.advance(196);
+ assert.equal((await flight).status,'cancelled');assert.equal(f.queries.length,1);assert.equal(sends,1);f.api.dispose();
+});
+test('a queued cancellation completed in 1.5 seconds confirms at two seconds',async()=>{
+ let committed=false,sends=0;
+ const f=fixture({read:async()=>committed?cancelReceipt():{ok:true,operation:{state:'running'}}});
+ const flight=f.api.run(CODE,p=>{sends++;p.submitting([cancelRequest.registrationId],cancelRequest);return {ok:true,operation:{state:'queued'}};},'cancel');
+ await flush();await f.advance(1500);assert.equal(f.queries.length,1);committed=true;
+ await f.advance(500);assert.equal((await flight).status,'cancelled');assert.equal(f.queries.length,2);assert.equal(sends,1);f.api.dispose();
+});
+test('an unresolved queued cancellation has bounded reads and keeps its original request',async()=>{
+ let sends=0;const f=fixture({read:async()=>({ok:true,operation:{state:'queued'}})});
+ const flight=f.api.run(CODE,p=>{sends++;p.submitting([cancelRequest.registrationId],cancelRequest);return {ok:true,operation:{state:'queued'}};},'cancel');flight.catch(()=>{});
+ await flush();await f.advance(300000);
+ assert.equal(f.queries.length,7);assert.equal(sends,1);assert.equal(f.api.snapshot()[0].autoPaused,true);
+ assert.equal(f.api.cancellationPending(CODE),true);assert.equal(f.storage.length,1);f.api.dispose();
+});
 test('cancellation ignores roster rows and mismatched receipts until its own transaction completes',async()=>{
  let response={ok:true,rows:[{registrationId:cancelRequest.registrationId,status:'cancelled'}]};
  const pending=deferred(),f=fixture({read:async (code,query)=>{
@@ -210,7 +232,8 @@ test('reload restores cancellation and retries only the original operation',asyn
 });
 test('a cancellation rejection ends waiting only for the matching operation',async()=>{
  const f=fixture({read:async()=>cancelReceipt({}, {state:'rejected',reason:'cancel-deadline-passed'})});
- await assert.rejects(f.api.run(CODE,p=>{p.submitting([cancelRequest.registrationId],cancelRequest);return {ok:true,operation:{state:'queued'}};},'cancel'),/cancel-deadline-passed/);
+ const rejected=assert.rejects(f.api.run(CODE,p=>{p.submitting([cancelRequest.registrationId],cancelRequest);return {ok:true,operation:{state:'queued'}};},'cancel'),/cancel-deadline-passed/);
+ await flush();await f.advance(1000);await rejected;
  assert.equal(f.api.snapshot()[0].state,'failed');assert.equal(f.storage.length,0);f.api.dispose();
 });
 test('only the pilot rooms use their current server ownership markers',async()=>{
@@ -268,6 +291,7 @@ test('the shipped cancellation action uses the V2 queue and avoids a legacy rese
  context.window.BXH_REGISTRATION_FLOW_V2_ROOMS=[];
  await assert.rejects(cloudSync.cancelRegistrationAsPlayer(CODE),/cancellation-pending/);
  assert.equal(requests.length,1);
+ await flush();
  response=cancelReceipt();await f.advance(8000);
  assert.equal((await flight).queueCancellation,true);assert.equal(f.api.cancellationPending(CODE),false);f.api.dispose();
 });
