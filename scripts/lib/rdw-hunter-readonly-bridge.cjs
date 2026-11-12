@@ -4,6 +4,7 @@
 // Caller supplies only a transaction with read permissions; this function never calls write methods.
 // Firebase Admin SDK runTransaction is not made read-only by a fictitious {readOnly:true} option.
 const {verifiedCurrentTier}=require('./rdw-current-tier-source.cjs');
+const {createReaderCapabilities}=require('./rdw-firestore-reader-capabilities.cjs');
 const VERSION='hunter-license-v2.1';
 function createReadOnlyTierResolver({db,createReader,clock}){
  if(!db||typeof db.runTransaction!=='function'||typeof db.doc!=='function'||typeof db.collection!=='function'||typeof createReader!=='function'||typeof clock!=='function')throw Error('trusted-reader-dependencies-required');
@@ -11,10 +12,7 @@ function createReadOnlyTierResolver({db,createReader,clock}){
  // Restrict constructor capabilities; do not expose runTransaction(), batch(),
  // bulkWriter() or admin methods. Firestore refs themselves remain powerful,
  // so provenance review / least-privilege IAM are STILL mandatory.
- const readerDb=Object.freeze({
-  doc:(path)=>db.doc(path),
-  collection:(name)=>db.collection(name)
- });
+ const {readerDb,makeReadTransaction}=createReaderCapabilities(db);
  const evaluate=createReader({db:readerDb});
  if(typeof evaluate!=='function')throw Error('trusted-reader-invalid');
  return async function resolve(uid){
@@ -27,7 +25,7 @@ function createReadOnlyTierResolver({db,createReader,clock}){
    // remains a read/write-capable object; do not hand that object to shadow code.
    // This limits accidental transaction writes, but does not replace server IAM,
    // an audited createReader implementation, or full backend read-only review.
-   const readTx=Object.freeze({get:(ref)=>tx.get(ref)});
+   const readTx=makeReadTransaction(tx);
    const evidence=await evaluate({tx:readTx,uid});
    if(!evidence||evidence.uid!==uid||evidence.version!==VERSION||evidence.complete!==true||evidence.unresolvedIdentities!==0||evidence.sourceScope!=='public-official-canonical-self-history-v1'||!(/^[a-f0-9]{64}$/.test(evidence.sourceDigest||'')))return {ok:false,reason:'incomplete-server-history'};
    const grade=evidence.overview?.grade;
