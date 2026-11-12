@@ -27,8 +27,8 @@ test('document read handle has no native Firestore write method or db back-refer
  assert.deepEqual(seen,[nativeDoc]);
  assert.equal(Object.isFrozen(tx),true);
  assert.equal(tx.set,undefined);
- await assert.rejects(tx.get(nativeDoc),/reader-reference-not-issued/);
- await assert.rejects(tx.get({path:'users/u1'}),/reader-reference-not-issued/);
+ assert.throws(()=>tx.get(nativeDoc),/reader-reference-not-issued/);
+ assert.throws(()=>tx.get({path:'users/u1'}),/reader-reference-not-issued/);
 });
 test('query chain exposes only whitelisted immutable read-builder methods',async()=>{
  const {db,nativeQuery}=fixture();
@@ -53,7 +53,7 @@ test('foreign references and invalid dependencies fail closed',async()=>{
  const {readerDb,makeReadTransaction}=createReaderCapabilities(fixture().db);
  assert.throws(()=>makeReadTransaction({}),/reader-transaction-required/);
  const tx=makeReadTransaction({get:async()=>{throw Error('should-not-run')}});
- await assert.rejects(tx.get(readerDb.doc('users/x').path),/reader-reference-not-issued/);
+ assert.throws(()=>tx.get(readerDb.doc('users/x').path),/reader-reference-not-issued/);
 });
 
 test('native document and query snapshot refs cannot escape reader transaction',async()=>{
