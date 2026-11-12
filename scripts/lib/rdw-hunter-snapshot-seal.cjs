@@ -65,7 +65,12 @@ function createSealer({db,authorize,verifyCanonicalMatch,resolveTiers,clock,enab
        prior.affectsLadder===false&&prior.affectsXp===false&&prior.affectsAwards===false&&
        prior?.code===code&&prior.matchId===matchId&&
        prior.playerA===match.playerA&&prior.playerB===match.playerB&&
-       prior.rosterRevision===expectedRosterRevision)
+       prior.rosterRevision===expectedRosterRevision&&
+       Number.isSafeInteger(prior.capturedAtMs)&&prior.capturedAtMs>0&&
+       prior.tiers&&['ungraded','e','d','c','b','a','s','national'].includes(prior.tiers.a)&&
+       ['ungraded','e','d','c','b','a','s','national'].includes(prior.tiers.b)&&
+       /^[a-f0-9]{64}$/.test(prior.digests?.a||'')&&
+       /^[a-f0-9]{64}$/.test(prior.digests?.b||''))
      return {ok:true,created:false,mode:'existing-immutable-baseline'};
     return {ok:false,code:'immutable-baseline-conflict'};
    }
@@ -73,7 +78,10 @@ function createSealer({db,authorize,verifyCanonicalMatch,resolveTiers,clock,enab
    if(!Number.isSafeInteger(atMs)||atMs<=0)throw Error('invalid-server-clock');
    // Both current tiers must be resolved by an injected audited backend reader,
    // within the SAME transaction and from the same canonical roster identity.
-   const tierPair=await resolveTiers({tx,code,matchId,playerA:match.playerA,playerB:match.playerB,atMs});
+   // Do not hand a writable Firestore transaction to the Hunter tier evaluator.
+   // Audited resolver construction and server IAM remain separate release gates.
+   const readTx=Object.freeze({get:ref=>tx.get(ref)});
+   const tierPair=await resolveTiers({tx:readTx,code,matchId,playerA:match.playerA,playerB:match.playerB,atMs});
    const a=checkedEvidence(tierPair?.a,match.playerA,atMs);
    const b=checkedEvidence(tierPair?.b,match.playerB,atMs);
    if(!a||!b)return {ok:false,code:'hunter-history-unverified'};
