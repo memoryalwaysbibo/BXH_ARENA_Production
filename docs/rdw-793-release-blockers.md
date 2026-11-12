@@ -42,5 +42,11 @@ Integration PR: #793. Source PR: #557.
 - It checks neutral `ungraded` handling, that incomplete history or disabled player accounts do not produce an additional baseline, and that fixture lifetime awards, XP and ladder documents remain unchanged.
 - The Reader remains **synthetic** in this automated test; the actual deployed Hunter Reader ZIP, production IAM/Rules and server authentication are not validated by this test. Do not interpret Emulator success as release approval.
 
+## 2026-11-12 Reader reference capability isolation
+- A new `rdw-firestore-reader-capabilities.cjs` layer issues **opaque frozen document/query handles**. It maintains the real Firestore reference privately in a WeakMap, exposing only document `path`, query `where/select/limit`, and a transaction `get` that rejects handles not issued by this layer.
+- Both Hunter read-only bridge and same-transaction tier-pair adapter now use this layer; the Reader is no longer handed native write-capable DocumentReference or Query objects by these adapters.
+- Unit tests cover fake-reference rejection, lack of document write methods, query shape and native-reference unwrapping. Emulator and real-source acceptance must still confirm compatibility.
+- This is **not** a security sandbox for arbitrary third-party code. A malicious Reader may import its own Admin SDK or use a service identity's permissions. Independently verified source and restrictive IAM, plus emulator/runtime tests, remain mandatory before release.
+
 ## Release decision
 **BLOCKED.** Passing synthetic tests is necessary but insufficient. Do not copy old #557 start-service or partner quota components into #793 merely to unblock this gate; those are separate behavior changes.
