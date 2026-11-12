@@ -35,17 +35,34 @@ const {assessMatch}=require('../scripts/lib/rdw-hunter-match-shadow.cjs');
    await db.doc('rdwFixtureLadder/'+uid).set({season:'S1',points:500});
    await db.doc('rdwFixtureXp/'+uid).set({xp:700});
   }
+  await db.doc('publicTournaments/BXH-RDWTEST').set({
+   visibility:'public',eventAuthority:'official',testMode:false
+  });
   const snapshots=await db.getAll(...docs.map(p=>db.doc(p)));
   const before=snapshots.map(s=>({path:s.ref.path,exists:s.exists,data:s.data()}));
-  const createReader=()=>async({tx,uid})=>{
-   assert.equal(typeof tx.get,'function');
-   for(const op of ['set','create','update','delete'])assert.equal(typeof tx[op],'undefined');
-   const snap=await tx.get(db.doc('rdwFixtureHunterEvidence/'+uid));
+  const createReader=({db:readerDb})=>{
+   assert.equal(typeof readerDb.doc,'function');
+   assert.equal(typeof readerDb.collection,'function');
+   for(const blocked of ['runTransaction','batch','bulkWriter','recursiveDelete'])
+    assert.equal(typeof readerDb[blocked],'undefined');
+   return async({tx,uid})=>{
+    assert.equal(typeof tx.get,'function');
+    for(const op of ['set','create','update','delete'])
+     assert.equal(typeof tx[op],'undefined');
+    // Exercise the same collection().where().select().limit() + tx.get(query)
+    // API shape used by the real Hunter reader, against the actual Emulator.
+    const q=readerDb.collection('publicTournaments').where('visibility','==','public')
+     .select('eventAuthority','testMode').limit(251);
+    const publicScope=await tx.get(q);
+    assert.equal(publicScope.size,1);
+    assert.equal(publicScope.docs[0].id,'BXH-RDWTEST');
+    const snap=await tx.get(readerDb.doc('rdwFixtureHunterEvidence/'+uid));
    if(!snap.exists)return null;
    const v=snap.data();
    return {uid,version:v.version,complete:v.complete,
     unresolvedIdentities:v.unresolvedIdentities,sourceDigest:v.sourceDigest,
     sourceScope:v.sourceScope,overview:{grade:{tier:v.tier}}};
+   };
   };
   const resolveTier=createReadOnlyTierResolver({db,createReader,clock:()=>100});
   const a=await resolveTier(uids[0]),b=await resolveTier(uids[1]);
