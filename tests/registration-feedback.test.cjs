@@ -19,6 +19,22 @@ test('100 repeated clicks share one request across the whole preflight and submi
  const calls=Array.from({length:100},()=>f.api.run(CODE,send));assert(calls.every(p=>p===calls[0]));await flush();assert.equal(sends,1);assert.equal(f.api.snapshot()[0].state,'submitting');
  pending.resolve({ok:true,status:'confirmed'});assert.equal((await calls[0]).status,'confirmed');assert.equal(f.storage.length,0);f.api.dispose();
 });
+test('closing a pending prompt leaves the original registration running',async()=>{
+ const f=fixture(),pending=deferred();let sends=0;
+ const flight=f.api.run(CODE,async progress=>{await pending.promise;progress.assertCurrent();progress.submitting(['user1']);sends++;return {ok:true,status:'confirmed'};});
+ await flush();assert.equal(f.api.snapshot()[0].state,'preparing');
+ f.api.dismiss(CODE);assert.equal(f.api.snapshot()[0].hidden,true);
+ pending.resolve();assert.equal((await flight).status,'confirmed');assert.equal(sends,1);
+ assert.equal(f.api.snapshot()[0].hidden,true);assert.equal(f.storage.length,0);f.api.dispose();
+});
+test('closing an accepted prompt keeps automatic result checks active',async()=>{
+ let committed=false,sends=0;
+ const f=fixture({read:async()=>({ok:true,operation:{state:committed?'completed':'queued'},rows:committed?[{registrationId:'user1',status:'confirmed'}]:[]})});
+ const flight=f.api.run(CODE,async progress=>{sends++;progress.submitting(['user1']);return {ok:true,operation:{state:'queued'}};});
+ await flush();f.api.dismiss(CODE);assert.equal(f.api.snapshot()[0].hidden,true);
+ committed=true;await f.advance(1000);
+ assert.equal((await flight).status,'confirmed');assert.equal(f.queries.length,1);assert.equal(sends,1);assert.equal(f.storage.length,0);f.api.dispose();
+});
 test('slow submission reads once and an empty result is never considered failure or success',async()=>{
  const f=fixture(),pending=deferred();const flight=f.api.run(CODE,async p=>{p.submitting(['user1']);return pending.promise;});flight.catch(()=>{});await flush();await f.advance(8000);
  assert.equal(f.queries.length,1);assert.equal(f.api.snapshot()[0].state,'unconfirmed');assert.equal(f.storage.length,1);

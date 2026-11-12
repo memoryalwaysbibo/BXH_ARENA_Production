@@ -71,6 +71,15 @@ test('desktop lobby and detail clicks coalesce and pending feedback is immediate
  server.rows=[{registrationId:'user1',status:'confirmed'}];await page.getByRole('button',{name:'查詢報名結果'}).click();await waitFor(page,()=>submissions.length===100);
  assert.equal(server.joins.length,1);assert.match(await page.locator('.registration-feedback-panel').innerText(),/正取/);
 });
+test('mobile user can close a sending prompt while the same request resolves in the background',async t=>{
+ const {page,server}=await fixture(t,{mobile:true});await page.click('#lobby');
+ await waitFor(page,()=>document.querySelector('.registration-feedback-panel')?.textContent.includes('報名送出中'));
+ await page.getByRole('button',{name:'關閉BXH-FEED01的報名提示'}).click();
+ assert.equal(await page.locator('.registration-feedback-panel').isVisible(),false);
+ server.rows=[{registrationId:'user1',status:'confirmed'}];
+ await waitFor(page,()=>submissions.length===1);
+ assert.equal(server.joins.length,1);assert.equal(await page.evaluate(()=>localStorage.length),0);
+});
 test('a dropped successful HTTP response recovers automatically without a second write',async t=>{
  const {page,server}=await fixture(t,{mode:'commit-drop'});await page.click('#lobby');await waitFor(page,()=>submissions.length===1);
  assert.equal(server.joins.length,1);assert.equal(server.committed.size,1);assert(server.reads>=1);assert.equal(await page.evaluate(()=>submissions[0].recovered),true);

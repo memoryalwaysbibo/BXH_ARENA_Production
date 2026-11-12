@@ -7192,7 +7192,15 @@ function showToast(msg, isErr, noticeScope=null){
   lastToastKey=key; lastToastAt=now;
   const el = document.createElement("div");
   el.className = "toast" + (isErr ? " err" : "");
-  el.textContent = msg;
+  const message = document.createElement("span");
+  message.textContent = msg;
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "toast-dismiss";
+  dismiss.textContent = "關閉";
+  dismiss.setAttribute("aria-label", "關閉提示");
+  dismiss.onclick = ()=>el.remove();
+  el.append(message, dismiss);
   if(noticeScope?.kind==='referee-seat'&&noticeScope.roomCode){
     el.dataset.bxhNoticeKind='referee-seat';el.dataset.bxhRoomCode=String(noticeScope.roomCode).toUpperCase();
   }
