@@ -34,7 +34,8 @@
   overscroll-behavior-y:auto;
   touch-action:pan-y;
 }
-.auth-content{position:relative;z-index:2;width:100%;max-width:640px;display:flex;flex-direction:column;align-items:center;}
+/* Keep long screens intrinsic: shrinking a centered column clips its start above scrollTop 0. */
+.auth-content{position:relative;z-index:2;width:100%;max-width:640px;display:flex;flex-direction:column;align-items:center;flex-shrink:0;}
 .auth-brand-header{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:10px;}
 .auth-logo-wrap{position:relative;width:104px;height:104px;margin-bottom:8px;}
 .auth-logo-glow{position:absolute;inset:-35%;background:radial-gradient(circle, rgba(212,175,55,0.32) 0%, transparent 70%);}

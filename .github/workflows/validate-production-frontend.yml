@@ -310,6 +310,20 @@ jobs:
       - name: Verify managed registration settings in mobile and desktop Chromium
         if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
         run: node tests/e2e/managed-registration-settings-browser.cjs
+      - name: Verify registration scroll boundaries on desktop and mobile
+        if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
+        env:
+          BXH_LAYOUT_SCREENSHOTS: test-results/auth-scroll
+        run: |
+          mkdir -p test-results/auth-scroll
+          node tests/e2e/auth-scroll-layout.cjs
+      - name: Upload registration layout screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: registration-scroll-layout-${{ github.run_id }}
+          path: test-results/auth-scroll/
+          if-no-files-found: ignore
       - name: Verify compact bracket finals labels
         if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
         run: node tests/e2e/bracket-final-label-layout.cjs
