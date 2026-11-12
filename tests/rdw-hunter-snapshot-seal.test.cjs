@@ -10,7 +10,7 @@ function evidence(uid,tier){
   computedAt:99,tier,current:{tier}};
 }
 function fixture(){
- const docs=new Map([['tournaments/'+CODE,{startedAt:null,rosterLocked:false}]]);
+ const docs=new Map([['tournaments/'+CODE,{startedAt:null,rosterLocked:false,registrationRosterRevision:5}]]);
  const writes=[];
  const tx={
   get:async ref=>({exists:docs.has(ref.path),data:()=>docs.get(ref.path)}),
@@ -61,7 +61,7 @@ test('authorization, roster and provenance failures never create a baseline',asy
  }
 });
 test('missing, started and roster-locked rooms are always blocked',async()=>{
- for(const room of [null,{startedAt:123,rosterLocked:false},{startedAt:null,rosterLocked:true}]){
+ for(const room of [null,{startedAt:123,rosterLocked:false,registrationRosterRevision:5},{startedAt:null,rosterLocked:true,registrationRosterRevision:5}]){
   const f=fixture();
   if(room===null)f.docs.delete('tournaments/'+CODE);
   else f.docs.set('tournaments/'+CODE,room);
@@ -72,12 +72,44 @@ test('ungraded stays an explicit trusted tier, not a missing identity',async()=>
  const f=fixture();
  const service=createSealer({enabled:true,db:{
   doc:path=>({path}),runTransaction:async fn=>fn({
-   get:async ref=>({exists:ref.path==='tournaments/'+CODE,data:()=>({startedAt:null,rosterLocked:false})}),
+   get:async ref=>({exists:ref.path==='tournaments/'+CODE,data:()=>({startedAt:null,rosterLocked:false,registrationRosterRevision:5})}),
    create:(_ref,snapshot)=>{assert.equal(snapshot.tiers.a,'ungraded');assert.equal(snapshot.rdwOnly,true);}
   })
  },clock:()=>100,authorize:async()=>true,verifyCanonicalMatch:async()=>({
   valid:true,rosterRevision:5,playerA:'a',playerB:'b'}),
  resolveTiers:async()=>({a:evidence('a','ungraded'),b:evidence('b','a')})});
  assert.equal((await service(input)).ok,true);
+ assert.deepEqual(f.writes,[]);
+});
+
+test('nested canonical state blocks late seal even when root claims pre-start',async()=>{
+ const f=fixture();
+ f.docs.set('tournaments/'+CODE,{
+  startedAt:null,rosterLocked:false,registrationRosterRevision:5,
+  data:JSON.stringify({startedAt:123,rosterLocked:true,registrationRosterRevision:5})
+ });
+ const result=await f.service(input);
+ assert.equal(result.ok,false);assert.equal(result.code,'tournament-already-started');
+ assert.deepEqual(f.writes,[]);
+});
+test('missing, stale or malformed canonical roster revision fails closed',async()=>{
+ for(const room of [
+  {startedAt:null,rosterLocked:false},
+  {startedAt:null,rosterLocked:false,registrationRosterRevision:4},
+  {registrationRosterRevision:5,data:'not-json'},
+  {registrationRosterRevision:5,data:JSON.stringify({startedAt:null,rosterLocked:false,registrationRosterRevision:4})},
+  {registrationRosterRevision:5,data:JSON.stringify({startedAt:null,rosterLocked:false})}
+ ]){
+  const f=fixture();f.docs.set('tournaments/'+CODE,room);
+  assert.equal((await f.service(input)).ok,false,JSON.stringify(room));
+  assert.deepEqual(f.writes,[]);
+ }
+});
+test('preexisting baseline with missing trusted proof is never accepted as idempotent',async()=>{
+ const f=fixture();
+ f.docs.set('rdwHunterShadowBaselines/'+CODE+'_'+MATCH,{
+  code:CODE,matchId:MATCH,playerA:'a',playerB:'b',rosterRevision:5
+ });
+ assert.equal((await f.service(input)).code,'immutable-baseline-conflict');
  assert.deepEqual(f.writes,[]);
 });
