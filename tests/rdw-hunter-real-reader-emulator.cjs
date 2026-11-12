@@ -5,7 +5,6 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
-const {createHash}=require('node:crypto');
 const {SOURCE,gitBlobHash}=require('../scripts/lib/rdw-hunter-source-attestation.cjs');
 const {createReadOnlyTierResolver}=require('../scripts/lib/rdw-hunter-readonly-bridge.cjs');
 function validateSourceDir(dir){
@@ -26,7 +25,11 @@ async function run({sourceDir,db,uid,clock=()=>Date.now()}){
  if(!process.env.FIRESTORE_EMULATOR_HOST||!process.env.FIREBASE_AUTH_EMULATOR_HOST)
   throw Error('auth-and-firestore-emulators-required');
  if(!db||typeof db.runTransaction!=='function')throw Error('emulator-db-required');
- if(typeof uid!=='string'||!uid.startsWith('rdw-realreader-test-'))throw Error('isolated-fixture-uid-required');
+ // A Firebase Emulator endpoint alone cannot prove the SDK isn't accidentally
+ // configured to a live project. Enforce the isolated demo project as well.
+ if(db.projectId!=='demo-rdw-real-reader')throw Error('isolated-emulator-project-required');
+ if(typeof uid!=='string'||!/^rdw-realreader-test-[a-z0-9-]{1,48}$/.test(uid))
+  throw Error('isolated-fixture-uid-required');
  const verified=validateSourceDir(sourceDir);
  const {createReader}=require(path.join(verified.root,'reader.cjs'));
  if(typeof createReader!=='function')throw Error('real-reader-export-missing');
@@ -36,13 +39,28 @@ async function run({sourceDir,db,uid,clock=()=>Date.now()}){
   'rdwFixtureLadder/'+uid,
   'rdwFixtureXp/'+uid
  ];
- const before=await db.getAll(...protectedPaths.map(p=>db.doc(p)));
- const snapshot=before.map(d=>({exists:d.exists,value:d.data()||null}));
+ const snapshotState=async()=>{
+  const fixed=await db.getAll(...protectedPaths.map(p=>db.doc(p)));
+  // Query the entire permanent-award collection, not just a synthetic receipt:
+  // a write to an unexpected deterministic award ID must not escape detection.
+  const grants=await db.collection('hunterLicenseAwards').get();
+  return {
+   fixed:fixed.map(d=>({path:d.ref.path,exists:d.exists,value:d.data()||null})),
+   grants:grants.docs.map(d=>({path:d.ref.path,value:d.data()}))
+    .sort((a,b)=>a.path.localeCompare(b.path))
+  };
+ };
+ const before=await snapshotState();
  const resolver=createReadOnlyTierResolver({db,createReader,clock});
- const result=await resolver(uid);
- if(!result.ok)throw Error('real-reader-evaluation-incomplete:'+result.reason);
- const after=await db.getAll(...protectedPaths.map(p=>db.doc(p)));
- assert.deepEqual(after.map(d=>({exists:d.exists,value:d.data()||null})),snapshot);
+ let result,readerFailure;
+ try{
+  result=await resolver(uid);
+  if(!result.ok)throw Error('real-reader-evaluation-incomplete:'+result.reason);
+ }catch(error){readerFailure=error;}
+ // Always compare protected records, even if Reader fails partway through.
+ const after=await snapshotState();
+ assert.deepEqual(after,before,'RDW-reader-mutated-protected-ledger');
+ if(readerFailure)throw readerFailure;
  return {ok:true,mode:'real-source-emulator-only',tier:result.tier,
   checkedFiles:verified.checked.length,releaseApproved:false,liveDeploymentVerified:false};
 }
