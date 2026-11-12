@@ -20,7 +20,10 @@ test('document read handle has no native Firestore write method or db back-refer
  assert.equal(Object.isFrozen(safe),true);
  const seen=[];
  const tx=makeReadTransaction({get:async ref=>{seen.push(ref);return {exists:true};}});
- assert.equal((await tx.get(safe)).exists,true);
+ const result=await tx.get(safe);
+ assert.equal(result.exists,true);
+ assert.equal(result.ref,undefined);
+ assert.equal(Object.isFrozen(result),true);
  assert.deepEqual(seen,[nativeDoc]);
  assert.equal(Object.isFrozen(tx),true);
  assert.equal(tx.set,undefined);
@@ -34,8 +37,15 @@ test('query chain exposes only whitelisted immutable read-builder methods',async
   .where('visibility','==','public').select('eventAuthority').limit(251);
  for(const method of ['get','add','doc','firestore','count','aggregate','set','update','delete'])
   assert.equal(query[method],undefined);
- const tx=makeReadTransaction({get:async ref=>{assert.equal(ref,nativeQuery);return {size:0,docs:[]};}});
- assert.equal((await tx.get(query)).size,0);
+ const nativeDoc={exists:true,id:'BXH-TEST',ref:{set(){throw Error('write')}},data:()=>({visibility:'public'})};
+ const tx=makeReadTransaction({get:async ref=>{assert.equal(ref,nativeQuery);return {size:1,docs:[nativeDoc]};}});
+ const result=await tx.get(query);
+ assert.equal(result.size,1);
+ assert.equal(result.docs[0].id,'BXH-TEST');
+ assert.equal(result.docs[0].ref,undefined);
+ assert.equal(result.docs[0].data().visibility,'public');
+ assert.equal(Object.isFrozen(result),true);
+ assert.equal(Object.isFrozen(result.docs),true);
  assert.equal(query.limit(2).where('visibility','==','public').select('testMode')!==query,true);
 });
 test('foreign references and invalid dependencies fail closed',async()=>{
@@ -44,4 +54,16 @@ test('foreign references and invalid dependencies fail closed',async()=>{
  assert.throws(()=>makeReadTransaction({}),/reader-transaction-required/);
  const tx=makeReadTransaction({get:async()=>{throw Error('should-not-run')}});
  await assert.rejects(tx.get(readerDb.doc('users/x').path),/reader-reference-not-issued/);
+});
+
+test('native document and query snapshot refs cannot escape reader transaction',async()=>{
+ const {db}=fixture();
+ const {readerDb,makeReadTransaction}=createReaderCapabilities(db);
+ const native={id:'u1',exists:true,ref:{set:()=>{throw Error('write leak')}},data:()=>({tier:'c'})};
+ const tx=makeReadTransaction({get:async()=>native});
+ const output=await tx.get(readerDb.doc('users/u1'));
+ assert.equal(output.data().tier,'c');
+ assert.equal('ref' in output,false);
+ assert.equal('firestore' in output,false);
+ assert.equal('set' in output,false);
 });
