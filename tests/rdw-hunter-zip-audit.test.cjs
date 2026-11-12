@@ -55,3 +55,28 @@ test('invalid path or digest cannot pass',()=>{
  assert.equal(auditZip().candidateVerified,false);
  assert.equal(auditZip({archivePath:'/not/existing.zip',expectedSha256:'a'.repeat(64)}).reason,'archive-unreadable');
 });
+
+test('rejects ZIP symlinks, encrypted flags and oversized expanded members',()=>{
+ const scenarios=[
+  ['symlink', 'symlink-zip-entry'],
+  ['oversized', 'zip-entry-size-invalid']
+ ];
+ for(const [kind,expected] of scenarios){
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'rdw-zip-special-'));
+  try{
+   const file=path.join(dir,'special.zip');
+   const script=[
+    'import sys,zipfile,stat',
+    'with zipfile.ZipFile(sys.argv[1],"w",compression=zipfile.ZIP_DEFLATED) as z:',
+    ' if sys.argv[2]=="symlink":',
+    '  i=zipfile.ZipInfo("reader.cjs");i.create_system=3;i.external_attr=(stat.S_IFLNK | 0o777)<<16;z.writestr(i,"/tmp/target")',
+    ' else: z.writestr("reader.cjs",b"x"*(4*1024*1024+1))'
+   ].join('\n');
+   execFileSync('python3',['-c',script,file,kind],{timeout:10000});
+   const expectedSha256=createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+   const out=auditZip({archivePath:file,expectedSha256,expectedBlobs:{'reader.cjs':gitBlobHash(Buffer.from('x'))}});
+   assert.equal(out.candidateVerified,false);
+   assert.equal(out.reason,expected);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+ }
+});
