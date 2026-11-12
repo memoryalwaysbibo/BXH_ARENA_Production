@@ -36,5 +36,11 @@ Integration PR: #793. Source PR: #557.
 - This **does not yet import the independently attested deployed Reader**, implement production tournament authorization, provision Rules/IAM, or register any callable. It is a reference dependency seam, not a releaseable server feature.
 - Real-reader performance and Firestore transaction limits for event sizes 8/32/128/320, along with source generation provenance and permanent ledger integrity, remain open acceptance gates.
 
+## 2026-11-12 combined Firestore Emulator integration
+- Added `tests/rdw-hunter-pair-snapshot-emulator.cjs` and a dedicated Critical E2E step.
+- It exercises `createTransactionTierResolver` + `createSealer` within the **same actual Firestore Emulator transaction**, including two simultaneous requests for one deterministic baseline.
+- It checks neutral `ungraded` handling, that incomplete history or disabled player accounts do not produce an additional baseline, and that fixture lifetime awards, XP and ladder documents remain unchanged.
+- The Reader remains **synthetic** in this automated test; the actual deployed Hunter Reader ZIP, production IAM/Rules and server authentication are not validated by this test. Do not interpret Emulator success as release approval.
+
 ## Release decision
 **BLOCKED.** Passing synthetic tests is necessary but insufficient. Do not copy old #557 start-service or partner quota components into #793 merely to unblock this gate; those are separate behavior changes.
