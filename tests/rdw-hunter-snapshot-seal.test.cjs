@@ -169,3 +169,40 @@ test('incomplete previously sealed evidence cannot be accepted on retry',async()
   assert.equal(f.writes.length,1);
  }
 });
+
+test('conflicting room identity aliases cannot seal a snapshot',async()=>{
+ for(const patch of [
+  {code:'BXH-OTHER1'},
+  {cloudCode:'BXH-OTHER1'},
+  {data:JSON.stringify({code:'BXH-OTHER1',registrationRosterRevision:5})},
+  {data:JSON.stringify({cloudCode:'BXH-OTHER1',registrationRosterRevision:5})}
+ ]){
+  const f=fixture();
+  f.docs.set('tournaments/'+CODE,{
+   startedAt:null,rosterLocked:false,registrationRosterRevision:5,...patch
+  });
+  const result=await f.service(input);
+  assert.equal(result.ok,false,JSON.stringify(patch));
+  assert.equal(result.code,'room-code-mismatch');
+  assert.deepEqual(f.writes,[]);
+ }
+});
+test('root team-mode cannot be hidden by nested individual data',async()=>{
+ const f=fixture();
+ f.docs.set('tournaments/'+CODE,{
+  registrationRosterRevision:5,meta:{battleMode:'team'},
+  data:JSON.stringify({cloudCode:CODE,registrationRosterRevision:5,meta:{battleMode:'individual'}})
+ });
+ const result=await f.service(input);
+ assert.equal(result.code,'team-mode-not-audited');
+ assert.deepEqual(f.writes,[]);
+});
+test('matching canonical room alias remains eligible',async()=>{
+ const f=fixture();
+ f.docs.set('tournaments/'+CODE,{
+  code:CODE,registrationRosterRevision:5,
+  data:JSON.stringify({cloudCode:CODE,registrationRosterRevision:5,meta:{battleMode:'individual'}})
+ });
+ assert.equal((await f.service(input)).ok,true);
+ assert.equal(f.writes.length,1);
+});
