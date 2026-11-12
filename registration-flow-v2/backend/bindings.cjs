@@ -6,7 +6,7 @@ const {createQueue}=require('./queue.cjs');
 const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
 const {createStartHandler,createDrawHandler}=require('./lifecycle.cjs');
-function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled,pilotRoom=null,retiredRoom=null}){
+function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled,pilotRoom=null,retiredRoom=null,retiredRooms=[]}){
  if(createFamilyRegistration?.v2CapacityAware!==true)throw Error('queue-family-capacity-source-required');
  const familyFactory=store=>createFamilyRegistration(store,Date.now,{myEventsProofEnabled:true});
  if(typeof promotionFactory!=='function')throw Error('queue-promotion-factory-required');
@@ -15,10 +15,12 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
  const {onSchedule}=require('firebase-functions/v2/scheduler');
  const workersReady=async()=>!stagedOnly&&await workersEnabled()===true;
  const roomAllowed=code=>pilotRoom===null||code===pilotRoom;
- const isRetired=code=>retiredRoom!==null&&code===retiredRoom;
+ const retired=new Set([...(retiredRoom===null?[]:[retiredRoom]),...retiredRooms]);
+ const isRetired=code=>retired.has(code);
  const intakeEnabled=async(code,tx)=>roomAllowed(code)&&!stagedOnly&&
   (pilotRoom!==null||await workersReady())&&await enabled(code,tx)===true;
  const queue=createQueue(db,{FieldValue,requireRoomOwnership:true,
+  onTiming:fields=>console.info(JSON.stringify({event:'registration-v2-worker-phase',...fields})),
   authorizeIntake:pilotRoom===null?undefined:intakeEnabled,
   handlers:{family:familyFactory,roster:rosterFactory,promotion:promotionFactory}});
  const api=createApi({queue,family:familyFactory(db),enabled:code=>isRetired(code)||intakeEnabled(code)});
@@ -56,10 +58,12 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
  });
  return {registrationQueueV2,registrationRosterQueueV2,registrationQueueV2Worker,registrationQueueV2Sweep,registrationStartV2,registrationDrawV2};
 }
-function createPilotBindings({pilotRoom,retiredRoom=null,...dependencies}){
+function createPilotBindings({pilotRoom,retiredRoom=null,retiredRooms=[],...dependencies}){
  const validRoom=code=>typeof code==='string'&&/^BXH-[A-Z0-9]{4,16}$/.test(code);
  if(!validRoom(pilotRoom))throw Error('invalid-pilot-room');
- if(retiredRoom!==null&&(!validRoom(retiredRoom)||retiredRoom===pilotRoom))throw Error('invalid-retired-room');
+ if(!Array.isArray(retiredRooms)||retiredRooms.length>8)throw Error('invalid-retired-room');
+ const retired=[...(retiredRoom===null?[]:[retiredRoom]),...retiredRooms];
+ if(retired.some(code=>!validRoom(code)||code===pilotRoom)||new Set(retired).size!==retired.length)throw Error('invalid-retired-room');
  const ref=dependencies.db.doc('systemSettings/registrationFlowV2Pilot');
  const allows=async(field,tx)=>{
   const snapshot=tx?await tx.get(ref):await ref.get();
@@ -67,7 +71,7 @@ function createPilotBindings({pilotRoom,retiredRoom=null,...dependencies}){
   return config?.roomCode===pilotRoom&&config.workersEnabled===true&&config[field]===true;
  };
  const lifecycle=(code,tx)=>code===pilotRoom&&allows('lifecycleEnabled',tx);
- return createBindings({...dependencies,pilotRoom,retiredRoom,stagedOnly:false,
+ return createBindings({...dependencies,pilotRoom,retiredRoom,retiredRooms,stagedOnly:false,
   workersEnabled:()=>allows('workersEnabled'),
   enabled:(_code,tx)=>allows('intakeEnabled',tx),
   drawEnabled:lifecycle,startEnabled:lifecycle,
