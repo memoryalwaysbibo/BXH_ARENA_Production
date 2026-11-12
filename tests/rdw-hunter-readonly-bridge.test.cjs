@@ -22,3 +22,26 @@ test('missing active flag and frozen profiles are not eligible',async()=>{
   const f=fixture({user});assert.equal((await f.resolve('u1')).ok,false);assert.deepEqual(f.writes,[]);
  }
 });
+
+test('injected Hunter evaluator is given only transaction read capability',async()=>{
+ const writes=[];
+ const tx={
+  get:async()=>({exists:true,data:()=>({active:true})}),
+  set:()=>writes.push('set'),create:()=>writes.push('create'),
+  update:()=>writes.push('update'),delete:()=>writes.push('delete')
+ };
+ const db={doc:path=>({path}),runTransaction:async run=>run(tx)};
+ const createReader=()=>async({tx:readerTx,uid})=>{
+  assert.equal(typeof readerTx.get,'function');
+  for(const method of ['set','create','update','delete'])assert.equal(method in readerTx,false);
+  assert.equal(Object.isFrozen(readerTx),true);
+  assert.throws(()=>readerTx.set({},{}),TypeError);
+  return {uid,version:'hunter-license-v2.1',complete:true,unresolvedIdentities:0,
+   sourceScope:'public-official-canonical-self-history-v1',
+   sourceDigest:'a'.repeat(64),overview:{grade:{tier:'c'}}};
+ };
+ const resolve=createReadOnlyTierResolver({db,createReader,clock:()=>1234});
+ const result=await resolve('u1');
+ assert.equal(result.ok,true);
+ assert.deepEqual(writes,[]);
+});
