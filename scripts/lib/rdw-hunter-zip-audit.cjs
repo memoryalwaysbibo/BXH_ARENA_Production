@@ -8,6 +8,9 @@ const {SOURCE,gitBlobHash}=require('./rdw-hunter-source-attestation.cjs');
 const MAX_ARCHIVE_BYTES=50*1024*1024;
 function auditZip({archivePath,expectedSha256,expectedBlobs=SOURCE.candidateGitBlobs}={}){
  const blocked=(reason,extra={})=>({candidateVerified:false,releaseApproved:false,reason,...extra});
+ if(!expectedBlobs||typeof expectedBlobs!=='object'||Array.isArray(expectedBlobs)||!Object.keys(expectedBlobs).length||
+    Object.values(expectedBlobs).some(hash=>typeof hash!=='string'||!(/^[a-f0-9]{40}$/.test(hash))))
+  return blocked('expected-fingerprints-invalid');
  if(typeof archivePath!=='string'||!archivePath||typeof expectedSha256!=='string'||!(/^[a-f0-9]{64}$/.test(expectedSha256)))
   return blocked('archive-or-expected-digest-missing');
  let bytes;
