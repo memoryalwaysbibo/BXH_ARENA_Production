@@ -35,12 +35,18 @@ function validate(uid,input){
 // Private server-only operation journal. This is a candidate, not an installed
 // Cloud Tasks deployment. onCreate + a scheduled sweep must both be wired before
 // rollout. Queue acceptance is NOT a reservation or proof of registration.
-function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAttempts=5,requireRoomOwnership=false,authorizeIntake,workerId=randomUUID(),beforeExecute=async()=>{}}={}){
+function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAttempts=5,requireRoomOwnership=false,authorizeIntake,workerId=randomUUID(),beforeExecute=async()=>{},onTiming=()=>{}}={}){
  if(!handlers?.family||!handlers?.roster||!FieldValue)throw Error('queue-dependencies-required');
  const rooms=db.collection('_registrationQueueV2');
  const roomRef=code=>rooms.doc(code);
  const jobsRef=code=>roomRef(code).collection('_registrationQueueJobsV2');
  const jobRef=(code,uid,operationId)=>jobsRef(code).doc(digest(uid+'|'+operationId));
+ const activeDrains=new Map();
+ async function timed(code,phase,work){
+  const started=Date.now();let outcome='ok';
+  try{return await work();}catch(error){outcome='error';throw error;}
+  finally{try{onTiming({code,phase,durationMs:Math.max(0,Date.now()-started),outcome});}catch{}}
+ }
  const checkLease=(lease,token)=>{if(lease?.owner!==workerId||lease?.token!==token||millis(lease.until)<=clock())throw fail('queue-lease-lost');};
  async function enqueue(uid,input,authorize){
   const value=validate(uid,input),ref=jobRef(value.code,uid,value.operationId),hash=digest(canonical({route:value.route,payload:value.payload}));
@@ -69,12 +75,17 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
  }
  async function acquire(code){
   const ref=roomRef(code),token=randomUUID();
-  return db.runTransaction(async tx=>{
+  // An ordinary read does not take a pessimistic transaction read lock on the
+  // shared lease. Busy event deliveries must not compete with the active writer.
+  // This is only a fast refusal: acquiring a lease still rechecks it atomically.
+  const observed=await timed(code,'lease-read',()=>ref.get());
+  if(millis(observed.data()?.until)>clock())return null;
+  return timed(code,'lease-acquire',()=>db.runTransaction(async tx=>{
    const snap=await tx.get(ref),data=snap.data();
    if(millis(data?.until)>clock())return null;
    tx.set(ref,{owner:workerId,token,until:clock()+leaseMs,updatedAt:clock()},{merge:true});
    return token;
-  });
+  }));
  }
  async function release(code,token){
   await db.runTransaction(async tx=>{const ref=roomRef(code),s=await tx.get(ref);if(s.data()?.owner===workerId&&s.data()?.token===token)tx.set(ref,{until:0,updatedAt:clock()},{merge:true});});
@@ -120,27 +131,38 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
    else tx.update(ref,{state:job.attempts>=maxAttempts?'attention':'queued',nextAttemptAt:clock()+Math.min(30000,1000*2**(job.attempts-1)),updatedAt:clock()});
   });
  }
- async function drain(code,{limit=25,budgetMs=20000}={}){
+ async function drainRoom(code,{limit=25,budgetMs=20000}={}){
   if(!/^BXH-[A-Z0-9]{4,16}$/.test(code))throw fail('invalid-operation');
   const token=await acquire(code);if(!token)return {busy:true,processed:0};
   const started=clock();let processed=0;
   try{
-   const snapshots=await jobsRef(code).where('state','in',['queued','running']).orderBy('acceptedAt').limit(limit).get();
+   const snapshots=await timed(code,'jobs-read',()=>jobsRef(code).where('state','in',['queued','running']).orderBy('acceptedAt').limit(limit).get());
    for(const snap of snapshots.docs){
     if(clock()-started>=budgetMs)break;
-    const job=await claim(code,snap.ref,token);if(!job)break;
+    const job=await timed(code,'job-claim',()=>claim(code,snap.ref,token));if(!job)break;
     try{
      await beforeExecute(job);
      const store=fencedDatabase(code,snap.ref,token);
      // Factories must use only this transaction-bound store for mutations.
-     await handlers[job.route](store)({auth:{uid:job.uid},data:job.payload});
+     await timed(code,'handler',()=>handlers[job.route](store)({auth:{uid:job.uid},data:job.payload}));
     }catch(error){await recordError(code,snap.ref,token,job,error);}
     processed++;
     const current=(await snap.ref.get()).data();
     if(['queued','attention'].includes(current.state))break;
    }
    return {busy:false,processed};
-  }finally{await release(code,token);}
+  }finally{await timed(code,'lease-release',()=>release(code,token));}
+ }
+ async function drain(code,options={}){
+  if(!/^BXH-[A-Z0-9]{4,16}$/.test(code))throw fail('invalid-operation');
+  // Event deliveries within this process share the active batch. Its original
+  // limit/budget apply; each delivery still checks its own job after it settles.
+  // Cross-process exclusion and expired-worker fencing remain database-owned.
+  const existing=activeDrains.get(code);
+  if(existing)return timed(code,'local-drain-wait',()=>existing);
+  const pending=drainRoom(code,options);activeDrains.set(code,pending);
+  try{return await pending;}
+  finally{if(activeDrains.get(code)===pending)activeDrains.delete(code);}
  }
  async function drainCreatedJob(code,jobId,options){
   const ref=jobsRef(code).doc(jobId);
@@ -167,3 +189,4 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
  return {enqueue,status,drain,drainCreatedJob,sweep,jobRef};
 }
 module.exports={createQueue,validate,businessRejections,safeResult};
+

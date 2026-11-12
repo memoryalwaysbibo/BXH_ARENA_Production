@@ -19,6 +19,7 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
  const intakeEnabled=async(code,tx)=>roomAllowed(code)&&!stagedOnly&&
   (pilotRoom!==null||await workersReady())&&await enabled(code,tx)===true;
  const queue=createQueue(db,{FieldValue,requireRoomOwnership:true,
+  onTiming:fields=>console.info(JSON.stringify({event:'registration-v2-worker-phase',...fields})),
   authorizeIntake:pilotRoom===null?undefined:intakeEnabled,
   handlers:{family:familyFactory,roster:rosterFactory,promotion:promotionFactory}});
  const api=createApi({queue,family:familyFactory(db),enabled:code=>isRetired(code)||intakeEnabled(code)});
@@ -74,3 +75,4 @@ function createPilotBindings({pilotRoom,retiredRoom=null,...dependencies}){
  });
 }
 module.exports={createBindings,createPilotBindings};
+
