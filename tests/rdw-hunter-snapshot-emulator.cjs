@@ -26,7 +26,7 @@ const evidence=(uid,tier)=>({uid,tier,ok:true,source:'server',verified:true,
   const baselineRef=db.doc('rdwHunterShadowBaselines/'+code+'_'+matchId);
   const awardRef=db.doc('hunterLicenseAwards/rdw-snapshot-initial');
   await eventRef.set({startedAt:null,rosterLocked:false,registrationRosterRevision:4,
-   matches:[{id:matchId,a:uids[0],b:uids[1]}]});
+   matches:[{id:matchId,a:uids[0],b:uids[1]},{id:'match-b',a:uids[0],b:uids[1]}]});
   await awardRef.set({uid:uids[0],tier:'national',action:'grant'});
   const tierRefs=uids.map(uid=>db.doc('users/'+uid+'/hunterLicense/highest'));
   for(const ref of tierRefs)await ref.set({highestTier:'national',permanent:true});
@@ -43,8 +43,8 @@ const evidence=(uid,tier)=>({uid,tier,ok:true,source:'server',verified:true,
     const permission=await tx.get(db.doc('rdwFixtureOrganizer/'+actorUid));
     return permission.exists&&permission.data().allowed===true;
    },
-   verifyCanonicalMatch:async({room,expectedRosterRevision})=>{
-    const m=room.matches?.find(m=>m.id===matchId);
+   verifyCanonicalMatch:async({room,matchId:requestedMatchId,expectedRosterRevision})=>{
+    const m=room.matches?.find(m=>m.id===requestedMatchId);
     return {valid:room.registrationRosterRevision===expectedRosterRevision&&!!m,
      rosterRevision:room.registrationRosterRevision,playerA:m?.a,playerB:m?.b};
    },
