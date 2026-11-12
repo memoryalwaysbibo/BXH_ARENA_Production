@@ -30,5 +30,11 @@ Integration PR: #793. Source PR: #557.
 - Automated tests cover the reference contract; **this is not yet a validated production Firestore schema, server-authorized snapshot writer, or live Hunter Reader integration.** It must remain disabled until authoritative backend/Rules, idempotency and Emulator transaction tests are completed.
 - The reference does not modify V1 ladder, XP, permanent Hunter awards or the real event start action.
 
+## 2026-11-12 same-transaction Hunter tier-pair adapter
+- Added `scripts/lib/rdw-hunter-transaction-tier-pair.cjs` with two-player current-tier evaluation inside **the caller-owned transaction**. It uses a restricted `tx.get` interface and checks both accounts, verified history/digests, and ungraded current tier. No lifetime highest-tier source is substituted.
+- Added a direct integration test with the disabled-by-default immutable prematch sealer. The test asserts a single snapshot write, neutral ungraded handling, invalid UID/account rejection, and repeat idempotency.
+- This **does not yet import the independently attested deployed Reader**, implement production tournament authorization, provision Rules/IAM, or register any callable. It is a reference dependency seam, not a releaseable server feature.
+- Real-reader performance and Firestore transaction limits for event sizes 8/32/128/320, along with source generation provenance and permanent ledger integrity, remain open acceptance gates.
+
 ## Release decision
 **BLOCKED.** Passing synthetic tests is necessary but insufficient. Do not copy old #557 start-service or partner quota components into #793 merely to unblock this gate; those are separate behavior changes.
