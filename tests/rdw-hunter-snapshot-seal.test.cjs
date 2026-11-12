@@ -113,3 +113,24 @@ test('preexisting baseline with missing trusted proof is never accepted as idemp
  assert.equal((await f.service(input)).code,'immutable-baseline-conflict');
  assert.deepEqual(f.writes,[]);
 });
+
+test('canonical JSON state may seal only when its own revision and pre-start gates agree',async()=>{
+ const f=fixture();
+ f.docs.set('tournaments/'+CODE,{
+  registrationRosterRevision:5,
+  data:JSON.stringify({registrationRosterRevision:5,startedAt:null,rosterLocked:false,meta:{battleMode:'individual'}})
+ });
+ const result=await f.service(input);
+ assert.equal(result.ok,true);assert.equal(result.created,true);
+ assert.equal(f.writes.length,1);
+});
+test('team battle canonical state is outside the RDW snapshot rollout',async()=>{
+ const f=fixture();
+ f.docs.set('tournaments/'+CODE,{
+  registrationRosterRevision:5,
+  data:JSON.stringify({registrationRosterRevision:5,meta:{battleMode:'team'}})
+ });
+ const result=await f.service(input);
+ assert.equal(result.ok,false);assert.equal(result.code,'team-mode-not-audited');
+ assert.deepEqual(f.writes,[]);
+});
