@@ -31,10 +31,11 @@ function fixture(){
    return callback(tx);
   }
  };
- const createReader=()=>async({tx,uid})=>{
+ const createReader=({db:readerDb})=>async({tx,uid})=>{
   // Only the read capability is exposed to the licensed reader.
   for(const method of ['set','create','update','delete'])assert.equal(typeof tx[method],'undefined');
-  const record=await tx.get(db.doc('licenseHistory/'+uid));
+  // Reader must use capabilities issued by its injected read-only db facade.
+  const record=await tx.get(readerDb.doc('licenseHistory/'+uid));
   const current=record.data();
   return {uid,version:'hunter-license-v2.1',complete:true,unresolvedIdentities:0,
    sourceScope:'public-official-canonical-self-history-v1',
