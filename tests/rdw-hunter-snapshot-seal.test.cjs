@@ -134,3 +134,38 @@ test('team battle canonical state is outside the RDW snapshot rollout',async()=>
  assert.equal(result.ok,false);assert.equal(result.code,'team-mode-not-audited');
  assert.deepEqual(f.writes,[]);
 });
+
+test('tier resolver gets only transaction read access',async()=>{
+ const f=fixture();
+ const service=createSealer({
+  enabled:true,
+  db:{doc:path=>({path}),runTransaction:async fn=>fn({
+   get:async ref=>({exists:ref.path==='tournaments/'+CODE,data:()=>({registrationRosterRevision:5})}),
+   create:()=>{}
+  })},
+  clock:()=>100,authorize:async()=>true,
+  verifyCanonicalMatch:async()=>({valid:true,rosterRevision:5,playerA:'a',playerB:'b'}),
+  resolveTiers:async({tx})=>{
+   assert.equal(typeof tx.get,'function');
+   assert.equal(Object.isFrozen(tx),true);
+   for(const op of ['create','set','update','delete'])assert.equal(op in tx,false);
+   return {a:evidence('a','c'),b:evidence('b','a')};
+  }
+ });
+ assert.equal((await service(input)).ok,true);
+ assert.equal(f.writes.length,0);
+});
+test('incomplete previously sealed evidence cannot be accepted on retry',async()=>{
+ for(const patch of [
+  {capturedAtMs:undefined},
+  {tiers:{a:'invalid',b:'a'}},
+  {digests:{a:'not-a-digest',b:'a'.repeat(64)}}
+ ]){
+  const f=fixture();
+  assert.equal((await f.service(input)).ok,true);
+  const key='rdwHunterShadowBaselines/'+CODE+'_'+MATCH;
+  f.docs.set(key,{...f.docs.get(key),...patch});
+  assert.equal((await f.service(input)).code,'immutable-baseline-conflict');
+  assert.equal(f.writes.length,1);
+ }
+});
