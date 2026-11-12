@@ -13,7 +13,7 @@ function checkedEvidence(evidence,uid,atMs){
  const v=verifiedCurrentTier(evidence,{uid,atMs});
  return v.ok?{uid,tier:v.tier,sourceDigest:evidence.sourceDigest,version:v.version}:null;
 }
-function prematchRoom(room,expectedRosterRevision){
+function prematchRoom(room,expectedRosterRevision,expectedCode){
  if(!room||typeof room!=='object')return {ok:false,reason:'room-data-invalid'};
  let state=room;
  if(Object.hasOwn(room,'data')){
@@ -22,6 +22,13 @@ function prematchRoom(room,expectedRosterRevision){
   }else state=room.data;
   if(!state||typeof state!=='object'||Array.isArray(state))return {ok:false,reason:'room-data-invalid'};
  }
+ // Never seal a snapshot for a document that advertises a different room.
+ // Missing optional aliases are tolerated; conflicting aliases are not.
+ if(expectedCode&&[room.code,room.cloudCode,state.code,state.cloudCode]
+    .some(value=>value!==undefined&&value!==null&&value!==''&&value!==expectedCode))
+  return {ok:false,reason:'room-code-mismatch'};
+ if(room.meta?.battleMode==='team'||state.meta?.battleMode==='team')
+  return {ok:false,reason:'team-mode-not-audited'};
  // A legacy root field cannot override a newer nested canonical room state.
  if(room.startedAt||room.rosterLocked||state.startedAt||state.rosterLocked)
   return {ok:false,reason:'tournament-already-started'};
@@ -30,7 +37,6 @@ function prematchRoom(room,expectedRosterRevision){
  if(!Number.isSafeInteger(innerRevision)||innerRevision!==expectedRosterRevision||
     (rootRevision!==undefined&&rootRevision!==innerRevision))
   return {ok:false,reason:'roster-revision-stale'};
- if(state.meta?.battleMode==='team')return {ok:false,reason:'team-mode-not-audited'};
  return {ok:true,state};
 }
 function createSealer({db,authorize,verifyCanonicalMatch,resolveTiers,clock,enabled=false}={}){
@@ -50,7 +56,7 @@ function createSealer({db,authorize,verifyCanonicalMatch,resolveTiers,clock,enab
    const [eventDoc,priorDoc]=await Promise.all([tx.get(tournamentRef),tx.get(baselineRef)]);
    if(!eventDoc.exists)return {ok:false,code:'tournament-missing'};
    const room=eventDoc.data();
-   const checked=prematchRoom(room,expectedRosterRevision);
+   const checked=prematchRoom(room,expectedRosterRevision,code);
    if(!checked.ok)return {ok:false,code:checked.reason};
    if(await authorize({tx,actorUid,code,room})!==true)
     return {ok:false,code:'not-authorized'};
