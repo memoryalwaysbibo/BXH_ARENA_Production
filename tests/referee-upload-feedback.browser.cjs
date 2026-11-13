@@ -19,6 +19,8 @@ const css=[...index.matchAll(/<link\b[^>]*rel="stylesheet"[^>]*href="([^"?]+)[^"
   await page.setContent('<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+css+'</style><main id="app"></main>');
   await page.addScriptTag({content:`
 var pendingModal=null,cloudStatus='connected',writes=[],resolveWrite;
+// about:blank is not a secure origin; production HTTPS supplies this API.
+Object.defineProperty(window.crypto,'randomUUID',{value:()=> 'fixture-operation-'+(writes.length+1),configurable:true});
 var state={id:'lab',cloudCode:'BXH-LAB',startedAt:1,meta:{stations:2,refereeSeatsV1:{version:1,courts:{}}},matches:[1,2].map(n=>({id:'m'+n,station:n,a:{playerId:'選手甲'},b:{playerId:'選手乙'},scoreA:0,scoreB:0,log:[],status:'in_progress'}))};
 const currentAuthUid=()=> 'judge',getMatch=id=>state.matches.find(m=>m.id===id),canUseRefereeSeatCommands=()=>true,canOperateStation=()=>true,canOperateMatchStation=()=>true,cloudAvailable=()=>true,refereeFaultWritePending=()=>false,refereeFaultCount=()=>0,refereeFaultLast=()=>null,playerName=x=>x,esc=String,checkWinnerSide=()=>null,refereeViewClass=()=>'',refereeSwapControl=()=>'<div class="ref-vs-mark">VS</div>',matchStatusBarHtml=()=> '進行中',refereeCourtSwapButton=()=>'',stationMutationErrorMessage=r=>r,showToast=()=>{},applyRemoteState=s=>state=s;
 const POINT_LABELS={spin:'旋轉＋1',knockout:'擊飛＋2',burst:'爆裂＋2',extreme:'極限＋3'};
