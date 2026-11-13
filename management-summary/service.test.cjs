@@ -7,7 +7,7 @@ const grant={status:'active',scope:'contract',organizationId:'org',orderCode:'or
 const room=(code,extra={})=>({code,name:'賽事 '+code,eventDate:'2026-11-01',updatedAt:1,createdBy:'owner',createdByRole:'admin',eventAuthority:'official',registrationEnabled:true,registrationStatus:'open',publishedAt:1,...extra});
 const rooms=n=>Array.from({length:n},(_,i)=>room('BXH-'+String(i).padStart(6,'0'),{eventDate:'2026-11-'+String(i+1).padStart(2,'0')}));
 function fixture(user=profile,data=rooms(12),parents={}){
- const reads=[],selections=[],wheres=[];
+ const reads=[],selections=[],wheres=[],rosterReads=[];
  const db={doc:path=>({path}),collection:path=>{const q={path,filters:[],where(...args){wheres.push(args);this.filters.push(args);return this;},select(...fields){selections.push(fields);this.fields=fields;return this;}};return q;},runTransaction:(fn,options)=>{assert.equal(options?.readOnly,true,'summary reads must use a lock-free read-only snapshot');return fn({get:async ref=>{
   reads.push(ref);
   if(ref.path.startsWith('users/')){const uid=ref.path.slice(6),value=uid==='actor'?user:parents[uid];return{exists:!!value,data:()=>value};}
@@ -20,9 +20,14 @@ function fixture(user=profile,data=rooms(12),parents={}){
     const parts=key.split('.');let target=projected;for(const part of parts.slice(0,-1))target=target[part]||=( {} );target[parts.at(-1)]=value;
    }return projected;
   }}))};
+ },getAll:async(...args)=>{
+  assert.deepEqual(args.pop(),{fieldMask:['data']});
+  const codes=args.map(ref=>ref.path.replace(/^tournaments\//,''));
+  rosterReads.push(codes);
+  return codes.slice().reverse().map(code=>({id:code,data:()=>({data:data.find(row=>row.code===code)?.data})}));
  }});}};
  const list=createSummaryHandler(db,{now:()=>NOW});
- return{reads,selections,wheres,call:(data={})=>list({auth:{uid:'actor'},data}),list};
+ return{reads,selections,wheres,rosterReads,call:(data={})=>list({auth:{uid:'actor'},data}),list};
 }
 test('Firestore projection returns five summaries and pagination never returns full runtime or registrations',async()=>{
  const data=rooms(12);data[11].data='sensitive full runtime';data[11].bracketView='sensitive bracket';data[11].players=[{email:'hidden'}];
@@ -30,10 +35,27 @@ test('Firestore projection returns five summaries and pagination never returns f
  assert.equal(first.items.length,5);assert.equal(first.counts.open,12);assert.equal(first.hasMore,true);
  assert.equal(first.items[0].eventDate,'2026-11-12');
  assert.equal(t.selections.length,1);assert.deepEqual(t.selections[0],FIELDS);
+ assert.deepEqual(t.rosterReads,[first.items.map(item=>item.code)]);
  assert.ok(!JSON.stringify(first).includes('sensitive'));assert.ok(!JSON.stringify(first).includes('hidden'));
  const second=await t.call({cursor:first.nextCursor}),third=await t.call({cursor:second.nextCursor});
  assert.equal(second.items.length,5);assert.equal(third.items.length,2);assert.equal(third.hasMore,false);
  assert.equal(new Set([...first.items,...second.items,...third.items].map(row=>row.code)).size,12);
+ assert.deepEqual(t.rosterReads.map(page=>page.length),[5,5,2]);
+});
+test('individual cards use room occupancy and configured capacity with a legacy and team fallback',async()=>{
+ const guests=Array.from({length:24},(_,i)=>({id:'guest'+i,source:'onsite',checkedIn:false}));
+ const data=[
+  room('ONSITE',{capacity:24,confirmedCount:0,data:JSON.stringify({players:guests,waitlistPlayers:[{id:'wait'}]})}),
+  room('MIXED',{capacity:3,confirmedCount:2,data:{players:[...guests.slice(0,2),{registrationId:'family_a'},{registrationId:'family_b'}]}}),
+  room('EMPTY',{capacity:24,confirmedCount:1,data:{players:[]}}),
+  room('LEGACY',{capacity:24,confirmedCount:7,data:'malformed'}),
+  room('TEAM',{capacity:8,confirmedCount:2,battleMode:'team',data:{players:guests}})
+ ];
+ const t=fixture(profile,data),result=await t.call();
+ const byCode=Object.fromEntries(result.items.map(item=>[item.code,[item.confirmedCount,item.capacity]]));
+ assert.deepEqual(byCode,{ONSITE:[24,24],MIXED:[4,3],EMPTY:[0,24],LEGACY:[7,24],TEAM:[2,8]});
+ assert.ok(!t.rosterReads.flat().includes('TEAM'));
+ assert.ok(!JSON.stringify(result).includes('family_a'));
 });
 test('search finds names, room codes and locations beyond the first page without leaking unmatched rows',async()=>{
  const data=rooms(12);data[0].name='很早的雪山貓賽事';data[1].location='台南南區';

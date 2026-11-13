@@ -2,8 +2,8 @@
 
 const {activeAccount,ownsEvent,effective}=require('./event-staff-core.cjs');
 const PAGE_SIZE=5;
-// Deliberately excludes data, bracketView, registrations, match logs, seat maps,
-// contact details and scoring fields. Projection happens inside Firestore.
+// Scope-wide search projects metadata only. Runtime data is read only for the
+// individual rooms on the requested page, after authorization and pagination.
 const FIELDS=Object.freeze(['name','eventDate','startAt','location','posterUrl','battleMode','teamSize',
  'formatType','ladderMode','testLadderEnabled','ladderPointsAwarded','tournamentPhase','archiveStatus',
  'registrationEnabled','registrationStatus','registrationOpenAt','registrationCloseAt','publishedAt',
@@ -45,6 +45,12 @@ function project(code,d,now){
   waitlistEnabled:d.waitlistEnabled===true,waitlistCapacity:count(d.waitlistCapacity),waitlistCount:count(d.waitlistCount),
   updatedAt:millis(d.updatedAt)||0,createdBy:tidy(d.createdBy,128),createdByName:tidy(d.createdByName),
   eventAuthority:tidy(d.eventAuthority||'official',32),testMode:d.testMode===true,createdByRole:tidy(d.createdByRole,32)};
+}
+function roomPlayerCount(data){
+ let runtime;
+ try{runtime=typeof data==='string'?JSON.parse(data):data;}catch{return null;}
+ if(!Array.isArray(runtime?.players))return null;
+ return runtime.players.filter(player=>player&&typeof player==='object'&&!Array.isArray(player)).length;
 }
 function compare(a,b){return a.eventDate===b.eventDate?b.updatedAt-a.updatedAt||a.code.localeCompare(b.code):a.eventDate<b.eventDate?1:-1;}
 function options(data={}){
@@ -119,6 +125,16 @@ function createSummaryHandler(db,{now=Date.now}={}){return async request=>{
   }
   const items=rows.slice(0,PAGE_SIZE),hasMore=rows.length>PAGE_SIZE,last=items.at(-1);
   const nextCursor=hasMore?Buffer.from(JSON.stringify({scope:scopeKey,after:{code:last.code,eventDate:last.eventDate,updatedAt:last.updatedAt}})).toString('base64url'):null;
+  const individualRooms=items.filter(item=>item.battleMode==='individual');
+  if(individualRooms.length){
+   const refs=individualRooms.map(item=>db.doc('tournaments/'+item.code));
+   const rosterSnapshots=await tx.getAll(...refs,{fieldMask:['data']});
+   const roomsByCode=new Map(individualRooms.map(item=>[item.code,item]));
+   for(const snapshot of rosterSnapshots){
+    const occupied=roomPlayerCount(snapshot.data()?.data);
+    if(occupied!==null)roomsByCode.get(snapshot.id).confirmedCount=occupied;
+   }
+  }
   return {ok:true,items,counts,hasMore,nextCursor,pageSize:PAGE_SIZE,asOf:at};
  },{readOnly:true});
 };}
