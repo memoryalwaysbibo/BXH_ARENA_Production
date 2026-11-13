@@ -9,13 +9,13 @@ function isPlayerSubmission(operation,code){
 }
 // Factory only: no exports are registered with Firebase by importing this file.
 // The rollout gate must be backed by server configuration, never client input.
-function createApi({queue,family,enabled=async()=>false}){
+function createApi({queue,family,enabled=async()=>false,readEnabled=async()=>false}){
  return async req=>{
   const uid=req.auth?.uid,d=req.data||{};
   if(!uid)throw Error('auth-required');
   // Previously accepted operations remain queryable after closing intake.
   if(d.action==='status')return queue.status(uid,d.code,d.operationId);
-  if(!await enabled(d.code))throw Error('registration-queue-disabled');
+  if(!await enabled(d.code)&&!(d.action==='mine'&&await readEnabled(d.code)))throw Error('registration-queue-disabled');
   if(d.action==='submit'){
    if(!isPlayerSubmission(d.operation,d.code))throw Error('invalid-operation');
    return queue.enqueue(uid,d.operation);

@@ -907,14 +907,13 @@
     }
   }
   const registrationV2RouteHints=new Map();
-  const registrationV2PilotCodes=new Set(['BXH-BZ2JW6','BXH-XJ7WJ5','BXH-XXDNAH']);
   function rememberRegistrationV2Route(code,room){
-    if(!registrationV2PilotCodes.has(code)||room?.registrationQueueVersion!==2)return;
+    if(!/^BXH-[A-Z0-9]{4,16}$/.test(code)||room?.registrationQueueVersion!==2)return;
     registrationV2RouteHints.set(code,{uid:authHandle?.currentUser?.uid,epoch:engagementSessionEpoch,at:Date.now()});
   }
   async function registrationFlowV2Enabled(code){
     if(Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code))return true;
-    if(!registrationV2PilotCodes.has(code))return false;
+    if(!/^BXH-[A-Z0-9]{4,16}$/.test(code))return false;
     if(!dbHandle||!fx?.getDocFromServer)throw Error('registration-route-unavailable');
     const uid=authHandle?.currentUser?.uid,epoch=engagementSessionEpoch;
     // The player flow has already read this public document. Reuse its V2
