@@ -60,3 +60,17 @@ test('legacy transaction shares pending feedback until acknowledgement and rejec
  h.tick(8000);assert.match(c.refereeUploadStatusHtml(1),/正在等待確認/);
  h.pending.shift().resolve({ok:true,state:structuredClone(c.state)});await p;assert.match(c.refereeUploadStatusHtml(1),/已儲存/);
 });
+
+test('winning-score confirmation remains disabled until the score transaction acknowledges',()=>{
+ const h=harness(),{c}=h;
+ Object.assign(c,{esc:v=>String(v||''),playerName:String,WINNER_CROWN_SVG:'',checkWinnerSide:()=> 'A'});
+ c.getMatch('m1').scoreA=4;c.pendingModal={type:'confirm-result',matchId:'m1',title:'確認結果',confirmLabel:'確認比分並送出結果'};
+ const a=source.indexOf('function renderModal('),b=source.indexOf('\nfunction openModal(',a);vm.runInContext(source.slice(a,b),c);
+ const token=c.beginRefereeUpload(c.getMatch('m1'));
+ assert.match(c.renderModal(),/id="modal-confirm-btn"[^>]*disabled/);
+ assert.match(c.renderModal(),/分數上傳中/);
+ h.tick(8000);assert.match(c.renderModal(),/正在等待確認/);
+ assert.match(c.renderModal(),/id="modal-confirm-btn"[^>]*disabled/);
+ c.finishRefereeUpload(token,{ok:true});assert(!/id="modal-confirm-btn"[^>]*disabled/.test(c.renderModal()));
+ assert.match(c.renderModal(),/分數已儲存/);
+});

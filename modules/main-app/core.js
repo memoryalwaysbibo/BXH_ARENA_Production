@@ -19356,6 +19356,11 @@ function renderModal(){
     <p class="hint" style="margin-top:6px;">驗證成功後，此次操作會記錄修改前的名次資料、修改者與修改時間。</p>`;
     mm.confirmDisabled = false;
   }
+  if(["confirm-result","confirm-quick"].includes(mm.type)){
+    const match=getMatch(mm.matchId);
+    if(refereeUploadPending(match))mm.confirmDisabled=true;
+    if(match)body+=refereeUploadStatusHtml(match.station);
+  }
   return `<div class="modal-overlay confirmation-overlay" data-action="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal-box ${mm.type==="confirm-quick"?"quick-confirm-modal":""}">
       <h3>${esc(mm.title)}</h3>
@@ -26360,7 +26365,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(!mm){ return; }
     if(mm.type==='court-force-exit'&&mm.acknowledged!==true)return;
     if(mm.type==="confirm-result"){
-      if(mm.confirmDisabled || mm.confirmBusy){ return; }
+      if(mm.confirmDisabled || mm.confirmBusy || refereeUploadPending(getMatch(mm.matchId))){ return; }
       mm.confirmBusy = true;
       render();
       (async ()=>{
@@ -26370,7 +26375,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       return;
     }
     if(mm.type==="confirm-quick"){
-      if(mm.confirmDisabled || mm.confirmBusy){ return; }
+      if(mm.confirmDisabled || mm.confirmBusy || refereeUploadPending(getMatch(mm.matchId))){ return; }
       mm.confirmBusy = true;
       render();
       (async ()=>{
