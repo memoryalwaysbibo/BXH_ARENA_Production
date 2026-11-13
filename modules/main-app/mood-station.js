@@ -56,11 +56,12 @@ function renderMoodReplies(m,c){
   </div>
  </div>`;
 }
+function isResultAnnouncement(m){return m.name==='BXH 系統' && String(m.text||'').startsWith('🏆 恭喜【冠軍】');}
 function renderMoodMessage(m,c){
  const replies=Array.isArray(m.replies)?m.replies:[];
  const open=!!c.replyOpen?.[m.id],menuKey='message:'+m.id;
  const heartCount=Number(m.heartCount||0),replyCount=Number(m.replyCount??replies.length);
- return `<div class="mood-message">
+ return `<div class="mood-message${isResultAnnouncement(m)?' mood-result':''}">
   <div class="mood-message-main">
    <div class="mood-message-line"><b>${esc(m.name)}</b>：${esc(m.text)}</div>
    <small class="mood-message-time">${esc(moodTime(m.createdAt))}</small>
@@ -86,7 +87,7 @@ function renderMoodStation(){
  if(c.messages===null&&!c.loading&&!c.error){c.loading=true;setTimeout(loadMood,0);}
  const items=(c.messages||[]).filter(m=>Number(m.createdAt)>Date.now()-86400000);
  const carousel=items.filter(m=>m.inCarousel!==false);
- const group=carousel.map(m=>`<span class="mood-item"><b>${esc(m.name)}</b>：${esc(m.text)}</span>`).join('');
+ const group=carousel.map(m=>`<span class="mood-item${isResultAnnouncement(m)?' mood-result':''}"><b>${esc(m.name)}</b>：${esc(m.text)}</span>`).join('');
  return `<section class="panel mood-station" aria-label="心情小棧">
  <div class="mood-head"><b>☕ 心情小棧</b><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="mood-expand" aria-expanded="${!!c.expanded}" aria-controls="mood-all">${c.expanded?'收合留言 ▴':'查看全部留言 ▾'}</button><button class="btn btn-primary btn-sm" data-action="mood-open" ${c.busy?'disabled':''}>${c.open?'收合':'我有話要說'}</button></div></div>
  ${renderRaffleAnnouncements()}

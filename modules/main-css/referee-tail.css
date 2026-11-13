@@ -42,6 +42,8 @@
 .mood-window{overflow:hidden;border-radius:8px;background:#0d1010;padding:12px;color:#e7e6df;outline-offset:3px}
 .mood-track{display:flex;width:max-content;max-width:none}.mood-track:has(.mood-group){animation:mood-scroll 34.615s linear infinite}
 .mood-group{display:flex;gap:32px;padding-right:32px}.mood-item{white-space:nowrap}.mood-item b{color:#d7c179}
+.mood-item.mood-result,.mood-message.mood-result .mood-message-line{color:#ffd166;font-weight:700}
+.mood-item.mood-result b,.mood-message.mood-result .mood-message-line b{color:#ff7a70}
 .mood-track.paused{animation-play-state:paused}
 .mood-window{cursor:pointer;touch-action:pan-y;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .mood-window:focus-visible{outline:2px solid #d7c179}
