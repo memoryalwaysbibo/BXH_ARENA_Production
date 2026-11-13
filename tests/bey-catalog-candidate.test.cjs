@@ -47,3 +47,25 @@ test('manual handoff module has no file chooser, upload, remote write, auth or s
  const text=require('node:fs').readFileSync(require('node:path').join(__dirname,'../modules/bey-catalog/catalog-candidate-presentation.js'),'utf8');
  assert.doesNotMatch(text,/fetch\s*\(|XMLHttpRequest|firebase|localStorage|sessionStorage|FormData|type\s*=\s*['"]file|innerHTML|insertAdjacentHTML/);
 });
+
+test('BX54 user-provided PNG preserves original bytes, unverified provenance and existing222 entries',async()=>{
+ const fs=require('node:fs'),path=require('node:path'),root=path.resolve(__dirname,'..');
+ const p=require('../modules/bey-catalog/catalog-candidate-policy.js');const data=JSON.parse(fs.readFileSync(path.join(root,p.dataURL)));const valid=model.validate(data,p);const bx=valid.entries.find(r=>r.recordId==='supplied_20261014_0085');
+ assert.equal(valid.entries.length,285);assert.equal(bx.pairingConfidence,'user_assigned');assert.equal(bx.provenance,'user_supplied_retail_source');assert.equal(bx.rightsStatus,'unverified');assert.equal(bx.status,'candidate');assert.equal(bx.sourceURL,'https://www.yodobashi.com/product/100000001010262959/');
+ const bytes=fs.readFileSync(path.join(root,bx.imageURL));assert.equal(bytes.length,464143);assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),'948062cf8f37cdaecad243aaca25874c8dc1104536bb06d86489b3fef4ebf82c');assert.equal(bytes.readUInt32BE(16),600);assert.equal(bytes.readUInt32BE(20),600);
+ const old=JSON.parse(fs.readFileSync(path.join(root,'data/bey-catalog-pending/candidate-images.36061318cf77a96c7e68d7c8c26b5429e26eec64136d1244ca2f0e9407599118.json')));const remaining=valid.entries.filter(r=>old.entries.some(o=>o.recordId===r.recordId));assert.deepEqual(remaining,old.entries);
+ for(const key of ['provenance','rightsStatus']){const bad=structuredClone(data);bad.entries.find(r=>r.recordId===bx.recordId)[key]='authorized';assert.throws(()=>model.validate(bad,p),/INVALID_CANDIDATE_MANIFEST/);}
+ const bad=structuredClone(data);delete bad.entries.find(r=>r.recordId===bx.recordId).rightsStatus;assert.throws(()=>model.validate(bad,p),/INVALID_CANDIDATE_MANIFEST/);
+});
+
+// The new batch is an additive reference layer, never a change to prior pairings.
+test('October16 references cover every stable row, preserve previous223 and retain source evidence',()=>{
+ const fs=require('node:fs'),path=require('node:path'),root=path.resolve(__dirname,'..');
+ const p=require('../modules/bey-catalog/catalog-candidate-policy.js');const data=model.validate(JSON.parse(fs.readFileSync(path.join(root,p.dataURL))),p);
+ const previous=JSON.parse(fs.readFileSync(path.join(root,'data/bey-catalog-pending/candidate-images.117ecc88dde1ed85319d34c295fc92a391159483c0ffcb26f13e1cce56f9d46b.json')));
+ assert.equal(data.entries.length,285);for(const r of previous.entries)assert.deepEqual(data.entries.find(x=>x.recordId===r.recordId),r);
+ const audit=JSON.parse(fs.readFileSync(path.join(root,'docs/bey-catalog/CANDIDATE_IMAGE_RESEARCH_20261016.json'))).entries;
+ assert.equal(audit.length,62);assert.equal(new Set(audit.map(x=>x.suppliedId)).size,62);
+ for(const a of audit){const r=data.entries.find(x=>x.recordId===a.suppliedId);assert.equal(r.pairingConfidence,'product_reference');assert.equal(r.status,'candidate');assert.equal(r.sourceImageSha256,a.sourceImageSha256);assert.equal(r.imageSha256,a.imageSha256);assert.equal(r.sourceURL,a.sourceURL);assert.equal(a.rightsStatus,'unverified');assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(root,r.imageURL))).digest('hex'),r.imageSha256);}
+ for(const [a,b] of [[280,281],[282,283],[284,285]])assert.notEqual(data.entries[a-1].imageURL,data.entries[b-1].imageURL);
+});
