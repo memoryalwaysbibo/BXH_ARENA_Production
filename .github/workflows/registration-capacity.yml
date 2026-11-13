@@ -1,0 +1,20 @@
+name: Registration capacity regression
+on:
+  pull_request:
+    paths:
+      - 'registration-capacity/**'
+      - 'tests/official-roster-capacity.test.cjs'
+      - 'modules/main-app/domain-utils.js'
+      - '.github/workflows/registration-capacity.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test registration-capacity/capacity.test.cjs tests/official-roster-capacity.test.cjs tests/community-quick-registration.test.cjs tests/team-registration-ui.test.cjs
+      - run: node scripts/verify-production-frontend.cjs
