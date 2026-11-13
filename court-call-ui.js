@@ -57,7 +57,7 @@ function courtCallBindServiceWorkerMessages(){
   courtCallDiscoveryAt=0;
   setTimeout(async()=>{
    try{
-    if(code&&courtCallUserKey())await loadCourtCalls(code);
+    if(code&&courtCallUserKey()){courtCallResume(code);await loadCourtCalls(code);}
     else await discoverCourtCallPlayerCodes(true);
    }catch{}
    syncCourtCallGlobalOverlay();
@@ -223,7 +223,8 @@ function courtCallContext(code){
   try{pending=JSON.parse(sessionStorage.getItem('bxh.call:'+courtCallUserKey()+':'+code)||'null');}catch{}
   courtCallCache.set(code,{
    code,identity:key,storageKey:'bxh.call:'+courtCallUserKey()+':'+code,
-   rows:[],prepares:[],used:false,error:'',pending,busy:false,loading:false,next:0
+   rows:[],prepares:[],used:false,error:'',pending,busy:false,loading:false,next:0,
+   phase:'unknown',phaseCheckedAt:0,phaseInfo:null,denied:false,failures:0
   });
  }
  return courtCallCache.get(code);
@@ -706,6 +707,76 @@ function courtCallVisibleCodes(){
  return [...codes].filter(x=>/^BXH-[A-Z0-9]{4,16}$/.test(x)).slice(0,10);
 }
 
+// Lifecycle reads are public-document reads, never the side-effecting CALL list.
+// Do not use event dates: an operator can legitimately start early or late.
+function courtCallPhase(info){
+ if(!info)return 'unknown';
+ const s=info.parsedData||info;
+ if(info.systemClosed||s.systemClosed||(s.systemClosure&&!s.systemClosure.restoredAt))return 'closed';
+ if(info.eventCancelled||s.meta?.eventCancelled||info.tournamentPhase==='cancelled')return 'closed';
+ if(info.archiveStatus==='completed'||s.archiveStatus==='completed'||info.tournamentPhase==='done')return 'done';
+ if(s.startedAt||['live','settling'].includes(info.tournamentPhase))return 'live';
+ return 'waiting';
+}
+function courtCallAuthorityKey(info){
+ const s=info?.parsedData||info||{},uid=courtCallUserKey();
+ let p={};try{p=userProfile||{};}catch{}
+ const ownPlayers=new Set((s.players||[]).filter(x=>[x.guardianUid,x.registrationUid,x.playerUid].includes(uid)).map(x=>x.id));
+ return JSON.stringify([p.role,p.active,p.deleted,p.accountStatus,p.isTestAccount,
+  s.createdAt,s.createdBy,s.ownerUid,(s.matches||[]).length,
+  (s.matches||[]).filter(m=>ownPlayers.has(m.a?.playerId)||ownPlayers.has(m.b?.playerId)).map(m=>m.id).sort(),
+  s.assignedStaffUids||s.meta?.assignedStaffUids,s.refereeStationRestrictionEnabled||s.meta?.refereeStationRestrictionEnabled,
+  s.refereeStationAssignments||s.meta?.refereeStationAssignments]);
+}
+function courtCallAdoptPhase(c,phase,info){
+ const authorityKey=courtCallAuthorityKey(info);
+ if(c.authorityKey!==undefined&&c.authorityKey!==authorityKey){c.denied=false;c.failures=0;c.next=0;}
+ c.authorityKey=authorityKey;
+ if(phase!==c.phase){c.denied=false;c.failures=0;c.next=0;c.phase=phase;}
+ if(['waiting','closed','done'].includes(phase)){c.rows=[];c.prepares=[];}
+}
+async function courtCallRefreshPhase(c){
+ // The open manager room already receives its normal realtime state. Reuse it.
+ try{
+  if(state?.cloudCode===c.code&&canOperateCurrentTournament()){
+   courtCallAdoptPhase(c,courtCallPhase(state),state);return;
+  }
+ }catch{}
+ // Reuse newly delivered schedule summaries; unchanged cached waiting data must
+ // not prevent a low-frequency read from noticing a remotely started event.
+ try{
+  const info=window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true
+   ?currentMyEventsPlayerSlice()?.snapshot()?.rooms?.find(r=>r.card?.code===c.code&&r.status==='ready')?.info
+   :myRegistrationsTournamentInfo[c.code];
+  const stamp=Number(info?.myEventsPublicRead?.receivedAt)||0;
+  const key=info?JSON.stringify([courtCallPhase(info),courtCallAuthorityKey(info),stamp]):'';
+  if(info&&key!==c.phaseInfoKey){
+   c.phaseInfoKey=key;
+   if(!stamp||stamp>=(c.phaseObservedAt||0)){
+    c.phaseCheckedAt=stamp||Date.now();c.phaseObservedAt=c.phaseCheckedAt;
+    courtCallAdoptPhase(c,courtCallPhase(info),info);
+   }
+  }
+ }catch{}
+ if(c.phaseCheckedAt&&Date.now()-c.phaseCheckedAt<30000)return;
+ c.phaseCheckedAt=Date.now();
+ try{
+  if(typeof window.cloudSync?.getPublicTournamentSummary!=='function')return;
+  let timer;
+  const info=await Promise.race([
+   window.cloudSync.getPublicTournamentSummary(c.code),
+   new Promise(resolve=>{timer=setTimeout(()=>resolve(null),3000);})
+  ]).finally(()=>clearTimeout(timer));
+  if(c!==courtCallContext(c.code))return;
+  // A failed or missing summary is not proof that an active event ended.
+  // Preserve an established live channel (including PASS recall).
+  if(info){c.phaseObservedAt=Date.now();courtCallAdoptPhase(c,courtCallPhase(info),info);}
+ }catch{}
+}
+function courtCallResume(code){
+ const c=courtCallContext(code);c.resumeVersion=(c.resumeVersion||0)+1;c.denied=false;c.failures=0;c.next=0;c.phaseCheckedAt=0;
+}
+
 function scheduleCourtCallPoll(){
  if(courtCallTimer)return;
  if(!courtCallUserKey()){syncCourtCallGlobalOverlay();return;}
@@ -718,7 +789,8 @@ function scheduleCourtCallPoll(){
   const list=courtCallVisibleCodes();
   for(const code of list){
    const c=courtCallContext(code);
-   if(!c.loading&&!c.busy&&Date.now()>=c.next)await loadCourtCalls(code);
+   // One stalled room must not block other rooms or the next scheduling tick.
+   if(!c.loading&&!c.busy&&Date.now()>=c.next)loadCourtCalls(code).catch(()=>{});
   }
   syncCourtCallGlobalOverlay();
   if(courtCallUserKey())scheduleCourtCallPoll();
@@ -726,7 +798,11 @@ function scheduleCourtCallPoll(){
 }
 
 async function loadCourtCalls(code){
- const c=courtCallContext(code);if(c.loading)return;c.loading=true;
+ const c=courtCallContext(code);if(c.loading||c.busy||Date.now()<c.next)return;c.loading=true;
+ await courtCallRefreshPhase(c);
+ if(c!==courtCallContext(code))return;
+ if(c.phase!=='live'||c.denied||typeof navigator!=='undefined'&&navigator.onLine===false){c.loading=false;syncCourtCallGlobalOverlay();return;}
+ const resumeVersion=c.resumeVersion||0;
  const oldRows=c.rows||[],oldPrepares=c.prepares||[],oldUsed=!!c.used,oldError=c.error||'';
  const oldSig=JSON.stringify({
   rows:oldRows.map(r=>({
@@ -745,7 +821,7 @@ async function loadCourtCalls(code){
   const newRows=Array.isArray(result.rows)?result.rows:[];
   const newPrepares=Array.isArray(result.prepares)?result.prepares:[];
   courtCallNotifyChanges(c,newRows,oldRows,newPrepares,oldPrepares);
-  c.rows=newRows;c.prepares=newPrepares;c.used=!!result.passUsed;c.error='';
+  c.rows=newRows;c.prepares=newPrepares;c.used=!!result.passUsed;c.error='';c.failures=0;
   const newSig=JSON.stringify({
    rows:newRows.map(r=>({
     id:r.matchId,seq:r.sequence,calledAt:r.calledAt,
@@ -757,15 +833,17 @@ async function loadCourtCalls(code){
   });
   changed=oldSig!==newSig||oldUsed!==c.used||oldError!=='';
  }catch(e){
-  if(c===courtCallContext(code)){
+  if(c===courtCallContext(code)&&(c.resumeVersion||0)===resumeVersion){
    const msg=courtCallError(e);
+   if(e?.code==='functions/permission-denied'||String(e?.message||'')==='permission-denied'){c.denied=true;c.rows=[];c.prepares=[];}
+   else c.failures=Math.min((c.failures||0)+1,5);
    // Silent background discovery should not paint permission errors into unrelated pages.
-   if((c.rows||[]).length||String(e?.message||e).includes('account-inactive'))c.error=msg;
+   if(oldRows.length||String(e?.message||e).includes('account-inactive'))c.error=msg;
    changed=oldError!==c.error;
   }
  }finally{
   if(c===courtCallContext(code)){
-   c.loading=false;c.next=Date.now()+2500;
+   c.loading=false;c.next=(c.resumeVersion||0)!==resumeVersion?0:Date.now()+(c.failures?Math.min(60000,2500*2**c.failures):2500);
    syncCourtCallGlobalOverlay();
    const embedsCallUi=(()=>{try{return (appPhase==='player-center'&&playerActiveTab==='registered')||((appPhase==='app'&&activeTab==='referee')||(appPhase==='community-room'&&communityRoomActiveTab==='referee'));}catch{return false;}})();
    if(changed&&embedsCallUi){try{renderPreservingScroll();}catch{}}
@@ -854,6 +932,7 @@ async function handleCourtCall(action,target){
   c.pending=null;sessionStorage.removeItem(storageKey);
   if(r.state&&typeof state!=='undefined'&&state.cloudCode===code)applyRemoteState(r.state,true);
   c.busy=false;
+  courtCallResume(code);
   await loadCourtCalls(code);
   if(payload.action==='notify')showToast('叫號已送出雙方選手');
   else if(payload.action==='prepare')showToast('已提前通知下一場雙方選手準備');

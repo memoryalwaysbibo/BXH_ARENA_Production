@@ -22997,7 +22997,14 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==='my-events-refresh'||action==='my-events-more'||action==='my-events-detail-more'||action==='my-events-receipt-recheck'){
-    if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true)currentMyEventsPlayerSlice()?.action(action,target.getAttribute("data-code"));
+    if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true){
+      const slice=currentMyEventsPlayerSlice(),owner=lobbyAuthKey();
+      Promise.resolve(slice?.action(action,target.getAttribute("data-code"))).then(()=>{
+        if(action==='my-events-refresh'&&owner===lobbyAuthKey()&&slice===currentMyEventsPlayerSlice()&&typeof courtCallResume==='function'){
+          for(const room of slice?.snapshot()?.rooms||[])if(room.status==='ready'&&room.card?.code)courtCallResume(room.card.code);
+        }
+      }).catch(()=>{});
+    }
     return;
   }
   if(action==="load-my-registrations"){
@@ -23024,6 +23031,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         }
         if(!current())return;
         myRegistrationsTournamentInfo=infoByCode;myRegistrationsCache=regs;myRegistrationsPartial=regs.partial===true;myRegistrationsError=null;
+        // Explicit user refresh permits one new CALL check; never a timer-based 403 retry.
+        if(typeof courtCallResume==='function')for(const code of Object.keys(infoByCode))courtCallResume(code);
       }catch(e){
         if(current()){myRegistrationsCache=[];myRegistrationsPartial=false;myRegistrationsError=mapRegistrationError(e);}
       }finally{
