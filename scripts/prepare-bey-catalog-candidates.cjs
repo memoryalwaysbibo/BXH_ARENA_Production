@@ -12,7 +12,7 @@ function prepare(manifestPath,allowlistPath,assetRoot){
  const imageURLs=[...new Set(data.entries.map(r=>r.imageURL))];
  for(const imageURL of imageURLs){
   const b=fs.readFileSync(path.join(assetRoot,imageURL)),hash=crypto.createHash('sha256').update(b).digest('hex');
-  if(imageURL!=='assets/bey-catalog/candidates/'+hash+'.webp'||b.length>2097152||b.toString('ascii',0,4)!=='RIFF'||b.toString('ascii',8,12)!=='WEBP')throw Error('CANDIDATE_ASSET_MISMATCH');
+  if(!['.webp','.png'].some(ext=>imageURL==='assets/bey-catalog/candidates/'+hash+ext)||b.length>2097152||!(imageURL.endsWith('.png')?b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])):b.toString('ascii',0,4)==='RIFF'&&b.toString('ascii',8,12)==='WEBP'))throw Error('CANDIDATE_ASSET_MISMATCH');
   const dest=path.join(root,imageURL);fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,b);
  }
  const dataURL='./data/bey-catalog-pending/candidate-images.'+sha256+'.json';
