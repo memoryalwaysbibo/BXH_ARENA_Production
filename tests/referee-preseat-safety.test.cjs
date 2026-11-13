@@ -9,7 +9,7 @@ function fixture(){
  const c={appPhase:'app',currentAuthUid:()=> 'judge',state:{id:'test',cloudCode:'BXH-TEST',meta:{stations:6},bracketSize:0,matches:[]},pendingModal:null,courtRetirementBusy:false,
   window:{BXHRefereeSeats:{render:(st,n)=>`<button data-seat-action="seat" data-station="${n}">加入裁判席</button>`}},
   isCommunityRoomOwner:()=>false,esc:v=>String(v??'').replace(/[<>&"']/g,''),refereeBracketRoundtripNav:()=>'',courtAtmosphereStyle:()=>'',
-  POINT_LABELS:{spin:'旋轉',knockout:'擊飛',burst:'爆裂',extreme:'極限'},canOperateStation:()=>true,checkWinnerSide:()=>null,refereeFaultWritePending:()=>false,refereeFaultCount:()=>0,refereeFaultLast:()=>null,refereeViewClass:()=>'',refereeCourtSwapButton:()=>'',matchStatusBarHtml:()=> '準備中',
+  POINT_LABELS:{spin:'旋轉',knockout:'擊飛',burst:'爆裂',extreme:'極限'},canOperateStation:()=>true,checkWinnerSide:()=>null,refereeUploadPending:()=>false,refereeUploadStatusHtml:()=>'<div class="ref-upload-status"></div>',refereeFaultWritePending:()=>false,refereeFaultCount:()=>0,refereeFaultLast:()=>null,refereeViewClass:()=>'',refereeCourtSwapButton:()=>'',matchStatusBarHtml:()=> '準備中',
   refereeDisplayForStation:()=> '測試裁判',refereeStationStatus:()=>({label:'等待中',cls:'waiting'}),
   stationCompletedCount:()=>0,refereeStationRestrictionEnabled:()=>true,canForceExitCourt:()=>true,canManageCourtRetirement:()=>true,
   playerName:id=>({a:'選手甲',b:'選手乙'})[id]||id,executed:[],toasts:[],render:()=>{},document:{getElementById:()=>({focus(){c.focused=true;}})}};

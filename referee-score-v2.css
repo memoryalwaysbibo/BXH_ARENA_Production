@@ -427,3 +427,9 @@
     font-size:7.5px;
   }
 }
+
+/* Reserved status row: same dimensions for idle, pending, and acknowledgement. */
+.ref-upload-status{box-sizing:border-box;height:3.5rem;min-height:3.5rem;display:flex;align-items:center;justify-content:center;padding:4px 12px;margin:8px 0 0;font-size:13px;line-height:1.4;text-align:center;color:#f5c76b;overflow:hidden;}
+.ref-upload-status[data-phase="saved"]{color:#73e4aa;}
+.ref-upload-status[data-phase="failed"],.ref-upload-status[data-phase="unknown"]{color:#ff9c9c;}
+.ref-upload-status[data-phase="idle"]{visibility:hidden;}

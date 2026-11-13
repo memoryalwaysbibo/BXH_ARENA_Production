@@ -21,7 +21,7 @@ function room(overrides={}) {
 }
 function runtime(target=room()) {
   const saved=[],writes=[],awarded=new Set(); let awardCount=0,resultCount=0;
-  const ctx={state:target,console,Map,Set,Date,Promise,recordIndex:[],currentRole:'admin',
+  const ctx={beginRefereeUpload:()=>null,finishRefereeUpload:()=>{},state:target,console,Map,Set,Date,Promise,recordIndex:[],currentRole:'admin',
     celebrationOpen:false,celebrationData:null,publicTournamentsCache:[],publicTournamentsError:null,
     historyCloudSyncLoaded:true,cloudSyncPending:false,myRegistrationsCache:null,
     ladderPublicLoaded:true,ladderAdminLogsLoaded:true,myLadderProfileCache:{},
@@ -204,7 +204,7 @@ const archiveControls = section('function renderArchiveControls(){', '\n/* ==== 
 const statusSource = section('function tournamentStatus(){', '\nfunction currentTournamentRegistrationLocked');
 function archiveView(target) {
   const timers=[];
-  const ctx={state:target,Number,Date,
+  const ctx={beginRefereeUpload:()=>null,finishRefereeUpload:()=>{},state:target,Number,Date,
     esc:x=>String(x),isSuperAdmin:()=>false,isAdminTierOrAbove:()=>true,
     settlementRouteForTournament:()=> 'no-ladder',setTimeout:fn=>timers.push(fn)};
   vm.createContext(ctx);vm.runInContext(statusSource+archiveControls,ctx);

@@ -6280,6 +6280,7 @@ function canOperateMatchStation(matchOrId, st=state){
 function requireStationPermission(matchOrId, st=state){
   if(st&&st.archiveStatus==="completed"){ showToast("此賽事已完成並封存，目前為唯讀。",true); return false; }
   const m=typeof matchOrId==="string" ? ((st&&st.matches)||[]).find(x=>x.id===matchOrId) : matchOrId;
+  if(refereeUploadPending(m,st)){showToast("分數上傳中，請勿重複操作本台。",true);return false;}
   if(refereeFaultWritePending(m,st)){showToast("失誤判定儲存中，請稍候再操作本場。",true);return false;}
   if(!canOperateMatchStation(m,st)){
     showToast(`此戰鬥台未指派給你${m&&m.station?`（${m.station}號台）`:""}，目前僅可查看。`, true);
@@ -6328,6 +6329,37 @@ function stationMutationErrorMessage(reason){
   return map[reason] || ("雲端場次更新失敗（"+reason+"），請重新整理後再試。");
 }
 
+// Transient UI only: no polling, retries, or tournament fields are written.
+const refereeUploads=new Map();
+function refereeUploadKey(station,st=state){return JSON.stringify([st.id,st.cloudCode||"",currentAuthUid(),Number(station)]);}
+function refereeUploadPending(m,st=state){return !!m&&refereeUploads.get(refereeUploadKey(m.station,st))?.pending===true;}
+function refereeUploadStatusHtml(station){
+  const entry=refereeUploads.get(refereeUploadKey(station));
+  const phase=entry?.phase||"idle";
+  const labels={idle:"",uploading:"分數上傳中…請勿重複操作",slow:"上傳時間較長，正在等待確認…",saved:"✓ 分數已儲存",failed:"分數未儲存，請核對比分後重試",unknown:"結果尚未確認，請先核對雲端比分，勿重複加分"};
+  return `<div class="ref-upload-status" data-phase="${phase}" role="status" aria-live="polite" aria-atomic="true" aria-busy="${entry?.pending?'true':'false'}">${labels[phase]}</div>`;
+}
+function beginRefereeUpload(m){
+  if(!m||!state.cloudCode)return null;
+  const key=refereeUploadKey(m.station),previous=refereeUploads.get(key);
+  if(previous?.pending)return null;
+  if(previous)clearTimeout(previous.timer);
+  const entry={key,pending:true,phase:"uploading",roomId:state.id,code:state.cloudCode,uid:currentAuthUid()};
+  entry.current=()=>state.id===entry.roomId&&state.cloudCode===entry.code&&currentAuthUid()===entry.uid;
+  refereeUploads.set(key,entry);
+  entry.timer=setTimeout(()=>{if(refereeUploads.get(key)!==entry||!entry.pending)return;entry.phase="slow";if(entry.current())render();},8000);
+  render();return entry;
+}
+function finishRefereeUpload(entry,result){
+  if(!entry||refereeUploads.get(entry.key)!==entry)return;
+  clearTimeout(entry.timer);entry.pending=false;
+  const definite=new Set(["station-not-assigned","station-mismatch","seat-stale","score-stale","dispatch-stale","already-completed","invalid-score","invalid-request","not-found","not-started","nothing-to-undo","permission-denied","fault-state-stale"]);
+  entry.phase=result===true||result?.ok===true?"saved":definite.has(result?.reason)?"failed":"unknown";
+  if(entry.current())render();
+  // Clear success only. Errors remain visible until a new operation or navigation.
+  if(entry.phase==="saved")entry.timer=setTimeout(()=>{if(refereeUploads.get(entry.key)!==entry)return;refereeUploads.delete(entry.key);if(entry.current())render();},2500);
+}
+
 const refereeSeatCommandBusy=new Set();
 async function executeRefereeSeatCommand(matchId,command){
   if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再操作。",true);return false;}
@@ -6336,12 +6368,14 @@ async function executeRefereeSeatCommand(matchId,command){
   if(typeof navigator!=="undefined"&&navigator.onLine===false){showToast("三席裁判計分需要連線確認；本次操作尚未送出，請連線後重試。",true);return false;}
   const key=code+":"+actorUid+":"+matchId;if(refereeSeatCommandBusy.has(key))return false;
   refereeSeatCommandBusy.add(key);
+  const upload=beginRefereeUpload(m);let uploadResult;
   try{
     const request={...command,code,matchId,operationId:crypto.randomUUID(),station:Number(m.station),
       expectedCourtRevision:state.meta.refereeSeatsV1.courts?.[m.station]?.revision??0,
       expectedScoreRevision:Number(m.refereeSeatScoreRevision||0),expectedDispatchRevision:Number(m.dispatchRevision||0),
       playerAId:m.a?.playerId||null,playerBId:m.b?.playerId||null};
     const result=await window.cloudSync?.commitRefereeCommand?.(request);
+    uploadResult=result;
     if(state.id!==roomId||state.cloudCode!==code||currentAuthUid()!==actorUid)return false;
     if(!result?.ok){
       const reason=result?.reason||"cloud-unavailable";
@@ -6359,7 +6393,7 @@ async function executeRefereeSeatCommand(matchId,command){
     if(["confirm","quick"].includes(command.action)) await finishTournament();
     return true;
   }catch(error){if(state.id===roomId&&currentAuthUid()===actorUid)showToast("本次操作尚未確認，請重連後核對雲端比分。",true);return false;}
-  finally{refereeSeatCommandBusy.delete(key);}
+  finally{refereeSeatCommandBusy.delete(key);finishRefereeUpload(upload,uploadResult);}
 }
 
 
@@ -6392,15 +6426,18 @@ async function executeRefereeDispatchCommand(command){
   finally{refereeSeatCommandBusy.delete(key);}
 }
 
-function persistRefereeMatchMutation(matchId, mutateRemoteFn){
+async function persistRefereeMatchMutation(matchId, mutateRemoteFn){
   if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在保留本機備份並讀取雲端，請稍候再操作。",true);return Promise.resolve({ok:false,reason:"sync-recovery-in-progress"});}
   const m=getMatch(matchId);
+  if(refereeUploadPending(m))return {ok:false,reason:"operation-pending"};
+  const upload=beginRefereeUpload(m);let uploadResult;
+  try{
   state.updatedAt=Date.now();
   const localSnapshot=cloneStateForSave(state);
   // Local history is best-effort. The cloud transaction below is authoritative.
   saveRecord(localSnapshot).catch(()=>false);
   if(!shouldUseStationScopedMutation(m)){
-    return saveState();
+    uploadResult=await saveState();return uploadResult;
   }
   const code=state.cloudCode;
   const station=Number(m.station||0);
@@ -6431,7 +6468,8 @@ function persistRefereeMatchMutation(matchId, mutateRemoteFn){
     return result;
   });
   stationMutationChain=task;
-  return task;
+  uploadResult=await task;return uploadResult;
+  }finally{finishRefereeUpload(upload,uploadResult);}
 }
 async function flushStationMatchMutations(){
   try{
@@ -9185,6 +9223,8 @@ async function confirmResultWithCloudGuard(matchId){
   if(!(state.cloudCode && cloudAvailable() && window.cloudSync.confirmMatchTransaction)){
     return confirmResult(matchId);
   }
+  const upload=beginRefereeUpload(m);let uploadResult;
+  try{
   const actor = adminDisplayName || (userProfile&&userProfile.email) || "admin";
   const stationSyncOk = await flushStationMatchMutations();
   if(!stationSyncOk){
@@ -9216,6 +9256,7 @@ async function confirmResultWithCloudGuard(matchId){
     const ref=currentRefereeIdentity();
     return {recordDuty:ref.isStaff,uid:ref.uid,matchId,tournamentName:(state.meta&&state.meta.name)||"",station:m&&m.station,dispatchRevision:m&&m.dispatchRevision||0,expectedSeatScoreRevision:m&&m.refereeSeatScoreRevision||0,roundLabel:refereeStageLabel(m),playerA:m&&m.a?playerName(m.a.playerId):"",playerB:m&&m.b?playerName(m.b.playerId):"",winnerName:localEval&&localEval.winnerId?playerName(localEval.winnerId):"",resultMethod:"score",eventAuthority:(state.meta&&state.meta.eventAuthority)||"official"};
   })());
+  uploadResult=result;
   if(!result.ok){
     const reason=result.reason||"validation-failed";
     const msg={
@@ -9242,6 +9283,7 @@ async function confirmResultWithCloudGuard(matchId){
 
   if(isTournamentFullyDecided()) await finishTournament();
   return true;
+  }finally{finishRefereeUpload(upload,uploadResult);}
 }
 
 /* ==== quick decision mode (裁判直接選擇獲勝方，不記錄比分) ==== */
@@ -9330,6 +9372,8 @@ async function confirmQuickDecisionWithCloudGuard(matchId, selectedWinnerId){
   if(!(state.cloudCode && cloudAvailable() && window.cloudSync.confirmMatchTransaction)){
     return confirmQuickDecision(matchId, selectedWinnerId);
   }
+  const upload=beginRefereeUpload(m);let uploadResult;
+  try{
   const actor = adminDisplayName || (userProfile&&userProfile.email) || "admin";
   const stationSyncOk = await flushStationMatchMutations();
   if(!stationSyncOk){
@@ -9361,6 +9405,7 @@ async function confirmQuickDecisionWithCloudGuard(matchId, selectedWinnerId){
     const ref=currentRefereeIdentity();
     return {recordDuty:ref.isStaff,uid:ref.uid,matchId,tournamentName:(state.meta&&state.meta.name)||"",station:m&&m.station,dispatchRevision:m&&m.dispatchRevision||0,expectedSeatScoreRevision:m&&m.refereeSeatScoreRevision||0,roundLabel:refereeStageLabel(m),playerA:m&&m.a?playerName(m.a.playerId):"",playerB:m&&m.b?playerName(m.b.playerId):"",winnerName:selectedWinnerId?playerName(selectedWinnerId):"",resultMethod:"quick_decision",eventAuthority:(state.meta&&state.meta.eventAuthority)||"official"};
   })());
+  uploadResult=result;
   if(!result.ok){
     const reason=result.reason||"validation-failed";
     const msg={
@@ -9388,6 +9433,7 @@ async function confirmQuickDecisionWithCloudGuard(matchId, selectedWinnerId){
 
   if(isTournamentFullyDecided()) await finishTournament();
   return true;
+  }finally{finishRefereeUpload(upload,uploadResult);}
 }
 
 function isTournamentFullyDecided(st=state){
@@ -12298,7 +12344,7 @@ function renderQuickDecisionPanel(m, court, stationNum){
   const aName = playerName(m.a.playerId), bName = playerName(m.b.playerId);
   const busy = !!(pendingModal && pendingModal.type==="confirm-quick" && pendingModal.busy);
   const preStartLocked=!state.startedAt;
-  const stationLocked=!canOperateStation(stationNum);
+  const stationLocked=!canOperateStation(stationNum)||refereeUploadPending(m);
   const warnBanner = m.completed ? `<div class="banner warn"><span>此對戰已完成判定，任何操作將修改已確認的結果，請謹慎操作。</span></div>` : (preStartLocked?`<div class="banner warn"><span>賽事尚未開始。請由主辦先按「開始賽事」，裁判台才會開放判定。</span></div>`:"");
   return `<div class="panel court-card referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
     ${refereeWorkstationHeader(m,stationNum)}${warnBanner}${renderCourtCallReferee(m)}
@@ -12308,7 +12354,7 @@ function renderQuickDecisionPanel(m, court, stationNum){
       ${refereeSwapControl(m)}
       <button class="ref-player-side side-b" data-action="open-quick-confirm" data-id="${m.id}" data-winner="${esc(m.b.playerId)}" ${m.completed||busy||preStartLocked||stationLocked?'disabled':''}><span class="ref-player-label">選手 B</span><strong>${esc(bName)}</strong><span class="ref-win-call">判定獲勝</span></button>
     </div>
-
+    ${refereeUploadStatusHtml(stationNum)}
   </div>`;
 }
 
@@ -12378,9 +12424,11 @@ function renderRefereeScorePanel(match,stationNum){
   const locked = !!(pendingModal && pendingModal.type==="confirm-result" && pendingModal.matchId===m.id);
   const preStartLocked=!state.startedAt;
   const stationLocked=waiting||!canOperateStation(stationNum);
+  const uploadSaving=!waiting&&refereeUploadPending(m);
+  const operationLocked=stationLocked||uploadSaving;
   const enchantmentPending=state.meta&&state.meta.playMode==="enchantment";
   const faultSaving=!waiting&&refereeFaultWritePending(m);
-  const scoreLocked=waiting || locked || faultSaving || preStartLocked || stationLocked || !!winSide || enchantmentPending;
+  const scoreLocked=waiting || locked || faultSaving || preStartLocked || operationLocked || !!winSide || enchantmentPending;
 
   const scoreBtn = (side, type) => `<button ${waiting?'':`data-action="score" data-id="${m.id}"`} data-side="${side}" data-type="${type}" ${scoreLocked?'disabled':''}>${POINT_LABELS[type]}</button>`;
   const faultBtn = (side) => {
@@ -12400,15 +12448,14 @@ function renderRefereeScorePanel(match,stationNum){
     ${!waiting&&stationLocked?`<div class="banner warn" style="margin:12px 16px 0;"><span>唯讀｜你未被指派 Court ${stationNum}，本台所有比分與判定操作已鎖定。</span></div>`:""}
     ${enchantmentPending?'<div class="banner warn" style="margin:12px 16px 0;"><span>附魔之戰尚在串接選手手機抽卡與裁判計分，此場暫不可送分。</span></div>':""}
     ${warnBanner}
-    ${faultSaving?'<div class="banner warn"><span>失誤判定儲存中，請稍候。</span></div>':""}
     ${!waiting&&preStartLocked?`<div class="banner warn" style="margin:12px 16px 0;"><span>賽事尚未開始。比分、判定與場次控制目前鎖定。</span></div>`:""}
     <div class="match-status-controls ref-match-toolbar">
       <span class="msc-label">場次狀態：${waiting?'等待對戰｜計分尚未開放':matchStatusBarHtml(m, true)}</span>
       <div class="msc-btns">
-        ${!waiting&&state.startedAt&&m.status==="in_progress" ? `<button class="btn btn-ghost btn-sm" data-action="pause-match-status" data-id="${m.id}" ${stationLocked?'disabled':''}>暫停比賽</button>` : ""}
-        ${!waiting&&state.startedAt&&m.status==="paused" ? `<button class="btn btn-ghost btn-sm" data-action="resume-match-status" data-id="${m.id}" ${stationLocked?'disabled':''}>恢復比賽</button>` : ""}
-        ${!waiting&&state.startedAt&&m.status!=="completed" ? `<button class="btn btn-ghost btn-sm" data-action="skip-match" data-id="${m.id}" ${stationLocked?'disabled':''}>跳過</button>` : ""}
-        ${waiting?"":refereeCourtSwapButton(m,stationNum,stationLocked)}
+        ${!waiting&&state.startedAt&&m.status==="in_progress" ? `<button class="btn btn-ghost btn-sm" data-action="pause-match-status" data-id="${m.id}" ${operationLocked?'disabled':''}>暫停比賽</button>` : ""}
+        ${!waiting&&state.startedAt&&m.status==="paused" ? `<button class="btn btn-ghost btn-sm" data-action="resume-match-status" data-id="${m.id}" ${operationLocked?'disabled':''}>恢復比賽</button>` : ""}
+        ${!waiting&&state.startedAt&&m.status!=="completed" ? `<button class="btn btn-ghost btn-sm" data-action="skip-match" data-id="${m.id}" ${operationLocked?'disabled':''}>跳過</button>` : ""}
+        ${waiting?"":refereeCourtSwapButton(m,stationNum,operationLocked)}
       </div>
     </div>
     <div class="ref-vs-arena standard${waiting?"":refereeViewClass(m)}">
@@ -12431,10 +12478,11 @@ function renderRefereeScorePanel(match,stationNum){
 
     <div class="score-log">${m.log.map(l=>`<span>${l.side==='A'?esc(aName):esc(bName)} ${POINT_LABELS[l.type]}</span>`).join("") || '<span>尚無得分紀錄</span>'}</div>
 
+    ${refereeUploadStatusHtml(stationNum)}
     <div class="btn-row ref-result-actions" style="margin-top:16px;">
-      <button class="btn btn-ghost ref-undo-score" ${waiting?'':`data-action="undo-score" data-id="${m.id}"`} ${!undoAvailable||locked||faultSaving||stationLocked?'disabled':''}>${undoLabel}</button>
-      <button class="btn btn-ghost ref-rematch" ${waiting?'':`data-action="rematch" data-id="${m.id}"`} ${locked||faultSaving||stationLocked?'disabled':''}>本局重賽</button>
-      <button class="btn btn-primary ref-confirm-result" ${waiting?'':`data-action="confirm-result" data-id="${m.id}"`} ${winSide&&!faultSaving&&!stationLocked?'':'disabled'}>確認比賽結果${winSide?`（建議：${winSide==='A'?esc(aName):esc(bName)} 勝）`:''}</button>
+      <button class="btn btn-ghost ref-undo-score" ${waiting?'':`data-action="undo-score" data-id="${m.id}"`} ${!undoAvailable||locked||faultSaving||operationLocked?'disabled':''}>${undoLabel}</button>
+      <button class="btn btn-ghost ref-rematch" ${waiting?'':`data-action="rematch" data-id="${m.id}"`} ${locked||faultSaving||operationLocked?'disabled':''}>本局重賽</button>
+      <button class="btn btn-primary ref-confirm-result" ${waiting?'':`data-action="confirm-result" data-id="${m.id}"`} ${winSide&&!faultSaving&&!operationLocked?'':'disabled'}>確認比賽結果${winSide?`（建議：${winSide==='A'?esc(aName):esc(bName)} 勝）`:''}</button>
     </div>
 
   `;
@@ -19308,13 +19356,18 @@ function renderModal(){
     <p class="hint" style="margin-top:6px;">驗證成功後，此次操作會記錄修改前的名次資料、修改者與修改時間。</p>`;
     mm.confirmDisabled = false;
   }
+  if(["confirm-result","confirm-quick"].includes(mm.type)){
+    const match=getMatch(mm.matchId);
+    if(refereeUploadPending(match))mm.confirmDisabled=true;
+    if(match)body+=refereeUploadStatusHtml(match.station);
+  }
   return `<div class="modal-overlay confirmation-overlay" data-action="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal-box ${mm.type==="confirm-quick"?"quick-confirm-modal":""}">
       <h3>${esc(mm.title)}</h3>
       ${body}
       <div class="btn-row ${(mm.type==="confirm-result"||mm.type==="confirm-quick")?"result-confirm-actions":""}">
         <button id="modal-cancel-btn" class="btn btn-ghost btn-block" data-action="modal-cancel" type="button">${esc(mm.cancelLabel||"取消")}</button>
-        <button id="modal-confirm-btn" class="btn ${mm.danger?'btn-danger-solid':'btn-primary'} btn-block" data-action="modal-confirm" type="button" ${mm.type==="registration-publish-preview"?'style="-webkit-user-select:none;user-select:none;-webkit-touch-callout:none"':""} ${(mm.confirmDisabled||mm.confirmBusy)?'disabled':''}>${mm.confirmBusy?'處理中……':esc(mm.confirmLabel||"確認")}</button>
+        <button id="modal-confirm-btn" class="btn ${mm.danger?'btn-danger-solid':'btn-primary'} btn-block" data-action="modal-confirm" type="button" ${mm.type==="registration-publish-preview"?'style="-webkit-user-select:none;user-select:none;-webkit-touch-callout:none"':""} ${(mm.confirmDisabled||mm.confirmBusy)?'disabled':''}>${mm.confirmBusy?(["confirm-result","confirm-quick"].includes(mm.type)?"分數上傳中…請勿重複操作":"處理中……"):esc(mm.confirmLabel||"確認")}</button>
       </div>
     </div>
   </div>`;
@@ -26312,7 +26365,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(!mm){ return; }
     if(mm.type==='court-force-exit'&&mm.acknowledged!==true)return;
     if(mm.type==="confirm-result"){
-      if(mm.confirmDisabled || mm.confirmBusy){ return; }
+      if(mm.confirmDisabled || mm.confirmBusy || refereeUploadPending(getMatch(mm.matchId))){ return; }
       mm.confirmBusy = true;
       render();
       (async ()=>{
@@ -26322,7 +26375,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       return;
     }
     if(mm.type==="confirm-quick"){
-      if(mm.confirmDisabled || mm.confirmBusy){ return; }
+      if(mm.confirmDisabled || mm.confirmBusy || refereeUploadPending(getMatch(mm.matchId))){ return; }
       mm.confirmBusy = true;
       render();
       (async ()=>{

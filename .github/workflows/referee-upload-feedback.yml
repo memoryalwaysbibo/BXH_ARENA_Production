@@ -1,0 +1,33 @@
+name: Referee upload feedback
+on:
+  pull_request:
+    paths:
+      - 'modules/main-app/core.js'
+      - 'referee-score-v2.css'
+      - 'tests/referee-upload-feedback*'
+      - '.github/workflows/referee-upload-feedback.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --check modules/main-app/core.js
+      - run: node --test tests/referee-upload-feedback.test.cjs tests/referee-fault-save.test.cjs tests/referee-preseat-safety.test.cjs referee-seats/scoring-bridge.test.cjs tests/tournament-completion-flow.cjs
+      - run: node tests/referee-score-v2-ui.test.cjs && node tests/referee-fault-ui.test.cjs
+      - run: npm install --prefix /tmp/referee-upload-browser --no-save playwright@1.55.0
+      - run: /tmp/referee-upload-browser/node_modules/.bin/playwright install --with-deps chromium
+      - run: node tests/referee-upload-feedback.browser.cjs && node tests/referee-preseat.browser.cjs
+        env:
+          NODE_PATH: /tmp/referee-upload-browser/node_modules
+          CODEX_PRIMARY_RUNTIME_NODE_MODULES: /tmp/referee-upload-browser/node_modules
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: referee-upload-feedback-browser
+          path: test-results/referee-upload-feedback

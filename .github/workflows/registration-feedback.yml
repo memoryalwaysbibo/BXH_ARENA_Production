@@ -14,7 +14,7 @@ permissions:
   contents: read
 jobs:
   unit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -25,7 +25,7 @@ jobs:
       - run: node --test tests/registration-feedback.test.cjs tests/lobby-stable-updates.test.cjs tests/player-center-integration.test.cjs tests/managed-registration-settings.test.cjs tests/community-quick-registration.test.cjs tests/community-quick-registration-cloud.test.cjs tests/ranked-registration-preopen-ui.test.cjs tests/team-registration-ui.test.cjs tests/registration-mode-draft.test.cjs
       - run: node scripts/verify-production-frontend.cjs
   browser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     container:
       image: mcr.microsoft.com/playwright:v1.55.0-noble
@@ -44,7 +44,7 @@ jobs:
           path: test-results/registration-feedback/
           if-no-files-found: ignore
   firestore:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4

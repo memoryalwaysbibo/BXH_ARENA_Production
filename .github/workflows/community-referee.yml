@@ -23,7 +23,7 @@ permissions:
   contents: read
 jobs:
   rules-and-transactions:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -56,7 +56,7 @@ jobs:
         run: /tmp/community-referee-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-referee-seat-compile --config referee-seats/firebase.emulator.json 'node --test referee-seats/full-rules.test.cjs referee-seats/firestore.test.cjs'
 
   invitation-browser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4

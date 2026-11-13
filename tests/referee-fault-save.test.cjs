@@ -10,7 +10,7 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 function fixture({scoped=true}={}){
  const m={id:'quarter',station:1,status:'in_progress',scoreA:3,scoreB:3,completed:false,a:{playerId:'ken'},b:{playerId:'hsu'},log:[],faultActions:[]};
  const ctx={state:{id:'room',cloudCode:scoped?'ROOM':null,meta:{playMode:'standard'},matches:[m]},pendingModal:null,cloudStatus:'connected',console,
-  canOperateCurrentTournament:()=>true,requireTournamentStartedForMatchAction:()=>true,canOperateMatchStation:()=>true,
+  refereeUploadPending:()=>false,canOperateCurrentTournament:()=>true,requireTournamentStartedForMatchAction:()=>true,canOperateMatchStation:()=>true,
   cloudAvailable:()=>true,currentAuthUid:()=> 'ref',getMatch:id=>ctx.state.matches.find(x=>x.id===id),
   checkWinnerSide:x=>x.scoreA>=4&&x.scoreA>x.scoreB?'A':x.scoreB>=4&&x.scoreB>x.scoreA?'B':null,
   refereeFaultApi:()=>F,playerName:id=>id,render:()=>{},shouldUseStationScopedMutation:()=>scoped};

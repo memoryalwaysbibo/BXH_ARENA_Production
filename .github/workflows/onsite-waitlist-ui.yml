@@ -21,7 +21,7 @@ concurrency:
 jobs:
   host_ui:
     name: Synthetic onsite host lifecycle
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     container:
       image: mcr.microsoft.com/playwright:v1.55.0-noble
