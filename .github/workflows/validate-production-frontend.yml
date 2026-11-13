@@ -23,7 +23,7 @@ concurrency:
 jobs:
   classify:
     name: Classify change risk
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       level: ${{ steps.risk.outputs.level }}
       run_ui: ${{ steps.risk.outputs.run_ui }}
@@ -64,7 +64,7 @@ jobs:
 
   validate:
     needs: classify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Guard production entrypoint integrity
@@ -253,7 +253,7 @@ jobs:
     needs: classify
     if: ${{ needs.classify.outputs.run_ui == 'true' }}
     name: UI Smoke - Desktop / iPhone / Android
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: mcr.microsoft.com/playwright:v1.55.0-noble
     steps:
@@ -372,7 +372,7 @@ jobs:
     needs: classify
     if: ${{ needs.classify.outputs.run_e2e == 'true' }}
     name: Critical E2E - Player Signup / Community Room
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: mcr.microsoft.com/playwright:v1.55.0-noble
     steps:
@@ -426,7 +426,7 @@ jobs:
     needs: classify
     if: ${{ needs.classify.outputs.run_deep == 'true' }}
     name: Deep E2E - Finals / Multi-court / Player / Public Watch
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: mcr.microsoft.com/playwright:v1.55.0-noble
     steps:
@@ -473,7 +473,7 @@ jobs:
     needs: classify
     if: ${{ needs.classify.outputs.run_ui == 'true' }}
     name: QR entry - iPhone held-pointer regression
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: mcr.microsoft.com/playwright:v1.55.0-noble
     steps:
