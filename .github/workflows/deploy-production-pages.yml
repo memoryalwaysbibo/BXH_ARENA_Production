@@ -99,12 +99,32 @@ jobs:
         if: steps.freshness.outputs.deploy == 'true'
         uses: actions/upload-pages-artifact@v4
         with:
+          name: github-pages-${{ github.run_attempt }}
           path: ${{ steps.public_site.outputs.path }}
+
+      - name: Wait for the exact attempt artifact to become visible
+        if: steps.freshness.outputs.deploy == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const name = 'github-pages-${{ github.run_attempt }}';
+            for (let attempt = 0; attempt < 12; attempt++) {
+              const {data} = await github.rest.actions.listWorkflowRunArtifacts({
+                ...context.repo, run_id: context.runId, name
+              });
+              const matches = data.artifacts.filter(item => item.name === name && !item.expired);
+              if (matches.length === 1) return;
+              if (matches.length > 1) throw new Error('Duplicate artifact for this deployment attempt');
+              await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+            throw new Error('Validated Pages artifact did not become visible');
 
       - name: Deploy to GitHub Pages
         if: steps.freshness.outputs.deploy == 'true'
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
 
 
       - name: Verify deployed production build matches validated artifact
