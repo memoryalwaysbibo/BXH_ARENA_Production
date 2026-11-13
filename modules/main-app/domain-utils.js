@@ -88,7 +88,16 @@ function communityLocalParticipantCount(st){
 function communityRegistrationParticipantCount(t){
   const source=communityRegistrationSource(t);
   const confirmed=Math.max(0,Number(source.confirmedCount)||0);
-  if(!isCommunityQuickRegistration(source))return confirmed;
+  if(!isCommunityQuickRegistration(source)){
+    const meta=communityRegistrationMeta(source);
+    if((source.battleMode||meta.battleMode)==="team")return confirmed;
+    const players=source.players||source.parsedData?.players;
+    if(!Array.isArray(players))return confirmed;
+    // Imported/onsite players occupy seats too. Public mirrors omit account
+    // identity, so count stable roster IDs without merging players by name.
+    const ids=new Set(players.filter(p=>p&&typeof p==='object').map((p,i)=>p.familyPlayerId?'family:'+p.familyPlayerId:String(p.registrationId||p.id||('row:'+i))));
+    return Math.max(confirmed,ids.size);
+  }
   if(Number.isSafeInteger(source.communityParticipantCount)&&source.communityParticipantCount>=0)return source.communityParticipantCount;
   const players=source.players||source.parsedData?.players||[];
   // Legacy public mirrors have only public player IDs. Their overlap with online

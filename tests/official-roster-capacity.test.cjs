@@ -1,0 +1,10 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const ctx=vm.createContext({window:{}});vm.runInContext(fs.readFileSync(path.join(__dirname,'../modules/main-app/domain-utils.js'),'utf8'),ctx);
+const count=ctx.window.BXHDomainUtils.communityRegistrationParticipantCount;
+const roster=n=>Array.from({length:n},(_,i)=>({id:'p'+i,name:'選手'}));
+test('official imported roster occupies 24/24 despite zero online counter',()=>assert.equal(count({confirmedCount:0,capacity:24,parsedData:{players:roster(24)}}),24));
+test('overcapacity is reported truthfully for manual repair, not clamped',()=>assert.equal(count({confirmedCount:7,capacity:24,parsedData:{players:roster(31)}}),31));
+test('public stable IDs deduplicate repeated entries, never same names',()=>assert.equal(count({confirmedCount:0,parsedData:{players:[{id:'a',name:'同名'},{id:'a',name:'同名'},{id:'b',name:'同名'}]}}),2));
+test('team events retain capacity units in teams',()=>assert.equal(count({battleMode:'team',confirmedCount:2,parsedData:{players:roster(6)}}),2));
+test('missing or lagging public roster retains known registration count',()=>{assert.equal(count({confirmedCount:7}),7);assert.equal(count({confirmedCount:7,parsedData:{players:roster(3)}}),7);});
