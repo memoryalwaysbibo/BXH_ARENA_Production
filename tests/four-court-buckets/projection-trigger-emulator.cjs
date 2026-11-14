@@ -35,6 +35,57 @@ async function until(check,message){const start=Date.now();while(!await check())
    assert((await root.get()).updateTime.isEqual(rootBefore.updateTime));
    report.cases.push({courts:count,buckets:Math.ceil(count/4),automaticEventPublication:true,allScoresPreserved:true,rootUnchanged:true,duplicateVectorSkipped:true,oldEpochSkipped:true,disabledWriterSkipped:true,reEnabledConverges:true});
   }
+  // Reproduce two simultaneous rooms (four courts and two courts), rather
+  // than inferring cross-room behavior from a single six-court tournament.
+  {
+   const rooms=[];
+   for(const count of [4,2]){
+    const code='BXH-TWOROOM'+count,f=fixture(code,count,false),root=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code),batch=db.batch();
+    batch.set(root,f.room);batch.set(pub,{bracketView:JSON.stringify(f.state),updatedAt:1,visibility:'public'});
+    for(const bucket of B.encode(f.state,f.room.scoreStorage))batch.set(root.collection('matchBuckets').doc(bucket.bucketId),bucket);
+    for(let station=1;station<=count;station++)batch.set(db.doc('users/ref'+station),f.user);
+    await batch.commit();rooms.push({count,code,root,pub,rootBefore:await root.get()});
+   }
+   const latencies=[],waves=[];
+   for(let wave=1;wave<=3;wave++){
+    const intentions=[];
+    for(const room of rooms){
+     const snapshots=await Promise.all(Array.from({length:Math.ceil(room.count/4)},(_,i)=>room.root.collection('matchBuckets').doc('court-'+(i+1)).get()));
+     const root=(await room.root.get()).data(),base=JSON.parse(root.data),state=B.materialize(base,root.scoreStorage,snapshots.map(s=>s.data()));
+     for(const match of state.matches){
+      const data=request(state,root,match.id,'score','two-room-operation-'+(++serial),{side:'A',finish:'spin'});
+      intentions.push({room,match,uid:'ref'+match.station,data});
+     }
+    }
+    const started=Date.now();
+    const accepted=await Promise.all(intentions.map(async intention=>{
+     const at=Date.now();let attempts=0,last;
+     while(attempts<3){
+      attempts++;
+      try{const result=await score({auth:{uid:intention.uid},data:intention.data});return {result,attempts,elapsedMs:Date.now()-at};}
+      catch(error){last=error;if(attempts<3)await new Promise(resolve=>setTimeout(resolve,50*attempts));}
+     }
+     throw last;
+    }));
+    assert.equal(accepted.length,6);assert(accepted.every(x=>x.result.ok&&x.result.scoreRevision===wave));
+    latencies.push(...accepted.map(x=>x.elapsedMs));
+    const acknowledged=Date.now();
+    await until(async()=>{
+     const snapshots=await Promise.all(rooms.map(room=>room.pub.get()));
+     return snapshots.every(snap=>JSON.parse(snap.data().bracketView).matches.every(match=>match.scoreA===wave&&match.log.length===wave));
+    },'two-room projection did not converge after wave '+wave);
+    waves.push({wave,scoreElapsedMs:acknowledged-started,publicObservedAfterAckMs:Date.now()-acknowledged,retries:accepted.reduce((n,x)=>n+x.attempts-1,0)});
+   }
+   for(const room of rooms){
+    assert((await room.root.get()).updateTime.isEqual(room.rootBefore.updateTime),'local score rewrote shared root');
+    assert.equal((await room.root.collection('bucketScoreAudit').get()).size,room.count*3);
+    const snapshots=await room.root.collection('matchBuckets').get(),base=JSON.parse(room.rootBefore.data().data);
+    const final=B.materialize(base,room.rootBefore.data().scoreStorage,snapshots.docs.map(s=>s.data()));
+    assert(final.matches.every(match=>match.scoreA===3&&match.log.length===3));
+   }
+   const percentile=p=>latencies.slice().sort((a,b)=>a-b)[Math.ceil(latencies.length*p)-1];
+   report.cases.push({name:'two-room-four-plus-two',rooms:2,courts:6,waves,scoreLatencyMs:{p50:percentile(.5),p95:percentile(.95),p99:percentile(.99)},allScoresPreserved:true,rootUnchanged:true,publicConverged:true});
+  }
   const dir=path.resolve('test-results/four-court-buckets');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'automatic-projection.json'),JSON.stringify(report,null,2)+'\n');console.log('PASS automatic Firestore projection: '+JSON.stringify(report));
  }finally{await deleteApp(app);}
 })().catch(error=>{console.error(error);process.exitCode=1;});
