@@ -11,6 +11,7 @@
   "changedFiles": [
     "core.cjs",
     "dispatch-core.cjs",
+    "score-diagnostics.cjs",
     "scoring-core.cjs",
     "scoring-service.cjs",
     "service.cjs"
@@ -70,13 +71,17 @@
       "baselineSha256": "58baa94158f07df2262cfc28db8b33236e5fd876274126a9f9a73219b051e4b7",
       "candidateSha256": "58baa94158f07df2262cfc28db8b33236e5fd876274126a9f9a73219b051e4b7"
     },
+    "score-diagnostics.cjs": {
+      "baselineSha256": null,
+      "candidateSha256": "fad4f0e3c6474681160fa52b0d0e020ced2c1301ae7256420d5fbb7ab8976444"
+    },
     "scoring-core.cjs": {
       "baselineSha256": "790274ea86481c82bca7a9a22fb36a7c07a0b4c12defe2d076626628130b89bd",
       "candidateSha256": "6d4007a738fcaaede5eb2a3db672b5a8b51e0ab68a1c00cab9c460beec6e9631"
     },
     "scoring-service.cjs": {
       "baselineSha256": "4e2db96a5bfbfd4e9def103b6f53dac70588260895744111b53c78e92509dc6c",
-      "candidateSha256": "866fadf8a809632731aa65c5b1812d9e2f3a683b812f892e12704fc95f52dfa2"
+      "candidateSha256": "d213e3b4d6f6eb12c3b2a05cd6365f02ce667a3176ced28a0d07602726af60bd"
     },
     "service.cjs": {
       "baselineSha256": "f782b2a67f2485c643f08a1e0cb48786a7772d7bc248411c8ccb4634a3861903",
