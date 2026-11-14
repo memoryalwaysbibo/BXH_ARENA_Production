@@ -3,7 +3,7 @@
   "capturedAt": "2026-11-04T07:40:10.419023+00:00",
   "sourceArchiveSha256": "5aadefa74c746c674cd251fe4d532148403646baeda641238ce2f5085612ad48",
   "rulesBaselineSha256": "580da8c9dbde90e936ff7ddd88543b3370ff2f3cd9c27c749b6aecc11802977e",
-  "rulesCandidateSha256": "dbdb8dc9ba46a110d6f8786cdc7ee4b9badc6bd3120769f4393bf51f31cbc9c3",
+  "rulesCandidateSha256": "f1f7a0aa81ac1a6dab8e42b4aece3982dfb3e295d4e727bd7ba719798900c33c",
   "functions": [
     "manageRefereeSeats",
     "commitRefereeCommand"
@@ -11,6 +11,7 @@
   "changedFiles": [
     "core.cjs",
     "dispatch-core.cjs",
+    "score-diagnostics.cjs",
     "scoring-core.cjs",
     "scoring-service.cjs",
     "service.cjs"
@@ -24,11 +25,11 @@
     },
     "core.cjs": {
       "baselineSha256": "f20226850b30dc6d2d800d11f49d45b36c03b6ca7447863c1923d2e83114a9e6",
-      "candidateSha256": "da98bac597e199394a9ad9f02d8698534ce526f271d17b45387458f7b2fbac04"
+      "candidateSha256": "03eff86281b91fe6c3e3d7e3eedd1aa63c3e5c8c894e18684405b1af69566bad"
     },
     "dispatch-core.cjs": {
       "baselineSha256": "49afa1d4792cdbf4e151435ce2c176021a75565ac2534f6a6b4ad5dccb17f6a1",
-      "candidateSha256": "4be700ad894bf35b95e1da39585544ad14d596df5c12d00362d0ec93a90efe3b"
+      "candidateSha256": "411fb880ed10df93424487bd9d9a9efedd7a864586cb8d814d71a875342e04e5"
     },
     "engine/court-retirement.cjs": {
       "baselineSha256": "597add4bf231a629e62385d61f970610ab59638055b45f3dfc834f04a5b447b0",
@@ -70,17 +71,21 @@
       "baselineSha256": "58baa94158f07df2262cfc28db8b33236e5fd876274126a9f9a73219b051e4b7",
       "candidateSha256": "58baa94158f07df2262cfc28db8b33236e5fd876274126a9f9a73219b051e4b7"
     },
+    "score-diagnostics.cjs": {
+      "baselineSha256": null,
+      "candidateSha256": "fad4f0e3c6474681160fa52b0d0e020ced2c1301ae7256420d5fbb7ab8976444"
+    },
     "scoring-core.cjs": {
       "baselineSha256": "790274ea86481c82bca7a9a22fb36a7c07a0b4c12defe2d076626628130b89bd",
       "candidateSha256": "6d4007a738fcaaede5eb2a3db672b5a8b51e0ab68a1c00cab9c460beec6e9631"
     },
     "scoring-service.cjs": {
       "baselineSha256": "4e2db96a5bfbfd4e9def103b6f53dac70588260895744111b53c78e92509dc6c",
-      "candidateSha256": "866fadf8a809632731aa65c5b1812d9e2f3a683b812f892e12704fc95f52dfa2"
+      "candidateSha256": "739bc8ec9c1af9a157506e2bd9c5f212340fee3b88eacd316c5c58d2cb067459"
     },
     "service.cjs": {
       "baselineSha256": "f782b2a67f2485c643f08a1e0cb48786a7772d7bc248411c8ccb4634a3861903",
-      "candidateSha256": "2587dbdd1e5663d05950b0f369ca4239e5fef8b9a51cd0cd762bc44661ae98d4"
+      "candidateSha256": "ffb2b5eb5dd6e9c416e4d79b554e6f36ca31d57a40aa64c54b845175903df13a"
     }
   }
 }
