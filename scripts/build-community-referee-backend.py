@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 REFERENCE = ROOT / 'referee-seats/reference/community-referee.production-20261104.json'
 MANIFEST = ROOT / 'release/community-referee/backend-manifest.json'
 OVERLAYS = ('core.cjs', 'dispatch-core.cjs', 'scoring-service.cjs', 'service.cjs')
+ADDITIONS = ('score-diagnostics.cjs',)
 
 
 def sha(data):
@@ -55,12 +56,12 @@ def build():
         if name.startswith('/') or '..' in Path(name).parts or sha(data) != reference['sourceFiles'][name]:
             raise ValueError('Live source file mismatch: ' + name)
     files = dict(original)
-    for name in OVERLAYS:
+    for name in (*OVERLAYS, *ADDITIONS):
         files[name] = (ROOT / 'referee-seats/functions' / name).read_bytes()
     files['scoring-core.cjs'] = community_scoring(original['scoring-core.cjs'].decode(),
                                                (ROOT / 'referee-seats/functions/scoring-core.cjs').read_text()).encode()
-    changed = sorted(name for name in original if files[name] != original[name])
-    if set(changed) != set(OVERLAYS) | {'scoring-core.cjs'}:
+    changed = sorted(name for name in files if name not in original or files[name] != original[name])
+    if set(changed) != set(OVERLAYS) | set(ADDITIONS) | {'scoring-core.cjs'}:
         raise ValueError('Unexpected release source scope')
     for name in ('index.js', 'package.json', 'package-lock.json', 'bucket-legacy-fence.cjs',
                  'event-staff-core.cjs', *[n for n in original if n.startswith('engine/')]):
@@ -72,7 +73,7 @@ def build():
                 'functions': ['manageRefereeSeats', 'commitRefereeCommand'],
                 'changedFiles': changed,
                 'preservedLiveIndexAndEngine': True, 'productionWrites': 0,
-                'files': {name: {'baselineSha256': sha(original[name]), 'candidateSha256': sha(files[name])}
+                'files': {name: {'baselineSha256': sha(original[name]) if name in original else None, 'candidateSha256': sha(files[name])}
                           for name in sorted(files)}}
     return files, manifest
 
@@ -99,8 +100,9 @@ def main():
             target.write_bytes(data)
         (args.output / 'backend-manifest.json').write_text(text)
         (args.output / 'firebase.json').write_text(json.dumps({'functions': [{'source': 'functions', 'codebase': 'referee-seats'}]}, indent=2) + '\n')
-    print('PASS: exact live source plus five community overlays; original engine/index/lockfile preserved; no deployment')
+    print('PASS: exact captured source plus reviewed overlays and diagnostic helper; original engine/index/lockfile preserved; no deployment')
 
 
 if __name__ == '__main__':
     main()
+

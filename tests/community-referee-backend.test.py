@@ -15,10 +15,13 @@ spec.loader.exec_module(backend)
 
 
 class LiveSource(unittest.TestCase):
-    def test_manifest_reproduces_and_only_five_files_change(self):
+    def test_manifest_reproduces_with_diagnostic_dependency(self):
         files, manifest = backend.build()
         self.assertEqual(manifest, json.loads(backend.MANIFEST.read_text()))
-        self.assertEqual(manifest['changedFiles'], sorted((*backend.OVERLAYS, 'scoring-core.cjs')))
+        self.assertEqual(manifest['changedFiles'], sorted((*backend.OVERLAYS, *backend.ADDITIONS, 'scoring-core.cjs')))
+        self.assertIn(b"require('./score-diagnostics.cjs')", files['scoring-service.cjs'])
+        self.assertIn('score-diagnostics.cjs', files)
+        self.assertIsNone(manifest['files']['score-diagnostics.cjs']['baselineSha256'])
         reference = json.loads(backend.REFERENCE.read_text())
         with zipfile.ZipFile(io.BytesIO((backend.REFERENCE.parent / reference['sourceFile']).read_bytes())) as archive:
             for name in files:
@@ -42,3 +45,4 @@ class LiveSource(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
