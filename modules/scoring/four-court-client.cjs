@@ -90,7 +90,9 @@
    try{
     const result=await (record.type==='seat'?transport.manageSeats:transport.commitScore)(clone(record.data));
     const revision=record.type==='dispatch'?result?.lifecycleRevision:result?.scoreRevision;
-    if(result?.ok&&record.type==='dispatch'&&(!Number.isSafeInteger(revision)||revision<1))return {ok:false,reason:'cloud-unavailable'};
+    // An incomplete success cannot prove which score was saved. Keep the same
+    // operation ID for an idempotent replay instead of allowing a new click.
+    if(result?.ok&&record.type!=='seat'&&(!Number.isSafeInteger(revision)||revision<1))return {ok:false,reason:'cloud-unavailable'};
     if(result?.ok&&record.type!=='seat'&&Number.isSafeInteger(revision)){
      record.awaiting=true;record.confirmedRevision=revision;
      acceptCommittedScore(result,record);
