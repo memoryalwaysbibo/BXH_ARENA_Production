@@ -55,4 +55,3 @@ function createScoringHandler(db,{clock=Date.now}={}){return async request=>{
  }catch(error){diagnostic.failed(error);throw error;}finally{diagnostic.close();}
 };}
 module.exports={createScoringHandler};
-

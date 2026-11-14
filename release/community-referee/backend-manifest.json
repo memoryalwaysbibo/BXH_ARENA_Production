@@ -3,7 +3,7 @@
   "capturedAt": "2026-11-04T07:40:10.419023+00:00",
   "sourceArchiveSha256": "5aadefa74c746c674cd251fe4d532148403646baeda641238ce2f5085612ad48",
   "rulesBaselineSha256": "580da8c9dbde90e936ff7ddd88543b3370ff2f3cd9c27c749b6aecc11802977e",
-  "rulesCandidateSha256": "f1f7a0aa81ac1a6dab8e42b4aece3982dfb3e295d4e727bd7ba719798900c33c",
+  "rulesCandidateSha256": "dbdb8dc9ba46a110d6f8786cdc7ee4b9badc6bd3120769f4393bf51f31cbc9c3",
   "functions": [
     "manageRefereeSeats",
     "commitRefereeCommand"
@@ -25,11 +25,11 @@
     },
     "core.cjs": {
       "baselineSha256": "f20226850b30dc6d2d800d11f49d45b36c03b6ca7447863c1923d2e83114a9e6",
-      "candidateSha256": "03eff86281b91fe6c3e3d7e3eedd1aa63c3e5c8c894e18684405b1af69566bad"
+      "candidateSha256": "da98bac597e199394a9ad9f02d8698534ce526f271d17b45387458f7b2fbac04"
     },
     "dispatch-core.cjs": {
       "baselineSha256": "49afa1d4792cdbf4e151435ce2c176021a75565ac2534f6a6b4ad5dccb17f6a1",
-      "candidateSha256": "411fb880ed10df93424487bd9d9a9efedd7a864586cb8d814d71a875342e04e5"
+      "candidateSha256": "4be700ad894bf35b95e1da39585544ad14d596df5c12d00362d0ec93a90efe3b"
     },
     "engine/court-retirement.cjs": {
       "baselineSha256": "597add4bf231a629e62385d61f970610ab59638055b45f3dfc834f04a5b447b0",
@@ -81,11 +81,11 @@
     },
     "scoring-service.cjs": {
       "baselineSha256": "4e2db96a5bfbfd4e9def103b6f53dac70588260895744111b53c78e92509dc6c",
-      "candidateSha256": "739bc8ec9c1af9a157506e2bd9c5f212340fee3b88eacd316c5c58d2cb067459"
+      "candidateSha256": "d213e3b4d6f6eb12c3b2a05cd6365f02ce667a3176ced28a0d07602726af60bd"
     },
     "service.cjs": {
       "baselineSha256": "f782b2a67f2485c643f08a1e0cb48786a7772d7bc248411c8ccb4634a3861903",
-      "candidateSha256": "ffb2b5eb5dd6e9c416e4d79b554e6f36ca31d57a40aa64c54b845175903df13a"
+      "candidateSha256": "2587dbdd1e5663d05950b0f369ca4239e5fef8b9a51cd0cd762bc44661ae98d4"
     }
   }
 }
