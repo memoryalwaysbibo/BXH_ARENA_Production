@@ -36,7 +36,7 @@ test('lost replies retain the exact operation for retry and never optimistically
  const h=setup();h.client.connect();h.ready();h.setSend(async()=>{throw Error('lost-reply');});
  assert.equal((await h.client.score('m1','score',{side:'A',finish:'spin'})).ok,false);assert.equal(h.client.getView().state.matches[0].scoreA,0);
  assert.equal((await h.client.score('m1','score',{side:'A',finish:'spin'})).reason,'operation-pending');
- h.setSend(async()=>({ok:true,replayed:true}));assert.equal((await h.client.retry('score:m1')).ok,true);
+ h.setSend(async()=>({ok:true,replayed:true,scoreRevision:1}));assert.equal((await h.client.retry('score:m1')).ok,true);
  assert.deepEqual(h.sent[0],h.sent[1]);assert.equal(h.sent[0].expectedCourtRevision,1);assert.equal(h.sent[0].expectedScoreRevision,0);assert.equal(h.sent[0].state,undefined);
 });
 test('new epoch blocks retries and delayed old bucket callbacks; revoked seats cannot submit',async()=>{
@@ -75,6 +75,13 @@ test('a mismatched committed patch cannot release the pending score',async()=>{
  assert.equal((await h.client.score('m1','score',{side:'A',finish:'spin'})).ok,true);
  assert.equal(h.client.getView().state.matches[0].scoreA,0);assert.deepEqual(h.client.getView().pending,['score:m1']);
  h.watches[0].next({bucket});assert.equal(h.client.getView().state.matches[0].scoreA,1);assert.deepEqual(h.client.getView().pending,[]);
+ h.client.disconnect();
+});
+test('a successful response without a score revision retains the original intention',async()=>{
+ const h=setup();h.client.connect();h.ready();h.setSend(async()=>({ok:true,structural:false}));
+ assert.equal((await h.client.score('m1','score',{side:'A',finish:'spin'})).reason,'cloud-unavailable');
+ assert.deepEqual(h.client.getView().retryable,['score:m1']);
+ assert.equal((await h.client.score('m1','score',{side:'A',finish:'spin'})).reason,'operation-pending');
  h.client.disconnect();
 });
 test('connection loss and reconnect retain the original command and operation id for retry',async()=>{
