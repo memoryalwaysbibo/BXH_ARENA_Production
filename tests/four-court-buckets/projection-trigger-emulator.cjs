@@ -74,7 +74,7 @@ async function until(check,message){const start=Date.now();while(!await check())
      const snapshots=await Promise.all(rooms.map(room=>room.pub.get()));
      return snapshots.every(snap=>JSON.parse(snap.data().bracketView).matches.every(match=>match.scoreA===wave&&match.log.length===wave));
     },'two-room projection did not converge after wave '+wave);
-    waves.push({wave,scoreElapsedMs:acknowledged-started,publicObservedAfterAckMs:Date.now()-acknowledged,retries:accepted.reduce((n,x)=>n+x.attempts-1,0)});
+    waves.push({wave,scoreElapsedMs:acknowledged-started,publicObservedAfterAckMs:Date.now()-acknowledged,requestRetries:accepted.reduce((n,x)=>n+x.attempts-1,0)});
    }
    for(const room of rooms){
     assert((await room.root.get()).updateTime.isEqual(room.rootBefore.updateTime),'local score rewrote shared root');
