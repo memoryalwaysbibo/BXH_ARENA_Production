@@ -2182,7 +2182,13 @@
       const actorUid=authHandle&&authHandle.currentUser&&authHandle.currentUser.uid;
       if(!actorUid) return {ok:false,reason:"auth-required"};
       if(!window.engagementService||typeof window.engagementService.settleLadder!=="function") throw new Error("service-unavailable");
-      return window.engagementService.settleLadder({code:String(code).toUpperCase()});
+      const normalized=String(code).toUpperCase();
+      if(fourCourtLifecycle?.isBucket(normalized)){
+        const expectedRoom=fourCourtLifecycle.binding(normalized);
+        if(!expectedRoom)return {ok:false,reason:'not-synchronized'};
+        return window.engagementService.settleLadder({code:normalized,expectedRoom});
+      }
+      return window.engagementService.settleLadder({code:normalized});
 
     },
 
@@ -4098,6 +4104,15 @@ if(testerSession){
       if(!cloudEnabled||!fnx||!functionsHandle)return {ok:false,reason:"cloud-unavailable"};
       try{const result=await fnx.httpsCallable(functionsHandle,"manageRefereeSeats")(data);return result.data;}
       catch(error){return {ok:false,reason:error?.message||"cloud-unavailable"};}
+    },
+    async confirmBucketArchive(code,expected){
+      const normalized=String(code).toUpperCase(),uid=authHandle?.currentUser?.uid;
+      if(!uid||!fourCourtLifecycle?.isBucket(normalized)||JSON.stringify(fourCourtLifecycle.binding(normalized))!==JSON.stringify(expected)||!window.BXHFourCourtArchive)return {ok:false,reason:'not-synchronized'};
+      try{
+        const [room,pub]=await Promise.all([fx.getDocFromServer(fx.doc(dbHandle,'tournaments',normalized)),fx.getDocFromServer(fx.doc(dbHandle,'publicTournaments',normalized))]);
+        if(!room.exists()||!pub.exists()||authHandle?.currentUser?.uid!==uid||JSON.stringify(fourCourtLifecycle.binding(normalized))!==JSON.stringify(expected))return {ok:false,reason:'bucket-session-mismatch'};
+        return {ok:true,state:window.BXHFourCourtArchive.verify({code:normalized,expected,room:room.data(),publicDocument:pub.data()})};
+      }catch{return {ok:false,reason:'bucket-archive-unconfirmed'};}
     },
     async retryBucketOperation(data){return fourCourtLifecycle?.isBucket(data.code)?fourCourtLifecycle.command(data,'retryBucketOperation'):{ok:false,reason:'bucket-session-mismatch'};},
     reconnectBucketRoom(code){return fourCourtLifecycle?.reconnect(String(code).toUpperCase())||{ok:false,reason:'bucket-session-mismatch'};},

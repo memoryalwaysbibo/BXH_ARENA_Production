@@ -82,6 +82,7 @@
    return result?.state?{...result,state:{...result.state,scoreStorage:clone(entry.manifest)}}:result;
   }
   return {observe,subscribe,read,command,isBucket:code=>markers.has(code),view:code=>active?.code===code?active.view:null,
+   binding(code){return active?.code===code&&current(active)&&active.view?.status==='ready'?{roomId:active.manifest.roomId,epoch:active.epoch}:null;},
    reconnect(code){const entry=active;if(!entry||entry.code!==code||!current(entry)||!entry.session)return {ok:false,reason:'bucket-session-mismatch'};entry.session.client.connect();return {ok:true};},
    suspend(){resumeContext=active?{code:active.code,uid:active.uid}:null;if(active?.session)active.session.client.disconnect();else stop();},
    resume(){const context=resumeContext;resumeContext=null;if(context&&auth.currentUser?.uid===context.uid&&[...listeners].some(x=>x.code===context.code&&x.primary)){if(active?.code===context.code&&active.session)active.session.client.connect();else observe(context.code,markers.get(context.code));}},

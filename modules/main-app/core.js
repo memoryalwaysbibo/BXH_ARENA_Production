@@ -6903,6 +6903,14 @@ async function ensureCloudAvailableForArchive(){
 
 async function writeArchiveStateToCloud(snapshot){
   if(!snapshot || !snapshot.cloudCode) return false;
+  if(Object.hasOwn(snapshot,'scoreStorage')||window.cloudSync?.bucketView?.(snapshot.cloudCode)){
+    // The trusted bucket writer/settlement service has already archived it.
+    // Read its acknowledgement; never send a whole-room legacy archive write.
+    if(!window.cloudSync?.confirmBucketArchive||!snapshot.scoreStorage)return false;
+    const result=await window.cloudSync.confirmBucketArchive(snapshot.cloudCode,{roomId:snapshot.id,epoch:snapshot.scoreStorage.epoch});
+    if(!result?.ok||result.state?.id!==snapshot.id||result.state?.cloudCode!==snapshot.cloudCode)return false;
+    Object.assign(snapshot,result.state);return true;
+  }
   const ready = await ensureCloudAvailableForArchive();
   if(!ready || !window.cloudSync || typeof window.cloudSync.pushUpdate!=="function") return false;
   try{
