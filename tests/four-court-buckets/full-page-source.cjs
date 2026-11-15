@@ -5,7 +5,7 @@ const assert=require('node:assert/strict');
 const project='demo-bxh-four-court-buckets';
 function once(source,from,to){assert.equal(source.split(from).length,2,'full-page adapter source anchor changed: '+from.slice(0,90));return source.replace(from,to);}
 function build(source){
- source=once(source,'const FOUR_COURT_CLIENT_ROLLOUT = false;','const FOUR_COURT_CLIENT_ROLLOUT = true;');
+ source=once(source,'const FOUR_COURT_CLIENT_ROLLOUT = true;','const FOUR_COURT_CLIENT_ROLLOUT = true;');
  const config=source.match(/  const FIREBASE_CONFIG = \{[\s\S]*?\n  \};/);assert(config);
  source=once(source,config[0],`  const FIREBASE_CONFIG = ${JSON.stringify({apiKey:'fake-emulator-key',authDomain:'localhost',projectId:project,appId:'1:123456:web:bucket-emulator'})};`);
  source=once(source,'FIREBASE_CONFIG.projectId === "bxh-arena"',`FIREBASE_CONFIG.projectId === "${project}"`);
