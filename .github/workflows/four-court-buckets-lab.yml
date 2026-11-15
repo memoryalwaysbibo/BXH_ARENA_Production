@@ -77,6 +77,11 @@ jobs:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules
           GCLOUD_PROJECT: demo-bxh-four-court-buckets
         run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config tests/four-court-buckets/firebase.json 'node tests/four-court-buckets/trusted-emulator.cjs'
+      - name: Keep two rooms scoring while public publication is stopped
+        env:
+          NODE_PATH: /tmp/bxh-four-court-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config tests/four-court-buckets/firebase.json 'node tests/four-court-buckets/continuous-scoring-emulator.cjs'
       - name: Verify cross-bucket dispatch, force exit and score races
         env:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules

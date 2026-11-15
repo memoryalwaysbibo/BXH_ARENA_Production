@@ -67,6 +67,21 @@
   }
   function disconnect(){active=false;generation++;roomStop?.();roomStop=null;stopBuckets();emit('offline');}
   const allowed=station=>!rootRoom?.systemClosed&&!rootRoom?.eventCancelled&&!rootRoom?.deletionStatus&&!['completed','archived'].includes(state?.archiveStatus)&&!['completed','archived'].includes(rootRoom?.archiveStatus)&&!state?.forcedCourtExits?.[station]?.closed&&(canManage(state,station)||['main','backup1','backup2'].some(slot=>state?.meta?.refereeSeatsV1?.courts?.[station]?.[slot]?.uid===uid));
+  // A successful callable returns the committed bucket. Use that authoritative
+  // snapshot immediately; the listener may arrive later or in an older order.
+  function acceptCommittedScore(result,record){
+   if(record.type!=='score'||!['score','fault','undo','rematch','pause','resume'].includes(record.data.action)||result.structural!==false||result.matchId!==record.data.matchId||result.scoreRevision!==Number(record.data.expectedScoreRevision)+1||!active||status!=='ready'||record.epoch!==manifest?.epoch)return;
+   const patch=result.buckets?.[0],id=result.bucketId;
+   if(!Array.isArray(result.buckets)||result.buckets.length!==1||!patch||patch.bucketId!==id||id!==B.route(Number(record.data.station),manifest.courtCount))return;
+   const previous=bucketWatermarks.get(id);
+   if(!previous||patch.revision<previous.revision||patch.revision===previous.revision&&JSON.stringify(patch)!==JSON.stringify(previous))return;
+   const candidate=[...buckets.values()].map(bucket=>bucket.bucketId===id?patch:bucket);
+   try{
+    const composed=B.materialize(base,manifest,candidate);
+    if(Number(composed.matches.find(m=>m.id===record.data.matchId)?.refereeSeatScoreRevision)!==result.scoreRevision)return;
+   }catch{return;}
+   bucketWatermarks.set(id,clone(patch));buckets.set(id,clone(patch));assemble();
+  }
   async function deliver(key,record){
    if(!active||status!=='ready')return {ok:false,reason:'not-synchronized'};
    if(record.epoch!==manifest.epoch){pending.delete(key);return {ok:false,reason:'generation-changed'};}
@@ -75,9 +90,12 @@
    try{
     const result=await (record.type==='seat'?transport.manageSeats:transport.commitScore)(clone(record.data));
     const revision=record.type==='dispatch'?result?.lifecycleRevision:result?.scoreRevision;
-    if(result?.ok&&record.type==='dispatch'&&(!Number.isSafeInteger(revision)||revision<1))return {ok:false,reason:'cloud-unavailable'};
+    // An incomplete success cannot prove which score was saved. Keep the same
+    // operation ID for an idempotent replay instead of allowing a new click.
+    if(result?.ok&&record.type!=='seat'&&(!Number.isSafeInteger(revision)||revision<1))return {ok:false,reason:'cloud-unavailable'};
     if(result?.ok&&record.type!=='seat'&&Number.isSafeInteger(revision)){
      record.awaiting=true;record.confirmedRevision=revision;
+     acceptCommittedScore(result,record);
      if((record.type==='dispatch'?Number(state?.courtLifecycleEpoch||0):Number(state?.matches.find(m=>m.id===record.data.matchId)?.refereeSeatScoreRevision||0))>=revision)pending.delete(key);
     }else if(result?.ok||result?.ok===false&&typeof result.reason==='string'&&!uncertain.has(result.reason))pending.delete(key);
     return result||{ok:false,reason:'cloud-unavailable'};

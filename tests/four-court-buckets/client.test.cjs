@@ -1,11 +1,12 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const B=require('../../referee-seats/functions/bucket-state.cjs'),{create}=require('../../modules/scoring/four-court-client.cjs');
+const {create:createBridge}=require('../../modules/scoring/four-court-app-bridge.cjs');
 const {fixture}=require('./trusted-fixture.cjs');
-function setup(){
+function setup(onView=()=>{}){
  const f=fixture('BXH-CLIENT1',6,false),rooms=[],watches=[],sent=[],views=[];let serial=0,send=async()=>({ok:true});
  const transport={watchRoom(code,next,error){const w={next,error,stopped:false};rooms.push(w);return ()=>w.stopped=true;},watchBucket(code,id,next,error){const w={id,next,error,stopped:false};watches.push(w);return ()=>w.stopped=true;},commitScore:async d=>{sent.push(d);return send(d);},manageSeats:async d=>{sent.push(d);return send(d);}};
- const client=create({transport,code:f.state.cloudCode,uid:'ref1',onView:v=>views.push(v),operationId:()=> 'client-operation-'+(++serial)});
+ const client=create({transport,code:f.state.cloudCode,uid:'ref1',onView:v=>{views.push(v);onView(v);},operationId:()=> 'client-operation-'+(++serial)});
  function ready(room=f.room,version='1'){rooms.at(-1).next({room,version});for(const bucket of B.encode(f.state,room.scoreStorage))watches.filter(w=>!w.stopped&&w.id===bucket.bucketId).at(-1).next({bucket});}
  return {f,rooms,watches,sent,views,client,ready,setSend:fn=>send=fn};
 }
@@ -35,7 +36,7 @@ test('lost replies retain the exact operation for retry and never optimistically
  const h=setup();h.client.connect();h.ready();h.setSend(async()=>{throw Error('lost-reply');});
  assert.equal((await h.client.score('m1','score',{side:'A',finish:'spin'})).ok,false);assert.equal(h.client.getView().state.matches[0].scoreA,0);
  assert.equal((await h.client.score('m1','score',{side:'A',finish:'spin'})).reason,'operation-pending');
- h.setSend(async()=>({ok:true,replayed:true}));assert.equal((await h.client.retry('score:m1')).ok,true);
+ h.setSend(async()=>({ok:true,replayed:true,scoreRevision:1}));assert.equal((await h.client.retry('score:m1')).ok,true);
  assert.deepEqual(h.sent[0],h.sent[1]);assert.equal(h.sent[0].expectedCourtRevision,1);assert.equal(h.sent[0].expectedScoreRevision,0);assert.equal(h.sent[0].state,undefined);
 });
 test('new epoch blocks retries and delayed old bucket callbacks; revoked seats cannot submit',async()=>{
@@ -53,6 +54,35 @@ test('successful reply keeps scoring locked until subscription confirms its scor
  h.f.state.matches[0].scoreA=1;h.f.state.matches[0].refereeSeatScoreRevision=1;
  const bucket=B.encode(h.f.state,h.f.room.scoreStorage)[0];h.watches[0].next({bucket:{...bucket,revision:1}});
  assert.equal(h.client.getView().pending.length,0);assert.equal(h.client.getView().state.matches[0].scoreA,1);
+});
+test('committed local bucket reply confirms the score immediately without waiting for a subscription',async()=>{
+ let bridge;const h=setup(view=>bridge?.publish(view));
+ bridge=createBridge({client:h.client,code:h.f.state.cloudCode,uid:'ref1',getUid:()=> 'ref1',timeoutMs:50});
+ h.client.connect();h.ready();const old=B.encode(h.f.state,h.f.room.scoreStorage)[0];
+ const next=structuredClone(h.f.state);next.matches[0].scoreA=1;next.matches[0].refereeSeatScoreRevision=1;
+ const bucket=B.encode(next,h.f.room.scoreStorage,B.encode(h.f.state,h.f.room.scoreStorage))[0];
+ h.setSend(async()=>({ok:true,structural:false,matchId:'m1',scoreRevision:1,bucketId:'court-1',buckets:[bucket]}));
+ const result=await bridge.cloud.commitRefereeCommand({code:h.f.state.cloudCode,matchId:'m1',action:'score'});
+ assert.equal(result.ok,true);assert.equal(result.state.matches[0].scoreA,1);assert.deepEqual(h.client.getView().pending,[]);
+ h.watches[0].next({bucket:old});assert.equal(h.client.getView().state.matches[0].scoreA,1);
+ bridge.close();h.client.disconnect();
+});
+test('a mismatched committed patch cannot release the pending score',async()=>{
+ const h=setup();h.client.connect();h.ready();const old=B.encode(h.f.state,h.f.room.scoreStorage)[0];
+ const next=structuredClone(h.f.state);next.matches[0].scoreA=1;next.matches[0].refereeSeatScoreRevision=1;
+ const bucket=B.encode(next,h.f.room.scoreStorage,[old])[0];
+ h.setSend(async()=>({ok:true,structural:false,matchId:'m1',scoreRevision:1,bucketId:'court-1',buckets:[{...bucket,epoch:'wrong-epoch'}]}));
+ assert.equal((await h.client.score('m1','score',{side:'A',finish:'spin'})).ok,true);
+ assert.equal(h.client.getView().state.matches[0].scoreA,0);assert.deepEqual(h.client.getView().pending,['score:m1']);
+ h.watches[0].next({bucket});assert.equal(h.client.getView().state.matches[0].scoreA,1);assert.deepEqual(h.client.getView().pending,[]);
+ h.client.disconnect();
+});
+test('a successful response without a score revision retains the original intention',async()=>{
+ const h=setup();h.client.connect();h.ready();h.setSend(async()=>({ok:true,structural:false}));
+ assert.equal((await h.client.score('m1','score',{side:'A',finish:'spin'})).reason,'cloud-unavailable');
+ assert.deepEqual(h.client.getView().retryable,['score:m1']);
+ assert.equal((await h.client.score('m1','score',{side:'A',finish:'spin'})).reason,'operation-pending');
+ h.client.disconnect();
 });
 test('connection loss and reconnect retain the original command and operation id for retry',async()=>{
  const h=setup();h.client.connect();h.ready();h.setSend(async()=>{throw Error('lost-reply');});await h.client.score('m1','score',{side:'A',finish:'spin'});h.rooms.at(-1).error(Error('unavailable'));assert.equal(h.client.getView().status,'error');
