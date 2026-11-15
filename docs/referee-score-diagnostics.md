@@ -46,3 +46,9 @@ resolved. A retry establishes callback re-execution, not its underlying cause.
 Use the phase evidence to decide the next investigation or fix. Keep diagnostics
 only as long as needed; phase records increase log volume and should be evaluated
 after capture. Do not claim these new records reconstruct historical missing spans.
+
+## Bucket scoring
+
+The bucket scoring handler uses the same diagnostic helper with a fixed `storage="bucket"` field. It records root/auth/config/receipt reads, authorization, bucket reads, materialization, optional structural public reads, transition, optional new-bucket reads, write preparation and commit. Receipt replays use `commit-replay`. Local score operations still do not read or write the public document or write the root. No additional Firestore request, retry or wait is introduced.
+
+`node --test tests/four-court-buckets/diagnostics.test.cjs` checks the actual handler with a deterministic transaction adapter, including a delayed bucket read, delayed commit, retried callback, receipt replay, dependency failure, broken logger, privacy and watchdog cleanup. Source registration and packaging must include `score-diagnostics.cjs` alongside the bucket handler. Phase logs increase volume; keep them scoped to the controlled pilot and review retention/cost afterward. Correlate backend phases with the Callable request and frontend completion; backend elapsed time alone is not end-to-end latency.
