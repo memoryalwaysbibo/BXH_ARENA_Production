@@ -59,7 +59,11 @@ async function measured(req){
    assert.equal((await room.root.collection('bucketScoreOperations').get()).size,room.state.meta.stations*cycles*2);
    const result=await createBucketPublicProjection(db)(room.state.cloudCode);
    assert(result.ok,'manual catch-up failed');
-   const published=JSON.parse((await room.pub.get()).data().bracketView);
+   assert.equal(result.skipped,false,'catch-up must publish new bucket versions');
+   const publicDoc=(await room.pub.get()).data();
+   assert.equal(publicDoc.scoreBucketProjection.epoch,room.room.scoreStorage.epoch);
+   assert.deepEqual(publicDoc.scoreBucketProjection.versions,Object.fromEntries(buckets.docs.map(s=>[s.id,s.data().revision])));
+   const published=JSON.parse(publicDoc.bracketView);
    assert(published.matches.every(m=>m.scoreA===0&&m.log.length===0));
   }
   const accepted=records.filter(r=>!r.replayed),values=accepted.map(r=>r.elapsedMs).sort((a,b)=>a-b),percentile=p=>values[Math.ceil(values.length*p)-1];
