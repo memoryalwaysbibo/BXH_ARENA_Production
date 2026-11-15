@@ -401,10 +401,34 @@ globalThis.BXHMatchBuckets=module.exports;})();
    return result?.state?{...result,state:{...result.state,scoreStorage:clone(entry.manifest)}}:result;
   }
   return {observe,subscribe,read,command,isBucket:code=>markers.has(code),view:code=>active?.code===code?active.view:null,
+   binding(code){return active?.code===code&&current(active)&&active.view?.status==='ready'?{roomId:active.manifest.roomId,epoch:active.epoch}:null;},
    reconnect(code){const entry=active;if(!entry||entry.code!==code||!current(entry)||!entry.session)return {ok:false,reason:'bucket-session-mismatch'};entry.session.client.connect();return {ok:true};},
    suspend(){resumeContext=active?{code:active.code,uid:active.uid}:null;if(active?.session)active.session.client.disconnect();else stop();},
    resume(){const context=resumeContext;resumeContext=null;if(context&&auth.currentUser?.uid===context.uid&&[...listeners].some(x=>x.code===context.code&&x.primary)){if(active?.code===context.code&&active.session)active.session.client.connect();else observe(context.code,markers.get(context.code));}},
    dispose(){if(disposed)return;stop();disposed=true;stopAuth();listeners.clear();markers.clear();}};
  }
  return {create};
+});
+(function(root,factory){
+ if(typeof module==='object'&&module.exports)module.exports=factory(require('../../referee-seats/functions/bucket-state.cjs'));
+ else root.BXHFourCourtArchive=factory(root.BXHMatchBuckets);
+})(typeof globalThis!=='undefined'?globalThis:this,function(B){
+ 'use strict';
+ const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+ function verify({code,expected,room,publicDocument}){
+  if(!expected?.roomId||!expected.epoch||!room||!publicDocument)throw Error('bucket-archive-unconfirmed');
+  let state,mirror;try{state=JSON.parse(room.data);mirror=JSON.parse(publicDocument.bracketView);}catch{throw Error('bucket-archive-unconfirmed');}
+  const m=B.context(room,state),v=publicDocument.scoreBucketProjection;
+  if(m.code!==code||m.roomId!==expected.roomId||m.epoch!==expected.epoch||room.archiveStatus!=='completed'||publicDocument.archiveStatus!=='completed'||room.tournamentPhase!=='done'||publicDocument.tournamentPhase!=='done'||state.archiveStatus!=='completed'||mirror.archiveStatus!=='completed'||state.settlementPhase!=='completed'||!Number.isSafeInteger(state.archivedAt)||state.archivedAt<=0||!state.championId||!state.runnerUpId||state.matches.some(x=>!x.isBye&&!x.completed))throw Error('bucket-archive-unconfirmed');
+  const ids=Array.from({length:m.bucketCount},(_,i)=>'court-'+(i+1));
+  if(v?.epoch!==m.epoch||!v.versions||Object.keys(v.versions).length!==ids.length||ids.some(id=>!Number.isSafeInteger(v.versions[id])||v.versions[id]<0))throw Error('bucket-archive-unconfirmed');
+  const score=s=>s.matches.map(x=>[x.id,x.winnerId||null,x.loserId||null,!!x.completed,x.scoreA??null,x.scoreB??null]);
+  if(!equal(score(state),score(mirror))||state.championId!==mirror.championId||state.runnerUpId!==mirror.runnerUpId||state.archivedAt!==mirror.archivedAt)throw Error('bucket-archive-unconfirmed');
+  if(room.ladderMode==='ranked'||state.meta.ladderMode==='ranked'){
+   const a=room.bucketSettlement,b=publicDocument.bucketSettlement;
+   if(room.ladderMode!=='ranked'||state.meta.ladderMode!=='ranked'||room.ladderPointsAwarded!==true||state.ladderPointsAwarded!==true||a?.version!==1||a.status!=='completed'||a.epoch!==m.epoch||!equal(a.versions,v.versions)||b?.status!=='completed'||b.epoch!==m.epoch||!equal(b.versions,v.versions)||a.completedAt!==b.completedAt)throw Error('bucket-archive-unconfirmed');
+  }else if(room.ladderMode!=='general'||state.meta.ladderMode!=='general'||state.ladderPointsAwarded===true)throw Error('bucket-archive-unconfirmed');
+  return {...state,scoreStorage:{...m},createdBy:room.createdBy||state.createdBy,ownerUid:room.ownerUid||state.ownerUid,createdByRole:room.createdByRole||state.createdByRole};
+ }
+ return {verify};
 });

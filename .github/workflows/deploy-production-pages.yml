@@ -164,7 +164,15 @@ jobs:
             exit 1
           fi
           for private_path in qr-checkin/reference/writer-handlers.json referee-certificates/functions/initial-preview.json referee-certificates/functions/identities.cjs referee-certificates/REVIEW-REGRESSION-MAP.md scripts/preview-referee-initialization.cjs tests/room-host-identity-regression.test.cjs; do
-            private_status="$(curl --silent --show-error --location --max-time 12 --output /dev/null --write-out '%{http_code}' "$base/$private_path?deployment_check=$EXPECTED_COMMIT")"
+            private_status=""
+            for probe in {1..4}; do
+              private_status="$(curl --silent --show-error --location --max-time 12 --output /dev/null --write-out '%{http_code}' "$base/$private_path?deployment_check=$EXPECTED_COMMIT&verification_attempt=$GITHUB_RUN_ATTEMPT-$probe" 2>/dev/null || true)"
+              if [[ "$private_status" == "404" ]]; then break; fi
+              # Retry only transport, rate-limit and 5xx failures. A served source
+              # (200) or any other response remains an immediate release failure.
+              if [[ ! "$private_status" =~ ^(000|429|5[0-9][0-9])$ ]]; then break; fi
+              sleep "$((probe * 2))"
+            done
             if [[ "$private_status" != "404" ]]; then
               echo "Private source must be absent from public artifact: path=$private_path http=$private_status" >&2
               exit 1

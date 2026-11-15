@@ -2,6 +2,7 @@
 // Shared trusted adapter. Production access requires both runtime and room gates.
 const {createHash}=require('node:crypto'),C=require('./core.cjs'),S=require('./scoring-core.cjs'),D=require('./dispatch-core.cjs'),B=require('./bucket-state.cjs');
 const {createScoreDiagnostics}=require('./score-diagnostics.cjs');
+const {archiveGeneral}=require('./bucket-general-archive.cjs');
 const LOCAL=new Set(['score','fault','undo','rematch','pause','resume']);
 const DISPATCH=new Set(['idle-claim','claim-skipped','manual-assign','swap','force-exit','reopen','claim-detached','retirement-transfer','resize']);
 function createBucketScoringHandler(db,{clock=Date.now,runtime='emulator'}={}){
@@ -44,6 +45,7 @@ function createBucketScoringHandler(db,{clock=Date.now,runtime='emulator'}={}){
    const authorization=dispatch?{managerOnly:['reopen','claim-detached','retirement-transfer','resize'].includes(d.action),stations:resize?[]:[...new Set(d.action==='swap'?[Number(d.station),Number(state.matches.find(x=>x.id===d.targetMatchId)?.station)]:d.action==='manual-assign'?[Number(d.station),Number(d.targetStation)]:[authorizationStation])]}:null;
    diagnostic.phase('transition');
    const result=(dispatch?D.transition:local?S.transitionLocal:S.transition)({room,state,user,uid,d,now,authority});
+   const closure=!local&&['confirm','quick'].includes(d.action)?archiveGeneral(room,state,now):null;
    const nextCount=Number(state.meta.stations);
    if(!Number.isSafeInteger(nextCount)||nextCount<1||nextCount>32||state.matches.some(x=>!x.completed&&Number(x.station)>nextCount))throw Error('bucket-court-count-invalid');
    const nextManifest=nextCount===m.courtCount?m:B.makeManifest(state,m.epoch);
@@ -65,8 +67,9 @@ function createBucketScoringHandler(db,{clock=Date.now,runtime='emulator'}={}){
     state.updatedAt=Math.max(now,Number(room.updatedAt||0)+1,Number(state.updatedAt||0)+1);
     const projection=C.project(room.refereeSeatsV1,room.createdBy,nextCount);
     state.meta={...state.meta,refereeSeatsV1:room.refereeSeatsV1,...projection,assignedStaffUids:room.assignedStaffUids||[]};
-    tx.update(root,{...(dispatch?{courtLifecycleWriteSeq:Number(room.courtLifecycleWriteSeq||0)+1}:{}),...projection,scoreStorage:nextManifest,data:JSON.stringify(state),updatedAt:state.updatedAt});
-    tx.update(publicRef,{bracketView:JSON.stringify(S.publicProjection(state,previous)),scoreBucketProjection:{epoch:m.epoch,versions:Object.fromEntries(encoded.map(b=>[b.bucketId,b.revision]))},updatedAt:state.updatedAt});
+    tx.update(root,{...(dispatch?{courtLifecycleWriteSeq:Number(room.courtLifecycleWriteSeq||0)+1}:{}),...projection,...closure?.document,scoreStorage:nextManifest,data:JSON.stringify(state),updatedAt:state.updatedAt});
+    const mirror=S.publicProjection(state,previous);if(closure)Object.assign(mirror,closure.runtime);
+    tx.update(publicRef,{...closure?.document,bracketView:JSON.stringify(mirror),scoreBucketProjection:{epoch:m.epoch,versions:Object.fromEntries(encoded.map(b=>[b.bucketId,b.revision]))},updatedAt:state.updatedAt});
    }
    const response={ok:true,matchId:result.matchId,scoreRevision:result.scoreRevision,bucketId,structural:!local,...(dispatch?{lifecycleRevision:state.courtLifecycleEpoch}: {})};
    tx.create(receiptRef,{uid,hash,epoch:m.epoch,at:now,result:response,...(dispatch?{authorization}: {})});
