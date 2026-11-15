@@ -6,7 +6,7 @@ const {chromium}=require('playwright'),esbuild=require('esbuild'),{initializeApp
 const B=require('../../referee-seats/functions/bucket-state.cjs'),{fixture}=require('./trusted-fixture.cjs');
 const root=path.resolve(__dirname,'../..'),out=path.join(root,'test-results/four-court-buckets/full-page');fs.mkdirSync(out,{recursive:true});
 const cloud=fs.readFileSync(path.join(root,'modules/cloud/cloud-runtime.js'),'utf8'),adapted=adapter.build(cloud);
-assert(cloud.includes('const FOUR_COURT_CLIENT_ROLLOUT = false;'));
+assert(cloud.includes('const FOUR_COURT_CLIENT_ROLLOUT = true;'));
 const sdk=esbuild.buildSync({stdin:{contents:['app','auth','firestore','functions','app-check'].map(name=>`export * from 'firebase/${name}';`).join('\n'),resolveDir:root},bundle:true,write:false,format:'iife',globalName:'BXHFullPageSDK',platform:'browser',nodePaths:(process.env.NODE_PATH||'').split(path.delimiter).filter(Boolean)}).outputFiles[0].text;
 const app=initializeApp({projectId:adapter.project},'bucket-full-page'),db=getFirestore(app),auth=getAuth(app),missing=new Set();
 const server=http.createServer((req,res)=>{
