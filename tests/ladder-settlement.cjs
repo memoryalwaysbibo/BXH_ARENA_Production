@@ -11,7 +11,7 @@ const method=runtime.slice(start,end);
 let received=null;
 const context=vm.createContext({
   window:{engagementService:{settleLadder:async payload=>{received=payload;return {ok:true,seasonId:'S0',results:[]};}}},
-  cloudEnabled:true,
+  fourCourtLifecycle:null,cloudEnabled:true,
   authHandle:{currentUser:{uid:'admin'}},
 });
 vm.runInContext('var api={'+method+'};',context);
