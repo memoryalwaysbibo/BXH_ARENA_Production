@@ -58,7 +58,9 @@ function applyAdminPosterStatsLayout(card,posterOverride){
   const poster=managementPosterUrl(posterOverride||item&&item.posterUrl);
   if(!poster)return false;
   addAdminPosterLayoutStyles();
-  let layout=card.querySelector(":scope > .tournament-poster-stats-layout");
+  const details=card.querySelector(".management-card-details");
+  const host=details||card;
+  let layout=host.querySelector(":scope > .tournament-poster-stats-layout");
   let preview=layout&&layout.querySelector(".tournament-poster-stats-preview");
   if(!layout){layout=document.createElement("div");layout.className="tournament-poster-stats-layout";layout.setAttribute("data-poster-stats-layout","");}
   if(!preview){
@@ -71,7 +73,7 @@ function applyAdminPosterStatsLayout(card,posterOverride){
   const image=preview.querySelector(".lobby-poster-image");
   if(image.src!==poster)image.src=poster;
   if(preview.parentElement!==layout||stats.parentElement!==layout||layout.firstElementChild!==preview||layout.lastElementChild!==stats)layout.replaceChildren(preview,stats);
-  if(!layout.isConnected)card.insertBefore(layout,card.querySelector(".btn-row")||null);
+  if(!layout.isConnected){if(details)details.insertBefore(layout,details.querySelector(".btn-row")||null);else card.insertBefore(layout,card.querySelector(".btn-row")||null);}
   syncAdminPosterStatHeight(image,stats,preview);
   return true;
 }
@@ -93,12 +95,13 @@ function addInlineRosterStyles(){
 }
 function ensureInlineRosterPanel(card){
   if(!card||!card.matches(".tournament-management-card"))return null;
-  let panel=card.querySelector(":scope > .tournament-inline-roster");
+  const host=card.querySelector(".management-card-details")||card;
+  let panel=host.querySelector(":scope > .tournament-inline-roster");
   if(!panel){
     panel=document.createElement("section");panel.className="tournament-inline-roster";panel.hidden=true;
     panel.setAttribute("aria-live","polite");
   }
-  const anchor=card.querySelector(":scope > .tournament-poster-stats-layout")||card.querySelector(":scope > .grid.grid-3");
+  const anchor=host.querySelector(":scope > .tournament-poster-stats-layout")||host.querySelector(":scope > .grid.grid-3");
   if(anchor&&panel.previousElementSibling!==anchor)anchor.after(panel);
   return panel;
 }
@@ -195,7 +198,8 @@ function scanCards(){
     applyAdminPosterStatsLayout(card);
     setupInlineRosterToggles(card);
     if(card.dataset.posterAccessHook==="1")return;
-    const actions=card.querySelector(".btn-row");
+    const details=card.querySelector(".management-card-details");
+    const actions=(details||card).querySelector(".btn-row");
     const codeButton=card.querySelector('[data-action="cloud-admin-copy-code"][data-code]');
     const code=codeButton&&codeButton.dataset.code;
     if(!actions||!code)return;
@@ -205,7 +209,8 @@ function scanCards(){
     button.dataset.posterManage="";button.dataset.code=code;button.hidden=true;button.textContent="＋新增照片";
     const copy=card.querySelector('[data-action="cloud-admin-copy-code"]');
     actions.insertBefore(button,copy||null);
-    refreshPermission(card);
+    if(details){details.addEventListener("toggle",()=>{if(details.open)refreshPermission(card);});if(details.open)refreshPermission(card);}
+    else refreshPermission(card);
   });
 }
 async function refreshPermission(card){

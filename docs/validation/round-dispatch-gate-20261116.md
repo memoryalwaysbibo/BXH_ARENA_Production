@@ -21,3 +21,7 @@ No new Firestore reads, writes, subscriptions or stored fields are introduced. T
 - Trusted engine generated with acorn 8.15.0 and acorn-walk 8.3.4; a second generation is byte-identical.
 
 These are local synthetic/in-memory tests, not a production room replay, Firestore Emulator concurrency test, or live browser acceptance test. GitHub CI and release validation remain to be checked. Frontend and backend engine changes must both be released; a frontend-only release does not update server-owned dispatch. No production deployment or room migration is included.
+
+## Integration with management navigation update
+
+Integrated main 7f1f012a5e41b0fc5f783b2f7dfa985f9bf1fbc5 (PR #810). The sole textual conflict was the core script URL in index.html: preserved all new management cache parameters and appended round-dispatch=20261116.1. The shared core merged without overlapping behavioral edits; trusted engine regeneration remains identical. Combined dispatch, management loading/service and host identity checks: 83 pass. Production frontend static verification passes. Previous 37 GitHub checks apply to head d29107328cfb3daa2c19da4b6a054c8dc034e708; the integrated head requires a fresh CI run.

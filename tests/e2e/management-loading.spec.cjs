@@ -26,7 +26,7 @@ const searchBinding = between(core, 'function bindAdminTournamentSearchInput(){'
 const cloudMethods = between(cloud, '    async queryAdminTournaments(){', '\n    // v13.13.4：玩家');
 const cloudDeadline = between(cloud, '  function withTimeout(promise, ms, fallbackValue){', '\n  async function tryInitFirebase(){');
 const styles = ['core-competition', 'auth-player', 'player-center-hunter', 'lobby-community', 'call-admin-tail', 'referee-tail', 'tail-p7'];
-const scripts = ['/modules/management-v2/navigation.js', '/modules/management-v2/adapter.js'];
+const scripts = ['/modules/management-v2/navigation.js', '/modules/management-v2/adapter.js', '/event-poster-ui.js'];
 function row(name = 'Fixture room', extra = {}) {
   return { code: 'BXH-MOCK01', name, createdBy: 'fixture-owner', createdByName: 'Fixture creator',
     eventAuthority: 'official', tournamentPhase: 'waiting', archiveStatus: 'ongoing', registrationStatus:'open',registrationEnabled:true, ...extra };
@@ -74,10 +74,10 @@ function callEngagementFunction(name,request){
  const call={...request,uid:currentAuthUid()};fixture.queries.push(call);
  const result=rows=>{
   const search=String(request.search||'').toLowerCase();
-  const group=row=>row.registrationStatus==='scheduled'?'upcoming':['closed','cancelled'].includes(row.registrationStatus)?'closed':row.registrationStatus==='draft'?'draft':'open';
+  const group=row=>row.archiveStatus==='completed'||row.tournamentPhase==='done'?'done':['live','settling'].includes(row.tournamentPhase)?'live':row.registrationStatus==='scheduled'?'upcoming':['closed','cancelled'].includes(row.registrationStatus)?'registration_closed':row.registrationStatus==='draft'?'draft':'open';
   const all=copy(rows).filter(row=>(request.kind==='community'?row.eventAuthority==='community':row.eventAuthority!=='community')&&(!search||[row.name,row.code,row.location||''].some(value=>value.toLowerCase().includes(search))));
-  const counts={all:all.length,open:0,upcoming:0,closed:0,draft:0};all.forEach(row=>counts[group(row)]++);
-  const filtered=all.filter(row=>request.status==='all'||group(row)===request.status).sort((a,b)=>a.code.localeCompare(b.code));
+  const counts={all:all.length,open:0,upcoming:0,registration_closed:0,live:0,done:0,draft:0};all.forEach(row=>counts[group(row)]++);
+  const filtered=all.filter(row=>request.status==='all'||group(row)===request.status).sort((a,b)=>Number(b.code===request.pinCode)-Number(a.code===request.pinCode)||Number(group(b)==='live')-Number(group(a)==='live')||a.code.localeCompare(b.code));
   const offset=Number(request.cursor||0),items=filtered.slice(offset,offset+5),hasMore=offset+5<filtered.length;
   return {ok:true,items,counts,pageSize:5,hasMore,nextCursor:hasMore?String(offset+5):null};
  };
@@ -118,7 +118,9 @@ function handleAction(action, target) {
 }
 fixture.enter = () => {
   firebaseUser = { uid: 'fixture-owner' }; userProfile = { role: 'admin', active: true };
-  currentRole = 'admin'; activeMode = 'admin'; appPhase = 'app'; activeTab = 'management'; render();
+  currentRole = 'admin'; activeMode = 'admin'; appPhase = 'app'; activeTab = 'management';
+  if(fixture.lastManaged)localStorage.setItem(managedRoomStorageKey(),JSON.stringify({uid:currentAuthUid(),mode:activeMode,code:fixture.lastManaged,tab:'referee'}));
+  render();
 };
 fixture.logout = () => { firebaseUser = null; userProfile = null; currentRole = null; activeMode = null; appPhase = 'landing'; render(); };
 fixture.changeAccount = () => { firebaseUser = { uid: 'next-owner' }; render(); };
@@ -142,7 +144,7 @@ async function openManagement(page, options = {}) {
     const url = new URL(route.request().url());
     if (url.hostname !== '127.0.0.1') return route.abort('blockedbyclient');
     if (url.pathname === '/' && url.searchParams.has('management_fixture')) return route.fulfill({ status: 200, contentType: 'text/html', body: html(options) });
-    if (scripts.includes(url.pathname) || url.pathname === '/modules/management-v2/styles.css' || /^\/modules\/main-css\/[a-z-]+\.css$/.test(url.pathname)) return route.continue();
+    if (scripts.includes(url.pathname) || url.pathname === '/modules/management-v2/styles.css' || /^\/modules\/main-css\/[a-z0-9-]+\.css$/.test(url.pathname)) return route.continue();
     return route.abort('blockedbyclient');
   });
   await page.goto('/?management_fixture=1', { waitUntil: 'load' });
@@ -180,8 +182,8 @@ test('a later-page timeout preserves cards and retry requests the same cursor',a
 test('status tabs replace owner tabs and reset the current page',async({page})=>{
  const rows=[...manyRows(),row('Upcoming event',{code:'UPCOMING',registrationStatus:'scheduled'}),row('Closed event',{code:'CLOSED',registrationStatus:'closed'})];
  await openManagement(page,{rows});await settle(page);await expect(page.locator('[data-filter="mine"]')).toHaveCount(0);
- await page.locator('[data-filter="upcoming"]').click();await settle(page);await expect(cards(page)).toHaveCount(1);await expect(cards(page)).toContainText('Upcoming event');
- await page.locator('[data-filter="closed"]').click();await settle(page);await expect(cards(page)).toContainText('Closed event');
+ await page.locator('summary').filter({hasText:'其他分類'}).click();await page.locator('[data-filter="upcoming"]').click();await settle(page);await expect(cards(page)).toHaveCount(1);await expect(cards(page)).toContainText('Upcoming event');
+ await page.locator('[data-filter="registration_closed"]').click();await settle(page);await expect(cards(page)).toContainText('Closed event');
  expect(await page.evaluate(()=>fixture.queries.at(-1).cursor)).toBeNull();
 });
 test('search finds an unloaded event and clearing restores the first five cards',async({page})=>{
@@ -198,7 +200,7 @@ test('Enter submits search without automatic downloads while typing',async({page
 test('changing status while another response is pending cannot mix categories',async({page})=>{
  const rows=[...manyRows(),row('Upcoming event',{code:'UPCOMING',registrationStatus:'scheduled'})];await openManagement(page,{rows});await settle(page);
  await page.evaluate(()=>fixture.holdQuery=true);await page.locator('[data-action="admin-tournament-load-more"]').click();await expect.poll(()=>page.evaluate(()=>fixture.queries.length)).toBe(2);
- await page.evaluate(()=>fixture.holdQuery=false);await page.locator('[data-filter="upcoming"]').click();await settle(page);
+ await page.evaluate(()=>fixture.holdQuery=false);await page.locator('summary').filter({hasText:'其他分類'}).click();await page.locator('[data-filter="upcoming"]').click();await settle(page);
  await page.evaluate(()=>fixture.queries[1].resolve(fixture.rows));await expect(cards(page)).toHaveCount(1);await expect(cards(page)).toContainText('Upcoming event');
 });
 test('refresh failure keeps the last five cards and offers an in-place retry',async({page})=>{
@@ -215,4 +217,25 @@ test('empty category differs from a denied first read and remains retryable',asy
  await openManagement(page,{holdQuery:true});await expect.poll(()=>page.evaluate(()=>fixture.queries.length)).toBe(1);
  await page.evaluate(()=>fixture.queries[0].reject({code:'functions/permission-denied'}));await expect(page.locator('.auth-error')).toContainText('權限');
  await page.evaluate(()=>{fixture.holdQuery=false;fixture.rows=[];});await refresh(page).click();await settle(page);await expect(page.getByText('此分類目前沒有賽事',{exact:true})).toBeVisible();
+});
+
+test('compact cards keep the last managed room first and retain poster and roster controls inside details',async({page},testInfo)=>{
+ const rows=manyRows();rows[8].tournamentPhase='live';rows[11].name='上次接管的房間';
+ rows[11].posterUrl='https://firebasestorage.googleapis.com/v0/b/bxh-arena.firebasestorage.app/o/room-posters%2FBXH-000011%2Faaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jpg?alt=media&token=bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+ const errors=await openManagement(page,{rows,lastManaged:'BXH-000011'});await settle(page);
+ await expect(cards(page).first()).toContainText('上次接管的房間');await expect(cards(page).nth(1)).toContainText('Paged room 8');
+ expect(await page.evaluate(()=>fixture.queries[0].pinCode)).toBe('BXH-000011');
+ const details=cards(page).first().locator('.management-card-details');await expect(details).not.toHaveAttribute('open');
+ await expect(cards(page).first().getByRole('button',{name:'返回管理',exact:true})).toBeVisible();
+ await expect(details.locator('[data-poster-open]').first()).toBeHidden();
+ await details.locator('summary').click();await expect(details).toHaveAttribute('open');
+ await expect(details.locator('[data-roster-kind="confirmed"]')).toBeVisible();
+ await expect(details.locator('.tournament-poster-stats-layout')).toBeVisible();
+ await page.evaluate(()=>render());await expect(cards(page).first().locator('.management-card-details')).toHaveAttribute('open');
+ await cards(page).first().locator('summary').click();
+ const tabs=page.locator('[role="tablist"][aria-label="賽事狀態分類"] [role="tab"]');
+ for(const tab of await tabs.all())await expect(tab).toBeVisible();
+ expect(await tabs.allTextContents()).toEqual(['全部 12','報名中 11','開賽中 1','已結束 0','報名已關閉 0']);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ await page.screenshot({path:testInfo.outputPath('management-compact.png'),fullPage:true});expect(errors).toEqual([]);
 });

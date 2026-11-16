@@ -339,7 +339,7 @@ let adminTournamentListBusy = false;
 let adminTournamentListError = "";
 let adminTournamentListItems = [];
 let adminTournamentListLoaded = false;
-let adminTournamentListFilter = "open"; // open | upcoming | closed | draft | all
+let adminTournamentListFilter = "all"; // all | open | live | done | registration_closed | upcoming | draft
 let adminTournamentListKind = "official";
 let adminTournamentListSearch = "";
 let adminTournamentListSearchDraft = "";
@@ -3496,15 +3496,20 @@ const {normalizeRoomCodeInput,normalizeLoginEmail,loginIdentifierDisplayValue,no
 // Commits an already-fetched tournament payload as the new active state. Pulled
 // out of resolveAndJoinTournamentByCode() so the switch-tournament preview flow
 // can reuse it without a second network fetch once the user confirms.
-async function commitJoinedTournamentData(code, data, usePublic){
+async function commitJoinedTournamentData(code, data, usePublic, options={}){
+  if(options.isCurrent&&!options.isCurrent())return false;
   state = Object.assign(defaultState(data.id), data);
   state.cloudCode = code;
   resetSettingsFormDraft();
   resetRegistrationFormDraft();
   refereeAssignmentDraftEnabled = null;
-  await setCurrentId(state.id);
-  await saveRecord(state);
+  const joined=state;
+  await setCurrentId(joined.id);
+  if(options.isCurrent&&!options.isCurrent())return false;
+  await saveRecord(joined);
+  if(options.isCurrent&&!options.isCurrent())return false;
   recordIndex = await loadIndex();
+  if(options.isCurrent&&!options.isCurrent())return false;
   if(cloudUnsub){ try{ cloudUnsub(); }catch(e){} }
   cloudUnsub = usePublic
     ? window.cloudSync.subscribePublic(code, applyRemoteState)
@@ -3580,14 +3585,14 @@ async function previewTournamentByCode(rawCode, opts){
   opts = opts || {};
   const code = normalizeRoomCodeInput(rawCode);
   if(!isValidRoomCode(code)) return { ok:false, reason:"invalid-format", code };
-  if(code === state.cloudCode) return { ok:false, reason:"same-tournament", code };
+  if(code === state.cloudCode && !opts.allowCurrent) return { ok:false, reason:"same-tournament", code };
   if(window.cloudSync && window.cloudSync.connect){ await window.cloudSync.connect(); }
   if(!cloudAvailable()) return { ok:false, reason:"network", code };
   const forcePrivate = opts.forcePrivate===true && hasPrivilegedTournamentProfile();
   const usePublic = forcePrivate ? false : (opts.forcePublic || currentRole==="guest" || currentRole==="player" || !hasAdminAccess());
   const result = usePublic
     ? await window.cloudSync.joinRoomPublic(code)
-    : await window.cloudSync.joinRoom(code);
+    : await window.cloudSync.joinRoom(code,{serverOnly:opts.serverOnly===true});
   if(!result.ok) return { ok:false, reason: result.reason, code };
   const data = result.data;
   const m = data.meta || {};
@@ -19736,6 +19741,7 @@ function restoreHorizontalNavPositions(positions){
 const AUTH_VIEW_KEY="bxh_prod_auth_view_v1";
 let authViewRestoreAttempted=false;
 function rememberAuthenticatedView(){
+ rememberManagedRoomView();
  if(!firebaseUser?.uid||!userProfile||userProfile.active!==true||guestReadOnlyMode)return;
  if(!['app','account-management','player-center','tournament-detail'].includes(appPhase))return;
  try{sessionStorage.setItem(AUTH_VIEW_KEY,JSON.stringify({uid:firebaseUser.uid,phase:appPhase,mode:activeMode,tab:activeTab,playerTab:playerActiveTab,profileSection:playerProfileSection,adminPage:superAdminManagementPage,cloudCode:state.cloudCode||'',detailCode:tournamentDetailCode||''}));}catch(e){}
@@ -20603,7 +20609,9 @@ function renderTournamentManagementTab(){
 
   const myUid=(firebaseUser&&firebaseUser.uid)||"";
   const isMine=t=>!!(myUid && t.createdBy===myUid);
+  const expanded=new Set(typeof document.querySelectorAll==='function'?[...document.querySelectorAll('.management-card-details[open]')].map(el=>el.getAttribute('data-room-code')):[]);
   const visibleItems=adminTournamentListItems;
+  const lastManaged=readManagedRoomRecord();
   const filterBar=adminTournamentListControlsHtml();
 
   let body = "";
@@ -20623,25 +20631,30 @@ function renderTournamentManagementTab(){
       const isCommunity=t.eventAuthority==="community";
       const done=(t.archiveStatus==="completed"||t.tournamentPhase==="done");
       const phaseLabel=({waiting:"尚未開始",live:"進行中",settling:"結算中",done:"已結束",cancelled:"已取消"})[t.tournamentPhase]||t.tournamentPhase||"—";
+      const pinned=lastManaged?.code===t.code;
       return `<div class="panel tournament-management-card" style="margin:0;">
-        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;">
-          <div style="min-width:0;flex:1;">
-            <div style="font-family:var(--font-d);font-weight:700;font-size:17px;">${esc(t.name||"未命名賽事")} ${isCurrent?'<span class="badge badge-neon">目前賽事</span>':''} ${isTest?'<span class="badge badge-danger">測試｜7天</span>':''} <span class="badge ${isCommunity?'badge-metal':t.ladderMode==='ranked'?'badge-neon':'badge-metal'}">${isCommunity?'玩家一般房間':t.testLadderEnabled?'🧪 測試積分賽事':t.ladderMode==='ranked'?'積分賽事':'一般賽事'}</span> <span class="badge badge-metal">${mine?'我建立':'他人建立'}</span>${t.ladderMode==='ranked'&&t.ladderPointsAwarded?'<span class="badge badge-ok">天梯已結算</span>':''}</div>
-            <div class="hint" style="margin-top:5px;">${esc(t.eventDate||"日期未設定")}　${esc(t.location||"")}　代碼 ${esc(t.code)}</div>
-            <div class="hint" style="margin-top:4px;">建立者：${esc(t.createdByName || t.createdBy || "舊版未記錄")}</div>
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+          <strong style="min-width:0;overflow-wrap:anywhere;">${esc(t.name||"未命名賽事")}</strong>
+          <span class="badge ${t.tournamentPhase==='live'?'badge-neon':'badge-metal'}">${esc(phaseLabel)}</span>
+        </div>
+        <div class="hint" style="margin-top:6px;overflow-wrap:anywhere;">${esc(t.code)}｜${esc(t.eventDate||"日期未設定")}${pinned?'｜<span class="badge badge-neon">上次管理</span>':isCurrent?'｜目前賽事':''}</div>
+        <div class="hint" style="margin-top:6px;">正取 ${confirmed}${cap?` / ${cap}`:""}｜備取 ${waiting}｜${esc(registrationStatusLabel(t.registrationStatus))}</div>
+        <div class="btn-row" style="margin-top:10px;">
+          ${isCommunity&&!canSupportCommunityRooms()?"":`<button class="btn btn-primary btn-sm" data-action="cloud-admin-open-tournament" data-code="${esc(t.code)}"${done?' data-open-history="true"':''}>${done?'查看紀錄':pinned?'返回管理':'進入管理'}</button>`}
+        </div>
+        <details class="management-card-details" data-room-code="${esc(t.code)}"${expanded.has(t.code)?' open':''} style="margin-top:10px;"><summary>展開詳情</summary>
+          <div class="hint" style="margin-top:8px;">${esc(t.location||"地點未設定")}｜建立者：${esc(t.createdByName||t.createdBy||"舊版未記錄")}</div>
+          <div class="grid grid-3" style="margin-top:10px;">
+            <div class="stat-box"><div class="label">正取</div><div class="value small">${confirmed}${cap?` / ${cap}`:""}</div></div>
+            <div class="stat-box"><div class="label">備取</div><div class="value small">${waiting}</div></div>
+            <div class="stat-box"><div class="label">賽事狀態</div><div class="value small">${esc(phaseLabel)}</div></div>
           </div>
-          <span class="badge ${done?'badge-neon':t.registrationStatus==='open'?'badge-neon':'badge-metal'}">${done?'已結束':esc(registrationStatusLabel(t.registrationStatus))}</span>
-        </div>
-        <div class="grid grid-3" style="margin-top:12px;">
-          <div class="stat-box"><div class="label">正取</div><div class="value small">${confirmed}${cap?` / ${cap}`:""}</div></div>
-          <div class="stat-box"><div class="label">備取</div><div class="value small">${waiting}${t.waitlistEnabled&&t.waitlistCapacity?` / ${Number(t.waitlistCapacity)}`:""}</div></div>
-          <div class="stat-box"><div class="label">賽事狀態</div><div class="value small">${esc(phaseLabel)}</div></div>
-        </div>
-        <div class="btn-row" style="margin-top:12px;">
-          ${isCommunity&&!canSupportCommunityRooms()?"":done?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-open-tournament" data-code="${esc(t.code)}" data-open-history="true">查看紀錄</button>`:(isCurrent?'<button class="btn btn-ghost btn-sm" disabled>目前已開啟</button>':`<button class="btn btn-primary btn-sm" data-action="cloud-admin-open-tournament" data-code="${esc(t.code)}">開啟管理</button>`)}
-          <button class="btn btn-ghost btn-sm" data-action="cloud-admin-copy-code" data-code="${esc(t.code)}">複製代碼</button>
-          ${isAdminTierOrAbove()?`<button class="btn btn-danger btn-sm" data-action="cloud-admin-delete-tournament" data-code="${esc(t.code)}" data-name="${esc(t.name||"未命名賽事")}" data-community="${isCommunity?'true':'false'}">${isCommunity?'刪除房間':'刪除賽事'}</button>`:""}
-        </div>
+          <div class="hint">${mine?'我建立':'他人建立'}｜${isTest?'測試賽事｜':''}${isCommunity?'玩家一般房間':t.ladderMode==='ranked'?'積分賽事':'一般賽事'}${t.ladderPointsAwarded?'｜天梯已結算':''}</div>
+          <div class="btn-row" style="margin-top:10px;">
+            <button class="btn btn-ghost btn-sm" data-action="cloud-admin-copy-code" data-code="${esc(t.code)}">複製房號</button>
+            ${isAdminTierOrAbove()?`<button class="btn btn-danger btn-sm" data-action="cloud-admin-delete-tournament" data-code="${esc(t.code)}" data-name="${esc(t.name||"未命名賽事")}" data-community="${isCommunity?'true':'false'}">${isCommunity?'刪除房間':'刪除賽事'}</button>`:""}
+          </div>
+        </details>
       </div>`;
     }).join("")}</div>`;
   }
@@ -20649,6 +20662,7 @@ function renderTournamentManagementTab(){
   return `${isPartnerOrganizerMode()?window.BXHPartnerOrganizer?.renderOverview?.(userProfile)||'':''}<div class="panel">
     <div class="panel-title"><span>賽事管理中心</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="cloud-refresh-admin-list">重新整理</button>${canCreateOfficialTournament()?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-new-tournament">＋ 新增賽事</button>`:""}</div></div>
     <div class="hint">每次僅載入 5 場賽事摘要；需要更多時再按下方按鈕。搜尋涵蓋賽事名稱、房號與地點。</div>
+    ${lastManaged?`<div class="btn-row" style="margin:10px 0;"><button class="btn btn-primary" data-action="cloud-admin-open-tournament" data-code="${esc(lastManaged.code)}">返回上次管理｜${esc(lastManaged.code)}</button></div>`:''}
     ${filterBar}
     ${adminTournamentListBusy && adminTournamentListItems.length?'<div class="hint" role="status">正在讀取 5 場賽事摘要，已顯示的清單仍可使用。</div>':""}
     ${adminTournamentListError && adminTournamentListItems.length?`<div class="auth-error" role="status">${esc(adminTournamentListError)}；保留已載入的清單，可重試本次讀取。</div>`:""}
@@ -20724,12 +20738,12 @@ function adminTournamentListControlsHtml({modal=false}={}){
     <input id="${modal?'admin-tournament-search-modal':'admin-tournament-search'}" class="admin-tournament-search-input" type="search" maxlength="120" autocomplete="off" aria-label="搜尋賽事名稱、房號或地點" placeholder="搜尋賽事名稱、房號或地點" value="${esc(adminTournamentListSearchDraft)}" style="flex:1;min-width:180px;">
     <button class="btn btn-ghost btn-sm" data-action="admin-tournament-search">搜尋</button>
     ${adminTournamentListSearch?'<button class="btn btn-ghost btn-sm" data-action="admin-tournament-search-clear">清除</button>':""}
-  </div><div class="tournament-owner-filter" role="tablist" aria-label="報名狀態分類">
-    ${[["open","報名中"],["upcoming","即將開放"],["closed","已關閉"]].map(([key,label])=>`<button role="tab" aria-selected="${adminTournamentListFilter===key}" class="${adminTournamentListFilter===key?'active':''}" data-action="admin-tournament-filter" data-filter="${key}">${label} <b>${count(key)}</b></button>`).join("")}
-  </div><details style="margin:10px 0;"><summary>其他分類${adminTournamentListFilter==='draft'?'｜草稿':adminTournamentListFilter==='all'?'｜所有狀態':''}${adminTournamentListKind==='community'?'｜一般房間':''}</summary>
+  </div><div class="tournament-owner-filter" role="tablist" aria-label="賽事狀態分類" style="display:flex;flex-wrap:wrap;overflow:visible;gap:6px;">
+    ${[["all","全部"],["open","報名中"],["live","開賽中"],["done","已結束"],["registration_closed","報名已關閉"]].map(([key,label])=>`<button role="tab" aria-selected="${adminTournamentListFilter===key}" class="${adminTournamentListFilter===key?'active':''}" data-action="admin-tournament-filter" data-filter="${key}">${label} <b>${count(key)}</b></button>`).join("")}
+  </div><details style="margin:10px 0;"><summary>其他分類${adminTournamentListFilter==='draft'?'｜草稿':adminTournamentListFilter==='upcoming'?'｜即將開放':''}${adminTournamentListKind==='community'?'｜一般房間':''}</summary>
     <div class="btn-row" style="margin-top:8px;">
       <button class="btn btn-ghost btn-sm" data-action="admin-tournament-filter" data-filter="draft">草稿 ${count('draft')}</button>
-      <button class="btn btn-ghost btn-sm" data-action="admin-tournament-filter" data-filter="all">所有狀態 ${count('all')}</button>
+      <button class="btn btn-ghost btn-sm" data-action="admin-tournament-filter" data-filter="upcoming">即將開放 ${count('upcoming')}</button>
       ${canSupportCommunityRooms()?`<button class="btn btn-ghost btn-sm" data-action="admin-tournament-kind" data-kind="${adminTournamentListKind==='community'?'official':'community'}">${adminTournamentListKind==='community'?'返回正式賽事':'一般房間'}</button>`:""}
     </div></details>`;
 }
@@ -20742,7 +20756,7 @@ function adminTournamentListPaginationHtml(){
 }
 function changeAdminTournamentListQuery({status=adminTournamentListFilter,kind=adminTournamentListKind,search=adminTournamentListSearch}={}){
   reconcileAdminTournamentListContext();
-  if(!["open","upcoming","closed","draft","all"].includes(status)||!["official","community"].includes(kind)||(kind==="community"&&!canSupportCommunityRooms()))return;
+  if(!["open","upcoming","closed","draft","all","live","done","registration_closed"].includes(status)||!["official","community"].includes(kind)||(kind==="community"&&!canSupportCommunityRooms()))return;
   adminTournamentListGeneration++;adminTournamentListPromise=null;adminTournamentListBusy=false;
   adminTournamentListItems=[];adminTournamentListLoaded=false;adminTournamentListError="";
   adminTournamentListFilter=status;adminTournamentListKind=kind;adminTournamentListSearch=String(search).trim().slice(0,120);
@@ -20768,7 +20782,7 @@ function resetAdminTournamentListContext(){
   adminTournamentListItems=[];
   adminTournamentListError="";
   adminTournamentListCursor=null;adminTournamentListHasMore=false;adminTournamentListCounts=null;
-  adminTournamentListFilter="open";adminTournamentListKind="official";adminTournamentListSearch="";adminTournamentListSearchDraft="";
+  adminTournamentListFilter="all";adminTournamentListKind=readManagedRoomRecord()?.kind==="community"&&canSupportCommunityRooms()?"community":"official";adminTournamentListSearch="";adminTournamentListSearchDraft="";
   adminTournamentListContextKey=adminTournamentListIdentityKey();
 }
 function reconcileAdminTournamentListContext(){
@@ -20791,7 +20805,7 @@ async function refreshAdminTournamentListVisibleItems(){
   const current=()=>generation===adminTournamentListGeneration&&key===adminTournamentListIdentityKey()&&adminTournamentListVisible();
   const pageCount=Math.ceil(adminTournamentListItems.length/5);
   const request={mode:isPartnerOrganizerMode()?"partner_organizer":isEventStaffMode()?"event_staff":"admin",
-    status:adminTournamentListFilter,kind:adminTournamentListKind,search:adminTournamentListSearch,cursor:null};
+    status:adminTournamentListFilter,kind:adminTournamentListKind,search:adminTournamentListSearch,...managedRoomPinRequest(),cursor:null};
   adminTournamentListRefreshBusy=true;
   try{
     if(window.cloudSync?.connect)await adminTournamentListDeadline(window.cloudSync.connect(),"refresh-connect");
@@ -20841,7 +20855,7 @@ function loadAdminTournamentList({force=false,append=false}={}){
   const current=()=>generation===adminTournamentListGeneration&&key===adminTournamentListIdentityKey()&&hasAdminAccess();
   const requestedCursor=append?adminTournamentListCursor:null;
   const request={mode:isPartnerOrganizerMode()?"partner_organizer":isEventStaffMode()?"event_staff":"admin",
-    status:adminTournamentListFilter,kind:adminTournamentListKind,search:adminTournamentListSearch,cursor:requestedCursor};
+    status:adminTournamentListFilter,kind:adminTournamentListKind,search:adminTournamentListSearch,...managedRoomPinRequest(),cursor:requestedCursor};
   adminTournamentListBusy=true;adminTournamentListError="";
   const promise=Promise.resolve().then(async()=>{
     try{
@@ -20869,6 +20883,91 @@ function loadAdminTournamentList({force=false,append=false}={}){
     }
   });
   adminTournamentListPromise=promise;return promise;
+}
+
+// Only successful private management entry changes this account/mode-scoped pointer.
+// Store navigation metadata, never tournament snapshots, rosters or scores.
+const MANAGED_ROOM_KEY="bxh_last_managed_room_v1";
+let managedRoomRestoreAttempted="";
+let managedRoomOpenBusy=false;
+let managedRoomEntryGeneration=0;
+function managedRoomStorageKey(){return MANAGED_ROOM_KEY+":"+currentAuthUid()+":"+activeMode;}
+function readManagedRoomRecord(){
+  try{
+    if(!currentAuthUid())return null;
+    const saved=JSON.parse(localStorage.getItem(managedRoomStorageKey())||"null");
+    return saved&&saved.uid===currentAuthUid()&&saved.mode===activeMode&&/^BXH-[A-Z0-9]{6}$/.test(saved.code||"")?saved:null;
+  }catch{return null;}
+}
+function managedRoomPinRequest(){const saved=readManagedRoomRecord();return saved?{pinCode:saved.code}:{};}
+function rememberManagedRoomView({entered=false}={}){
+  if(!hasAdminAccess()||guestReadOnlyMode||appPhase!=="app"||!state.cloudCode)return;
+  const saved=readManagedRoomRecord();
+  if(!entered&&saved?.code!==state.cloudCode)return;
+  if(typeof publicWatchReturnContext!=="undefined"&&publicWatchReturnContext)return;
+  const tab=activeTab==='management'?(saved?.code===state.cloudCode?saved.tab:'live'):activeTab;
+  const focus=tab==='referee'?refereeResumeFocus():null;
+  const record={uid:currentAuthUid(),mode:activeMode,code:state.cloudCode,tab,
+    kind:state.meta?.eventAuthority==='community'||state.eventAuthority==='community'?'community':'official',
+    station:focus?.station||(saved?.code===state.cloudCode?saved.station:0)||0,managedAt:entered?Date.now():saved.managedAt};
+  try{localStorage.setItem(managedRoomStorageKey(),JSON.stringify(record));}catch{}
+}
+async function openManagedTournament(code,{openHistory=false,resume=false,isCurrent=()=>true}={}){
+  if(!hasAdminAccess()||(managedRoomOpenBusy&&managedRoomOpenBusy.actor===currentAuthUid()&&managedRoomOpenBusy.mode===activeMode))return false;
+  const actor=currentAuthUid(),mode=activeMode,generation=++managedRoomEntryGeneration;
+  const current=()=>generation===managedRoomEntryGeneration&&actor===currentAuthUid()&&mode===activeMode&&hasAdminAccess()&&isCurrent();
+  const saved=resume?readManagedRoomRecord():null;
+  const entry={actor,mode,generation};managedRoomOpenBusy=entry;adminTournamentListBusy=true;adminTournamentListError="";render();
+  try{
+    const result=await adminTournamentListDeadline(previewTournamentByCode(code,{forcePrivate:true,allowCurrent:true,serverOnly:true}),"managed-room");
+    if(!current())return false;
+    if(!result.ok||result.usePublic){
+      adminTournamentListError=CODE_ENTRY_ERROR_MESSAGES[result.reason]||"無法恢復管理房間，請重新選擇。";
+      appPhase="app";activeTab="management";return false;
+    }
+    const community=result.rawData?.meta?.eventAuthority==='community'||result.rawData?.eventAuthority==='community';
+    if(community&&!canSupportCommunityRooms()){
+      adminTournamentListError='目前無法讀取一般房間的管理資料';appPhase='app';activeTab='management';return false;
+    }
+    await commitJoinedTournamentData(result.code,result.rawData,false,{isCurrent:current});
+    if(!current())return false;
+    publicWatchReturnContext=null;publicWatchUsesPrivateData=false;adminTournamentListOpen=false;
+    guestReadOnlyMode=false;appPhase="app";
+    if(openHistory||state.archiveStatus==='completed'||state.tournamentPhase==='done'){
+      activeTab="history";viewingRecordId=state.id;viewingRecordData=state;historyCloudSyncLoaded=true;
+    }else{
+      const tabs=['live','bracket','referee','duty','registrations','settings','people','operations'];
+      activeTab=saved?.code===code&&tabs.includes(saved.tab)?saved.tab:state.meta?.registrationEnabled?'registrations':'live';
+      if(activeTab==='referee'&&saved?.station){
+        rebuildCourtAssignments();
+        const station=Number(saved.station),court=state.courtAssignments?.[courtKey(station)];
+        const match=court?.currentMatchId?getMatch(court.currentMatchId):null;
+        if(canOperateStation(station)){
+          if(match&&!match.completed)state.currentMatchId=match.id;
+          setTimeout(()=>{if(current())document.getElementById('court-card-'+station)?.scrollIntoView?.({block:'start'});},80);
+        }else{activeTab='live';showToast('原裁判台權限或席位已變更，已回到即時戰況。',true);}
+      }
+    }
+    if(!openHistory&&activeTab!=='history')rememberManagedRoomView({entered:true});
+    adminTournamentListKind=community?'community':'official';
+    adminTournamentListLoaded=false;
+    showToast(resume?'已恢復上次管理的房間':'已進入管理房間');return true;
+  }catch(error){
+    if(current()){adminTournamentListError='管理房間連線失敗，請重試或選擇其他房間。';appPhase='app';activeTab='management';}
+    return false;
+  }finally{
+    if(managedRoomOpenBusy===entry)managedRoomOpenBusy=false;
+    if(current()){adminTournamentListBusy=false;render();}
+  }
+}
+async function restoreLastManagedRoom(uid,intent,isCurrent){
+  if(!['admin','partner_organizer','event_staff'].includes(intent)||guestReadOnlyMode||getTournamentEntryFromUrl()||pendingRegistrationCode)return false;
+  const key=uid+':'+intent;
+  if(managedRoomRestoreAttempted===key)return false;
+  managedRoomRestoreAttempted=key;
+  const saved=readManagedRoomRecord();if(!saved)return false;
+  await openManagedTournament(saved.code,{resume:true,isCurrent});
+  return true; // failure deliberately stays on the retryable management screen
 }
 
 function renderAdminNoTournamentScreen(){
@@ -24458,42 +24557,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const code = target.getAttribute("data-code") || "";
     const openHistory = target.getAttribute("data-open-history")==="true";
     if(!code) return;
-    adminTournamentListBusy = true; adminTournamentListError = ""; render();
-    (async ()=>{
-      try{
-        const result = await previewTournamentByCode(code,{forcePrivate:canSupportCommunityRooms()});
-        adminTournamentListBusy = false;
-        if(!result.ok){
-          adminTournamentListError = CODE_ENTRY_ERROR_MESSAGES[result.reason] || "無法開啟此賽事";
-          render(); return;
-        }
-        const community = result.rawData?.meta?.eventAuthority==="community" || result.rawData?.eventAuthority==="community";
-        if(community && (!canSupportCommunityRooms() || result.usePublic)){
-          adminTournamentListError = "目前無法讀取一般房間的管理資料";
-          render(); return;
-        }
-        await commitJoinedTournamentData(result.code, result.rawData, result.usePublic);
-        publicWatchReturnContext = null;
-        publicWatchUsesPrivateData = false;
-        adminTournamentListOpen = false;
-        appPhase = "app";
-        if(openHistory || state.archiveStatus==="completed"){
-          activeTab = "history";
-          viewingRecordId = state.id;
-          viewingRecordData = state;
-          historyCloudSyncLoaded = true;
-          showToast("已開啟賽後紀錄：「"+((state.meta&&state.meta.name)||result.code)+"」");
-        }else{
-          activeTab = (result.rawData && result.rawData.meta && result.rawData.meta.registrationEnabled) ? "registrations" : "live";
-          showToast("已開啟「"+((state.meta&&state.meta.name)||result.code)+"」");
-        }
-        render();
-      }catch(e){
-        adminTournamentListBusy = false;
-        adminTournamentListError = "開啟賽事時發生錯誤，請稍後再試";
-        render();
-      }
-    })();
+    void openManagedTournament(code,{openHistory,resume:readManagedRoomRecord()?.code===code});
     return;
   }
   if(action==="cloud-switch-tournament"){
@@ -26895,6 +26959,7 @@ async function init(){
                   }
 
                   if(restoreRaffleIntent()){render();return;}
+                  if(restoringSession && await restoreLastManagedRoom(fbUser.uid,intent,authStateIsCurrent)){if(authStateIsCurrent())render();return;}
                   if(restoringSession && restoreRefereeWorkstationView(fbUser.uid,intent)){render();return;}
                   if(restoringSession && restoreAuthenticatedView(fbUser.uid,intent)){render();return;}
                   if(appPhase==="landing" || appPhase==="admin-login" || appPhase==="admin-setup" || appPhase==="admin-success" || appPhase==="player-login" || appPhase==="player-apply" || currentRole==="guest"){

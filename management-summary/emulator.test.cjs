@@ -16,6 +16,7 @@ test('real Admin SDK projection, scoped search and cursor pages remain private',
   const list=createSummaryHandler(db),call=data=>list({auth:{uid:'actor'},data});
   const first=await call({});assert.equal(first.items.length,5);assert.equal(first.counts.all,13);assert.ok(first.hasMore);
   const second=await call({cursor:first.nextCursor});assert.equal(second.items.length,5);assert.ok(!second.items.some(item=>first.items.some(old=>old.code===item.code)));
+  const pinned=await call({status:'all',pinCode:'BXH-000000'});assert.equal(pinned.items[0].code,'BXH-000000');assert.equal(pinned.items[0].confirmedCount,1);
   const found=await call({search:'雪山貓'});assert.equal(found.items.length,1);assert.equal(found.items[0].code,'BXH-000000');
   assert.ok(!JSON.stringify(first).includes('PRIVATE_'));assert.ok(!JSON.stringify(found).includes('PRIVATE_'));
   await assert.rejects(list({auth:{uid:'player'},data:{}}),/permission-denied/);
