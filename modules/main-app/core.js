@@ -3264,7 +3264,7 @@ async function detachConfirmedDeletedRoom(code, expectedRoom=state){
   const replacement=defaultState();state=replacement;
   resetSettingsFormDraft();resetRegistrationFormDraft();
   window.BXHRefereeSeats?.bind({state:()=>state,uid:currentAuthUid,operator:()=>false,render,toast:showToast});
-  if(hasAdminAccess()){appPhase='app';activeTab='management';adminTournamentListOpen=true;}
+  if(hasAdminAccess()){appPhase='app';activeTab='management';adminTournamentListOpen=false;}
   else{appPhase='landing';}
   render();
   // Both saves update the same read-modify-write local index. Keep them serial.
@@ -24517,7 +24517,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           await detachWork;
           showToast((isCommunity?"已刪除一般房間：":"已刪除賽事：")+name);
           adminTournamentListItems = adminTournamentListItems.filter(t=>t.code!==code);
-          if(state===postDeleteSelection){adminTournamentListOpen=true;await loadAdminTournamentList({force:true});}
+          if(state===postDeleteSelection)await loadAdminTournamentList({force:true});
         }catch(e){
           console.warn("[deleteTournament] failed", e);
           const raw=String((e&&e.message)||"");
