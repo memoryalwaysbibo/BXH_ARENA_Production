@@ -11261,12 +11261,22 @@ function bracketCommitStatusHtml(inRosterOverview=false){
   s.busy?(cloud?(phaseLabels[s.phase]||'資料上傳中…'):'儲存中…'):uploaded?(cloud?'上傳成功':'儲存成功'):queued?'等待儲存，尚未送出':preflightTimeout?'雲端核對逾時，尚未送出':uncertain?'儲存結果尚未確認':(cloud?'上傳失敗':'儲存失敗');
  const message=s.busy?'請稍候，本次配對已保留，完成後會自動顯示結果。':uploaded?'對戰表已確認儲存。':queued?'前一筆儲存仍在處理，本次配對尚未重新送出。稍後按重試會沿用相同配對。':preflightTimeout?'送出前未能讀取完整雲端資料，本次配對尚未送出。請保留此頁，稍後按重試會沿用相同配對。':uncertain?'尚未取得完整雲端確認，不能判定上傳失敗。請保留此頁；提交回覆後會自動查證，重試也會沿用相同配對。':s.error==='bracket-version-conflict'?'已同步雲端最新資料，請確認後再抽籤。':'本次配對已保留，重試時不會重新抽籤。';
  const failureDetail=!s.busy&&!uploaded&&s.error?'<p>原因：'+esc(s.error)+'</p>':'';
+ const diff=s.difference;
+ const diffLines=[];
+ if(diff&&!s.busy&&!uploaded){
+  for(const [key,label] of [['onlyCloud','雲端新增、本頁未有'],['onlyLocal','本頁有、雲端未有'],['checkin','報到狀態已變更']]){
+   const item=diff[key];if(item?.count)diffLines.push('<li>'+label+' '+item.count+' 人：'+item.names.map(esc).join('、')+(item.count>item.names.length?' 等':'')+'</li>');
+  }
+  if(diff.revisions?.length)diffLines.push('<li>名單或報到版本已更新：'+diff.revisions.map(x=>esc(x.field)+' '+esc(x.local)+' → '+esc(x.cloud)).join('、')+'</li>');
+  if(diff.pairingChanged)diffLines.push('<li>雲端對戰表與本次配對不同。</li>');
+ }
+ const diffDetail=diffLines.length?'<div class="banner warn" role="alert"><b>雲端資料差異</b><p>本頁 '+esc(diff.localCount)+' 人，雲端 '+esc(diff.cloudCount)+' 人；請核對後以雲端名單重新抽籤。原配對不會自行覆蓋雲端。</p><ul>'+diffLines.join('')+'</ul></div>':'';
  const detail=c.server?(uploaded?(s.action==='start'?'已讀回正式開賽狀態。':'已核對公私對戰表。'):s.pending?'重試會沿用同一筆操作，並重新核對雲端結果。':'請依下列原因核對名單或對戰表，再重新操作。'):message;
  return rosterUpdate+'<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+detail+'</p>'+
- failureDetail+
+ failureDetail+diffDetail+
  (s.pending&&(appPhase==='app'||appPhase==='community-room')?'<button class="btn btn-ghost" data-action="bracket-commit-manage" data-section="confirmed">停止等待，返回管理</button>':'')+
  (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.action==='start'?(s.busy?'確認開賽中…':'重試確認開賽'):(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存')))+'</button>':'')+
- (cloud&&s.canDiscard?'<button class="btn btn-ghost" data-action="bracket-commit-discard">取消上傳</button>':'')+
+ (cloud&&s.canDiscard?'<button class="btn btn-ghost" data-action="bracket-commit-discard">'+(diffLines.length?'載入雲端名單並解除等待':'取消上傳')+'</button>':'')+
  (s.pending&&!s.busy&&s.result==='failed'&&canOfferAdminOperationalOverride()&&!adminOperationalOverrideBusy?'<button class="btn btn-danger" data-action="admin-force-reconfirm">管理員強制提交原配對</button>':'')+'</section>';
 }
 function bracketDrawButtonHtml(){

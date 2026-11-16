@@ -5,6 +5,20 @@ function signature(s={}){
  return JSON.stringify([s.drawnAt||null,s.bracketSize||0,s.meta?.formatType||'single',s.meta?.battleMode||'individual',
   (s.matches||[]).map(m=>[m.id,m.bracket,m.round,m.indexInRound,m.a?.playerId||null,m.b?.playerId||null,m.teamIds||null]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))]);
 }
+// Compare the pending client roster with a fresh private server read. Never
+// decide that a rejected draw can commit merely because its counts match.
+function rosterDifference(local={},remote={}){
+ const byId=players=>new Map((players||[]).filter(p=>p&&p.id!=null).map(p=>[String(p.id),p]));
+ const a=byId(local.players),b=byId(remote.players),names=items=>items.slice(0,8).map(p=>String(p.name||p.id||'未知選手'));
+ const onlyCloud=[...b].filter(([id])=>!a.has(id)).map(([,p])=>p);
+ const onlyLocal=[...a].filter(([id])=>!b.has(id)).map(([,p])=>p);
+ const checkin=[...b].filter(([id,p])=>a.has(id)&&Boolean(a.get(id).checkedIn)!==Boolean(p.checkedIn)).map(([,p])=>p);
+ const fields=['registrationRosterRevision','qrCheckinRevision','onsiteWaitlistRuntimeRevision','entrySelectionRevision'];
+ const revisions=fields.filter(k=>Number(local[k]||0)!==Number(remote[k]||0)).map(k=>({field:k,local:Number(local[k]||0),cloud:Number(remote[k]||0)}));
+ const pairingChanged=!!(local.bracketDraw?.id&&remote.bracketDraw?.id&&signature(local)!==signature(remote));
+ if(!onlyCloud.length&&!onlyLocal.length&&!checkin.length&&!revisions.length&&!pairingChanged)return null;
+ return {localCount:a.size,cloudCount:b.size,onlyCloud:{count:onlyCloud.length,names:names(onlyCloud)},onlyLocal:{count:onlyLocal.length,names:names(onlyLocal)},checkin:{count:checkin.length,names:names(checkin)},revisions,pairingChanged};
+}
 function assertWrite(remote,incoming,options={}){
  const same=remote.bracketDraw?.id&&remote.bracketDraw.id===incoming.bracketDraw?.id;
  if(options.bracketCommit){
@@ -19,6 +33,7 @@ function assertWrite(remote,incoming,options={}){
 }
 function create(ctx){
  let busy=false,pending=null,error='',result='',phase='',inFlightWrite=null;
+ let difference=null;
  let phaseAt=0,timings=[],cancelRetry=null;
  function progress(next){
   const now=Date.now();if(phaseAt)timings.push({phase,elapsedMs:now-phaseAt});
@@ -46,7 +61,7 @@ function create(ctx){
  }
  async function retry(firstSubmission=false){
   if(busy||!pending||!ctx.current())return false;
-  busy=true;error='';result='';phaseAt=0;timings=[];
+  busy=true;error='';result='';difference=null;phaseAt=0;timings=[];
   let lateWrite=null,cancelled=false,confirmedByTransaction=false;
   let stopWaiting;
   const stop=new Promise(resolve=>{stopWaiting=resolve;});
@@ -167,6 +182,10 @@ function create(ctx){
    if(cancelled)return false;
    try{if(e.message!=='permission-denied')await waitForFeedback();}catch{return false;}
    error=e.message||'cloud-save-unconfirmed';result='failed';
+   if(ctx.cloud()&&pending&&/stale|conflict|roster-changed/.test(error)){
+    try{const current=await deadline(ctx.read(),5000);if(ctx.current()&&current?.ok&&current.data?.id===pending.snapshot.id)
+     difference=rosterDifference(pending.snapshot,current.data);}catch{}
+   }
    try{ctx.trace?.({phase,error,elapsedMs:Date.now()-phaseAt,timings:timings.slice()});}catch{}
    return false;
   }
@@ -185,7 +204,7 @@ function create(ctx){
   if(busy||pending||!ctx.current())return false;
   const override=options.adminOperationalOverride;
   if(override&&!ctx.authorizeOverride?.(override))return false;
-  error='';result='';
+  error='';result='';difference=null;
   const base=ctx.state();if(base.startedAt||base.archiveStatus==='completed')return false;
   const snapshot=ctx.generate(options);if(!snapshot)return false;
   const id=ctx.operationId(),at=Date.now();
@@ -253,14 +272,14 @@ function create(ctx){
   finally{busy=false;if(ctx.current())ctx.changed();}
   return resume?retry():false;
  }
- return {begin,retry,discard,renewOverride,forceSubmit,selection,submit:()=>pending?retry():begin(),blocked:()=>busy||!!pending,busy:()=>busy,status:()=>({busy,pending:!!pending,canDiscard:!!pending&&(!busy||!!cancelRetry),error,result,phase,timings:timings.slice(),override:pending?.adminOperationalOverride?clone(pending.adminOperationalOverride):null}),async verify(snapshot){
+ return {begin,retry,discard,renewOverride,forceSubmit,selection,submit:()=>pending?retry():begin(),blocked:()=>busy||!!pending,busy:()=>busy,status:()=>({busy,pending:!!pending,canDiscard:!!pending&&(!busy||!!cancelRetry),error,result,phase,difference,timings:timings.slice(),override:pending?.adminOperationalOverride?clone(pending.adminOperationalOverride):null}),async verify(snapshot){
   if(busy||pending)return false;if(!ctx.cloud())return true;
   try{const latest=await deadline(ctx.read());return ctx.current()&&!busy&&!pending&&signature(ctx.state())===signature(snapshot)&&latest?.ok===true&&!latest.data.startedAt&&signature(latest.data)===signature(snapshot)&&signature(latest.publicData)===signature(snapshot);}catch{return false;}
  }};
 }
 function createServer(ctx){
  const key='bxh-v2-lifecycle:'+ctx.key;
- let pending=null,busy=false,error='',result='',phase='',action='draw';
+ let pending=null,busy=false,error='',result='',phase='',action='draw',difference=null;
  try{
   const saved=JSON.parse(ctx.storage?.getItem(key)||'null');
   if(['draw','start'].includes(saved?.action)&&saved.data?.operationId&&saved.data.code===ctx.code&&saved.data.roomId===ctx.roomId){
@@ -301,7 +320,7 @@ function createServer(ctx){
  async function retry(){
   if(busy||!pending||!ctx.current())return false;
   const {action:kind,data}=pending;
-  busy=true;error='';result='';phase='writing';ctx.changed();
+  busy=true;error='';result='';difference=null;phase='writing';ctx.changed();
   try{
    let receipt;
    for(let attempt=0;attempt<2;attempt++){
@@ -322,7 +341,14 @@ function createServer(ctx){
   }catch(e){
    if(!ctx.current())return false;
    if(['functions/failed-precondition','functions/invalid-argument','functions/not-found'].includes(e.code))clear();
-   error=pending?'confirmation-timeout':e.message;result='failed';return false;
+   error=pending?'confirmation-timeout':e.details?.reason||e.message;result='failed';
+   if(!pending&&kind==='draw'){
+    try{const latest=await readPair();if(ctx.current()&&!latest.data.startedAt){
+     difference=rosterDifference(ctx.state(),latest.data);
+     if(difference)ctx.apply(latest.data);
+    }}catch{}
+   }
+   return false;
   }finally{busy=false;if(ctx.current())ctx.changed();}
  }
  async function submit(kind,options={}){
@@ -340,13 +366,13 @@ function createServer(ctx){
  }
  return {server:true,begin:options=>submit('draw',options),start:confirmEarlyStart=>submit('start',{confirmEarlyStart}),
   retry,submit:()=>pending?retry():submit('draw'),blocked:()=>busy||!!pending,
-  status:()=>({action,busy,pending:!!pending,error,result,phase}),async verify(snapshot){
+  status:()=>({action,busy,pending:!!pending,error,result,phase,difference}),async verify(snapshot){
    if(busy||pending)return false;
    try{const latest=await readPair();return !busy&&!pending&&!latest.data.startedAt&&latest.data.bracketDraw?.id===snapshot.bracketDraw?.id&&signature(ctx.state())===signature(snapshot)&&signature(latest.data)===signature(snapshot);}
    catch{return false;}
   }};
 }
-const api={signature,assertWrite,create,createServer};if(typeof module==='object'&&module.exports)module.exports=api;else root.BXHBracketCommit=api;
+const api={signature,rosterDifference,assertWrite,create,createServer};if(typeof module==='object'&&module.exports)module.exports=api;else root.BXHBracketCommit=api;
 })(typeof window==='object'?window:globalThis);
 
 
