@@ -7,15 +7,34 @@ never start another page. The owner tabs are replaced by Open / Upcoming / Close
 Full events stay under Open, because waitlist registration may still be possible.
 Drafts, all statuses and administrator-only community rooms remain in secondary
 controls. Search covers the name, room code and location of the authorized scope,
-including events not previously loaded. Default sorting is event date descending,
-then update time descending, with a stable code tie-breaker.
+including events not previously loaded. Management defaults to All with tabs All / Registration open / Live / Done / Registration closed.
+Upcoming and Draft remain secondary filters. Legacy `closed` queries still work.
+Registration closed excludes live/settling/completed rooms; Live includes settling.
+The latest successfully managed room (`pinCode`) ranks first within the authorized,
+searched category, then live rooms, then event date descending and stable room code.
+Updates to counts or `updatedAt` do not shuffle same-day rooms. Pinning cannot bypass
+permissions, room type, search or filters; the pin is included in the cursor scope.
+Cards collapse their metadata, poster, roster and secondary actions into Details.
+
+The frontend stores only the last private management code, mode, tab and station in
+account/mode-scoped localStorage. Public viewing, history viewing and failed entry
+do not replace it. On session restoration the frontend uses the existing private
+join API with `serverOnly` to reauthorize and read fresh state before subscribing;
+it does not replay any score submission or restore a cached score snapshot.
+A lost seat returns to live view; unavailable/deleted rooms return to management
+with an explicit retry shortcut. The latest-room pointer is local to the device.
+
+This change requires the updated callable to be deployed and verified **before**
+merging/publishing the frontend. The new filters and global pinning cannot be
+implemented by sorting just the five already-loaded browser rows.
 
 `listManagementTournamentSummaries` is an independent read-only callable codebase.
 It checks the current user, organization/contract or effective activity-staff
 invitation inside a Firestore read-only transaction. It uses Firestore `select()`
-to read only a field allowlist; it never fetches runtime `data`, `bracketView`,
-registration subcollections, matches or scores. It returns five sanitized display
-rows, counts and a query-scoped cursor. It never writes, repairs or grants access.
+for scope-wide metadata. After pagination it preserves the deployed correction
+that reads only those five individual rooms' runtime `data` to count occupied
+player slots. It never returns runtime snapshots, bracket data or private player
+fields. It returns five sanitized display rows, counts and a query-scoped cursor. It never writes, repairs or grants access.
 Opening a room or explicitly expanding its roster continues to use the existing
 authorized detail APIs.
 

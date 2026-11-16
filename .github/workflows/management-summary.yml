@@ -1,7 +1,7 @@
 name: Management Summary Browser
 on:
   pull_request:
-    paths: ['management-summary/**', 'modules/main-app/core.js', 'modules/cloud/cloud-runtime.js', 'tests/management-loading.test.cjs', 'tests/e2e/management-loading.spec.cjs', 'playwright.management-summary.config.cjs', '.github/workflows/management-summary.yml']
+    paths: ['management-summary/**', 'event-poster-ui.js', 'modules/main-app/core.js', 'modules/cloud/cloud-runtime.js', 'tests/management-loading.test.cjs', 'tests/e2e/management-loading.spec.cjs', 'playwright.management-summary.config.cjs', '.github/workflows/management-summary.yml']
 permissions:
   contents: read
 jobs:
@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --test management-summary/service.test.cjs tests/management-loading.test.cjs tests/partner-workspace-access.test.cjs
+      - run: node --test management-summary/service.test.cjs tests/management-loading.test.cjs tests/partner-workspace-access.test.cjs tests/event-poster-gallery.test.cjs
   browser:
     runs-on: ubuntu-24.04
     container:

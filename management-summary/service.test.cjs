@@ -7,7 +7,7 @@ const grant={status:'active',scope:'contract',organizationId:'org',orderCode:'or
 const room=(code,extra={})=>({code,name:'賽事 '+code,eventDate:'2026-11-01',updatedAt:1,createdBy:'owner',createdByRole:'admin',eventAuthority:'official',registrationEnabled:true,registrationStatus:'open',publishedAt:1,...extra});
 const rooms=n=>Array.from({length:n},(_,i)=>room('BXH-'+String(i).padStart(6,'0'),{eventDate:'2026-11-'+String(i+1).padStart(2,'0')}));
 function fixture(user=profile,data=rooms(12),parents={}){
- const reads=[],selections=[],wheres=[];
+ const reads=[],selections=[],wheres=[],rosterReads=[];
  const db={doc:path=>({path}),collection:path=>{const q={path,filters:[],where(...args){wheres.push(args);this.filters.push(args);return this;},select(...fields){selections.push(fields);this.fields=fields;return this;}};return q;},runTransaction:(fn,options)=>{assert.equal(options?.readOnly,true,'summary reads must use a lock-free read-only snapshot');return fn({get:async ref=>{
   reads.push(ref);
   if(ref.path.startsWith('users/')){const uid=ref.path.slice(6),value=uid==='actor'?user:parents[uid];return{exists:!!value,data:()=>value};}
@@ -20,9 +20,14 @@ function fixture(user=profile,data=rooms(12),parents={}){
     const parts=key.split('.');let target=projected;for(const part of parts.slice(0,-1))target=target[part]||=( {} );target[parts.at(-1)]=value;
    }return projected;
   }}))};
+ },getAll:async(...args)=>{
+  assert.deepEqual(args.pop(),{fieldMask:['data']});
+  const codes=args.map(ref=>ref.path.replace(/^tournaments\//,''));
+  rosterReads.push(codes);
+  return codes.slice().reverse().map(code=>({id:code,data:()=>({data:data.find(row=>row.code===code)?.data})}));
  }});}};
  const list=createSummaryHandler(db,{now:()=>NOW});
- return{reads,selections,wheres,call:(data={})=>list({auth:{uid:'actor'},data}),list};
+ return{reads,selections,wheres,rosterReads,call:(data={})=>list({auth:{uid:'actor'},data}),list};
 }
 test('Firestore projection returns five summaries and pagination never returns full runtime or registrations',async()=>{
  const data=rooms(12);data[11].data='sensitive full runtime';data[11].bracketView='sensitive bracket';data[11].players=[{email:'hidden'}];
@@ -30,10 +35,27 @@ test('Firestore projection returns five summaries and pagination never returns f
  assert.equal(first.items.length,5);assert.equal(first.counts.open,12);assert.equal(first.hasMore,true);
  assert.equal(first.items[0].eventDate,'2026-11-12');
  assert.equal(t.selections.length,1);assert.deepEqual(t.selections[0],FIELDS);
+ assert.deepEqual(t.rosterReads,[first.items.map(item=>item.code)]);
  assert.ok(!JSON.stringify(first).includes('sensitive'));assert.ok(!JSON.stringify(first).includes('hidden'));
  const second=await t.call({cursor:first.nextCursor}),third=await t.call({cursor:second.nextCursor});
  assert.equal(second.items.length,5);assert.equal(third.items.length,2);assert.equal(third.hasMore,false);
  assert.equal(new Set([...first.items,...second.items,...third.items].map(row=>row.code)).size,12);
+ assert.deepEqual(t.rosterReads.map(page=>page.length),[5,5,2]);
+});
+test('individual cards use room occupancy and configured capacity with a legacy and team fallback',async()=>{
+ const guests=Array.from({length:24},(_,i)=>({id:'guest'+i,source:'onsite',checkedIn:false}));
+ const data=[
+  room('ONSITE',{capacity:24,confirmedCount:0,data:JSON.stringify({players:guests,waitlistPlayers:[{id:'wait'}]})}),
+  room('MIXED',{capacity:3,confirmedCount:2,data:{players:[...guests.slice(0,2),{registrationId:'family_a'},{registrationId:'family_b'}]}}),
+  room('EMPTY',{capacity:24,confirmedCount:1,data:{players:[]}}),
+  room('LEGACY',{capacity:24,confirmedCount:7,data:'malformed'}),
+  room('TEAM',{capacity:8,confirmedCount:2,battleMode:'team',data:{players:guests}})
+ ];
+ const t=fixture(profile,data),result=await t.call();
+ const byCode=Object.fromEntries(result.items.map(item=>[item.code,[item.confirmedCount,item.capacity]]));
+ assert.deepEqual(byCode,{ONSITE:[24,24],MIXED:[4,3],EMPTY:[0,24],LEGACY:[7,24],TEAM:[2,8]});
+ assert.ok(!t.rosterReads.flat().includes('TEAM'));
+ assert.ok(!JSON.stringify(result).includes('family_a'));
 });
 test('search finds names, room codes and locations beyond the first page without leaking unmatched rows',async()=>{
  const data=rooms(12);data[0].name='很早的雪山貓賽事';data[1].location='台南南區';
@@ -44,7 +66,7 @@ test('search finds names, room codes and locations beyond the first page without
 });
 test('state tabs classify full as open, future as upcoming and archived or cancelled as closed',async()=>{
  const data=[room('OPEN'),room('FULL',{registrationStatus:'full',capacity:32,confirmedCount:32}),room('FUTURE',{registrationStatus:'scheduled',registrationOpenAt:NOW+1000}),room('PAST',{registrationCloseAt:NOW-1000}),room('ARCHIVE',{archiveStatus:'completed'}),room('CANCELLED',{eventCancelled:true}),room('DRAFT',{registrationStatus:'draft',registrationEnabled:false})];
- const t=fixture(profile,data);const first=await t.call();assert.deepEqual(first.counts,{all:7,open:2,upcoming:1,closed:3,draft:1});
+ const t=fixture(profile,data);const first=await t.call();assert.deepEqual(first.counts,{all:7,open:2,upcoming:1,closed:3,draft:1,live:0,done:1,registration_closed:2});
  assert.equal((await t.call({status:'upcoming'})).items[0].code,'FUTURE');assert.equal((await t.call({status:'draft'})).items[0].code,'DRAFT');
  assert.equal(registrationStatus({registrationStatus:'scheduled',registrationEnabled:true,registrationOpenAt:NOW-1,publishedAt:1},NOW),'open');
 });
@@ -56,10 +78,27 @@ test('deleted cursor anchor does not skip the next remaining room',async()=>{
  const data=rooms(12),t=fixture(profile,data),first=await t.call();const anchor=first.items.at(-1).code;
  data.splice(data.findIndex(row=>row.code===anchor),1);const second=await t.call({cursor:first.nextCursor});assert.equal(second.items.length,5);assert.ok(!second.items.some(item=>first.items.some(old=>old.code===item.code)));
 });
-test('active staff and administrators can list community rooms separately',async()=>{
- const data=[room('OFFICIAL'),room('COMMUNITY',{eventAuthority:'community'})];
- assert.deepEqual((await fixture(profile,data).call({kind:'community'})).items.map(row=>row.code),['COMMUNITY']);
- const t=fixture({role:'staff',active:true},data);assert.deepEqual((await t.call({kind:'community'})).items.map(row=>row.code),['COMMUNITY']);assert.equal((await t.call()).items.length,1);
+test('BXH staff and administrators can search general rooms separately from official events',async()=>{
+ const data=[room('BXH-OFFICIAL'),room('BXH-COMMUNITY',{eventAuthority:'community'})];
+ for(const role of ['staff','admin','super_admin']){
+  const t=fixture({role,active:true},data);
+  const result=await t.call({mode:'admin',kind:'community',search:'bxh-community'});
+  assert.deepEqual(result.items.map(row=>row.code),['BXH-COMMUNITY']);
+  assert.deepEqual((await t.call()).items.map(row=>row.code),['BXH-OFFICIAL']);
+ }
+});
+test('community summaries are denied outside the active BXH staff and administrator scope',async()=>{
+ for(const [user,mode] of [
+  [{role:'player',active:true},'admin'],
+  [{role:'staff',active:false},'admin'],
+  [{role:'staff',active:true,isTestAccount:true},'admin'],
+  [{role:'player',active:true,partnerOrganizer:grant},'partner_organizer'],
+  [{role:'player',active:true},'event_staff']
+ ]){
+  const t=fixture(user);
+  await assert.rejects(t.call({mode,kind:'community'}),/permission-denied/);
+  assert.equal(t.selections.length,0);
+ }
 });
 test('ordinary, disabled, deleted, frozen and inactive accounts cannot read summaries',async()=>{
  for(const user of [{role:'player',active:true},{role:'admin',active:false},{role:'admin',active:true,deleted:true},{role:'admin',active:true,accountStatus:'frozen'}]){
@@ -87,4 +126,28 @@ test('event staff require accepted assignment and a still-effective parent organ
 });
 test('invalid inputs fail before any database query',async()=>{
  const t=fixture();for(const data of [{status:'mine'},{kind:'private'},{mode:'super_admin'},{search:'x'.repeat(121)},{cursor:123}])await assert.rejects(t.call(data),/invalid-/);assert.equal(t.reads.length,0);
+});
+
+test('last managed room is ranked before live rooms even beyond the first page; cursors preserve all rows',async()=>{
+ const data=rooms(17);data[4].tournamentPhase='live';data[5].tournamentPhase='settling';
+ const t=fixture(profile,data),seen=[];let cursor=null;
+ do{const result=await t.call({status:'all',pinCode:'BXH-000000',cursor});seen.push(...result.items);cursor=result.nextCursor;}while(cursor);
+ assert.equal(seen[0].code,'BXH-000000');assert.equal(seen[1].tournamentPhase,'settling');assert.equal(seen[2].tournamentPhase,'live');
+ assert.equal(seen.length,17);assert.equal(new Set(seen.map(x=>x.code)).size,17);
+ const first=await t.call({status:'all',pinCode:'BXH-000000'});
+ await assert.rejects(t.call({status:'all',pinCode:'BXH-000001',cursor:first.nextCursor}),/invalid-cursor/);
+});
+test('updatedAt changes never shuffle same-day room cards',async()=>{
+ const data=[room('BXH-AAAAAA',{updatedAt:1}),room('BXH-BBBBBB',{updatedAt:999})];const t=fixture(profile,data);
+ assert.deepEqual((await t.call({status:'all'})).items.map(x=>x.code),['BXH-AAAAAA','BXH-BBBBBB']);
+ data[0].updatedAt=10000;assert.deepEqual((await t.call({status:'all'})).items.map(x=>x.code),['BXH-AAAAAA','BXH-BBBBBB']);
+});
+test('live, completed and registration-closed filters are distinct and pin cannot bypass scope or search',async()=>{
+ const data=[room('BXH-AAAAAA'),room('BXH-BBBBBB',{tournamentPhase:'live'}),room('BXH-CCCCCC',{tournamentPhase:'done'}),room('BXH-DDDDDD',{registrationStatus:'closed'}),room('BXH-EEEEEE',{tournamentPhase:'settling'})];
+ const t=fixture(profile,data);
+ for(const [status,expected] of [['open',['BXH-AAAAAA']],['live',['BXH-BBBBBB','BXH-EEEEEE']],['done',['BXH-CCCCCC']],['registration_closed',['BXH-DDDDDD']]]){
+  const r=await t.call({status,pinCode:'BXH-AAAAAA'});assert.deepEqual(r.items.map(x=>x.code),expected);assert.equal(r.counts[status],expected.length);
+ }
+ assert.equal((await t.call({status:'all',search:'DDDDDD',pinCode:'BXH-AAAAAA'})).items[0].code,'BXH-DDDDDD');
+ const tester={role:'tester',active:true};assert.equal((await fixture(tester,data).call({status:'all',pinCode:'BXH-AAAAAA'})).items.length,0);
 });

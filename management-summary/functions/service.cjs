@@ -2,8 +2,8 @@
 
 const {activeAccount,ownsEvent,effective}=require('./event-staff-core.cjs');
 const PAGE_SIZE=5;
-// Deliberately excludes data, bracketView, registrations, match logs, seat maps,
-// contact details and scoring fields. Projection happens inside Firestore.
+// Scope-wide search projects metadata only. Runtime data is read only for the
+// individual rooms on the requested page, after authorization and pagination.
 const FIELDS=Object.freeze(['name','eventDate','startAt','location','posterUrl','battleMode','teamSize',
  'formatType','ladderMode','testLadderEnabled','ladderPointsAwarded','tournamentPhase','archiveStatus',
  'registrationEnabled','registrationStatus','registrationOpenAt','registrationCloseAt','publishedAt',
@@ -46,14 +46,29 @@ function project(code,d,now){
   updatedAt:millis(d.updatedAt)||0,createdBy:tidy(d.createdBy,128),createdByName:tidy(d.createdByName),
   eventAuthority:tidy(d.eventAuthority||'official',32),testMode:d.testMode===true,createdByRole:tidy(d.createdByRole,32)};
 }
-function compare(a,b){return a.eventDate===b.eventDate?b.updatedAt-a.updatedAt||a.code.localeCompare(b.code):a.eventDate<b.eventDate?1:-1;}
+function roomPlayerCount(data){
+ let runtime;
+ try{runtime=typeof data==='string'?JSON.parse(data):data;}catch{return null;}
+ if(!Array.isArray(runtime?.players))return null;
+ return runtime.players.filter(player=>player&&typeof player==='object'&&!Array.isArray(player)).length;
+}
+function managementBucket(row){
+ if(row.archiveStatus==='completed'||row.tournamentPhase==='done')return 'done';
+ if(['live','settling'].includes(row.tournamentPhase))return 'live';
+ return row.registrationBucket==='closed'?'registration_closed':row.registrationBucket;
+}
+function orderedCompare(pinCode){return (a,b)=>Number(b.code===pinCode)-Number(a.code===pinCode)
+ ||Number(managementBucket(b)==='live')-Number(managementBucket(a)==='live')
+ ||(a.eventDate===b.eventDate?a.code.localeCompare(b.code):a.eventDate<b.eventDate?1:-1);}
+function compare(a,b){return orderedCompare(null)(a,b);}
 function options(data={}){
  if(!data||typeof data!=='object'||Array.isArray(data))throw Error('invalid-argument');
  const status=data.status||'open',kind=data.kind||'official',mode=data.mode||'admin';
- if(!['open','upcoming','closed','draft','all'].includes(status)||!['official','community'].includes(kind)
+ if(!['open','upcoming','closed','draft','all','live','done','registration_closed'].includes(status)||!['official','community'].includes(kind)
   ||!['admin','partner_organizer','event_staff'].includes(mode)||typeof(data.search??'')!=='string'||data.search?.length>120)throw Error('invalid-argument');
  if(data.cursor!=null&&(typeof data.cursor!=='string'||data.cursor.length>2000))throw Error('invalid-cursor');
- return {status,kind,mode,search:norm(data.search||''),cursor:data.cursor||null};
+ if(data.pinCode!=null&&(typeof data.pinCode!=='string'||!/^BXH-[A-Z0-9]{6}$/.test(data.pinCode)))throw Error('invalid-argument');
+ return {status,kind,mode,pinCode:data.pinCode||null,search:norm(data.search||''),cursor:data.cursor||null};
 }
 function partnerGrant(profile,now){
  const g=profile.partnerOrganizer;
@@ -107,18 +122,29 @@ function createSummaryHandler(db,{now=Date.now}={}){return async request=>{
   rows=rows.filter(row=>row.name.trim()||row.eventDate.trim()||row.location.trim()||row.registrationEnabled
    ||row.confirmedCount||row.waitlistCount||row.tournamentPhase!=='waiting');
   if(opt.search)rows=rows.filter(row=>[row.name,row.code,row.location].some(value=>norm(value).includes(opt.search)));
-  const counts={all:rows.length,open:0,upcoming:0,closed:0,draft:0};
-  rows.forEach(row=>counts[row.registrationBucket]++);
-  rows=rows.filter(row=>opt.status==='all'||row.registrationBucket===opt.status).sort(compare);
-  const scopeKey=JSON.stringify([uid,scope,opt.mode,opt.kind,opt.status,opt.search]);
+  const counts={all:rows.length,open:0,upcoming:0,closed:0,draft:0,live:0,done:0,registration_closed:0};
+  rows.forEach(row=>{counts[row.registrationBucket]++;const key=managementBucket(row);if(['live','done','registration_closed'].includes(key))counts[key]++;});
+  const compareRows=orderedCompare(opt.pinCode);
+  rows=rows.filter(row=>opt.status==='all'||(['live','done','registration_closed'].includes(opt.status)?managementBucket(row)===opt.status:row.registrationBucket===opt.status)).sort(compareRows);
+  const scopeKey=JSON.stringify([uid,scope,opt.mode,opt.kind,opt.status,opt.search,opt.pinCode]);
   if(opt.cursor){
    let cursor;try{cursor=JSON.parse(Buffer.from(opt.cursor,'base64url').toString('utf8'));}catch{throw Error('invalid-cursor');}
    if(cursor.scope!==scopeKey||typeof cursor.after?.code!=='string'||typeof cursor.after?.eventDate!=='string'
     ||!Number.isFinite(cursor.after?.updatedAt))throw Error('invalid-cursor');
-   rows=rows.filter(row=>compare(row,cursor.after)>0);
+   rows=rows.filter(row=>compareRows(row,cursor.after)>0);
   }
   const items=rows.slice(0,PAGE_SIZE),hasMore=rows.length>PAGE_SIZE,last=items.at(-1);
-  const nextCursor=hasMore?Buffer.from(JSON.stringify({scope:scopeKey,after:{code:last.code,eventDate:last.eventDate,updatedAt:last.updatedAt}})).toString('base64url'):null;
+  const nextCursor=hasMore?Buffer.from(JSON.stringify({scope:scopeKey,after:{code:last.code,eventDate:last.eventDate,updatedAt:last.updatedAt,tournamentPhase:last.tournamentPhase,archiveStatus:last.archiveStatus,registrationBucket:last.registrationBucket}})).toString('base64url'):null;
+  const individualRooms=items.filter(item=>item.battleMode==='individual');
+  if(individualRooms.length){
+   const refs=individualRooms.map(item=>db.doc('tournaments/'+item.code));
+   const rosterSnapshots=await tx.getAll(...refs,{fieldMask:['data']});
+   const roomsByCode=new Map(individualRooms.map(item=>[item.code,item]));
+   for(const snapshot of rosterSnapshots){
+    const occupied=roomPlayerCount(snapshot.data()?.data);
+    if(occupied!==null)roomsByCode.get(snapshot.id).confirmedCount=occupied;
+   }
+  }
   return {ok:true,items,counts,hasMore,nextCursor,pageSize:PAGE_SIZE,asOf:at};
  },{readOnly:true});
 };}
