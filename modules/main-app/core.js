@@ -6324,6 +6324,7 @@ function stationMutationErrorMessage(reason){
     "cloud-unavailable":"目前無法連線雲端，請稍後再試。",
     "operation-pending":"這場有尚未確認的操作，請先按「重新確認未完成操作」，不要重新加分。",
     "corrupt-data":"雲端賽事資料異常，已停止寫入。",
+    "previous-round-waiting":"上一輪仍有未開打、PASS 或暫停場次，請先安排上一輪。",
     "bronze-before-final":"季殿尚未完成，冠亞必須等待季殿結束後才能開始。"
   };
   return map[reason] || ("雲端場次更新失敗（"+reason+"），請重新整理後再試。");
@@ -7318,6 +7319,20 @@ function singleElimBronzeBeforeFinalBlocked(match,matches=state.matches,meta=sta
   return Number(match.round||0)===Number(gate.finalRound);
 }
 
+// Round order is shared by official, general and player-created single-elim rooms.
+// A prior round may still be playing, but no waiting/PASS/paused match may be
+// bypassed. This checks every earlier round, including unresolved placeholders.
+function singleElimRoundDispatchBlocked(match,matches=state.matches,meta=state.meta){
+  if((meta?.formatType||"single")!=="single" || !match || match.bracket!=="SE") return false;
+  return matches.some(m=>m && m.bracket==="SE" && !m.isBye && !m.completed &&
+    Number(m.round||0)<Number(match.round||0) &&
+    (m.status!=="in_progress" || !!m.skippedAt || !!m.callPass));
+}
+
+function singleElimDispatchBlocked(match,matches=state.matches,meta=state.meta){
+  return singleElimBronzeBeforeFinalBlocked(match,matches,meta) || singleElimRoundDispatchBlocked(match,matches,meta);
+}
+
 function activeSingleElimSchedulePhase(matches=state.matches, meta=state.meta){
   // Placement gate is stronger than normal per-court progression: once both
   // semifinal losers are known, 季殿 must finish before 冠亞 can become ready,
@@ -7612,6 +7627,12 @@ function autoAdvanceReadyMatches(){
   blockedDouble.forEach(m=>{m.status="pending";m.startedAt=null;m.updatedAt=Date.now();});
   if(blockedDouble.length) clearCourtAssignmentRefs(state,blockedDouble.map(m=>m.id));
 
+  state.matches.forEach(m=>{
+    if(m.status==="ready" && singleElimRoundDispatchBlocked(m,state.matches,state.meta) && !matchHasDecisionData(m)){
+      m.status="pending";m.startedAt=null;m.updatedAt=Date.now();
+    }
+  });
+
   const readyStations = new Set();
   state.matches.forEach(m=>{ if(!m.isBye && m.status==="ready" && m.station!=null) readyStations.add(m.station); });
 
@@ -7622,7 +7643,7 @@ function autoAdvanceReadyMatches(){
     m.a && m.b &&
     m.station!=null &&
     !readyStations.has(m.station) &&
-    !singleElimBronzeBeforeFinalBlocked(m,state.matches,state.meta) &&
+    !singleElimDispatchBlocked(m,state.matches,state.meta) &&
     (!(state.meta&&state.meta.formatType==="double") || !window.BXHDoubleElim || window.BXHDoubleElim.isPhaseOpen(state.matches,m))
   );
 
@@ -7647,6 +7668,7 @@ function setMatchInProgress(matchId, force){
   const m = getMatch(matchId);
   if(!m || m.isBye) return;
   if(singleElimBronzeBeforeFinalBlocked(m,state.matches,state.meta)){showToast("季殿尚未完成，冠亞必須等待季殿結束後才能開始。",true);return;}
+  if(singleElimRoundDispatchBlocked(m,state.matches,state.meta)){showToast("上一輪仍有未開打、PASS 或暫停場次，請先安排上一輪。",true);return;}
   if(!requireStationPermission(m)) return;
   if(!m.a || !m.b){ showToast("此場次尚未確定兩位選手，無法設為進行中", true); return; }
   const conflict = state.matches.find(x=> x.id!==m.id && !x.isBye && x.station===m.station && x.status==="in_progress");
@@ -7664,6 +7686,7 @@ function setMatchInProgress(matchId, force){
   m.updatedBy = adminDisplayName || (userProfile&&userProfile.email) || "admin";
   persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
     if(!remoteMatch) return {ok:false,reason:"not-found"};
+    if(singleElimRoundDispatchBlocked(remoteMatch,remoteState.matches,remoteState.meta)) return {ok:false,reason:"previous-round-waiting"};
     if(singleElimBronzeBeforeFinalBlocked(remoteMatch,remoteState.matches,remoteState.meta)) return {ok:false,reason:"bronze-before-final"};
     const conflict=(remoteState.matches||[]).find(x=>x.id!==remoteMatch.id && !x.isBye && x.station===remoteMatch.station && x.status==="in_progress");
     if(conflict){ conflict.status="ready"; conflict.updatedAt=Date.now(); }
@@ -7679,6 +7702,7 @@ function setMatchReady(matchId){
   const m = getMatch(matchId);
   if(!m || m.isBye) return;
   if(singleElimBronzeBeforeFinalBlocked(m,state.matches,state.meta)){showToast("季殿尚未完成，冠亞不能進入預備或開賽狀態。",true);return;}
+  if(singleElimRoundDispatchBlocked(m,state.matches,state.meta)){showToast("上一輪仍有未開打、PASS 或暫停場次，請先安排上一輪。",true);return;}
   if(!requireStationPermission(m)) return;
   if(m.completed || m.status==="completed"){ showToast("此場次已完成，無法設為預備中", true); return; }
   if(!m.a || !m.b){ showToast("此場次尚未確定兩位選手，無法設為預備中", true); return; }
@@ -7694,6 +7718,7 @@ function setMatchReady(matchId){
   m.updatedBy = adminDisplayName || (userProfile&&userProfile.email) || "admin";
   persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
     if(!remoteMatch) return {ok:false,reason:"not-found"};
+    if(singleElimRoundDispatchBlocked(remoteMatch,remoteState.matches,remoteState.meta)) return {ok:false,reason:"previous-round-waiting"};
     if(singleElimBronzeBeforeFinalBlocked(remoteMatch,remoteState.matches,remoteState.meta)) return {ok:false,reason:"bronze-before-final"};
     (remoteState.matches||[]).forEach(x=>{ if(x.id!==remoteMatch.id && !x.isBye && x.station===remoteMatch.station && x.status==="ready"){ x.status="pending"; x.updatedAt=Date.now(); } });
     remoteMatch.status="ready"; remoteMatch.updatedAt=Date.now();
@@ -8098,18 +8123,9 @@ const {courtKey,matchLabel,liveEtaCountdownText,matchStatusClass}=window.BXHMatc
 function stationExecutionQueue(stationNum){
   if(state.forcedCourtExits?.[stationNum]?.closed)return [];
   const retirement=state.courtRetirementPlan?.courts?.[stationNum];
-  if(retirement&&Number(stationNum)>window.BXHCourtRetirement.target(state))return refereeMatches().filter(m=>Number(m.station)===Number(stationNum)&&!m.completed&&retirement.holdIds.includes(m.id)&&m.a&&m.b&&!m.skippedAt);
+  if(retirement&&Number(stationNum)>window.BXHCourtRetirement.target(state))return refereeMatches().filter(m=>Number(m.station)===Number(stationNum)&&!m.completed&&retirement.holdIds.includes(m.id)&&m.a&&m.b&&!m.skippedAt&&!singleElimDispatchBlocked(m,state.matches,state.meta));
   let available=refereeMatches().filter(m=>m.station===stationNum&&!m.completed&&m.a&&m.b&&m.status!=="paused");
-  if((state.meta.formatType||"single")==="single"){
-    const phase=activeSingleElimSchedulePhase();
-    if(phase){
-      // Preserve normal independent per-court progression, but never permit the
-      // championship final to bypass a pending 季殿 placement match.
-      const samePhase=available.filter(m=>isInActiveSingleElimPhase(m,phase));
-      const laterReady=available.filter(m=>!isInActiveSingleElimPhase(m,phase));
-      available=samePhase.concat(laterReady.filter(m=>!singleElimBronzeBeforeFinalBlocked(m)));
-    }
-  }
+  available=available.filter(m=>!singleElimDispatchBlocked(m,state.matches,state.meta));
   const normal=available.filter(m=>!m.skippedAt).sort((a,b)=>{
     const ap=Number(a.dispatchPriorityAt||0),bp=Number(b.dispatchPriorityAt||0);
     if(!!ap!==!!bp) return ap?-1:1;
@@ -8145,7 +8161,7 @@ function reconcileCourtAssignments(){
     if(state.forcedCourtExits?.[i]?.closed)continue;
     if(!court)continue;
     const current=court.currentMatchId?getMatch(court.currentMatchId):null;
-    const validCurrent=!!(current&&!current.completed&&Number(current.station)===i&&current.a&&current.b&&current.status!=="paused"&&!singleElimBronzeBeforeFinalBlocked(current,state.matches,state.meta));
+    const validCurrent=!!(current&&!current.completed&&Number(current.station)===i&&current.a&&current.b&&current.status!=="paused"&&!singleElimBronzeBeforeFinalBlocked(current,state.matches,state.meta)&&(current.status==="in_progress"||!singleElimRoundDispatchBlocked(current,state.matches,state.meta)));
     preserved[key]=validCurrent?current.id:null;
   }
   rebuildCourtAssignments();
@@ -8186,6 +8202,9 @@ function rebuildCourtAssignments(){
     // redistribution) no longer actually belongs to this court.
     if(current && (current.completed || current.station!==i)) current = null;
     if(current && singleElimBronzeBeforeFinalBlocked(current,state.matches,state.meta) && !matchHasDecisionData(current)){
+      current.status="pending";current.startedAt=null;court.currentMatchId=null;current=null;
+    }
+    if(current && ["pending","ready"].includes(current.status) && singleElimRoundDispatchBlocked(current,state.matches,state.meta)){
       current.status="pending";current.startedAt=null;court.currentMatchId=null;current=null;
     }
     // A paused match STAYS as the court's current match (paused ≠ vacated).
@@ -12081,7 +12100,7 @@ function canCourtSwapSource(m){
 function canCourtSwapTarget(m,sourceMatch,st=state){
   if(window.BXHCourtRetirement&&(!window.BXHCourtRetirement.accepts(st,m?.station)||!window.BXHCourtRetirement.accepts(st,sourceMatch?.station)))return false;
   if(!m||!sourceMatch||m.id===sourceMatch.id||m.isBye||m.completed||!m.a||!m.b) return false;
-  if(singleElimBronzeBeforeFinalBlocked(m,(st&&st.matches)||[],(st&&st.meta)||{})) return false;
+  if(singleElimDispatchBlocked(m,(st&&st.matches)||[],(st&&st.meta)||{})) return false;
   if(m.status==="in_progress"||m.status==="paused"||m.skippedAt||m.callPass||matchHasDecisionData(m)) return false;
   return true;
 }
@@ -12093,11 +12112,10 @@ function idleCourtCandidates(st,stationNum){
   const movable=new Set(window.BXHCourtRetirement.movableQueuedMatches(st).map(m=>m.id));
   const courts=st.courtAssignments||{};
   const busy=new Set(Object.values(courts).map(c=>c&&c.currentMatchId).filter(Boolean));
-  const phase=(st.meta.formatType||"single")==="single"?activeSingleElimSchedulePhase(st.matches,st.meta):null;
   return (st.matches||[]).filter(m=>m&&movable.has(m.id)&&Number(m.station)!==Number(stationNum)&&!busy.has(m.id)&&
     !m.isBye&&!m.completed&&m.a&&m.b&&!m.skippedAt&&!m.callPass&&
     !matchHasDecisionData(m)&&["pending","ready"].includes(m.status||"pending")&&
-    (!phase||isInActiveSingleElimPhase(m,phase,st.matches)||!singleElimBronzeBeforeFinalBlocked(m,st.matches,st.meta)))
+    !singleElimDispatchBlocked(m,st.matches,st.meta))
     .sort((a,b)=>Number(a.seq||0)-Number(b.seq||0));
 }
 function applyIdleCourtClaim(st,matchId,stationNum){
@@ -12209,7 +12227,7 @@ async function executeCourtSwap(targetId){
 }
 let bracketManualAssignSuppressClickId="";
 let bracketManualAssignSuppressClickUntil=0;
-function canManualAssignMatch(m,st=state){return !!(m&&!m.isBye&&!m.completed&&m.a&&m.b&&!matchHasDecisionData(m)&&m.status!=="paused"&&!m.skippedAt&&!m.callPass&&!singleElimBronzeBeforeFinalBlocked(m,(st&&st.matches)||[],(st&&st.meta)||{}));}
+function canManualAssignMatch(m,st=state){return !!(m&&!m.isBye&&!m.completed&&m.a&&m.b&&!matchHasDecisionData(m)&&m.status!=="paused"&&!m.skippedAt&&!m.callPass&&!singleElimDispatchBlocked(m,(st&&st.matches)||[],(st&&st.meta)||{}));}
 function applyManualCourtAssign(st,matchId,targetStation){
  const m=(st.matches||[]).find(x=>x.id===matchId);if(!canManualAssignMatch(m,st))return {ok:false,reason:"match-no-longer-available"};
  const n=window.BXHCourtRetirement?window.BXHCourtRetirement.target(st):Math.max(1,Number(st.meta?.stations||1));if(targetStation<1||targetStation>n||window.BXHCourtRetirement&&!window.BXHCourtRetirement.accepts(st,targetStation))return {ok:false,reason:"station-not-assigned"};
