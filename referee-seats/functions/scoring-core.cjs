@@ -44,6 +44,7 @@ function perform({room,state,user,uid,d,now,authority={}},propagate){
  }else{
   if(m.completed||m.status==='completed')fail('already-completed');
   if(engine.singleElimBronzeBeforeFinalBlocked(m,state.matches,state.meta))fail('bronze-before-final');
+  if(['start','ready'].includes(action)&&engine.singleElimRoundDispatchBlocked(m,state.matches,state.meta))fail('previous-round-waiting');
   if(action==='score'||action==='fault'){
    if(engine.checkWinnerSide(m))fail('no-more-score');
    if(m.scoringMode==='quick')fail('quick-mode');

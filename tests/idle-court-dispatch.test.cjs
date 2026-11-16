@@ -5,7 +5,7 @@ const src=fs.readFileSync(require('node:path').join(__dirname,'..','modules','ma
 function fn(name,next){const start=src.indexOf('function '+name+'(');assert(start>=0,name);const end=src.indexOf('\n'+next,start);assert(end>start,name);return src.slice(start,end);}
 const sandbox={window:{},Date,Number,Object,Set,Array,String,Math,
  courtKey:n=>'court'+n,
- activeSingleElimSchedulePhase:()=>null,
+ singleElimDispatchBlocked:()=>false,
  isInActiveSingleElimPhase:()=>true,
  matchHasDecisionData:m=>!!(m.completed||m.scoreA||m.scoreB||m.log?.length),
  clearCourtAssignmentRefs:(st,ids)=>Object.values(st.courtAssignments).forEach(c=>{if(ids.includes(c.currentMatchId))c.currentMatchId=null;if(ids.includes(c.nextMatchId))c.nextMatchId=null;})};
