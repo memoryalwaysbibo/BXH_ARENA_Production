@@ -41,6 +41,7 @@ async function mount(page){
     // This fixture only renders the overview; summary refresh is exercised by
     // the management-loading browser suite.
     window.scheduleAdminTournamentListRefresh=()=>{};
+    window.readManagedRoomRecord=()=>null; // no last-managed room in this isolated overview fixture
     window.mock={calls:0,used:2,fail:false,pending:false};
     window.engagementService={getPartnerContract:async()=>{
       window.mock.calls++;
