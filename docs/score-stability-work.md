@@ -48,3 +48,27 @@ p95 3,742 ms、最慢 8,037 ms。320 人房 PASS 為 7,778 ms，前三次交易
 完整頁面測試已補 v1/v2、6/12 台與 PASS 失去回覆的重試案例，但本機在
 開啟瀏覽器前即遭 socket 權限限制，通過案例數為 0。隔離轉接檢查 3 項
 通過；尚不能宣稱完整頁面驗收完成。候選版未部署、未啟用正式房間。
+
+## 下一步與 CI 修正（2026-11-18）
+
+最新遠端 CI 發現三項阻礙，已在候選分支修正並本機重驗：
+
+- release/buckets/firestore.rules 重新由固定線上基準與候選規則生成，補上
+  v2 額外開關；真實 Emulator 的原始及候選權限驗收皆通過。
+- community-referee/backend-manifest.json 同步已修改診斷模組的 SHA256；
+  原始引擎、入口、lockfile 仍受不可變基準檢查保護。相關 7 項 Python
+  檢查及 manifest 重現檢查通過。
+- 跨桶同時確認測試改為等待所有操作結束，只接受公開快照明確的
+  projection-source-changed 拒絕，隨後必須重新發布、核對兩位晉級者、
+  決賽派台、冠亞軍與工作紀錄；整套 trusted Emulator 驗收通過。
+
+這些修正未改變 PASS 執行範圍，也不代表已消除等待。PASS 目前呼叫
+scoring-core.transition → engine.markMatchSkipped → rebuildCourtAssignments，
+然後再次 rebuildPropagationForState；它可影響全房派台。因此不能直接
+把它改為只讀本台桶，否則未讀到的其他台 pause/resume、比分或派台狀態
+可能使全房重建與寫回失去一致性。
+
+後續實作順序：先明列 PASS 與派台所依賴的場次狀態及版本，再建立只提交
+受影響場次的結構路徑；一般送分與公開戰況各自確認。驗收必須涵蓋 PASS
+與其他台送分／暫停／完成同時發生、舊版本拒絕及同收據重播。完整頁面
+驗收仍待新 CI 跑到該步驟；正式站與房間開關均未修改。

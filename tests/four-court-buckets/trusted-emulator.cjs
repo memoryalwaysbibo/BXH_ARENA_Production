@@ -227,7 +227,14 @@ async function send(root,id,action,extra={}){
    const {root,pub}=await seed('BXH-CROSS1');
    for(const id of ['m1','m2']){await send(root,id,'score',{side:'A',finish:'extreme'});await send(root,id,'score',{side:'A',finish:'spin'});}
    const before=await read(root),commands=['m1','m2'].map(id=>{const d=request(before.state,before.room,id,'confirm',operation());return {auth:{uid:'ref'+d.station},data:d};});
-   await Promise.all([...commands.map(d=>commit(d)),publish('BXH-CROSS1')]);await publish('BXH-CROSS1');
+   // A captured public snapshot may become stale while either confirmation
+   // changes structure. Settle every scoring command, accept only that explicit
+   // publisher conflict, then require a fresh public catch-up before assertions.
+   const overlapping=await Promise.allSettled([...commands.map(d=>commit(d)),publish('BXH-CROSS1')]);
+   for(const result of overlapping.slice(0,commands.length))assert.equal(result.status,'fulfilled',result.reason?.message);
+   const projection=overlapping.at(-1);
+   if(projection.status==='rejected')assert.equal(projection.reason.message,'projection-source-changed');
+   await publish('BXH-CROSS1');
    const after=await read(root),final=after.state.matches.find(m=>m.id==='final');
    assert.equal(final.a.playerId,'a');assert.equal(final.b.playerId,'c');
    // The old court-5 forecast must not keep court 1 idle once both players
