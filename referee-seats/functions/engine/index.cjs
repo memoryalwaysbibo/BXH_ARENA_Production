@@ -11,7 +11,7 @@ function createEngine(initialState,identity,now,operationId,drawSeed){
  const showToast=()=>{};
  const currentRefereeIdentity=()=>identity;
  const retirement=require('./court-retirement.cjs').BXHCourtRetirement;
- const window={BXHDoubleElim:require('./double-elimination.cjs'),BXHCourtRetirement:{...retirement,reconcile:st=>retirement.reconcile(st,now)}};
+ const window={BXHPassReturn:require('./pass-return.cjs').BXHPassReturn,BXHDoubleElim:require('./double-elimination.cjs'),BXHCourtRetirement:{...retirement,reconcile:st=>retirement.reconcile(st,now)}};
  const {courtKey,correctionMatchHasActualPlay,correctionParticipantSignature,matchHasDecisionData,nextPow2,seedOrder}=require('./match-utils.cjs');
  const POINT_TYPES = { spin:1, knockout:2, burst:2, extreme:3, fault:1 };
 const HUNTER_ROUND_SCHEMA_VERSION = 1;
@@ -115,7 +115,7 @@ function applyCourtSwapMutation(remoteState,sourceId,targetId){
 
 function applyIdleCourtClaim(st,matchId,stationNum){
   const court=st.courtAssignments&&st.courtAssignments[courtKey(stationNum)];
-  if(!court||court.currentMatchId) return {ok:false,reason:"court-no-longer-idle"};
+  if(!court||court.status==="paused"||court.currentMatchId&&!window.BXHPassReturn?.idle(st,stationNum)) return {ok:false,reason:"court-no-longer-idle"};
   const match=idleCourtCandidates(st,stationNum).find(m=>m.id===matchId);
   if(!match) return {ok:false,reason:"match-no-longer-available"};
   const now=Date.now();
@@ -196,6 +196,12 @@ function applyQuickDecisionFields(m, evalResult, actor){
 }
 
 function applySkippedDispatch(remote,m,target,expectedRevision){
+  if(window.BXHPassReturn?.supported(remote)&&m?.skippedAt){
+    if(Number(m.dispatchRevision||0)!==expectedRevision)return {ok:false,reason:"dispatch-stale"};
+    const result=window.BXHPassReturn.request(remote,m,target,Date.now(),n=>window.BXHCourtRetirement.accepts(remote,n),x=>singleElimDispatchBlocked(x,remote.matches,remote.meta));
+    if(result.ok)rebuildPropagationForState(remote);
+    return result;
+  }
   if(callPassProtected(remote,m))return {ok:false,reason:"dispatch-stale"};
   if(!m || m.completed || !m.skippedAt || m.resumeQueuedAt || !m.a || !m.b || (m.dispatchRevision||0)!==expectedRevision) return {ok:false,reason:"dispatch-stale"};
   if(!Number.isInteger(target)||target<1||target>(window.BXHCourtRetirement?window.BXHCourtRetirement.target(remote):Number(remote.meta.stations||1))) return {ok:false,reason:"station-mismatch"};
@@ -503,11 +509,14 @@ function getMatch(id){ return state.matches.find(m=>m.id===id); }
 
 function idleCourtCandidates(st,stationNum){
   if(window.BXHCourtRetirement&&!window.BXHCourtRetirement.accepts(st,stationNum))return [];
+  if(st.courtAssignments?.[courtKey(stationNum)]?.status==="paused")return [];
   if(!window.BXHCourtRetirement?.movableQueuedMatches)return [];
-  const movable=new Set(window.BXHCourtRetirement.movableQueuedMatches(st).map(m=>m.id));
+  const sequential=(st.meta?.formatType||"single")==="single";
+  const routing=sequential?{...st,courtAssignments:Object.fromEntries(Object.entries(st.courtAssignments||{}).map(([k,c])=>[k,{...c,nextMatchId:null}]))}:st;
+  const movable=new Set(window.BXHCourtRetirement.movableQueuedMatches(routing).map(m=>m.id));
   const courts=st.courtAssignments||{};
   const busy=new Set(Object.values(courts).map(c=>c&&c.currentMatchId).filter(Boolean));
-  return (st.matches||[]).filter(m=>m&&movable.has(m.id)&&Number(m.station)!==Number(stationNum)&&!busy.has(m.id)&&
+  return (st.matches||[]).filter(m=>m&&movable.has(m.id)&&(!sequential||!m.dispatchPriorityAt)&&(sequential||Number(m.station)!==Number(stationNum))&&!busy.has(m.id)&&
     !m.isBye&&!m.completed&&m.a&&m.b&&!m.skippedAt&&!m.callPass&&
     !matchHasDecisionData(m)&&["pending","ready"].includes(m.status||"pending")&&
     !singleElimDispatchBlocked(m,st.matches,st.meta))
@@ -517,8 +526,13 @@ function idleCourtCandidates(st,stationNum){
 function markMatchSkipped(matchId){
   const m=getMatch(matchId);
   const queue=stationExecutionQueue(m.station);
-  m.skipWaitFor=queue.filter(x=>x.id!==matchId&&!x.skippedAt).slice(0,2).map(x=>x.id);
-  m.skipManualOnly=m.skipWaitFor.length===0;
+  if(window.BXHPassReturn?.supported(state)){
+    const planned=window.BXHPassReturn.create(state,m,Date.now());
+    if(!planned.ok)throw Object.assign(new Error(planned.reason),{seatCode:planned.reason});
+  }else{
+    m.skipWaitFor=queue.filter(x=>x.id!==matchId&&!x.skippedAt).slice(0,2).map(x=>x.id);
+    m.skipManualOnly=m.skipWaitFor.length===0;
+  }
   m.status="pending"; m.skippedAt=Date.now(); m.resumeQueuedAt=null;
   m.dispatchRevision=Number(m.dispatchRevision||0)+1;
   m.updatedAt=Date.now();
@@ -582,6 +596,9 @@ function rebuildCourtAssignments(authoritative=false){
     next[key] = existing[key] ? Object.assign({}, existing[key]) : { currentMatchId:null, nextMatchId:null, status:"idle", lockedBy:null, lockedAt:null, updatedAt:null };
   }
   state.courtAssignments = next;
+  if(authoritative&&window.BXHPassReturn)window.BXHPassReturn.reconcile(state,Date.now(),{
+    accepts:n=>window.BXHCourtRetirement.accepts(state,n),blocked:m=>singleElimDispatchBlocked(m,state.matches,state.meta)
+  });
 
   for(let i=1;i<=n;i++){
     const key = courtKey(i);
@@ -636,6 +653,7 @@ function rebuildCourtAssignments(authoritative=false){
           if(!current.startedAt) current.startedAt = Date.now();
           current.updatedAt = Date.now();
           current.dispatchPriorityAt = null;
+          window.BXHPassReturn?.started(current,Date.now());
           current.skippedAt = null; current.resumeQueuedAt=null; current.skipWaitFor=[]; current.skipManualOnly=false;
         }else{
           // 產生對戰表／預排裁判台不等於開賽。未按「開始賽事」前只能保持預備狀態。
@@ -647,6 +665,7 @@ function rebuildCourtAssignments(authoritative=false){
     // Preassigned first matches must become live when the tournament starts.
     if(current && state.startedAt && ["pending","ready"].includes(current.status)){
       current.status="in_progress";current.startedAt=current.startedAt||Date.now();current.updatedAt=Date.now();
+      if(current.skippedAt&&current.resumeQueuedAt){window.BXHPassReturn?.started(current,Date.now());current.skippedAt=null;current.resumeQueuedAt=null;current.skipWaitFor=[];current.skipManualOnly=false;}
     }
     const remaining = queue.filter(m=>m.id!==court.currentMatchId);
     // Single elimination forecasts follow queue order too. Other formats
@@ -956,7 +975,7 @@ function stationExecutionQueue(stationNum){
     if(ap&&bp&&ap!==bp) return bp-ap;
     return Number(a.seq||0)-Number(b.seq||0);
   });
-  const skipped=available.filter(m=>m.skippedAt&&!m.resumeQueuedAt&&!m.skipManualOnly).sort((a,b)=>a.skippedAt-b.skippedAt || String(a.id).localeCompare(String(b.id)));
+  const skipped=available.filter(m=>m.skippedAt&&!m.resumeQueuedAt&&!m.skipManualOnly&&!m.passReturn).sort((a,b)=>a.skippedAt-b.skippedAt || String(a.id).localeCompare(String(b.id)));
   for(const m of skipped){
     if(!Array.isArray(m.skipWaitFor)) m.skipWaitFor=normal.slice(0,2).map(x=>x.id); // legacy rooms
   }
