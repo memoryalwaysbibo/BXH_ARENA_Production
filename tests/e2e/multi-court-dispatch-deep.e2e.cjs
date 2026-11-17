@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const crypto = require('node:crypto');
 
-test('two courts preserve independent work and queue a skipped match onto a busy court', async ({ page }) => {
+test('two courts preserve independent work and automatically return PASS after its prerequisite', async ({ page }) => {
   const externalFirebaseRequests=[];
 
   await page.route('**/*', async route=>{
@@ -160,25 +160,23 @@ test('two courts preserve independent work and queue a skipped match onto a busy
     return !!(m&&m.skippedAt&&!m.completed);
   },initial.c1,{timeout:30000});
 
-  // The skipped match appears in the shared dispatch list. Queue it behind busy Court 2.
-  const claimTo2=page.locator(`[data-action="claim-skipped-match"][data-id="${initial.c1}"][data-station="2"]`);
+  // Manual return is visible after opening the control, but cannot bypass PASS prerequisites.
+  const row=page.locator('.pass-return-row').filter({has:page.locator(`[data-action="claim-skipped-match"][data-id="${initial.c1}"]`)});
+  await row.locator('summary').click();
+  const claimTo2=row.locator(`[data-action="claim-skipped-match"][data-id="${initial.c1}"][data-station="2"]`);
   await expect(claimTo2).toBeVisible({timeout:20000});
-  await claimTo2.click();
-
-  await page.waitForFunction(id=>{
-    const m=state.matches.find(x=>x.id===id);
-    return !!(m&&m.resumeQueuedAt&&Number(m.station)===2);
-  },initial.c1,{timeout:30000});
-
-  const queued=await page.evaluate(id=>({
-    current:state.courtAssignments?.court2?.currentMatchId||null,
-    next:state.courtAssignments?.court2?.nextMatchId||null,
-    skipped:state.matches.find(x=>x.id===id)
+  await expect(claimTo2).toBeDisabled();
+  await expect(row.getByText('等待 PASS 前置場次完成',{exact:true})).toBeVisible();
+  const waiting=await page.evaluate(id=>({
+    other:state.courtAssignments?.court2?.currentMatchId,
+    original:state.courtAssignments?.court1?.currentMatchId,
+    match:state.matches.find(x=>x.id===id)
   }),initial.c1);
-
-  expect(queued.current).toBe(initial.c2);
-  expect(queued.next).toBe(initial.c1);
-  expect(queued.skipped.resumeQueuedAt).toBeTruthy();
+  expect(waiting.other).toBe(initial.c2);
+  expect(waiting.original).not.toBe(initial.c1);
+  expect(waiting.match.passReturn.originStation).toBe(1);
+  expect(waiting.match.passReturn.waitFor).toContain(initial.c2);
+  expect(waiting.match.resumeQueuedAt).toBeFalsy();
 
   async function winCourt2Current(expectedCompleted){
     const card=page.locator('#court-card-2');
@@ -209,16 +207,23 @@ test('two courts preserve independent work and queue a skipped match onto a busy
 
   await winCourt2Current(1);
 
-  // After Court 2 finishes its own match, the claimed skipped match becomes its current match.
-  await page.waitForFunction(id=>state.courtAssignments?.court2?.currentMatchId===id,initial.c1,{timeout:30000});
+  // Court 2 keeps its own work. Its completion releases PASS onto the original idle court.
+  await page.waitForFunction(id=>state.courtAssignments?.court1?.currentMatchId===id,initial.c1,{timeout:30000});
   const resumed=await page.evaluate(id=>{
     const m=state.matches.find(x=>x.id===id);
-    return {status:m?.status,station:m?.station,current:state.courtAssignments?.court2?.currentMatchId};
+    return {status:m?.status,station:m?.station,current:state.courtAssignments?.court1?.currentMatchId,
+      skippedAt:m?.skippedAt,resumeQueuedAt:m?.resumeQueuedAt,passReturn:m?.passReturn,
+      copies:Object.values(state.courtAssignments||{}).filter(c=>c.currentMatchId===id).length};
   },initial.c1);
 
   expect(resumed.current).toBe(initial.c1);
-  expect(resumed.station).toBe(2);
-  expect(['ready','in_progress']).toContain(resumed.status);
+  expect(resumed.station).toBe(1);
+  expect(resumed.status).toBe('in_progress');
+  expect(resumed.skippedAt).toBeFalsy();
+  expect(resumed.resumeQueuedAt).toBeFalsy();
+  expect(resumed.passReturn.status).toBe('playing');
+  expect(resumed.passReturn.assignedStation).toBe(1);
+  expect(resumed.copies).toBe(1);
 
   expect(externalFirebaseRequests).toEqual([]);
 });
