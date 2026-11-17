@@ -26,6 +26,24 @@ commit outcome; check authoritative state and the operation receipt before retry
 
 ## Validation
 
+Failures also expose `errorReason` from an explicit allowlist of engine `seatCode`
+values (for example `score-stale`, `dispatch-stale`, `seat-stale` and
+`pass-protected`). `errorCode` continues to identify numeric/allowlisted dependency
+codes. Unknown values remain `unclassified`; error messages are never used as a
+fallback. This distinguishes a stale request rejected during transition from a
+database rejection during commit without changing scoring or transaction retries.
+It only improves future logs after deployment; it cannot reconstruct reasons
+missing from previously recorded failures.
+
+The 2026-11-17 BXH-Z85SEZ screenshots show operation `275fc18f7ff8702b`
+re-entering the callback at 21,618 ms and 44,458 ms, after commit-labelled waits of
+20,743 ms and 22,757 ms. The final outcome is not visible. Later screenshots show
+overlapping score retries on courts 1, 3 and 5 and failures in both commit and
+transition. This supports investigating shared-document contention, but does not
+prove a particular lock holder, dependency error, successful commit or the reason
+for any transition failure. The retry interval includes SDK backoff; it is not an
+exact measurement of Firestore server lock duration.
+
 `node --test referee-seats/score-diagnostics.test.cjs referee-seats/scoring.test.cjs`
 checks retry accounting, stage timing/watchdog cleanup, private-field exclusion,
 logging failures, and real handler behavior with a transaction adapter. The existing
