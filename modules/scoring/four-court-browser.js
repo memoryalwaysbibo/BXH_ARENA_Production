@@ -56,6 +56,19 @@ globalThis.BXHMatchBuckets=module.exports;})();
  const uncertain=new Set(['cloud-unavailable','unavailable','deadline-exceeded']);
  function version(v){if(typeof v!=='string'||! /^(0|[1-9][0-9]*)$/.test(v))throw Error('invalid-room-version');return v;}
  const compare=(a,b)=>a.length-b.length||(a===b?0:a>b?1:-1);
+ // Preserve the existing JSON clone/toJSON semantics (including Timestamp),
+ // but ignore map key enumeration order. Array order remains significant.
+ function sameJsonValue(a,b){
+  function equal(x,y){
+   if(x===y)return true;
+   if(x===null||y===null||typeof x!=='object'||typeof y!=='object')return false;
+   if(Array.isArray(x)!==Array.isArray(y))return false;
+   if(Array.isArray(x))return x.length===y.length&&x.every((value,i)=>equal(value,y[i]));
+   const keys=Object.keys(x);
+   return keys.length===Object.keys(y).length&&keys.every(key=>Object.prototype.hasOwnProperty.call(y,key)&&equal(x[key],y[key]));
+  }
+  try{const x=JSON.stringify(a),y=JSON.stringify(b);return x===undefined||y===undefined?x===y:equal(JSON.parse(x),JSON.parse(y));}catch{return false;}
+ }
  function create({transport,code,uid,onView=()=>{},operationId,canManage=()=>false}){
   if(!B||!/^BXH-[A-Z0-9]{4,16}$/.test(code)||!uid||typeof operationId!=='function')throw Error('invalid-client');
   let rootRoom=null,base=null,manifest=null,rootVersion=null,state=null,status='offline',generation=0,bucketGeneration=0,roomStop=null,bucketStops=[],active=false,viewVersion=0,subscriptionFailed=false;
@@ -92,7 +105,7 @@ globalThis.BXHMatchBuckets=module.exports;})();
      const nextVersion=version(event.version);if(rootVersion&&compare(nextVersion,rootVersion)<0)return;
      const nextRoom=clone(event.room),nextBase=JSON.parse(nextRoom.data),nextManifest=B.context(nextRoom,nextBase);
      if(nextManifest.code!==code)throw Error('room-mismatch');
-     if(rootVersion===nextVersion&&JSON.stringify(nextRoom)!==JSON.stringify(rootRoom))throw Error('room-version-conflict');
+     if(rootVersion===nextVersion&&!sameJsonValue(nextRoom,rootRoom))throw Error('room-version-conflict');
      const reset=!manifest||nextManifest.epoch!==manifest.epoch||nextManifest.courtCount!==manifest.courtCount||nextManifest.bucketCount!==manifest.bucketCount;
      rootRoom=nextRoom;base=nextBase;manifest=nextManifest;rootVersion=nextVersion;
      if(reset){
@@ -105,7 +118,7 @@ globalThis.BXHMatchBuckets=module.exports;})();
         if(!value||value.bucketId!==id||value.epoch!==manifest.epoch||value.code!==manifest.code||value.roomId!==manifest.roomId||value.schema!==B.schema||!Number.isSafeInteger(value.revision)||value.revision<0){buckets.delete(id);return emit('syncing','bucket-context');}
         const previous=bucketWatermarks.get(id);
         if(previous&&value.revision<previous.revision)return;
-        if(previous&&value.revision===previous.revision&&JSON.stringify(value)!==JSON.stringify(previous)){subscriptionFailed=true;return emit('error','bucket-version-conflict');}
+        if(previous&&value.revision===previous.revision&&!sameJsonValue(value,previous)){subscriptionFailed=true;return emit('error','bucket-version-conflict');}
         bucketWatermarks.set(id,clone(value));buckets.set(id,clone(value));assemble();
        },error=>{if(active&&token===generation&&bucketToken===bucketGeneration)subscriptionError(error);}));
       }
@@ -123,7 +136,7 @@ globalThis.BXHMatchBuckets=module.exports;})();
    const patch=result.buckets?.[0],id=result.bucketId;
    if(!Array.isArray(result.buckets)||result.buckets.length!==1||!patch||patch.bucketId!==id||id!==B.route(Number(record.data.station),manifest.courtCount))return;
    const previous=bucketWatermarks.get(id);
-   if(!previous||patch.revision<previous.revision||patch.revision===previous.revision&&JSON.stringify(patch)!==JSON.stringify(previous))return;
+   if(!previous||patch.revision<previous.revision||patch.revision===previous.revision&&!sameJsonValue(patch,previous))return;
    const candidate=[...buckets.values()].map(bucket=>bucket.bucketId===id?patch:bucket);
    try{
     const composed=B.materialize(base,manifest,candidate);

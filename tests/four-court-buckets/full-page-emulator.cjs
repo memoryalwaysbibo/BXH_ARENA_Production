@@ -54,6 +54,20 @@ const server=http.createServer((req,res)=>{
    const wire=await page.evaluate(()=>BXHFullPageLab.wire.filter(w=>w.name==='commitBucketRefereeCommand'));
    assert.equal(wire.length,3);assert.deepEqual(wire[1],wire[2]);assert.equal(await page.locator('#court-card-1 .side-score').first().innerText(),'2');assert.equal(await page.evaluate(()=>state.matches.find(m=>m.id==='m1').scoreA),2);
    const scored=JSON.parse((await db.doc('tournaments/'+code+'/matchBuckets/court-1').get()).data().matches).find(m=>m.id==='m1');assert.equal(scored.scoreA,2);assert.equal(scored.log.length,2);
+   // Undo through the real UI and native Callable, including a lost success reply.
+   const undo=page.locator('[data-action="undo-score"][data-id="m1"]');
+   assert.equal(await undo.isEnabled(),true);await page.evaluate(()=>window.dropNextBucketReply=true);await undo.click();
+   await page.waitForFunction(()=>state.matches.find(m=>m.id==='m1').scoreA===1&&cloudSync.bucketView(state.cloudCode)?.retryable.length===1);
+   await page.locator('[data-action="referee-sync-recovery"]').click();
+   await page.waitForFunction(()=>cloudSync.bucketView(state.cloudCode)?.status==='ready'&&cloudSync.bucketView(state.cloudCode)?.retryable.length===1);
+   await page.locator('[data-action="referee-bucket-retry"]').click();
+   await page.waitForFunction(()=>cloudSync.bucketView(state.cloudCode)?.status==='ready'&&cloudSync.bucketView(state.cloudCode)?.pending.length===0&&cloudSync.bucketView(state.cloudCode)?.retryable.length===0);
+   const undoWire=await page.evaluate(()=>BXHFullPageLab.wire.filter(w=>w.name==='commitBucketRefereeCommand'));
+   assert.equal(undoWire.length,5);assert.deepEqual(undoWire[3],undoWire[4]);
+   const undone=JSON.parse((await db.doc('tournaments/'+code+'/matchBuckets/court-1').get()).data().matches).find(m=>m.id==='m1');
+   assert.equal(undone.scoreA,1);assert.equal(undone.log.length,1);assert.equal(await undo.isEnabled(),true);assert.equal(await button.isEnabled(),true);
+   // Restore the score for the existing downstream force-exit/claim assertions.
+   await button.click();await page.waitForFunction(()=>state.matches.find(m=>m.id==='m1').scoreA===2&&cloudSync.bucketView(state.cloudCode)?.status==='ready'&&cloudSync.bucketView(state.cloudCode)?.pending.length===0);
    assert((await db.doc('tournaments/'+code).get()).updateTime.isEqual(rootBefore.updateTime),'ordinary scoring rewrote root');assert((await db.doc('publicTournaments/'+code).get()).updateTime.isEqual(pubBefore.updateTime),'ordinary scoring rewrote public mirror');
    assert.equal(await page.evaluate(()=>BXHFullPageLab.wire.filter(w=>['commitRefereeCommand','manageRefereeSeats'].includes(w.name)).length),0);
    await page.screenshot({path:path.join(out,count+'-courts-mobile.png'),fullPage:true});await page.setViewportSize({width:1280,height:900});await page.screenshot({path:path.join(out,count+'-courts-desktop.png'),fullPage:true});
