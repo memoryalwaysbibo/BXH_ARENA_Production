@@ -95,7 +95,7 @@ jobs:
         env:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules
           GCLOUD_PROJECT: demo-bxh-four-court-buckets
-        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config tests/four-court-buckets/firebase.json 'node tests/four-court-buckets/dispatch-emulator.cjs && node tests/four-court-buckets/projection-snapshot-emulator.cjs && node tests/four-court-buckets/pass-contention-emulator.cjs'
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config tests/four-court-buckets/firebase.json 'node tests/four-court-buckets/dispatch-emulator.cjs && node tests/four-court-buckets/projection-snapshot-emulator.cjs && node tests/four-court-buckets/pass-contention-emulator.cjs && node tests/four-court-buckets/partition-comparison-emulator.cjs'
       - name: Verify reviewed migration, backups and closed-release rollback
         env:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules

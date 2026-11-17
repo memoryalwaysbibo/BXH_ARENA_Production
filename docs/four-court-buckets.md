@@ -1,5 +1,37 @@
 # Four-court scoring buckets: isolated candidate
 
+## Partition contention comparison (2026-11-18)
+
+The isolated `partition-comparison-emulator.cjs` holds the trusted scoring engine,
+authorization, operation receipts, root reads and workload constant and changes
+only the bucket-state adapter. Width 4 is the current candidate; width 1 uses a
+distinct, **test-only** schema. Exact source anchors must match before adaptation.
+No deployed schema, migration, client route or runtime flag is changed.
+
+Each run creates 128-player/5-court and 320-player/12-court generated brackets,
+launches 17 courts together and performs two score/undo cycles plus a receipt
+replay per court. Two repetitions reverse layout order (4,1 then 1,4). All 272
+accepted operations and 68 receipt replays passed persisted score, ledger and
+receipt-count checks; neither layout rewrote root/public snapshots.
+
+| Layout | Scoring operations | Failures | Transaction retries | p50 | p95 | Maximum |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Four courts per bucket | 136 | 0 | 30 | 40 ms | 3,909 ms | 7,812 ms |
+| One court per bucket (lab only) | 136 | 0 | 0 | 244 ms | 373 ms | 399 ms |
+
+Run wall times were 7,960/6,720 ms for width 4 and 1,272/1,338 ms for width 1.
+This supports reducing the candidate's shared score-write scope to address tail
+latency; the one-court median was higher, so it is not evidence that every score
+became faster. This is not proof of production throughput or the 11/17 incident
+cause. It excludes PASS, progression, publication, subscriptions and migration.
+Changing the live candidate layout requires a versioned manifest/schema plus
+client, Rules, cutover, rollback and structural-command acceptance; changing the
+divisor in production would reinterpret existing bucket data unsafely.
+
+The bounded summary is committed as
+`docs/validation/score-partition-comparison-20261118.json`; the full synthetic
+per-operation report is generated under `test-results/four-court-buckets/`.
+
 ## Public projection snapshot candidate (2026-11-18)
 
 The publisher first reads structural root/configuration, all score buckets and the

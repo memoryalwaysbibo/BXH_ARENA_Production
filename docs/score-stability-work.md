@@ -14,7 +14,7 @@ transition 失敗。尚未取得完整日誌、最後結果和確切錯誤碼，
 
 | 工作 | 已有可沿用程式 | 尚需完成或驗證 |
 | --- | --- | --- |
-| 比分獨立儲存 | bucket-scoring-service、bucket-state | 現有候選是四台共用一桶，不是每場一份；確認隔離粒度與共享讀取的競爭 |
+| 比分獨立儲存 | bucket-scoring-service、bucket-state；每台獨立的隔離對照實驗已完成 | 共桶對照顯示尾端延遲差異；正式每場／每台版本化儲存、客戶端、遷移與回復仍待完成 |
 | 成功確認、防重送 | bucketScoreOperations 收據、client pending intention | 斷線／失去回覆／重新載入後的操作復原與結果核對 |
 | 公開戰況同步 | bucket-public-projection、projection trigger；已改為唯讀快照＋短發布交易 | 舊快照／PASS／關閉開關保護已有測試；尚無正式環境延遲改善證明，仍需收斂與完整頁面驗證 |
 | 晉級、PASS、派台 | 結構交易、既有 progression/dispatch engine；已補候選版 skip 與派台版本確認 | 確認、PASS 與派台仍讀全部桶、改寫根文件；尚需並行競爭與完整頁面實驗驗證 |
