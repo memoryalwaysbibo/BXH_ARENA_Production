@@ -1,5 +1,28 @@
 # Four-court scoring buckets: isolated candidate
 
+## Mixed PASS timing follow-up (2026-11-18)
+
+A second native v2 mixed run accepted all 62 operations with zero failures,
+21 transaction retries, p95 3,742 ms and max 8,037 ms. Both rooms' score ledgers,
+operation receipts, PASS replay safety and public catch-up passed. Timing now
+records awaited reads, transaction callback work and the interval after each
+callback until retry/handler completion. The latter includes commit/retry/backoff;
+it must not be described as a direct measurement of database locks.
+
+The 320-player PASS took 7,778 ms across three attempts. Its callbacks took
+473/215/39 ms, while the first two post-callback intervals took 3,207/3,830 ms.
+An overlapping court-11 score took 8,037 ms, also predominantly after callbacks.
+This supports investigating structural transaction contention in the local lab;
+it does not identify the error or exact blocker in the real tournament.
+Evidence: `validation/per-court-v2-pass-timing-20261118.json`.
+
+Full-page acceptance now includes both schemas at 6/12 courts and actual PASS
+buttons with a lost committed reply, reconnect and exact receipt retry. This
+new four-case test **has not passed locally**: host policy denied Chromium's
+process-singleton socket before any page opened. Adapter isolation tests pass
+(3/3), but cannot substitute for browser acceptance. CI still executes the full
+page test; production remains unchanged and uncertified.
+
 ## Native per-court v2 candidate (2026-11-18)
 
 `bxh-court-buckets-v2` is now a separate supported candidate schema: court `s`

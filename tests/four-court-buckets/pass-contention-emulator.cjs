@@ -36,14 +36,21 @@ async function read(room){
  });
 }
 async function measured(room,command){
- let attempts=0;
- const observed={projectId:db.projectId,doc:p=>db.doc(p),runTransaction:(fn,...options)=>db.runTransaction(tx=>{attempts++;return fn(tx);},...options)};
+ let attempts=0;const attemptTimings=[];
+ const observed={projectId:db.projectId,doc:p=>db.doc(p),runTransaction:(fn,...options)=>db.runTransaction(async tx=>{
+  attempts++;const timing={attempt:attempts,startedMs:Date.now(),readMs:0};attemptTimings.push(timing);
+  const wrapped=new Proxy(tx,{get(target,key){const value=Reflect.get(target,key,target);if(typeof value!=='function')return value;
+   if(key==='get'||key==='getAll')return async(...args)=>{const began=Date.now();try{return await value.apply(target,args);}finally{timing.readMs+=Date.now()-began;}};
+   return value.bind(target);
+  }});
+  try{return await fn(wrapped);}finally{timing.callbackEndedMs=Date.now();timing.callbackMs=timing.callbackEndedMs-timing.startedMs;}
+ },...options)};
  const record={room:room.state.cloudCode,station:command.station,action:command.action,operationId:command.operationId},start=Date.now();
  try{
   const result=await createBucketScoringHandler(observed)({auth:{uid:'ref'+command.station},data:command});
   Object.assign(record,{ok:true,replayed:result.replayed===true});return result;
  }catch(error){Object.assign(record,{ok:false,errorCode:error.code??null,reason:error.seatCode||'unclassified'});throw error;}
- finally{Object.assign(record,{elapsedMs:Date.now()-start,attempts});records.push(record);}
+ finally{const endedMs=Date.now();Object.assign(record,{elapsedMs:endedMs-start,attempts,attemptTimings:attemptTimings.map((t,i)=>({attempt:t.attempt,readMs:t.readMs,callbackMs:t.callbackMs,afterCallbackMs:(attemptTimings[i+1]?.startedMs??endedMs)-t.callbackEndedMs}))});records.push(record);}
 }
 async function workload(room){
  const initial=await read(room),passMatch=initial.state.matches.find(m=>m.id===initial.state.courtAssignments.court1.currentMatchId);
