@@ -1,5 +1,36 @@
 # Four-court scoring buckets: isolated candidate
 
+## Public projection snapshot candidate (2026-11-18)
+
+The publisher first reads structural root/configuration, all score buckets and the
+public base in a Firestore **read-only** transaction. It materializes and serializes
+the score projection outside the publication write transaction. The latter reads
+only root/configuration/public, rechecks enabled/room gates and exact root update
+time, then writes only public output. It does not read or lock score buckets during
+publication. A structural change, including PASS, migration or rollback, rejects
+the captured snapshot with `projection-source-changed`; the existing retry-enabled
+trigger can retry from a new snapshot. An unrelated public update also requires a
+fresh snapshot instead of discarding it.
+
+The current public revision vector must not move backward in any bucket: an equal
+vector is deduplicated and a newer/incomparable vector is left untouched. A score
+can arrive after capture, so this remains an eventually consistent public view;
+the bucket score/receipt is authoritative. No projection writes the root. Automatic
+publication shutdown and current production room gates are rechecked before writing.
+
+Five transaction-adapter tests cover the lock scope, structural/public changes,
+stale vectors, shutdown and missing buckets. A real Emulator test delays a captured
+publisher while a new score is published, while PASS commits, and while automatic
+publication is disabled. Each case must preserve the newer public state. These
+tests do not certify real Functions event delivery or complete mobile UI behavior.
+
+The mixed 128/320-player test again verified 62 accepted operations with zero
+scoring failures, but measured 33 retries and p95 7,294 ms / maximum 11,001 ms in
+this run. The preceding whole-transaction run measured 22 retries and maximum
+10,365 ms. These single Emulator runs with fixture read transactions are not a
+controlled benchmark; they do **not** demonstrate latency improvement. PASS,
+score-bucket grouping and other shared reads remain contention candidates.
+
 ## Referee PASS candidate support (2026-11-18)
 
 The `skip` action now follows the existing trusted scoring engine as a structural
