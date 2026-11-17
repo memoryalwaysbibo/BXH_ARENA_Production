@@ -335,6 +335,7 @@ let switchTournamentBusy = false;
 
 // ==== v13.14.0 管理端雲端賽事清單 ====
 let adminTournamentListOpen = false;
+let tournamentSettingsSavedNotice = null;
 let adminTournamentListBusy = false;
 let adminTournamentListError = "";
 let adminTournamentListItems = [];
@@ -12543,7 +12544,7 @@ async function resizeCourtsSafely(n,expected,nextMeta,expectedRevision=Number(st
   if(state.meta?.refereeSeatsV1?.version===1){
     const metaPatch=Object.fromEntries(Object.entries(nextMeta||{}).filter(([key,value])=>key!=="stations"&&JSON.stringify(value)!==JSON.stringify(state.meta[key])));
     const ok=await executeRefereeDispatchCommand({action:"resize",count:n,expectedTarget:expected,expectedPlanRevision:expectedRevision,metaPatch});
-    if(ok){resetSettingsFormDraft();resetRegistrationFormDraft();}return;
+    if(ok){resetSettingsFormDraft();resetRegistrationFormDraft();}return ok;
   }
   if(courtRetirementBusy)return;courtRetirementBusy=true;const roomId=state.id;
   try{
@@ -12561,7 +12562,8 @@ async function resizeCourtsSafely(n,expected,nextMeta,expectedRevision=Number(st
     if(result.state)applyRemoteState(result.state,true);
     resetSettingsFormDraft();resetRegistrationFormDraft();await saveRecord(state);
     showToast(state.courtRetirementPlan?.status==="draining"?"已設定保留 "+n+" 台；退場台完成目前場次後退出，不再接新場。":"已安全調整為 "+n+" 台");
-  }catch(e){showToast("調整未完成："+e.message+"。原場次與比分保留，請確認連線後重試。",true);}
+    return true;
+  }catch(e){showToast("調整未完成："+e.message+"。原場次與比分保留，請確認連線後重試。",true);return false;}
   finally{courtRetirementBusy=false;renderPreservingScroll();}
 }
 async function transferRetiringCourtMatch(id,to){
@@ -20610,7 +20612,8 @@ function renderTournamentManagementTab(){
   const myUid=(firebaseUser&&firebaseUser.uid)||"";
   const isMine=t=>!!(myUid && t.createdBy===myUid);
   const expanded=new Set(typeof document.querySelectorAll==='function'?[...document.querySelectorAll('.management-card-details[open]')].map(el=>el.getAttribute('data-room-code')):[]);
-  const visibleItems=adminTournamentListItems;
+  const savedNotice=currentSettingsSavedNotice();
+  const visibleItems=savedNotice?[...adminTournamentListItems.filter(t=>t.code===savedNotice.code),...adminTournamentListItems.filter(t=>t.code!==savedNotice.code)]:adminTournamentListItems;
   const lastManaged=readManagedRoomRecord();
   const filterBar=adminTournamentListControlsHtml();
 
@@ -20632,7 +20635,9 @@ function renderTournamentManagementTab(){
       const done=(t.archiveStatus==="completed"||t.tournamentPhase==="done");
       const phaseLabel=({waiting:"尚未開始",live:"進行中",settling:"結算中",done:"已結束",cancelled:"已取消"})[t.tournamentPhase]||t.tournamentPhase||"—";
       const pinned=lastManaged?.code===t.code;
-      return `<div class="panel tournament-management-card" style="margin:0;">
+      const justSaved=savedNotice?.code===t.code;
+      return `<div class="panel tournament-management-card"${justSaved?` data-settings-saved-code="${esc(t.code)}" tabindex="-1"`:""} style="margin:0;${justSaved?'outline:2px solid var(--gold);outline-offset:2px;':''}">
+        ${justSaved?'<div class="hint" role="status" style="color:var(--gold);margin-bottom:8px;">✓ 賽事設定已儲存</div>':''}
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
           <strong style="min-width:0;overflow-wrap:anywhere;">${esc(t.name||"未命名賽事")}</strong>
           <span class="badge ${t.tournamentPhase==='live'?'badge-neon':'badge-metal'}">${esc(phaseLabel)}</span>
@@ -20659,7 +20664,8 @@ function renderTournamentManagementTab(){
     }).join("")}</div>`;
   }
 
-  return `${isPartnerOrganizerMode()?window.BXHPartnerOrganizer?.renderOverview?.(userProfile)||'':''}<div class="panel">
+  if(savedNotice)locateSettingsSavedCard();
+  return `${savedNotice?`<div class="banner" role="status">✓ 賽事設定已儲存｜${esc(savedNotice.code)}</div>`:""}${isPartnerOrganizerMode()?window.BXHPartnerOrganizer?.renderOverview?.(userProfile)||'':''}<div class="panel">
     <div class="panel-title"><span>賽事管理中心</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="cloud-refresh-admin-list">重新整理</button>${canCreateOfficialTournament()?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-new-tournament">＋ 新增賽事</button>`:""}</div></div>
     <div class="hint">每次僅載入 5 場賽事摘要；需要更多時再按下方按鈕。搜尋涵蓋賽事名稱、房號與地點。</div>
     ${lastManaged?`<div class="btn-row" style="margin:10px 0;"><button class="btn btn-primary" data-action="cloud-admin-open-tournament" data-code="${esc(lastManaged.code)}">返回上次管理｜${esc(lastManaged.code)}</button></div>`:''}
@@ -20670,6 +20676,45 @@ function renderTournamentManagementTab(){
   ${body}
   ${adminTournamentListPaginationHtml()}
   ${canCreateOfficialTournament()?`<div class="panel" style="margin-top:12px;border-style:dashed;text-align:center;"><div style="font-family:var(--font-d);font-weight:700;font-size:16px;margin-bottom:8px;">建立下一場賽事</div><button class="btn btn-primary" data-action="cloud-admin-new-tournament">＋ 新增賽事</button></div>`:""}`;
+}
+
+function currentSettingsSavedNotice(){
+  const notice=typeof tournamentSettingsSavedNotice==="undefined"?null:tournamentSettingsSavedNotice;
+  return notice&&notice.actor===currentAuthUid()&&notice.mode===activeMode&&appPhase==="app"&&activeTab==="management"?notice:null;
+}
+function locateSettingsSavedCard(){
+  const notice=currentSettingsSavedNotice();
+  if(!notice||notice.located)return;
+  requestAnimationFrame(()=>{
+    if(currentSettingsSavedNotice()!==notice||notice.located)return;
+    const card=[...document.querySelectorAll('[data-settings-saved-code]')].find(el=>el.getAttribute('data-settings-saved-code')===notice.code);
+    if(!card)return;
+    notice.located=true;
+    card.scrollIntoView({block:"center",behavior:"auto"});
+    card.focus({preventScroll:true});
+    setTimeout(()=>{
+      if(tournamentSettingsSavedNotice!==notice)return;
+      tournamentSettingsSavedNotice=null;
+      if(appPhase==="app"&&activeTab==="management"&&currentAuthUid()===notice.actor&&activeMode===notice.mode)renderPreservingScroll();
+    },8000);
+  });
+}
+async function saveTournamentSettingsAndReturn(previousMeta,message,save){
+  const roomId=state.id,code=state.cloudCode,actor=currentAuthUid(),mode=activeMode;
+  const fromSettings=appPhase==="app"&&activeTab==="settings";
+  const saved=save?await save():await saveRegistrationSettingsAndReport(previousMeta,message,true);
+  if(!saved||!fromSettings||appPhase!=="app"||activeTab!=="settings"||state.id!==roomId||state.cloudCode!==code||currentAuthUid()!==actor||activeMode!==mode)return saved;
+  if(!code){showToast("草稿已儲存，請按「完成架構並發布」發布賽事");return true;}
+  if(!hasAdminAccess())return saved;
+  rememberManagedRoomView({entered:true});
+  tournamentSettingsSavedNotice={code,actor,mode,located:false};
+  adminTournamentListOpen=false;
+  viewingRecordId=null;viewingRecordData=null;
+  activeTab="management";mainTabNavCenterRequested=true;
+  void changeAdminTournamentListQuery({status:"all",kind:state.meta?.eventAuthority==="community"||state.eventAuthority==="community"?"community":"official",search:""});
+  render();
+  requestAnimationFrame(()=>{if(currentSettingsSavedNotice()?.code===code&&!tournamentSettingsSavedNotice.located)window.scrollTo({top:0,behavior:"auto"});});
+  return true;
 }
 
 function renderAdminTournamentListModal(){
@@ -26072,7 +26117,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         state.gfMatchId=null; state.gfResetMatchId=null; state.bronzeMatchId=null; state.rrRounds=0;
         state.courtAssignments={};
         aiCreateLastApplied=null; aiCreateReviewAcknowledged=false; aiCreateReviewAcknowledged=false;
-        void saveRegistrationSettingsAndReport(previousRegistrationMeta,"賽制已更換，請重新產生對戰表",true);
+        void saveTournamentSettingsAndReturn(previousRegistrationMeta,"賽制已更換，請重新產生對戰表");
       }});
       return;
     }
@@ -26089,7 +26134,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       if(!canManageCourtRetirement()){showToast("目前身分無法調整退場台",true);return;}
       // Apply other draft fields only after the cloud retirement transaction succeeds.
       const draftBefore=cloneStateForSave(state);applyMeta();const nextMeta=JSON.parse(JSON.stringify(state.meta));state=draftBefore;state.meta.stations=physicalCourtCount;
-      resizeCourtsSafely(requestedStations,previousCourtTarget,nextMeta);return;
+      void saveTournamentSettingsAndReturn(previousRegistrationMeta,"賽事設定已儲存",()=>resizeCourtsSafely(requestedStations,previousCourtTarget,nextMeta));return;
     }
     applyMeta();
     if(state.courtRetirementPlan)state.meta.stations=physicalCourtCount;
@@ -26104,7 +26149,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
 
     rebuildCourtAssignments();
     aiCreateLastApplied=null;
-    void saveRegistrationSettingsAndReport(previousRegistrationMeta,"賽事設定已儲存",true);
+    void saveTournamentSettingsAndReturn(previousRegistrationMeta,"賽事設定已儲存");
     return;
   }
   if(action==="load-test"){
