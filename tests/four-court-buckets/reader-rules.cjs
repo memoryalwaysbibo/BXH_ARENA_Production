@@ -13,8 +13,11 @@ async function until(check,message){const start=Date.now();while(!check()){if(Da
  try{
   for(const [uid,profile]of Object.entries({ref1:{active:true,role:'staff'},unseated:{active:true,role:'staff'},admin:{active:true,role:'super_admin'},player:{active:true,role:'player'},disabled:{active:false,role:'staff'},tester:{active:true,role:'staff',isTestAccount:true}}))await admin(db=>setDoc(doc(db,'users',uid),profile));
   await admin(db=>setDoc(doc(db,'systemConfig','fourCourtScoreBuckets'),{enabled:true,privateReadsEnabled:true}));
-  for(const count of [6,12]){
-   const code='BXH-WEBREAD'+count,f=fixture(code,count,false),encoded=B.encode(f.state,f.room.scoreStorage);
+  for(const [count,storageSchema] of [[6,B.schema],[12,B.schema],[6,B.perCourtSchema]]){
+   const code='BXH-WEBREAD'+count+(storageSchema===B.perCourtSchema?'V2':''),f=fixture(code,count,false);
+   f.room.scoreStorage=B.makeManifest(f.state,'reader-layout-epoch',storageSchema);
+   const encoded=B.encode(f.state,f.room.scoreStorage);
+   await admin(db=>setDoc(doc(db,'systemConfig','fourCourtScoreBuckets'),{enabled:true,privateReadsEnabled:true,perCourtStorageEnabled:storageSchema===B.perCourtSchema}));
    await admin(async db=>{await setDoc(doc(db,'tournaments',code),f.room);for(const bucket of encoded)await setDoc(doc(db,'tournaments',code,'matchBuckets',bucket.bucketId),bucket);});
    const db=env.authenticatedContext('ref1').firestore(),auth={currentUser:{uid:'ref1'}},authListeners=new Set();
    const authApi={onAuthStateChanged(_auth,next){authListeners.add(next);queueMicrotask(()=>{if(authListeners.has(next))next(auth.currentUser);});return ()=>authListeners.delete(next);}};
@@ -46,12 +49,13 @@ async function until(check,message){const start=Date.now();while(!check()){if(Da
    auth.currentUser=null;for(const callback of [...authListeners])callback(null);
    assert.equal(client.getView().status,'error');assert.equal((await transport.commitScore({})).reason,'auth-changed');
    client.disconnect();
-   report.cases.push({courts:count,buckets:Math.ceil(count/4),webSdkSubscription:true,seatRevocationReadOnly:true,profileRevocationStopsRead:true,signOutStopsRead:true,unauthorizedReadsDenied:true,clientWritesDenied:true,listDenied:true});
+   if(storageSchema===B.perCourtSchema){await admin(db=>setDoc(doc(db,'systemConfig','fourCourtScoreBuckets'),{enabled:true,privateReadsEnabled:true,perCourtStorageEnabled:false}));await assertFails(getDocFromServer(doc(db,'tournaments',code,'matchBuckets','court-6')));}
+   report.cases.push({schema:storageSchema,courts:count,buckets:f.room.scoreStorage.bucketCount,webSdkSubscription:true,seatRevocationReadOnly:true,profileRevocationStopsRead:true,signOutStopsRead:true,unauthorizedReadsDenied:true,clientWritesDenied:true,listDenied:true});
   }
   const code='BXH-WEBREAD6',ref=()=>doc(env.authenticatedContext('admin').firestore(),'tournaments',code,'matchBuckets','court-1');
   await admin(db=>setDoc(doc(db,'systemConfig','fourCourtScoreBuckets'),{enabled:true,privateReadsEnabled:false}));await assertFails(getDocFromServer(ref()));
   await admin(db=>setDoc(doc(db,'systemConfig','fourCourtScoreBuckets'),{enabled:true,privateReadsEnabled:true}));
-  const f=fixture(code,6,false),bucket=B.encode(f.state,f.room.scoreStorage)[0];
+  const f=fixture(code,6,false);f.room.scoreStorage=B.makeManifest(f.state,'reader-layout-epoch');const bucket=B.encode(f.state,f.room.scoreStorage)[0];
   await admin(db=>setDoc(doc(db,'tournaments',code,'matchBuckets','court-1'),{...bucket,epoch:'wrong-epoch'}));await assertFails(getDocFromServer(ref()));
   await admin(db=>setDoc(doc(db,'tournaments',code,'matchBuckets','court-1'),bucket));
   f.room.createdByRole='partner_organizer';await admin(db=>setDoc(doc(db,'tournaments',code),f.room));await assertFails(getDocFromServer(ref()));

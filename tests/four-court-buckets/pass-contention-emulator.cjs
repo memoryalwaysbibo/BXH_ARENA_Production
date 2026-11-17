@@ -9,17 +9,18 @@ const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
 const {createBucketScoringHandler}=require('../../referee-seats/functions/bucket-scoring-service.cjs');
 const {createBucketPublicProjection}=require('../../referee-seats/functions/bucket-public-projection.cjs');
 const {fixture,request}=require('./trusted-fixture.cjs');
+const targetSchema=process.env.BXH_SCORE_LAB_SCHEMA||B.schema;assert([B.schema,B.perCourtSchema].includes(targetSchema));
 const app=initializeApp({projectId:process.env.GCLOUD_PROJECT},'pass-contention-test'),db=getFirestore(app);
 const records=[];let serial=0;
 const op=()=> 'mixed-pass-operation-'+String(++serial).padStart(8,'0');
 const cycles=2;
 async function seed(players,courts){
- const f=fixture('BXH-MIX'+players,courts,false);
+ const f=fixture('BXH-MIX'+players+(targetSchema===B.perCourtSchema?'V2':''),courts,false);
  f.state.players=Array.from({length:players},(_,i)=>({id:'p'+i,name:'Synthetic '+i,checkedIn:true}));
  f.state.startedAt=null;
  const engine=createEngine(f.state,{uid:'host'},1000,'draw-'+players,'synthetic-fixed-seed-'+players);
  assert(engine.generateSingleElim());f.state.startedAt=1;engine.rebuildCourtAssignments();
- f.room.scoreStorage=B.makeManifest(f.state,'mixed-pass-epoch-'+players);f.room.data=JSON.stringify(f.state);
+ f.room.scoreStorage=B.makeManifest(f.state,'mixed-pass-epoch-'+players,targetSchema);f.room.data=JSON.stringify(f.state);
  const root=db.doc('tournaments/'+f.state.cloudCode),pub=db.doc('publicTournaments/'+f.state.cloudCode),batch=db.batch();
  batch.set(root,f.room);batch.set(pub,{bracketView:JSON.stringify(f.state),updatedAt:1});
  for(const b of B.encode(f.state,f.room.scoreStorage))batch.set(root.collection('matchBuckets').doc(b.bucketId),b);
@@ -61,7 +62,7 @@ async function workload(room){
  });
  // PASS, other courts' score/undo and publication intentionally overlap.
  const passTask=measured(room,pass);
- const publishTask=(async()=>{for(let i=0;i<cycles;i++)assert((await createBucketPublicProjection(db)(room.state.cloudCode)).ok);})();
+ const publishTask=(async()=>{for(let i=0;i<cycles;i++){for(let attempt=0;;attempt++){try{assert((await createBucketPublicProjection(db)(room.state.cloudCode)).ok);break;}catch(error){if(error.message!=='projection-source-changed'||attempt>=2)throw error;}}}})();
  const results=await Promise.allSettled([...scoreTasks,passTask,publishTask]);
  const errors=results.filter(r=>r.status==='rejected');assert.equal(errors.length,0,JSON.stringify(errors.map(r=>r.reason?.message)));
  const beforeReplay=await room.root.get(),auditBefore=await room.root.collection('bucketScoreAudit').get();
@@ -87,7 +88,7 @@ async function workload(room){
  return {players:room.players,courts:room.courts,matches:latest.state.matches.length,acceptedOperations:accepted,passReplaySafe:true,allScoresAndReceiptsVerified:true,publicCatchupVerified:true};
 }
 (async()=>{
- const report={kind:'two-room-score-pass-projection-contention',environment:'Firestore Emulator',productionWrites:0,cycles,records};
+ const report={kind:'two-room-score-pass-projection-contention',storageSchema:targetSchema,environment:'Firestore Emulator',productionWrites:0,cycles,records};
  try{
   await db.doc('systemConfig/fourCourtScoreBuckets').set({enabled:true});
   const rooms=[];for(const [players,courts] of [[128,5],[320,12]])rooms.push(await seed(players,courts));
@@ -99,7 +100,7 @@ async function workload(room){
   report.failedOperations=records.filter(r=>!r.ok).length;
   report.transactionRetries=records.reduce((sum,r)=>sum+Math.max(0,r.attempts-1),0);
   const dir=path.resolve('test-results/four-court-buckets');fs.mkdirSync(dir,{recursive:true});
-  fs.writeFileSync(path.join(dir,'pass-contention.json'),JSON.stringify(report,null,2)+'\n');
+  fs.writeFileSync(path.join(dir,targetSchema===B.perCourtSchema?'pass-contention-v2.json':'pass-contention.json'),JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify({...report,records:undefined}));assert(report.ok,'mixed score/PASS workload failed; inspect pass-contention.json');
  }finally{await deleteApp(app);}
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -1,11 +1,11 @@
 'use strict';
-const SCHEMA='bxh-match-buckets-v1';
+const SCHEMAS=new Set(['bxh-match-buckets-v1','bxh-court-buckets-v2']);
 function createBucketProjectionEventHandler({publish,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){
  return async event=>{
   const code=event.params?.code,id=event.params?.bucketId,after=event.data?.after;
   if(!after?.exists)return {ok:true,skipped:true,reason:'bucket-deleted'};
   const bucket=after.data();
-  if(!/^BXH-[A-Z0-9]{4,16}$/.test(code||'')||!/^court-[1-9][0-9]*$/.test(id||'')||bucket?.schema!==SCHEMA||bucket.code!==code||bucket.bucketId!==id||typeof bucket.epoch!=='string'||!bucket.epoch||!Number.isSafeInteger(bucket.revision)||bucket.revision<0)return {ok:true,skipped:true,reason:'invalid-bucket-event'};
+  if(!/^BXH-[A-Z0-9]{4,16}$/.test(code||'')||!/^court-[1-9][0-9]*$/.test(id||'')||!SCHEMAS.has(bucket?.schema)||bucket.code!==code||bucket.bucketId!==id||typeof bucket.epoch!=='string'||!bucket.epoch||!Number.isSafeInteger(bucket.revision)||bucket.revision<0)return {ok:true,skipped:true,reason:'invalid-bucket-event'};
   // Briefly gather a burst. The transaction reads current buckets, never the
   // event's score payload. Version-vector deduplication suppresses old repeats.
   await wait(150);

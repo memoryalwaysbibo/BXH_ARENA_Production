@@ -1,5 +1,43 @@
 # Four-court scoring buckets: isolated candidate
 
+## Native per-court v2 candidate (2026-11-18)
+
+`bxh-court-buckets-v2` is now a separate supported candidate schema: court `s`
+routes to `court-s`, and its bucket count equals physical court count. The v1
+schema keeps its original four-court grouping. Every encoder, compositor, local
+score route, resize, private subscription and publication uses the manifest schema;
+no existing v1 bucket is reinterpreted. A missing/wrong-schema bucket blocks scoring.
+
+New-room activation selects the schema through the server-owned configuration
+`activationStorageSchema`; absent configuration keeps v1. Production v2 scoring
+and activation additionally require `perCourtStorageEnabled`, the existing runtime
+gates and exact room/epoch allowlists. Candidate Rules require that extra flag for
+v2 reads. These changes do not set any production flag or activate any room.
+Operator review plans use version 2 plus explicit `storageSchema`, and inspection
+prints that schema. Source digests include layout identity. A v1→v2 change must use
+verified rollback to legacy state followed by a new reviewed activation/epoch;
+in-place schema edits are unsupported. Rollback reads every authoritative bucket
+and remains available when score/publication release flags are disabled.
+
+Validation: 172 related unit/adapter tests pass, including native v2 client waiting
+for all six court subscriptions, wrong-schema rejection, production opt-in and
+operator review count/schema checks. Real Emulator runs cover v2 6/12-court
+activation, independent scores, PASS/replay, resize preserving v2, public catch-up,
+rollback retaining current score logs with disabled release, and semifinal/final
+progression. Existing v1 migration/rollback tests still pass. Web SDK/Rules tests
+cover v1 and v2 synchronization, profile/seat revocation, unauthorized reads,
+client-write refusal and v2 read-flag shutdown.
+
+The canonical layout comparison now uses native schemas rather than rewriting
+bucket-state source. Two counterbalanced rounds accepted 136 score/undo operations
+per layout without failures: v1 had 26 retries / p95 3,447 ms / max 6,123 ms;
+v2 had zero retries / p95 284 ms / max 315 ms (p50 180 ms versus v1's 28 ms).
+This is an isolated local scoring workload, not a real tournament capacity claim.
+The native v2 mixed 128/320-player PASS/publication workload also preserved all
+62 operations, but still had 20 retries / p95 5,524 ms / max 7,019 ms. PASS remains
+a full structural transaction. These runs do not establish a full-system latency
+fix or certify live mobile/App Check/event delivery; production remains closed.
+
 ## Partition contention comparison (2026-11-18)
 
 The isolated `partition-comparison-emulator.cjs` holds the trusted scoring engine,

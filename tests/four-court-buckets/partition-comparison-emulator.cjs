@@ -10,14 +10,8 @@ const app=initializeApp({projectId:process.env.GCLOUD_PROJECT},'partition-compar
 const records=[],runs=[];let serial=0;
 function adapter(width){
  assert([1,4].includes(width));
- const file=require.resolve('../../referee-seats/functions/bucket-state.cjs');
- let source=fs.readFileSync(file,'utf8');
- // Exact anchors prevent silently benchmarking an unadapted/changed layout.
- assert.equal((source.match(/Math\.ceil\(station\/4\)/g)||[]).length,1);
- assert.equal((source.match(/Math\.ceil\(count\/4\)/g)||[]).length,1);
- assert.equal((source.match(/Math\.ceil\(state\.meta\.stations\/4\)/g)||[]).length,1);
- if(width===1)source=source.replace("schema='bxh-match-buckets-v1'","schema='bxh-match-buckets-lab-per-court-v1'").replace('Math.ceil(station/4)','station').replace('Math.ceil(count/4)','count').replace('Math.ceil(state.meta.stations/4)','state.meta.stations');
- const module={exports:{}};vm.runInNewContext(source,{module},{filename:file});return module.exports;
+ const B=require('../../referee-seats/functions/bucket-state.cjs'),schema=width===1?B.perCourtSchema:B.schema;
+ return {...B,makeManifest:(state,epoch)=>B.makeManifest(state,epoch,schema),route:(station,count)=>B.route(station,count,schema)};
 }
 function handler(B,metric){
  const file=require.resolve('../../referee-seats/functions/bucket-scoring-service.cjs'),local=createRequire(file),module={exports:{}};
@@ -76,7 +70,7 @@ async function run(width,round){
  entry.allScoresReceiptsAndReplayVerified=true;console.log(JSON.stringify(entry));
 }
 (async()=>{
- const report={kind:'trusted-core-partition-comparison',productionWrites:0,publicProjection:false,structuralCommands:false,testOnlyPerCourtSchema:true,runs,records};
+ const report={kind:'trusted-core-partition-comparison',productionWrites:0,publicProjection:false,structuralCommands:false,candidatePerCourtSchema:true,runs,records};
  try{
   await db.doc('systemConfig/fourCourtScoreBuckets').set({enabled:true});
   // Reverse order on the second repeat to reduce simple warmup/order bias.

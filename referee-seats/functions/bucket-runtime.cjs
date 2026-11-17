@@ -10,6 +10,7 @@ function createBucketRuntime(db,{runtime='emulator',env=process.env}={}){
  }else throw Error('invalid-bucket-runtime');
  return {assertRoom(config,manifest){
   if(config?.enabled!==true)throw Error('release-not-ready');
+  if(runtime==='production'&&manifest.schema==='bxh-court-buckets-v2'&&config.perCourtStorageEnabled!==true)throw Error('bucket-room-not-enabled');
   if(runtime==='production'&&(config.productionEnabled!==true||!Object.hasOwn(config.productionRooms||{},manifest.code)||config.productionRooms[manifest.code]!==manifest.epoch))throw Error('bucket-room-not-enabled');
  }};
 }

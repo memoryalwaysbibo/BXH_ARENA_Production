@@ -25,7 +25,7 @@ function createBucketScoringHandler(db,{clock=Date.now,runtime='emulator'}={}){
    const room=rootSnap.data(),user=userSnap.data(),authority={now,partnerEnabled:false};
    if(C.partnerRoom(room))throw Error('partner-not-supported');
    let base;try{base=JSON.parse(room.data);}catch{throw Error('corrupt-data');}
-   const m=B.context(room,base),dispatch=DISPATCH.has(d.action),skip=d.action==='skip',structuralDispatch=dispatch||skip,resize=d.action==='resize',authorizationStation=dispatch?D.authorizationStation(d):Number(d.station),bucketId=resize?null:B.route(authorizationStation,m.courtCount),local=LOCAL.has(d.action);
+   const m=B.context(room,base),dispatch=DISPATCH.has(d.action),skip=d.action==='skip',structuralDispatch=dispatch||skip,resize=d.action==='resize',authorizationStation=dispatch?D.authorizationStation(d):Number(d.station),bucketId=resize?null:B.route(authorizationStation,m.courtCount,m.schema),local=LOCAL.has(d.action);
    if(m.code!==code)throw Error('room-mismatch');
    gate.assertRoom(configSnap.data(),m);
    if(!C.eligible(room,user,uid,authority)||!(resize?C.manager(room,user,uid,authority):S.allowed(room,user,uid,authorizationStation,authority)))throw Error('station-not-assigned');
@@ -49,7 +49,7 @@ function createBucketScoringHandler(db,{clock=Date.now,runtime='emulator'}={}){
    const closure=!local&&['confirm','quick'].includes(d.action)?archiveGeneral(room,state,now):null;
    const nextCount=Number(state.meta.stations);
    if(!Number.isSafeInteger(nextCount)||nextCount<1||nextCount>32||state.matches.some(x=>!x.completed&&Number(x.station)>nextCount))throw Error('bucket-court-count-invalid');
-   const nextManifest=nextCount===m.courtCount?m:B.makeManifest(state,m.epoch);
+   const nextManifest=nextCount===m.courtCount?m:B.makeManifest(state,m.epoch,m.schema);
    const encoded=B.encode(state,nextManifest,buckets),changed=encoded.filter(b=>!local||ids.includes(b.bucketId)).filter(b=>b.matches!==buckets.find(x=>x.bucketId===b.bucketId)?.matches);
    if(nextManifest.bucketCount>m.bucketCount){
     diagnostic.phase('read-added-buckets');
@@ -57,7 +57,7 @@ function createBucketScoringHandler(db,{clock=Date.now,runtime='emulator'}={}){
     const old=await tx.getAll(...additions);if(old.some(s=>s.exists))throw Error('bucket-already-exists');
    }
    if(local){
-    const outside=x=>Number(x.station)<=0||Number(x.station)>m.courtCount||B.route(Number(x.station),m.courtCount)!==bucketId;
+    const outside=x=>Number(x.station)<=0||Number(x.station)>m.courtCount||B.route(Number(x.station),m.courtCount,m.schema)!==bucketId;
     const original=base.matches.filter(outside),after=state.matches.filter(outside);
     if(JSON.stringify(original)!==JSON.stringify(after))throw Error('cross-bucket-local-change');
    }

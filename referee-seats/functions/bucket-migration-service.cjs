@@ -42,7 +42,7 @@ function createBucketMigrationService(db,{runtime='emulator',env=process.env,clo
    if(!receipt.exists||record.action!=='activate'||record.code!==request.code||record.epoch!==request.epoch||record.roomId!==room.scoreStorage?.roomId||saved.some((s,i)=>!s.exists||P.digest(s.data())!==record.backupHashes?.[i]))throw Error('migration-backup-invalid');
    versions.backups=[receipt,...saved].map(s=>stamp(s.updateTime));
   }
-  const prepared=P.prepare({...request,room,publicDocument,buckets,versions});
+  const prepared=P.prepare({...request,room,publicDocument,buckets,versions,storageSchema:releaseSnap.data()?.activationStorageSchema||require('./bucket-state.cjs').schema});
   if(request.action==='activate')authorizeActivation(releaseSnap.data(),prepared.manifest);
   return {...prepared,room,publicDocument};
  }
