@@ -1,5 +1,23 @@
 # Four-court scoring buckets: isolated candidate
 
+## Referee PASS candidate support (2026-11-18)
+
+The `skip` action now follows the existing trusted scoring engine as a structural
+transaction, reading the complete authoritative bucket set and atomically writing
+changed buckets, root/court assignments, public projection, receipt and audit.
+It advances `courtLifecycleEpoch` and `courtLifecycleWriteSeq`. The app bridge
+routes referee PASS through the client's retained dispatch intention and waits for
+the authoritative root lifecycle revision, so a bucket score revision alone cannot
+falsely acknowledge a changed court queue. Lost-reply replay uses the same receipt,
+rechecks current court authority and makes no additional writes. PASS does not
+create a match-confirmation duty log.
+
+6/12-court transaction-adapter tests cover next-match assignment, other-bucket
+score/ledger preservation, projection consistency, replay and stale/protected or
+missing-bucket refusal. A bridge test verifies that a score update without the root
+dispatch acknowledgement cannot settle PASS. This does not remove structural
+transaction contention and is not a production latency or full-page acceptance test.
+
 ## Dynamic physical court count (current candidate)
 
 The trusted `resize` dispatch now changes the manifest in the same Firestore transaction as the root, public projection, receipt, and bucket creation/deletion. An active court count of 1–4 uses one bucket; 5–8 uses two; 9–12 uses three. Growing beyond a boundary creates the new bucket only after checking that its document does not already exist. Shrinking deletes buckets outside the new physical count only after the retirement engine has moved or finished all pending matches there. A match already completed on a retired court keeps its original station and full score history in the authoritative root; re-expansion moves that history back into its court bucket. Detached station-0 matches also stay in the root.

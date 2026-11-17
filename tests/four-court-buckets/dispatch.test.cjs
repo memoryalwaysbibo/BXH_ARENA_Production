@@ -10,6 +10,44 @@ function setup(count=6){
  const send=(uid,data)=>commit({auth:{uid},data});return {docs,root,read,send,cmd:(action,id,extra={})=>command(read(),action,id,'dispatch-operation-'+seq++,extra)};
 }
 function prepare(h,mutate){const f=h.read();mutate(f.state);f.room.data=JSON.stringify(f.state);h.docs.set(h.root,f.room);for(const b of B.encode(f.state,f.room.scoreStorage))h.docs.set(h.root+'/matchBuckets/'+b.bucketId,b);}
+for(const count of [6,12])test(count+' courts: referee PASS updates authoritative dispatch and replays without skipping twice',async()=>{
+ const h=setup(count);
+ prepare(h,state=>{
+  const other=state.matches.find(m=>m.id==='m5');other.scoreA=2;other.log=[{side:'A',points:2}];
+  const source=state.matches[0];
+  state.matches.push({...structuredClone(source),id:'queued-pass-1',seq:100,indexInRound:100,status:'pending'});
+  state.matches.push({...structuredClone(source),id:'queued-pass-2',seq:101,indexInRound:101,status:'pending'});
+ });
+ const {request}=require('./trusted-fixture.cjs'),f=h.read();
+ const d=request(f.state,f.room,'m1','skip','bucket-pass-operation-'+count);
+ const result=await h.send('ref1',d),after=h.read(),match=after.state.matches.find(m=>m.id==='m1');
+ assert.equal(result.structural,true);assert.equal(result.lifecycleRevision,1);
+ assert.equal(match.refereeSeatScoreRevision,1);assert.equal(match.dispatchRevision,1);assert(match.skippedAt);
+ assert.deepEqual(match.skipWaitFor,['queued-pass-1','queued-pass-2']);
+ assert.notEqual(after.state.courtAssignments.court1.currentMatchId,'m1');
+ const other=after.state.matches.find(m=>m.id==='m5');assert.equal(other.scoreA,2);assert.equal(other.log.length,1);
+ const mirror=JSON.parse(h.docs.get('publicTournaments/'+f.state.cloudCode).bracketView);
+ assert.equal(mirror.matches.find(m=>m.id==='m1').skippedAt,match.skippedAt);
+ for(const [court,actual] of Object.entries(mirror.courtAssignments)){const expected=after.state.courtAssignments[court];assert.equal(actual.currentMatchId,expected.currentMatchId);assert.equal(actual.nextMatchId,expected.nextMatchId);assert.equal(actual.status,expected.status);}
+ const saved=JSON.stringify([...h.docs]);assert.equal((await h.send('ref1',d)).replayed,true);
+ assert.equal(JSON.stringify([...h.docs]),saved);assert(![...h.docs.keys()].some(p=>p.startsWith('staffActivityLogs/')));
+ await assert.rejects(h.send('ref1',{...d,operationId:'bucket-pass-stale-operation'}),/score-stale/);
+ assert.equal(JSON.stringify([...h.docs]),saved);
+ h.docs.get(h.root).refereeSeatsV1.courts['1'].main=null;
+ await assert.rejects(h.send('ref1',d),/station-not-assigned/);
+});
+test('referee PASS rejects missing buckets, stale seats and protected matches without writes',async()=>{
+ const {request}=require('./trusted-fixture.cjs');
+ for(const kind of ['missing','seat','protected']){
+  const h=setup();if(kind==='protected')prepare(h,s=>{s.matches[0].callPass={waitFor:['m2']};});
+  const f=h.read(),d=request(f.state,f.room,'m1','skip','bucket-pass-refusal-'+kind);
+  if(kind==='missing')h.docs.delete(h.root+'/matchBuckets/court-2');
+  if(kind==='seat')d.expectedCourtRevision=99;
+  const before=JSON.stringify([...h.docs]);
+  await assert.rejects(h.send('ref1',d),/bucket-context|seat-stale|pass-protected/);
+  assert.equal(JSON.stringify([...h.docs]),before);
+ }
+});
 for(const count of [6,12])test(count+' courts: cross-bucket swap keeps canonical score/ledger and replay performs no writes',async()=>{
  const h=setup(count),score={code:h.read().state.cloudCode,action:'score',matchId:'m2',station:2,operationId:'dispatch-initial-score',expectedCourtRevision:1,expectedScoreRevision:0,expectedDispatchRevision:0,playerAId:'a1',playerBId:'b1',side:'A',finish:'burst'};
  await h.send('ref2',score);const d=h.cmd('swap','m1',{targetMatchId:'m5'}),result=await h.send('host',d),after=h.read();assert.equal(result.lifecycleRevision,1);assert.equal(after.state.matches[0].station,5);assert.equal(after.state.matches[1].scoreA,2);assert.equal(after.state.matches[1].log.length,1);assert.equal(after.state.matches.find(m=>m.id==='m5').station,1);
