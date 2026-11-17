@@ -165,3 +165,61 @@ test('history viewing and player mode cannot replace a managed room; card detail
  t.s.activeMode='player';assert.equal(t.saved(),null);t.s.activeMode='admin';await t.load();
  assert.match(t.view(),/class="management-card-details"/);assert.doesNotMatch(t.view(),/class="management-card-details"[^>]* open/);
 });
+
+// Settings-save navigation shares the management regression entrypoint.
+{
+'use strict';
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),vm=require('node:vm');
+const core=fs.readFileSync(__dirname+'/../modules/main-app/core.js','utf8');
+function fn(name){const m=new RegExp('^(?:async )?function '+name+'\\(','m').exec(core);assert(m,name);return core.slice(m.index,core.indexOf('\n}',m.index)+2);}
+function rig(){
+ const calls={toasts:[],queries:[],pins:0,frames:[],timers:[],renders:0,scrolls:0};
+ const s={state:{id:'room',cloudCode:'BXH-ABC123',meta:{}},appPhase:'app',activeTab:'settings',activeMode:'admin',actor:'u1',
+  tournamentSettingsSavedNotice:null,adminTournamentListOpen:true,viewingRecordId:'old',viewingRecordData:{},mainTabNavCenterRequested:false,
+  currentAuthUid:()=>s.actor,hasAdminAccess:()=>true,saveRegistrationSettingsAndReport:async()=>true,
+  rememberManagedRoomView(){calls.pins++;},changeAdminTournamentListQuery(q){calls.queries.push(q);return Promise.resolve();},
+  render(){calls.renders++;},renderPreservingScroll(){calls.renders++;},showToast:m=>calls.toasts.push(m),
+  requestAnimationFrame:f=>calls.frames.push(f),setTimeout:f=>calls.timers.push(f),document:{querySelectorAll:()=>[]},window:{scrollTo:()=>calls.scrolls++}};
+ vm.createContext(s);vm.runInContext(['currentSettingsSavedNotice','locateSettingsSavedCard','saveTournamentSettingsAndReturn'].map(fn).join('\n'),s);
+ return {s,calls,save:()=>s.saveTournamentSettingsAndReturn({},'saved')};
+}
+test('confirmed save returns to management, pins room and resets filters before refreshing summaries',async()=>{
+ const {s,calls,save}=rig();assert.equal(await save(),true);assert.equal(s.activeTab,'management');assert.equal(calls.pins,1);
+ assert.deepEqual(JSON.parse(JSON.stringify(calls.queries)),[{status:'all',kind:'official',search:''}]);
+ assert.equal(s.tournamentSettingsSavedNotice.code,'BXH-ABC123');assert.equal(s.adminTournamentListOpen,false);assert.equal(s.viewingRecordId,null);
+});
+test('save stays on settings until acceptance; failure does not navigate or refresh',async()=>{
+ const {s,calls,save}=rig();let finish;s.saveRegistrationSettingsAndReport=()=>new Promise(r=>finish=r);
+ const pending=save();assert.equal(s.activeTab,'settings');assert.equal(calls.queries.length,0);finish(false);
+ assert.equal(await pending,false);assert.equal(s.activeTab,'settings');assert.equal(s.tournamentSettingsSavedNotice,null);assert.equal(calls.queries.length,0);
+});
+test('new local draft remains on settings with a publication prompt',async()=>{
+ const {s,calls,save}=rig();s.state.cloudCode=null;await save();assert.equal(s.activeTab,'settings');assert.match(calls.toasts.at(-1),/草稿已儲存.*發布/);assert.equal(calls.queries.length,0);
+});
+test('completion never pulls user back after room, identity, mode or tab changes',async()=>{
+ for(const change of [s=>s.state={id:'other',cloudCode:'BXH-OTHER1'},s=>s.actor='u2',s=>s.activeMode='staff',s=>s.activeTab='people',s=>s.appPhase='player-center']){
+  const {s,calls,save}=rig();let finish;s.saveRegistrationSettingsAndReport=()=>new Promise(r=>finish=r);const pending=save();change(s);finish(true);await pending;
+  assert.equal(calls.queries.length,0);assert.equal(calls.pins,0);assert.equal(s.tournamentSettingsSavedNotice,null);
+ }
+});
+test('admin-managed community event refreshes the matching management scope',async()=>{
+ const {s,calls,save}=rig();s.state.meta.eventAuthority='community';await save();assert.equal(calls.queries[0].kind,'community');
+});
+test('court resize follows the same successful-save rule without issuing a second write',async()=>{
+ const {s,calls}=rig();s.saveRegistrationSettingsAndReport=()=>{throw Error('duplicate save');};
+ assert.equal(await s.saveTournamentSettingsAndReturn({},'saved',async()=>false),false);assert.equal(calls.queries.length,0);
+ assert.equal(await s.saveTournamentSettingsAndReturn({},'saved',async()=>true),true);assert.equal(s.activeTab,'management');
+});
+test('fresh saved card is scrolled and focused once; fallback scroll cannot override its position',async()=>{
+ const {s,calls,save}=rig();let scroll=0,focus=0;const card={getAttribute:()=>s.state.cloudCode,scrollIntoView:()=>scroll++,focus:()=>focus++};
+ await save();s.document.querySelectorAll=()=>[card];s.locateSettingsSavedCard();
+ calls.frames.pop()();calls.frames.shift()();assert.equal(scroll,1);assert.equal(focus,1);assert.equal(calls.scrolls,0);
+ s.locateSettingsSavedCard();assert.equal(calls.frames.length,0);calls.timers.shift()();assert.equal(s.tournamentSettingsSavedNotice,null);
+});
+test('a delayed location callback cannot scroll another account or mode',async()=>{
+ const {s,calls,save}=rig();await save();s.locateSettingsSavedCard();s.actor='other';for(const f of calls.frames)f();assert.equal(calls.scrolls,0);assert.equal(s.currentSettingsSavedNotice(),null);
+});
+
+}
