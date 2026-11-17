@@ -180,6 +180,18 @@ assert(selectStart>0&&selectEnd>selectStart);
   assert.equal(await page.locator('#court-card-2 [data-action="score"]:not(:disabled)').count(),0);
   await selector.getByRole('button',{name:'全部台',exact:true}).tap();
   assert.equal(await page.locator('.referee-workstation').count(),12);
+  // The full-page bucket listener may render between opening this menu and
+  // tapping its action. Cloud updates must not collapse the overview menu.
+  await page.locator('#court-card-1 .ref-court-maintenance summary').tap();
+  await page.evaluate(()=>{for(let i=0;i<8;i++){state.matches[1].scoreA++;render();}});
+  assert.equal(await page.locator('#court-card-1 .ref-court-maintenance').evaluate(el=>el.open),true);
+  assert.equal(await page.locator('#court-card-1 [data-action="court-force-exit"]').isVisible(),true);
+  assert.equal(await page.locator('#court-card-2 .ref-court-maintenance').evaluate(el=>el.open),false);
+  await page.evaluate(()=>{judgeUid='menu-other-user';render();});
+  assert.equal(await page.locator('.ref-court-maintenance[open]').count(),0,'expanded maintenance cannot carry over to another account');
+  await page.locator('#court-card-1 .ref-court-maintenance summary').tap();
+  await page.evaluate(()=>{state.cloudCode='BXH-MENU02';render();});
+  assert.equal(await page.locator('.ref-court-maintenance[open]').count(),0,'expanded maintenance cannot carry over to another room');
   await page.evaluate(()=>{appPhase='community-room';render();});
   await selector.getByRole('button',{name:'台3',exact:true}).tap();
   assert.equal(await page.locator('#court-card-3').count(),1);
