@@ -9,6 +9,7 @@ const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
 const {createBucketScoringHandler}=require('../../referee-seats/functions/bucket-scoring-service.cjs');
 const {createBucketPublicProjection}=require('../../referee-seats/functions/bucket-public-projection.cjs');
 const {fixture,request}=require('./trusted-fixture.cjs');
+const deferredPassPublic=process.env.BXH_SCORE_LAB_ASYNC_PASS==='true';
 const targetSchema=process.env.BXH_SCORE_LAB_SCHEMA||B.schema;assert([B.schema,B.perCourtSchema].includes(targetSchema));
 const app=initializeApp({projectId:process.env.GCLOUD_PROJECT},'pass-contention-test'),db=getFirestore(app);
 const records=[];let serial=0;
@@ -95,9 +96,9 @@ async function workload(room){
  return {players:room.players,courts:room.courts,matches:latest.state.matches.length,acceptedOperations:accepted,passReplaySafe:true,allScoresAndReceiptsVerified:true,publicCatchupVerified:true};
 }
 (async()=>{
- const report={kind:'two-room-score-pass-projection-contention',storageSchema:targetSchema,environment:'Firestore Emulator',productionWrites:0,cycles,records};
+ const report={kind:'two-room-score-pass-projection-contention',storageSchema:targetSchema,environment:'Firestore Emulator',deferredPassPublic,productionWrites:0,cycles,records};
  try{
-  await db.doc('systemConfig/fourCourtScoreBuckets').set({enabled:true});
+  await db.doc('systemConfig/fourCourtScoreBuckets').set({enabled:true,...(deferredPassPublic?{skipPublicProjectionAsyncEnabled:true,automaticPublicProjectionEnabled:true}:{})});
   const rooms=[];for(const [players,courts] of [[128,5],[320,12]])rooms.push(await seed(players,courts));
   const runs=await Promise.allSettled(rooms.map(workload));
   report.rooms=runs.map(r=>r.status==='fulfilled'?r.value:{failed:true,message:r.reason?.message});
@@ -107,7 +108,7 @@ async function workload(room){
   report.failedOperations=records.filter(r=>!r.ok).length;
   report.transactionRetries=records.reduce((sum,r)=>sum+Math.max(0,r.attempts-1),0);
   const dir=path.resolve('test-results/four-court-buckets');fs.mkdirSync(dir,{recursive:true});
-  fs.writeFileSync(path.join(dir,targetSchema===B.perCourtSchema?'pass-contention-v2.json':'pass-contention.json'),JSON.stringify(report,null,2)+'\n');
+  fs.writeFileSync(path.join(dir,targetSchema===B.perCourtSchema?(deferredPassPublic?'pass-contention-v2-async.json':'pass-contention-v2.json'):'pass-contention.json'),JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify({...report,records:undefined}));assert(report.ok,'mixed score/PASS workload failed; inspect pass-contention.json');
  }finally{await deleteApp(app);}
 })().catch(error=>{console.error(error);process.exitCode=1;});

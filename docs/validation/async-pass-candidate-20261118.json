@@ -1,0 +1,85 @@
+{
+  "candidate": "deferred-public-projection-for-referee-pass",
+  "productionWrites": 0,
+  "defaultEnabled": false,
+  "requiredFlags": [
+    "skipPublicProjectionAsyncEnabled",
+    "automaticPublicProjectionEnabled"
+  ],
+  "unitTests": {
+    "relatedSuitePassed": 132
+  },
+  "mixedWorkload": {
+    "kind": "two-room-score-pass-projection-contention",
+    "storageSchema": "bxh-court-buckets-v2",
+    "environment": "Firestore Emulator",
+    "deferredPassPublic": true,
+    "productionWrites": 0,
+    "cycles": 2,
+    "rooms": [
+      {
+        "players": 128,
+        "courts": 5,
+        "matches": 127,
+        "acceptedOperations": 17,
+        "passReplaySafe": true,
+        "allScoresAndReceiptsVerified": true,
+        "publicCatchupVerified": true
+      },
+      {
+        "players": 320,
+        "courts": 12,
+        "matches": 511,
+        "acceptedOperations": 45,
+        "passReplaySafe": true,
+        "allScoresAndReceiptsVerified": true,
+        "publicCatchupVerified": true
+      }
+    ],
+    "ok": true,
+    "latencyMs": {
+      "p50": 55,
+      "p95": 3788,
+      "max": 3915
+    },
+    "failedOperations": 0,
+    "transactionRetries": 15
+  },
+  "nativeTransactions": {
+    "kind": "async-pass-native-transactions",
+    "productionWrites": 0,
+    "automaticEventsVerified": false,
+    "cases": [
+      {
+        "name": "async-pass-with-score-pause-confirm",
+        "schema": "bxh-court-buckets-v2",
+        "courts": 6,
+        "automaticEventCatchup": false,
+        "explicitCatchup": true,
+        "concurrentResultsVerified": true,
+        "replayPreservesRootAndAudit": true,
+        "ackDoesNotRequirePublicWrite": true
+      },
+      {
+        "name": "async-pass-with-score-pause-confirm",
+        "schema": "bxh-court-buckets-v2",
+        "courts": 12,
+        "automaticEventCatchup": false,
+        "explicitCatchup": true,
+        "concurrentResultsVerified": true,
+        "replayPreservesRootAndAudit": true,
+        "ackDoesNotRequirePublicWrite": true
+      }
+    ]
+  },
+  "automaticEvents": {
+    "status": "blocked-locally",
+    "reason": "Functions Emulator Unix socket creation/listen denied with EPERM; no automatic-event PASS case executed.",
+    "remoteCi": "pending for this candidate"
+  },
+  "limitations": [
+    "Single Emulator runs are not controlled performance comparisons.",
+    "PASS still reads all buckets and writes shared structural root.",
+    "Full-page asynchronous PASS acceptance and live event delivery remain unverified."
+  ]
+}

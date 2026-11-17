@@ -40,8 +40,12 @@ function createBucketScoringHandler(db,{clock=Date.now,runtime='emulator'}={}){
     if(structuralDispatch){const a=saved.authorization;if(!a||!Array.isArray(a.stations)||!a.stations.length&&!a.managerOnly)throw Error('operation-authority-missing');if(a.managerOnly&&!C.manager(room,user,uid,authority)||a.stations.some(n=>!Number.isInteger(n)||n<1||n>m.courtCount||!S.allowed(room,user,uid,n,authority)))throw Error('station-not-assigned');}
     diagnostic.phase('commit-replay');return {...saved.result,replayed:true,buckets};
    }
+   // Referee acknowledgement may precede the spectator projection only when
+   // both the explicit PASS opt-in and automatic publication are enabled.
+   // All structural state, score buckets, receipt and audit remain atomic.
+   const deferredPublic=skip&&configSnap.data().skipPublicProjectionAsyncEnabled===true&&configSnap.data().automaticPublicProjectionEnabled===true;
    let previous;
-   if(!local){diagnostic.phase('read-public');const snap=await tx.get(publicRef);if(!snap.exists)throw Error('public-mirror-missing');try{previous=JSON.parse(snap.data().bracketView);}catch{throw Error('public-mirror-missing');}}
+   if(!local&&!deferredPublic){diagnostic.phase('read-public');const snap=await tx.get(publicRef);if(!snap.exists)throw Error('public-mirror-missing');try{previous=JSON.parse(snap.data().bracketView);}catch{throw Error('public-mirror-missing');}}
    const authorization=structuralDispatch?{managerOnly:['reopen','claim-detached','retirement-transfer','resize'].includes(d.action),stations:resize?[]:[...new Set(d.action==='swap'?[Number(d.station),Number(state.matches.find(x=>x.id===d.targetMatchId)?.station)]:d.action==='manual-assign'?[Number(d.station),Number(d.targetStation)]:[authorizationStation])]}:null;
    diagnostic.phase('transition');
    const result=(dispatch?D.transition:local?S.transitionLocal:S.transition)({room,state,user,uid,d,now,authority});
@@ -69,10 +73,12 @@ function createBucketScoringHandler(db,{clock=Date.now,runtime='emulator'}={}){
     const projection=C.project(room.refereeSeatsV1,room.createdBy,nextCount);
     state.meta={...state.meta,refereeSeatsV1:room.refereeSeatsV1,...projection,assignedStaffUids:room.assignedStaffUids||[]};
     tx.update(root,{...(structuralDispatch?{courtLifecycleWriteSeq:Number(room.courtLifecycleWriteSeq||0)+1}:{}),...projection,...closure?.document,scoreStorage:nextManifest,data:JSON.stringify(state),updatedAt:state.updatedAt});
-    const mirror=S.publicProjection(state,previous);if(closure)Object.assign(mirror,closure.runtime);
-    tx.update(publicRef,{...closure?.document,bracketView:JSON.stringify(mirror),scoreBucketProjection:{epoch:m.epoch,versions:Object.fromEntries(encoded.map(b=>[b.bucketId,b.revision]))},updatedAt:state.updatedAt});
+    if(!deferredPublic){
+     const mirror=S.publicProjection(state,previous);if(closure)Object.assign(mirror,closure.runtime);
+     tx.update(publicRef,{...closure?.document,bracketView:JSON.stringify(mirror),scoreBucketProjection:{epoch:m.epoch,versions:Object.fromEntries(encoded.map(b=>[b.bucketId,b.revision]))},updatedAt:state.updatedAt});
+    }
    }
-   const response={ok:true,matchId:result.matchId,scoreRevision:result.scoreRevision,bucketId,structural:!local,...(structuralDispatch?{lifecycleRevision:state.courtLifecycleEpoch}: {})};
+   const response={ok:true,matchId:result.matchId,scoreRevision:result.scoreRevision,bucketId,structural:!local,...(skip?{publicProjection:deferredPublic?'deferred':'inline'}:{}),...(structuralDispatch?{lifecycleRevision:state.courtLifecycleEpoch}: {})};
    tx.create(receiptRef,{uid,hash,epoch:m.epoch,at:now,result:response,...(structuralDispatch?{authorization}: {})});
    const match=state.matches.find(x=>x.id===result.matchId);
    tx.create(root.collection('bucketScoreAudit').doc(key),{uid,at:now,action:d.action,station:result.station,matchId:result.matchId,scoreRevision:result.scoreRevision,scoreA:match?.scoreA??null,scoreB:match?.scoreB??null,...(structuralDispatch?{lifecycleRevision:state.courtLifecycleEpoch,targetStation:d.targetStation??null,targetMatchId:d.targetMatchId??null}: {})});

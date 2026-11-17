@@ -1,5 +1,43 @@
 # Four-court scoring buckets: isolated candidate
 
+## Deferred PASS public projection candidate (2026-11-18)
+
+Referee `skip` can now omit the public document from its scoring transaction.
+Both server-owned flags `skipPublicProjectionAsyncEnabled` and
+`automaticPublicProjectionEnabled` must be true; absent either flag, the existing
+inline public update remains. No flag is changed in production. Other structural
+commands, including confirmation/quick decision, keep their existing semantics.
+
+The same transaction still commits authoritative buckets, structural root/court
+assignments, lifecycle revision, operation receipt and audit. The stored response
+identifies `publicProjection: deferred` versus `inline`. Client acknowledgement
+continues to require the authoritative lifecycle revision, not the public mirror.
+A changed bucket emits the existing background event. The publisher reads current
+truth, rejects stale structure and prevents backward score vectors. Receipt replay
+checks current court authority and never repeats PASS, even after flags change.
+
+The benefit is removal of one synchronous public read/write dependency, not a
+full reduction to court-local structural transactions. PASS still reads every
+bucket and rewrites the shared root because its engine recomputes global dispatch.
+A delayed/failed worker can leave spectator state behind after referee success;
+activation must verify real event delivery and catch-up first. Closing the PASS
+flag makes future PASS inline; already deferred work still needs publication.
+
+Validation: 132 related unit/adapter cases passed. Gate tests cover both schemas,
+6/12 courts, no public access in deferred mode, inline fallback with either flag
+missing, atomic receipts/lifecycle and authority recheck. Real Firestore Emulator
+6/12-court cases overlap PASS with another court's score, pause and confirmation;
+authoritative scores/statuses and receipt replay passed, followed by explicit
+public catch-up. Native v2 mixed 128/320-player testing accepted 62 operations,
+zero failures and 15 retries (p95 3,788 ms, max 3,915 ms). A single run is not a
+controlled before/after benchmark or production improvement claim.
+
+Actual Functions event acceptance was attempted locally but Unix socket startup
+was denied (EPERM), before any new automatic-event PASS case executed. CI runs
+the same shared scenarios with automatic catch-up and no manual publisher; that
+acceptance and asynchronous full-page behavior remain pending. Summary:
+`docs/validation/async-pass-candidate-20261118.json`. Candidate remains draft.
+
 ## Mixed PASS timing follow-up (2026-11-18)
 
 A second native v2 mixed run accepted all 62 operations with zero failures,

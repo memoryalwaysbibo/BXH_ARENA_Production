@@ -3,11 +3,11 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),B=require
 function setup(count=6){
  const f=roomFixture('BXH-DISPATCH'+count,count),root='tournaments/'+f.state.cloudCode,docs=new Map([[root,f.room],['publicTournaments/'+f.state.cloudCode,{bracketView:JSON.stringify(f.state),updatedAt:1}],['users/host',f.user],['users/ref1',f.user],['users/ref5',f.user],['users/ref2',f.user],['systemConfig/fourCourtScoreBuckets',{enabled:true}]]);
  for(const b of B.encode(f.state,f.room.scoreStorage))docs.set(root+'/matchBuckets/'+b.bucketId,b);
- const ref=path=>({path,collection:name=>({doc:id=>ref(path+'/'+name+'/'+id)})});let seq=1;
- const db={projectId:'demo-bxh-four-court-buckets',doc:ref,async runTransaction(run){const writes=[];const get=async ref=>{assert.equal(writes.length,0,'transaction read after write');const data=docs.get(ref.path);return {exists:!!data,data:()=>structuredClone(data)};};const result=await run({get,getAll:(...refs)=>Promise.all(refs.map(get)),set:(r,d)=>writes.push([r.path,d]),delete:r=>writes.push([r.path,null]),update:(r,d)=>writes.push([r.path,{...docs.get(r.path),...d}]),create:(r,d)=>{assert(!docs.has(r.path));writes.push([r.path,d]);}});for(const [p,d]of writes)if(d===null)docs.delete(p);else docs.set(p,structuredClone(d));return result;}};
+ const ref=path=>({path,collection:name=>({doc:id=>ref(path+'/'+name+'/'+id)})});let seq=1;const readPaths=[];
+ const db={projectId:'demo-bxh-four-court-buckets',doc:ref,async runTransaction(run){const writes=[];const get=async ref=>{readPaths.push(ref.path);assert.equal(writes.length,0,'transaction read after write');const data=docs.get(ref.path);return {exists:!!data,data:()=>structuredClone(data)};};const result=await run({get,getAll:(...refs)=>Promise.all(refs.map(get)),set:(r,d)=>writes.push([r.path,d]),delete:r=>writes.push([r.path,null]),update:(r,d)=>writes.push([r.path,{...docs.get(r.path),...d}]),create:(r,d)=>{assert(!docs.has(r.path));writes.push([r.path,d]);}});for(const [p,d]of writes)if(d===null)docs.delete(p);else docs.set(p,structuredClone(d));return result;}};
  const previous=process.env.FIRESTORE_EMULATOR_HOST;process.env.FIRESTORE_EMULATOR_HOST='127.0.0.1:8188';let commit;try{commit=createBucketScoringHandler(db,{clock:()=>1000+seq++});}finally{if(previous===undefined)delete process.env.FIRESTORE_EMULATOR_HOST;else process.env.FIRESTORE_EMULATOR_HOST=previous;}
  function read(){const room=docs.get(root),state=B.materialize(JSON.parse(room.data),room.scoreStorage,Array.from({length:room.scoreStorage.bucketCount},(_,i)=>docs.get(root+'/matchBuckets/court-'+(i+1))));return {room,state};}
- const send=(uid,data)=>commit({auth:{uid},data});return {docs,root,read,send,cmd:(action,id,extra={})=>command(read(),action,id,'dispatch-operation-'+seq++,extra)};
+ const send=(uid,data)=>commit({auth:{uid},data});return {docs,root,readPaths,read,send,cmd:(action,id,extra={})=>command(read(),action,id,'dispatch-operation-'+seq++,extra)};
 }
 function prepare(h,mutate){const f=h.read();mutate(f.state);f.room.data=JSON.stringify(f.state);h.docs.set(h.root,f.room);for(const b of B.encode(f.state,f.room.scoreStorage))h.docs.set(h.root+'/matchBuckets/'+b.bucketId,b);}
 for(const count of [6,12])test(count+' courts: referee PASS updates authoritative dispatch and replays without skipping twice',async()=>{
@@ -96,4 +96,32 @@ test('12→8→4 removal keeps completed historical court scores and re-expansio
 });
 test('swap replay rechecks both original court permissions even after the matches exchanged stations',async()=>{
  const h=setup(),room=h.docs.get(h.root);room.refereeSeatsV1.courts['5'].backup1={uid:'ref1'};const d=h.cmd('swap','m1',{targetMatchId:'m5'});await h.send('ref1',d);h.docs.get(h.root).refereeSeatsV1.courts['5'].backup1=null;const before=JSON.stringify([...h.docs]);await assert.rejects(h.send('ref1',d),/station-not-assigned/);assert.equal(JSON.stringify([...h.docs]),before);
+});
+
+for(const count of [6,12])for(const storageSchema of [B.schema,B.perCourtSchema])test(count+' courts '+storageSchema+': async PASS requires both flags, keeps authority atomic and leaves public untouched',async()=>{
+ const {request}=require('./trusted-fixture.cjs');
+ for(const flags of [{},{skipPublicProjectionAsyncEnabled:true},{automaticPublicProjectionEnabled:true},{skipPublicProjectionAsyncEnabled:true,automaticPublicProjectionEnabled:true}]){
+  const h=setup(count),initial=h.read();
+  initial.room.scoreStorage=B.makeManifest(initial.state,'async-pass-test-epoch',storageSchema);
+  h.docs.set(h.root,initial.room);
+  for(const b of B.encode(initial.state,initial.room.scoreStorage))h.docs.set(h.root+'/matchBuckets/'+b.bucketId,b);
+  h.docs.set('systemConfig/fourCourtScoreBuckets',{enabled:true,...flags});
+  const f=h.read(),publicPath='publicTournaments/'+f.state.cloudCode,before=JSON.stringify(h.docs.get(publicPath));
+  const d=request(f.state,f.room,'m1','skip','async-pass-gated-operation-'+count);
+  const result=await h.send('ref1',d),after=h.read(),deferred=flags.skipPublicProjectionAsyncEnabled===true&&flags.automaticPublicProjectionEnabled===true;
+  assert.equal(result.publicProjection,deferred?'deferred':'inline');
+  assert.equal(h.readPaths.includes(publicPath),!deferred);
+  assert.equal(JSON.stringify(h.docs.get(publicPath))===before,deferred);
+  assert.equal(after.room.courtLifecycleWriteSeq,1);assert.equal(after.state.courtLifecycleEpoch,1);
+  assert(after.state.matches.find(m=>m.id==='m1').skippedAt);
+  assert.equal(after.state.matches.find(m=>m.id==='m1').dispatchRevision,1);
+  assert.equal([...h.docs.keys()].filter(p=>p.includes('/bucketScoreOperations/')).length,1);
+  assert.equal([...h.docs.keys()].filter(p=>p.includes('/bucketScoreAudit/')).length,1);
+  // Revoking publication opt-in changes future operations, never re-executes a receipt.
+  h.docs.set('systemConfig/fourCourtScoreBuckets',{enabled:true});
+  const replayBefore=JSON.stringify([...h.docs]);assert.equal((await h.send('ref1',d)).replayed,true);
+  assert.equal(JSON.stringify([...h.docs]),replayBefore);
+  h.docs.get(h.root).refereeSeatsV1.courts['1'].main=null;
+  await assert.rejects(h.send('ref1',d),/station-not-assigned/);
+ }
 });
