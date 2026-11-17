@@ -21093,12 +21093,24 @@ function renderStableRefereeScreen(app,html,key){
 
 
 function renderRefereeCourtView(app,html){
+  // Overview updates replace the DOM; retain only the operator's expanded
+  // maintenance menus within the same authenticated room view.
+  const maintenanceKey=refereeTabOpen()?refereeCourtViewKey():null;
+  const openCourts=maintenanceKey&&app.__bxhMaintenanceKey===maintenanceKey&&typeof app.querySelectorAll==="function"
+    ?new Set([...app.querySelectorAll(".ref-court-maintenance[open]")].map(el=>el.closest(".court-card")?.id).filter(Boolean)):new Set();
   if(refereeCourtFocusActive()){
     renderStableRefereeScreen(app,html,refereeCourtViewKey());
+    app.__bxhMaintenanceKey=maintenanceKey;
     return true;
   }
   refereeRenderContext=null;
   app.innerHTML=html;
+  app.__bxhMaintenanceKey=maintenanceKey;
+  if(openCourts.size){
+    for(const menu of app.querySelectorAll(".ref-court-maintenance")){
+      if(openCourts.has(menu.closest(".court-card")?.id))menu.open=true;
+    }
+  }
   return false;
 }
 
