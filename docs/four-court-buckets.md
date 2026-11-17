@@ -18,6 +18,29 @@ missing-bucket refusal. A bridge test verifies that a score update without the r
 dispatch acknowledgement cannot settle PASS. This does not remove structural
 transaction contention and is not a production latency or full-page acceptance test.
 
+### Mixed score/PASS/publication Emulator observation
+
+`pass-contention-emulator.cjs` generates real synthetic 128-player/5-court and
+320-player/12-court brackets (127 and 511 match records, including BYEs). Both
+rooms run concurrently. Court 1 sends PASS while the other courts each run two
+score/undo cycles; public projection workers overlap. Receipt replay must not
+change the root or add another audit record. Every final score, ledger count,
+receipt count and caught-up public match is checked. Exact demo project/loopback
+assertions execute before Firebase initialization.
+
+The local run accepted 62 operations with zero failed scoring operations and
+verified both room outcomes, but observed 22 transaction retries, p50 55 ms,
+p95 6,363 ms and maximum 10,365 ms. PASS took 6,363 ms with two retries in the
+128-player room and 2,585 ms without retry in the 320-player room. This is evidence
+that correctness passed while waiting still remains in the candidate. It does not
+identify a production lock holder or establish the 11/17 root cause.
+
+The harness uses additional coherent read transactions between commands to avoid
+composing a new bucket against pre-PASS structure; those reads also create load.
+These timings describe this Emulator workload, not real client subscriptions,
+network latency, a whole tournament, a capacity target or a performance improvement
+over legacy scoring. The generated report is `test-results/four-court-buckets/pass-contention.json`.
+
 ## Dynamic physical court count (current candidate)
 
 The trusted `resize` dispatch now changes the manifest in the same Firestore transaction as the root, public projection, receipt, and bucket creation/deletion. An active court count of 1–4 uses one bucket; 5–8 uses two; 9–12 uses three. Growing beyond a boundary creates the new bucket only after checking that its document does not already exist. Shrinking deletes buckets outside the new physical count only after the retirement engine has moved or finished all pending matches there. A match already completed on a retired court keeps its original station and full score history in the authoritative root; re-expansion moves that history back into its court bucket. Detached station-0 matches also stay in the root.

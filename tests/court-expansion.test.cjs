@@ -37,15 +37,15 @@ function harness(size=32,started=true){
 function resize(h,n){const {st,api}=h;const result=api.request(st,n,api.target(st),100,Number(st.courtRetirementPlan?.revision||0));assert(result.ok);h.ctx.rebuildPropagationForState(st);return result;}
 const routing=st=>st.matches.map(m=>[m.id,m.station,Number(m.dispatchRevision||0)]);
 const structure=st=>st.matches.map(m=>[m.id,m.seq,m.bracket,m.round,m.indexInRound,m.a,m.b,m.winnerId,m.loserId,m.scoreA,m.scoreB,m.log,m.faultActions]);
-test('1→6 distributes current/next and future placeholders in one rebuild, preserving original current and next',()=>{
- const h=harness();h.st.matches[0].scoreA=2;const first=clone(h.st.matches[0]),oldNext=h.st.courtAssignments.court1.nextMatchId,slots=structure(h.st);
+test('1→6 fills current courts in sequence while preserving original play and bracket slots',()=>{
+ const h=harness();h.st.matches[0].scoreA=2;const first=clone(h.st.matches[0]),slots=structure(h.st);
  resize(h,6);const cs=Object.values(h.st.courtAssignments);
  assert.equal(cs.length,6);assert(cs.every(c=>c.currentMatchId&&c.nextMatchId));assert.equal(new Set(cs.flatMap(c=>[c.currentMatchId,c.nextMatchId])).size,12);
- assert.deepEqual(clone(h.st.matches[0]),first);assert.equal(h.st.courtAssignments.court1.nextMatchId,oldNext);
+ assert.deepEqual(clone(h.st.matches[0]),first);assert.deepEqual(cs.map(c=>c.currentMatchId),Array.from({length:6},(_,i)=>'r0m'+i));
  assert.deepEqual(structure(h.st),slots);assert.equal(new Set(h.st.matches.filter(m=>m.round>0).map(m=>m.station)).size,6);
- assert(h.st.matches.every(m=>Number(m.dispatchRevision||0)<=1));
+ assert(h.st.matches.every(m=>Number(m.dispatchRevision||0)<=2));
 });
-test('1→6→6 is a routing and plan no-op; repeat rebuilds cannot steal reserved next',()=>{
+test('1→6→6 is a routing and plan no-op; repeated rebuilds preserve the resulting assignments',()=>{
  const h=harness();resize(h,6);const routes=routing(h.st),plan=clone(h.st.courtRetirementPlan),refs=clone(h.st.courtAssignments);
  resize(h,6);assert.deepEqual(routing(h.st),routes);assert.deepEqual(clone(h.st.courtRetirementPlan),plan);
  for(let i=0;i<6;i++)h.ctx.rebuildPropagationForState(h.st);
@@ -57,11 +57,11 @@ test('pre-start expansion distributes queues without starting the tournament or 
  assert(Object.values(h.st.courtAssignments).every(c=>c.currentMatchId&&c.nextMatchId));
  assert(h.st.matches.every(m=>m.status!=='in_progress'&&!m.startedAt));
 });
-test('insufficient unreserved pairs leaves courts idle instead of stealing notified next or duplicating current',()=>{
+test('available forecast fills an idle court without duplicating current when pairs are scarce',()=>{
  const h=harness(4),next=h.st.courtAssignments.court1.nextMatchId;resize(h,6);
- assert.equal(h.st.courtAssignments.court1.nextMatchId,next);
+ assert.equal(h.st.courtAssignments.court2.currentMatchId,next);
  const current=Object.values(h.st.courtAssignments).map(c=>c.currentMatchId).filter(Boolean);
- assert.equal(current.length,1);assert.equal(new Set(current).size,1);
+ assert.equal(current.length,2);assert.equal(new Set(current).size,2);
 });
 test('1→6→3→6 preserves current work, scores and bracket structure through existing shrink/drain behavior',()=>{
  const h=harness();resize(h,6);const current=new Set(Object.values(h.st.courtAssignments).map(c=>c.currentMatchId));
@@ -107,16 +107,16 @@ test('closed source/destination courts and detached station zero are excluded',(
  assert(!h.st.matches.some(m=>m.station===3));assert(!h.st.courtAssignments.court3.currentMatchId);
  const m=h.st.matches[5];m.station=3;assert(!h.api.movableQueuedMatches(h.st).some(x=>x.id===m.id));
 });
-test('each idle claim is immediately reserved; five empty courts get five distinct unreserved matches',()=>{
- const h=harness();h.st.meta.stations=6;const oldNext=h.st.courtAssignments.court1.nextMatchId;
+test('five idle courts receive the next five pairs in sequence, including old forecasts',()=>{
+ const h=harness();h.st.meta.stations=6;
  h.ctx.rebuildPropagationForState(h.st);const cs=Object.values(h.st.courtAssignments);
  assert(cs.every(c=>c.currentMatchId));assert.equal(new Set(cs.map(c=>c.currentMatchId)).size,6);
- assert.equal(h.st.courtAssignments.court1.nextMatchId,oldNext);
- assert(h.st.matches.every(m=>Number(m.dispatchRevision||0)<=1));
+ assert.deepEqual(cs.map(c=>c.currentMatchId),Array.from({length:6},(_,i)=>'r0m'+i));
+ assert(h.st.matches.every(m=>Number(m.dispatchRevision||0)<=2));
 });
-test('valid old next survives lower-sequence arrivals, but stale/completed/blocked next is replaced',()=>{
+test('old next cannot outrank a lower-sequence eligible match',()=>{
  const h=harness();h.st.courtAssignments.court1.nextMatchId='r0m10';
- h.ctx.rebuildCourtAssignments();assert.equal(h.st.courtAssignments.court1.nextMatchId,'r0m10');
+ h.ctx.rebuildCourtAssignments();assert.equal(h.st.courtAssignments.court1.nextMatchId,'r0m1');
  h.st.matches[10].status='paused';h.ctx.rebuildCourtAssignments();assert.equal(h.st.courtAssignments.court1.nextMatchId,'r0m1');
  h.st.courtAssignments.court1.nextMatchId='missing';h.ctx.rebuildCourtAssignments();assert.equal(h.st.courtAssignments.court1.nextMatchId,'r0m1');
 });
@@ -126,10 +126,11 @@ test('real winner propagation still fills correct later-round slots after expans
  h.ctx.rebuildPropagationForState(h.st);
  const m=h.st.matches.find(m=>m.id==='r1m0');assert.equal(m.a.playerId,'p0');assert.equal(m.b.playerId,'p2');
 });
-test('finished current advances the reserved next even when its seq is later',()=>{
+test('finished current advances earliest waiting pair instead of later old forecast',()=>{
  const h=harness();h.st.courtAssignments.court1.nextMatchId='r0m10';resize(h,6);
  const current=h.st.matches[0];current.completed=true;current.status='completed';current.winnerId=current.a.playerId;current.loserId=current.b.playerId;
- h.ctx.rebuildPropagationForState(h.st);assert.equal(h.st.courtAssignments.court1.currentMatchId,'r0m10');
+ const expected=h.st.matches.filter(m=>m.round===0&&!m.completed&&m.status!=='in_progress').sort((a,b)=>a.seq-b.seq)[0].id;
+ h.ctx.rebuildPropagationForState(h.st);assert.equal(h.st.courtAssignments.court1.currentMatchId,expected);
 });
 test('explicit transfer/resume and eligible PASS priority still override an old next',()=>{
  for(const priority of [{dispatchPriorityAt:123},{skippedAt:120,resumeQueuedAt:123},{skippedAt:120,skipWaitFor:[],callPass:{waitFor:[]}}]){

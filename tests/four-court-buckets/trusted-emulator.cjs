@@ -229,13 +229,18 @@ async function send(root,id,action,extra={}){
    const before=await read(root),commands=['m1','m2'].map(id=>{const d=request(before.state,before.room,id,'confirm',operation());return {auth:{uid:'ref'+d.station},data:d};});
    await Promise.all([...commands.map(d=>commit(d)),publish('BXH-CROSS1')]);await publish('BXH-CROSS1');
    const after=await read(root),final=after.state.matches.find(m=>m.id==='final');
-   assert.equal(final.a.playerId,'a');assert.equal(final.b.playerId,'c');assert.equal(final.station,5);
+   assert.equal(final.a.playerId,'a');assert.equal(final.b.playerId,'c');
+   // The old court-5 forecast must not keep court 1 idle once both players
+   // are known. Sequential dispatch routes the final to the first empty court.
+   assert.equal(final.station,1);assert.equal(final.dispatchRevision,1);
+   assert.equal(after.state.courtAssignments.court1.currentMatchId,'final');
    const publicState=JSON.parse((await pub.get()).data().bracketView);
    assert.equal(publicState.matches.find(m=>m.id==='final').b.playerId,'c');
    assert(after.state.matches.filter(m=>['m1','m2'].includes(m.id)).every(m=>m.completed&&m.hunterData.analyzable));
    await send(root,'final','score',{side:'B',finish:'extreme'});await send(root,'final','score',{side:'B',finish:'spin'});await send(root,'final','confirm');
    const complete=await read(root);assert.equal(complete.state.championId,'c');assert.equal(complete.state.runnerUpId,'a');
-   assert.equal((await db.collection('staffActivityLogs/ref5/matches').where('tournamentCode','==','BXH-CROSS1').get()).size,2);
+   assert.equal((await db.collection('staffActivityLogs/ref1/matches').where('tournamentCode','==','BXH-CROSS1').get()).size,2);
+   assert.equal((await db.collection('staffActivityLogs/ref5/matches').where('tournamentCode','==','BXH-CROSS1').get()).size,1);
    report.cases.push({name:'cross-bucket-confirm-and-final',passed:true,champion:'c',sourceBuckets:2,concurrentPublicWorker:true});
   }
   {

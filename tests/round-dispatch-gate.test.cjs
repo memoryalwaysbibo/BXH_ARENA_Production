@@ -40,11 +40,11 @@ function browser(st){
 function server(st){return createEngine(st,{uid:'ref',name:'Ref'},100,'round-order-test');}
 for(const [label,make] of [['browser',browser],['server',server]]){
  for(const [room,meta] of [['積分',{ladderMode:'ranked'}],['一般',{ladderMode:'general'}],['玩家一般',{eventAuthority:'community',ladderMode:'general',ownerUid:'player'}]]){
-  test(`${label}: ${room} waits while a first-round match has not started`,()=>{
+  test(`${label}: ${room} starts waiting prior-round work before releasing a later round`,()=>{
    const st=fixture(meta);make(st).rebuildPropagationForState(st);
-   assert.notEqual(byId(st,'r1m0').status,'in_progress');
-   assert(!Object.values(st.courtAssignments).some(c=>c.currentMatchId==='r1m0'||c.nextMatchId==='r1m0'));
-   assert.equal(byId(st,'r0m3').status,'ready');
+   assert.equal(byId(st,'r0m3').status,'in_progress');
+   assert(Object.values(st.courtAssignments).some(c=>c.currentMatchId==='r0m3'));
+   if(byId(st,'r1m0').status==='in_progress')assert(st.matches.filter(m=>m.round===0&&!m.completed).every(m=>m.status==='in_progress'));
   });
   test(`${label}: ${room} releases next round while earlier matches are still playing`,()=>{
    const st=fixture(meta);byId(st,'r0m3').status='in_progress';byId(st,'r0m3').station=3;
@@ -80,8 +80,8 @@ for(const [label,make] of [['browser',browser],['server',server]]){
  test(`${label}: preassigned future ready/current and next pointers cannot bypass a waiting round`,()=>{
   const st=fixture();st.courtAssignments.court1={currentMatchId:'r1m0',nextMatchId:'r1m1'};byId(st,'r1m0').status='ready';
   make(st).rebuildPropagationForState(st);
-  assert.equal(st.courtAssignments.court1.currentMatchId,null);assert.equal(st.courtAssignments.court1.nextMatchId,null);
-  assert.equal(byId(st,'r1m0').status,'pending');
+  assert.equal(st.courtAssignments.court1.currentMatchId,'r0m3');assert.notEqual(st.courtAssignments.court1.nextMatchId,'r1m1');
+  assert.notEqual(st.courtAssignments.court1.currentMatchId,'r1m0');
  });
  test(`${label}: ongoing later-round play survives an earlier pause`,()=>{
   const st=fixture();byId(st,'r0m3').status='paused';byId(st,'r1m0').status='in_progress';byId(st,'r1m0').scoreA=1;
@@ -100,7 +100,7 @@ test('browser: manual assignment, swap, idle claim and reconciliation use the sa
  assert.equal(ctx.canCourtSwapTarget(next,byId(st,'r0m3'),st),false);
  assert.equal(ctx.applyIdleCourtClaim(st,next.id,3).ok,false);
  st.courtAssignments.court1.currentMatchId=next.id;next.dispatchRevision=1;next.status='ready';
- ctx.reconcileCourtAssignments();assert.equal(st.courtAssignments.court1.currentMatchId,null);
+ ctx.reconcileCourtAssignments();assert.notEqual(st.courtAssignments.court1.currentMatchId,next.id);
 });
 test('server: an idle claim cannot select a later-round match from another court',()=>{
  const st=fixture();assert.equal(server(st).applyIdleCourtClaim(st,'r1m0',3).ok,false);
@@ -147,8 +147,12 @@ for(const [players,courts] of [[24,4],[128,6],[320,12]])test(`server: full synth
   if(st.championId)break;
   const current=Object.values(st.courtAssignments).map(c=>byId(st,c.currentMatchId)).filter(m=>m&&!m.completed&&m.status==='in_progress');
   assert(current.length,'no deadlock');assert.equal(new Set(current.map(m=>m.id)).size,current.length);
-  // Finish one court at a time, leaving other courts busy to exercise overlap.
-  const m=current.sort((a,b)=>a.seq-b.seq)[0];
+  for(const m of newlyRunning){
+   const overtaken=st.matches.filter(x=>!x.completed&&!x.isBye&&x.round===m.round&&x.a&&x.b&&x.status!=='in_progress'&&x.seq<m.seq);
+   assert.equal(overtaken.length,0,'new work must not overtake a lower-sequence waiting pair');
+  }
+  // Vary which court finishes; always finishing the first hides routing bugs.
+  const m=current.sort((a,b)=>a.seq-b.seq)[(step*7+3)%current.length];
   Object.assign(m,{completed:true,status:'completed',winnerId:m.a.playerId,loserId:m.b.playerId});played++;
  }
  assert(st.championId);assert.equal(played,players-1);

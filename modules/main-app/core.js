@@ -7845,13 +7845,13 @@ function resumeMatchStatus(matchId){
   render();
 }
 
-function rebuildPropagation(){
+function rebuildPropagation(authoritative=false){
   const fmt = state.meta.formatType || "single";
   if(fmt==="double") rebuildPropagationDouble();
   else if(fmt==="roundrobin") rebuildPropagationRoundRobin();
   else rebuildPropagationSingle();
   syncMatchStatuses();
-  rebuildCourtAssignments();
+  rebuildCourtAssignments(authoritative);
 }
 
 
@@ -7865,9 +7865,9 @@ function rebuildPropagationForState(targetState){
   const previousState=state;
   try{
     state=targetState;
-    rebuildPropagation();
+    rebuildPropagation(true);
     // Only the authoritative transaction may rebalance queued matches. Never
-    // move a match currently displayed on another court or one with play data.
+    // move actual play; ordinary next forecasts may be reassigned in sequence.
     if(state.startedAt&&state.archiveStatus!=="completed"){
       let moved=false;
       for(let n=1;n<=Math.max(1,Number(state.meta.stations)||1);n++){
@@ -7877,7 +7877,7 @@ function rebuildPropagationForState(targetState){
           if(candidate&&applyIdleCourtClaim(state,candidate.id,n).ok)moved=true;
         }
       }
-      if(moved)rebuildPropagation();
+      if(moved)rebuildPropagation(true);
     }
     return targetState;
   }finally{
@@ -8186,7 +8186,7 @@ function reconcileCourtAssignments(){
     }
   }
 }
-function rebuildCourtAssignments(){
+function rebuildCourtAssignments(authoritative=false){
   window.BXHCourtRetirement?.reconcile(state);
   const n = Math.max(1, state.meta.stations||1);
   const existing = state.courtAssignments || {};
@@ -8201,7 +8201,7 @@ function rebuildCourtAssignments(){
     const key = courtKey(i);
     const court = state.courtAssignments[key];
     if(state.forcedCourtExits?.[i]?.closed){Object.assign(court,{currentMatchId:null,nextMatchId:null,status:"retired",lockedBy:null,lockedAt:null});continue;}
-    const queue = stationExecutionQueue(i);
+    let queue = stationExecutionQueue(i);
 
     let current = court.currentMatchId ? getMatch(court.currentMatchId) : null;
     // Drop the current assignment if it completed, or (due to a station
@@ -8213,11 +8213,35 @@ function rebuildCourtAssignments(){
     if(current && ["pending","ready"].includes(current.status) && singleElimRoundDispatchBlocked(current,state.matches,state.meta)){
       current.status="pending";current.startedAt=null;court.currentMatchId=null;current=null;
     }
+    if(authoritative&&(state.meta.formatType||"single")==="single"&&state.startedAt&&current&&
+       ["pending","ready"].includes(current.status)&&!current.startedAt&&!matchHasDecisionData(current)&&
+       !current.dispatchPriorityAt&&!current.resumeQueuedAt&&!current.skippedAt&&!current.callPass){
+      court.currentMatchId=null;current=null;
+    }
     // A paused match STAYS as the court's current match (paused ≠ vacated).
     if(!current){
       const first=queue[0];
       const explicit=first&&(first.dispatchPriorityAt||first.resumeQueuedAt||first.skippedAt);
-      current = (explicit?first:queue.find(m=>m.id===court.nextMatchId)||first) || null;
+      const sequential=(state.meta.formatType||"single")==="single";
+      current = (explicit||sequential?first:queue.find(m=>m.id===court.nextMatchId)||first) || null;
+      // A displayed next is a forecast, not an execution-order lock. Before
+      // starting ordinary single-elimination work, take the earliest eligible
+      // queued match across all courts. Keep actual play, PASS dependencies,
+      // explicit transfers and retiring courts outside automatic rebalancing.
+      if(authoritative&&sequential&&!explicit&&state.startedAt&&window.BXHCourtRetirement?.accepts(state,i)){
+        const routing={...state,courtAssignments:Object.fromEntries(Object.entries(state.courtAssignments).map(([key,c])=>[key,{...c,nextMatchId:null}]))};
+        const candidate=window.BXHCourtRetirement.movableQueuedMatches(routing)
+          .filter(m=>m.a&&m.b&&!m.dispatchPriorityAt&&!singleElimDispatchBlocked(m,state.matches,state.meta))
+          .sort((a,b)=>Number(a.seq||0)-Number(b.seq||0))[0];
+        if(candidate&&(!current||Number(candidate.seq||0)<Number(current.seq||0))){
+          clearCourtAssignmentRefs(state,[candidate.id]);
+          if(Number(candidate.station)!==i){
+            candidate.station=i;candidate.dispatchRevision=Number(candidate.dispatchRevision||0)+1;candidate.updatedAt=Date.now();
+          }
+          current=candidate;
+          queue=stationExecutionQueue(i);
+        }
+      }
       court.currentMatchId = current ? current.id : null;
       if(current){
         ensureMatchStatusFields(current);
@@ -8239,14 +8263,22 @@ function rebuildCourtAssignments(){
       current.status="in_progress";current.startedAt=current.startedAt||Date.now();current.updatedAt=Date.now();
     }
     const remaining = queue.filter(m=>m.id!==court.currentMatchId);
-    // Preserve a displayed next (possibly notified), except for an explicit
-    // swap/transfer/resume or the existing PASS dependency priority.
+    // Single elimination forecasts follow queue order too. Other formats
+    // retain their existing next reservation behavior.
     const first=remaining[0];
     const explicit=first&&(first.dispatchPriorityAt||first.resumeQueuedAt||first.skippedAt);
-    const nextM = (explicit?first:remaining.find(m=>m.id===court.nextMatchId)||first) || null;
+    const nextM = (explicit||(state.meta.formatType||"single")==="single"?first:remaining.find(m=>m.id===court.nextMatchId)||first) || null;
     court.nextMatchId = nextM ? nextM.id : null;
     court.status = current ? (current.status||"in_progress") : "idle";
     court.updatedAt = Date.now();
+  }
+  // Later idle courts can take earlier courts' forecast matches. Refresh all
+  // forecasts after routing so a single transaction returns consistent refs.
+  if(authoritative&&(state.meta.formatType||"single")==="single"){
+    for(let i=1;i<=n;i++){
+      const court=state.courtAssignments[courtKey(i)];
+      court.nextMatchId=stationExecutionQueue(i).find(m=>m.id!==court.currentMatchId)?.id||null;
+    }
   }
 }
 
@@ -12197,7 +12229,9 @@ function applyCourtSwapMutation(remoteState,sourceId,targetId){
   if(!sourceStation||!targetStation) return {ok:false,reason:"station-mismatch"};
   const now=Date.now();
   clearCourtAssignmentRefs(remoteState,[source.id,target.id]);
-  source.station=targetStation;source.status="pending";source.startedAt=null;source.updatedAt=now;source.dispatchPriorityAt=null;source.dispatchRevision=Number(source.dispatchRevision||0)+1;
+  // Both endpoints are explicit manual routing decisions; automatic idle fill
+  // must not steal the displaced source before its destination can receive it.
+  source.station=targetStation;source.status="pending";source.startedAt=null;source.updatedAt=now;source.dispatchPriorityAt=now;source.dispatchRevision=Number(source.dispatchRevision||0)+1;
   target.station=sourceStation;target.status="ready";target.startedAt=null;target.updatedAt=now;target.dispatchPriorityAt=now;target.dispatchRevision=Number(target.dispatchRevision||0)+1;
   remoteState.currentMatchId=target.id;
   return {ok:true,state:remoteState};
