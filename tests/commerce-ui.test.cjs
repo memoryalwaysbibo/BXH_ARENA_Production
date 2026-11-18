@@ -81,3 +81,34 @@ test('storefront hides room quota and VIP categories, all-products results and c
  c.category='vip';t.ui.shop();assert.equal(c.category,'');
 });
 
+
+function ticketOffer(changes={}){
+ return {id:'activation-32-sku',name:'賽事啟動券｜32 人',status:'published',purchasable:true,
+  audience:'partner_organizer',version:4,priceTwd:300,
+  delivery:{kind:'ticket',assetId:'32',quantity:1,durationDays:30},...changes};
+}
+test('an eligible ticket offer replaces its preview and uses its real checkout SKU',async()=>{
+ const t=setup();t.ui.shop();
+ const c=t.ui.context();c.storeOpen=true;c.products=[ticketOffer()];
+ await t.ui.handle('commerce-category',{dataset:{id:'ticket'}});
+ assert.equal((t.ui.shop().match(/暫停購買/g)||[]).length,4);
+ await t.ui.handle('commerce-product',{dataset:{id:'tournament_activation_32'}});
+ const details=t.ui.shop();
+ assert.match(details,/有效合作主辦/);assert.match(details,/30 天/);assert.match(details,/最多持有 2 張/);
+ assert.match(details,/data-action="commerce-buy"[^>]*>建立訂單｜NT\$ 300/);
+ await t.ui.handle('commerce-buy',{dataset:{id:'tournament_activation_32'}});
+ assert.deepEqual(t.calls,[{action:'create-order',productId:'activation-32-sku',expectedVersion:4,operationId:'same-operation'}]);
+});
+test('ordinary players, closed checkout and invalid offers cannot create a ticket order',async()=>{
+ const t=setup();t.ui.shop();const c=t.ui.context();const id='tournament_activation_32';
+ c.storeOpen=true;c.products=[ticketOffer({purchasable:false,unavailableReason:'partner-organizer-required'})];
+ await t.ui.handle('commerce-product',{dataset:{id}});
+ assert.match(t.ui.shop(),/此商品限授權有效的合作主辦購買/);
+ await t.ui.handle('commerce-buy',{dataset:{id}});
+ c.storeOpen=false;c.products=[ticketOffer()];
+ await t.ui.handle('commerce-buy',{dataset:{id}});
+ c.storeOpen=true;c.products=[ticketOffer({audience:'all'}),ticketOffer({status:'draft'})];
+ await t.ui.handle('commerce-buy',{dataset:{id}});
+ assert.equal(t.calls.length,0);
+ assert.match(t.ui.shop(),/暫停購買/);
+});
