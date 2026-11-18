@@ -1001,7 +1001,7 @@
   let playerRegistrationFeedback=null;
   function submitRegistrationCancellation(payload){
     const {code,operationId}=payload;
-    const route=ticketRegistrationPilot(code)?'family':'roster';
+    const route=code&&code===window.BXH_TICKET_ROOM_PILOT_CODE?'family':'roster';
     return callEngagementFunction('registrationQueueV2',{action:'submit',code,operation:{code,route,operationId,payload}},20000);
   }
   function getPlayerRegistrationFeedback(){
