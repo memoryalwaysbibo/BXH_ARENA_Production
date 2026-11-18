@@ -20,9 +20,9 @@ const {chromium}=require(require.resolve('playwright',{paths:[process.env.CODEX_
     window.render=()=>document.getElementById('app').innerHTML=BXHPassReturnUI.idle(st,1,bindings)+BXHPassReturnUI.skipped(st,bindings);
     window.render();
    });
-   await page.getByText('可接手場次（0）',{exact:true}).click();
+   await page.getByText('可接手場次（1）',{exact:true}).click();
    assert(await page.getByText('等待 PASS 前置場次完成',{exact:true}).first().isVisible());
-   assert(await page.locator('[data-action="claim-skipped-match"]').first().isDisabled());
+   assert(await page.locator('[data-action="claim-skipped-match"]').first().isEnabled());
    await page.evaluate(()=>{st.matches[1].completed=true;render();});
    await page.getByText('可接手場次（1）',{exact:true}).click();
    assert(await page.locator('[data-action="claim-skipped-match"]').first().isEnabled());

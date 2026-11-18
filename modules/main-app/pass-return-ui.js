@@ -19,7 +19,7 @@
     if(st.courtAssignments?.['court'+n]?.status==='paused')return '<div class="hint">本台已暫停，恢復後才能接手場次。</div>';
     const available=new Set(b.candidates(n).map(m=>m.id));
     const matches=(st.matches||[]).filter(m=>!m.isBye&&!m.completed).sort((a,c)=>Number(a.seq||0)-Number(c.seq||0));
-    const readyPass=m=>m.skippedAt&&root.BXHPassReturn.readiness(st,m).ok&&!b.blocked(m);
+    const readyPass=m=>m.skippedAt&&root.BXHPassReturn.readiness(st,m,{manual:true}).ok&&!b.blocked(m);
     const ordered=matches.slice().sort((a,c)=>Number(available.has(c.id)||readyPass(c))-Number(available.has(a.id)||readyPass(a))||Number(a.seq||0)-Number(c.seq||0));
     const rows=ordered.slice(0,12).map(m=>{
       const ok=available.has(m.id)||readyPass(m);
@@ -35,13 +35,14 @@
     const targets=Array.from({length:b.courtCount},(_,i)=>i+1).filter(n=>b.accepts(n)&&b.canOperate(n));
     const rows=matches.map(m=>{
       const p=m.passReturn,ready=root.BXHPassReturn.readiness(st,m).ok&&!b.blocked(m);
+      const manualReady=root.BXHPassReturn.readiness(st,m,{manual:true}).ok&&!b.blocked(m);
       const origin=p?.originStation||m.station,assigned=p?.assignedStation||p?.requestedStation;
       const status=!ready?reason(st,m,b):assigned?'已安排台'+assigned:'條件已滿足，等待空台';
       const waited=Math.max(0,Math.floor((b.now-Number(p?.skippedAt||m.skippedAt))/60000));
-      const controls=b.canManage?`<details><summary>指定回補台</summary><div class="btn-row">${targets.map(n=>`<button type="button" class="btn btn-ghost btn-sm" data-action="claim-skipped-match" data-id="${esc(m.id)}" data-station="${n}" ${!ready||b.busy?'disabled':''}>台${n}${root.BXHPassReturn.idle(st,n)?'｜空閒':'｜忙碌後回補'}</button>`).join('')}</div></details>`:'';
+      const controls=b.canManage?`<details><summary>指定回補台</summary><div class="btn-row">${targets.map(n=>`<button type="button" class="btn btn-ghost btn-sm" data-action="claim-skipped-match" data-id="${esc(m.id)}" data-station="${n}" ${!manualReady||b.busy?'disabled':''}>台${n}${root.BXHPassReturn.idle(st,n)?'｜空閒':'｜忙碌後回補'}</button>`).join('')}</div></details>`:'';
       return `<div class="panel pass-return-row"><strong>${esc(b.label(m))}｜${esc(m.a&&m.b?b.name(m.a.playerId)+' vs '+b.name(m.b.playerId):'等待晉級')}</strong><div class="hint">原台 ${Number(origin)}｜${assigned?'安排台 '+Number(assigned):'尚未派台'}｜等待 ${waited} 分鐘</div><div class="hint">${esc(status)}</div>${controls}</div>`;
     }).join('');
-    return `<section class="panel"><div class="panel-title">PASS 自動回補（${matches.length}）</div><p class="hint">條件滿足後原台優先，其他空台補位。保留原比分與紀錄。</p>${rows}</section>`;
+    return `<section class="panel"><div class="panel-title">PASS 自動回補（${matches.length}）</div><p class="hint">自動回補：條件滿足後原台優先。手動指定：可略過 PASS 前置等待，空台立即回補，忙碌台待目前場次結束。保留原比分與紀錄。</p>${rows}</section>`;
   }
   const notifyKey=(code,m)=>'bxh.pass-notified:'+code+':'+m.id+':'+Number(m.station)+':'+Number(m.dispatchRevision||0);
   function acknowledged(code,m){try{return root.sessionStorage?.getItem(notifyKey(code,m))==='sent';}catch{return false;}}
