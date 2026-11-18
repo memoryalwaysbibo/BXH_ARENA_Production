@@ -25,6 +25,55 @@ function currentEligiblePlayers(state,registrations,confirmedCount){
  return eligible;
 }
 
+function grantTime(value){
+ if((typeof value!=='number'&&typeof value!=='string')||(typeof value==='string'&&!value.trim()))return NaN;
+ const n=Number(value);
+ return Number.isFinite(n)?n:Date.parse(value);
+}
+
+function ownsTicketRoom(room,user,uid,now){
+ const g=user.partnerOrganizer;
+ const started=g?.startsAtMs??g?.startsAt;
+ const from=started==null&&g?.scope!=='contract'?0:grantTime(started);
+ const until=grantTime(g?.expiresAtMs??g?.expiresAt);
+ const order=g?.orderCode||user.partnerContractOrderCode||null;
+ return user.role==='player'&&g?.status==='active'&&typeof g.organizationId==='string'&&g.organizationId.trim()
+  &&Number.isFinite(from)&&from>=0&&from<=now&&Number.isFinite(until)&&until>now
+  &&(g.scope==='contract'?typeof order==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(order)
+    :(!order&&(g.scope==null||g.scope==='manual')))
+  &&room?.createdByRole==='partner_organizer'&&room.createdBy===uid&&room.ownerUid===uid
+  &&room.partnerOrganizationCode===g.organizationId&&(room.partnerContractOrderCode||null)===order;
+}
+
+async function readReservedTicket({db,tx,room,pub,state,roomId,code,uid,user,now}){
+ const access=room.ticketAccessV1;
+ if(!access||access.version!==1||access.ownerUid!==uid||access.roomId!==roomId||
+    typeof access.ticketId!=='string'||!/^BXH-SO-[A-Z0-9]{24}$/.test(access.ticketId)||
+    pub.ticketRoomVersion!==1||state.meta?.eventAuthority!=='ticket')throw Error('ticket-binding-invalid');
+ const ref=db.doc('commerceTickets/'+access.ticketId);
+ const settings=db.doc('systemSettings/commerceTicketLifecycleV1');
+ const [ticketSnap,releaseSnap]=await tx.getAll(ref,settings);
+ const release=releaseSnap.data(),ticket=ticketSnap.data();
+ if(release?.enabled!==true||release.roomCode!==code||release.roomId!==roomId)throw Error('ticket-lifecycle-disabled');
+ if(ticket?.version!==1||ticket.id!==access.ticketId||ticket.orderId!==access.ticketId||ticket.status!=='reserved'||
+    ticket.ownerUid!==uid||ticket.boundRoomCode!==code||ticket.boundRoomId!==roomId||ticket.usedAt||
+    (ticket.contractCode||null)!==(room.partnerContractOrderCode||null))throw Error('ticket-binding-invalid');
+ if(!Number.isSafeInteger(ticket.expiresAt)||ticket.expiresAt<=now)throw Error('ticket-expired');
+ const capacity=ticket.capacity;
+ if(![32,64,96,128,160].includes(capacity)||access.baseCapacity!==capacity||
+    access.addedCapacity!==0||ticket.addedCapacity!==0||room.capacity!==capacity||pub.capacity!==capacity||
+    state.meta.registrationCapacity!==capacity||state.players.length>capacity)throw Error('ticket-capacity-invalid');
+ if(ticket.contractCode){
+  const contract=(await tx.get(db.doc('partnerContracts/'+ticket.contractCode))).data();
+  const g=user.partnerOrganizer;
+  if(contract?.orderCode!==ticket.contractCode||contract.targetUid!==uid||contract.status!=='active'||
+     contract.signedBy!==uid||!contract.signatureHash||!contract.signedAt||
+     grantTime(contract.startsAt)!==grantTime(g.startsAtMs??g.startsAt)||
+     grantTime(contract.expiresAt)!==grantTime(g.expiresAtMs??g.expiresAt))throw Error('permission-denied');
+ }
+ return ref;
+}
+
 function createLifecycleHandler(action,{db,enabled=async()=>false,clock=Date.now}){
  const draw=action==='draw';
  const allowedFields=draw?drawFields:startFields;
@@ -45,14 +94,16 @@ function createLifecycleHandler(action,{db,enabled=async()=>false,clock=Date.now
   return db.runTransaction(async tx=>{
    const [userSnap,roomSnap,publicSnap,prior]=await tx.getAll(db.doc('users/'+uid),roomRef,publicRef,operation);
    const user=userSnap.data();
-   if(user?.active!==true||user.deleted||user.isTestAccount||['deleted','disabled','frozen'].includes(user.accountStatus)||
-      !['admin','super_admin'].includes(user.role))throw Error('permission-denied');
    const room=roomSnap.data(),pub=publicSnap.data();
+   const ticketRoom=room?.eventAuthority==='ticket'||pub?.eventAuthority==='ticket'||!!room?.ticketAccessV1||!!pub?.ticketRoomVersion;
+   if(user?.active!==true||user.deleted||user.isTestAccount||['deleted','disabled','frozen'].includes(user.accountStatus)||
+      (ticketRoom?!ownsTicketRoom(room,user,uid,now):!['admin','super_admin'].includes(user.role)))throw Error('permission-denied');
    if(!room||!pub)throw Error('not-found');
    const state=JSON.parse(room.data),mirror=JSON.parse(pub.bracketView);
    if(state.id!==roomId)throw Error('bracket-room-changed');
    if(prior.exists){
-    if(prior.data().requestHash!==requestHash)throw Error('operation-conflict');
+    if(prior.data().requestHash!==requestHash||
+       (ticketRoom&&prior.data().ticketId!==room.ticketAccessV1?.ticketId))throw Error('operation-conflict');
     return {...prior.data().result,replayed:true};
    }
    if(!registrationQueueOwnsRoom(room)||!await enabled(code,tx))throw Error('registration-queue-disabled');
@@ -60,8 +111,9 @@ function createLifecycleHandler(action,{db,enabled=async()=>false,clock=Date.now
    if([room,pub,state].some(doc=>doc.systemClosed||doc.eventCancelled||doc.testMode||doc.deletionStatus||
       ['completed','archived'].includes(doc.archiveStatus)||doc.registrationSelection||doc.onsiteWaitlistServerOwned||
       doc.onsiteWaitlistDrawEnabled||doc.onsiteWaitlistDraw?.enabled||'scoreStorage' in doc||'scoreBucketProjection' in doc||
-      doc.createdByRole==='partner_organizer'||doc.partnerOrganizationCode)||state.meta?.eventCancelled||
-      state.entrySelection?.mode==='registration'||room.eventAuthority!=='official'||pub.eventAuthority!=='official'||
+      (!ticketRoom&&(doc.createdByRole==='partner_organizer'||doc.partnerOrganizationCode)))||state.meta?.eventCancelled||
+      state.entrySelection?.mode==='registration'||
+      room.eventAuthority!==(ticketRoom?'ticket':'official')||pub.eventAuthority!==room.eventAuthority||
       room.registrationEnabled!==true||pub.registrationEnabled!==true||
       [room.battleMode,pub.battleMode,state.meta?.battleMode].some(mode=>mode&&mode!=='individual')||
       [room.formatType,pub.formatType,state.meta?.formatType].some(format=>format&&format!=='single')||
@@ -84,6 +136,7 @@ function createLifecycleHandler(action,{db,enabled=async()=>false,clock=Date.now
    if(!pending.empty)throw Error('registration-queue-pending');
    if(registrations.size>320||room.confirmedCount!==pub.confirmedCount)throw Error('registration-roster-stale');
    const eligible=currentEligiblePlayers(state,registrations,room.confirmedCount);
+   const ticketRef=ticketRoom?await readReservedTicket({db,tx,room,pub,state,roomId,code,uid,user,now}):null;
    const phaseFields=draw?{}:{tournamentPhase:'live',registrationStatus:'started'};
    const result=draw
     ? commitDraw({state,mirror,uid,now,id:'v2-'+digest(JSON.stringify([code,roomId,operationKey])),drawSeed})
@@ -93,7 +146,8 @@ function createLifecycleHandler(action,{db,enabled=async()=>false,clock=Date.now
    const fields={...fence,...phaseFields,updatedAt:state.updatedAt};
    tx.update(roomRef,{...fields,bracketSize:state.bracketSize,data:JSON.stringify(state)});
    tx.update(publicRef,{...fields,bracketView:JSON.stringify(mirror)});
-   tx.create(operation,{requestHash,result,actorUid:uid});
+   if(ticketRef&&!draw)tx.update(ticketRef,{status:'consumed',usedAt:now,updatedAt:now});
+   tx.create(operation,{requestHash,result,actorUid:uid,...(ticketRef?{ticketId:ticketRef.id}:{})});
    return result;
   });
  };
