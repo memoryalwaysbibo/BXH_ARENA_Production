@@ -5071,10 +5071,16 @@ function registrationParticipantNameMode(value){
 }
 
 function ensureRegistrationFormDraft(){
-  if(registrationFormDraft) return;
+  // Only an empty, unpublished official draft defaults to the unified signup flow.
+  // Opening an existing onsite room must never change its registration or roster.
+  const newOfficialDraft=state.meta?.eventAuthority!=="community"&&!state.cloudCode&&!state.meta?.publishedAt&&!state.startedAt&&!state.bracketSize&&!(state.players||[]).length;
+  if(registrationFormDraft){
+    if(newOfficialDraft)registrationFormDraft.registrationEnabled=true;
+    return;
+  }
   const m = state.meta;
   registrationFormDraft = {
-    registrationEnabled: !!m.registrationEnabled,
+    registrationEnabled: newOfficialDraft || !!m.registrationEnabled,
     registrationOpenAt: m.registrationOpenAt || null,
     registrationCloseAt: m.registrationCloseAt || null,
     registrationCapacity: m.registrationCapacity || null,
@@ -13222,10 +13228,6 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
     ${showModeSelector?managedRegistrationSettingsNotice():""}
     ${registrationFormDraftDirty ? `<div class="banner warn"><span>尚有未儲存的變更，請記得點擊下方「儲存報名設定」。</span></div>` : ""}
     ${showModeSelector ? `<div class="scoring-mode-cards">
-      <button class="scoring-mode-card ${!d.registrationEnabled?'active':''}" data-action="set-registration-enabled" data-value="false" ${locked?'disabled':''}>
-        <div class="smc-title">現場報名</div>
-        <div class="smc-desc">現場直接新增選手，不開放線上報名。</div>
-      </button>
       <button class="scoring-mode-card ${d.registrationEnabled?'active':''}" data-action="set-registration-enabled" data-value="true" ${locked?'disabled':''}>
         <div class="smc-title">線上報名</div>
         <div class="smc-desc">發布後玩家可掃 QR 或從賽事大廳自行報名。</div>
@@ -14030,13 +14032,10 @@ function renderSettings(){
   <div class="settings-section-head" style="margin-top:0;">
     <span class="settings-section-num">1</span>
     <span class="settings-section-title">報名方式</span>
-    <span class="settings-section-desc">先決定現場報名或線上報名</span>
+    <span class="settings-section-desc">統一使用線上報名；可依現場需求設定開放時間</span>
   </div>
   <div class="panel settings-flow-panel">
     <div class="settings-choice-row">
-      <button class="scoring-mode-card ${!registrationChoice?"active":""}" data-action="set-registration-enabled" data-value="false" ${state.bracketSize>0||onsiteRegistrationSettingsLocked()?'disabled':''}>
-        <div class="smc-title">現場報名</div><div class="smc-desc">現場直接新增選手，不開放線上報名。</div>
-      </button>
       <button class="scoring-mode-card ${registrationChoice?"active":""}" data-action="set-registration-enabled" data-value="true" ${state.bracketSize>0||onsiteRegistrationSettingsLocked()?'disabled':''}>
         <div class="smc-title">線上報名</div><div class="smc-desc">玩家可由賽事大廳或 QR CODE 進入報名。</div>
       </button>
@@ -14123,8 +14122,8 @@ function renderSettings(){
       <div class="settings-mini-title">線上報名設定</div>
       <div class="settings-integrated-registration">${renderRegistrationSettingsPanel(false)}</div>
     `:`
-      <div class="settings-mini-title">現場報名</div>
-      <p class="hint">本場採現場報名，不需要設定報名開放時間、截止時間、名額或備取。</p>
+      <div class="settings-mini-title">既有現場房間</div>
+      <p class="hint">本場保留原有設定與名單。若要開放帳號報名，請選擇上方「線上報名」並完成設定。</p>
     `}
   </div>
 
@@ -25579,6 +25578,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     syncSettingsDraftFromDom();
     ensureRegistrationFormDraft();
     const enabled=target.getAttribute("data-value")==="true";
+    if(!enabled){showToast("現場報名模式已停用，請使用線上報名設定。",true);return;}
     registrationFormDraft.registrationEnabled=enabled;
     if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
     // Switching modes only edits the draft. A half-completed registration
