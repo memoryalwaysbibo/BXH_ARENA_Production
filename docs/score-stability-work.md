@@ -113,3 +113,24 @@ BXH-PAGE6 / BXH-PAGE6V2 等非六碼代碼，正式 tournament-entry-utils 的
 錯誤報告包含當前 schema／台數。135 項相關單元/adapter 測試通過，
 但完整頁面仍需新 CI 跑完。背景事件步驟現在只依賴測試來源準備成功，
 可在頁面驗收失敗時仍執行；不會把原本失敗的 job 變成成功。正式站未改。
+
+## 驗收通過與正式來源盤查準備（2026-11-18）
+
+99899b1 的分桶 CI run 44207361081 整套成功：v1/v2 各 6/12 台完整
+原始裁判頁面、native Callable、失去回覆的加分/撤銷/PASS重試、退台/
+重開/跨桶申請與帳號撤銷通過。實際 Functions Emulator 事件的 v2 6/12
+台 async PASS 亦通過，自動補齊公開戰況、沒有手動 publisher；雙房
+4+2 台事件收斂通過。這是合成帳號與 Emulator，不等於正式效能或真實
+App Check 驗收。完整頁面的 PASS 使用預設 inline 路徑。
+
+使用者提供的線上 scoring-core 指紋為 093b6d4e1cec11c3b3bd6a45d3ed2c51f72ff9818893f33992d35ce955c806a5，
+與 PR817 相容發布文件基準相同，保留於 reference；這不是新的雲端讀回。
+候選的主要差異是 local transition 不全房推進、公開台數欄位及新增匯出。
+PR817 的自動 PASS 回補尚為另一候選，不能覆蓋或宣稱已共同驗收。
+
+已新增 BXH816_readonly_inventory.py：固定專案，僅讀五個函式的部署摘要、
+現行 commitRefereeCommand 固定來源世代 ZIP 的選定檔案指紋、相關開關與
+Rules 指紋；不執行來源、不解壓到可執行目錄、不輸出 token/環境機密，
+不部署、不寫雲端。缺少或無權讀的函式統一標示 unavailable，不能誤判
+為未部署。六項離線測試通過。必須由已登入 Cloud Shell 執行後，才能
+核對正式來源並準備限房啟用；目前沒有 GCP 登入，未做正式讀回或部署。

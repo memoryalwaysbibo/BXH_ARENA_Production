@@ -1,0 +1,24 @@
+{
+  "kind": "provided-live-source-review",
+  "productionWrites": 0,
+  "reference": "referee-seats/reference/BXH816_live_scoring-core-20261118.cjs",
+  "referenceSha256": "093b6d4e1cec11c3b3bd6a45d3ed2c51f72ff9818893f33992d35ce955c806a5",
+  "provenance": "User-provided BXH817_live_scoring-core.cjs.txt; matches PR817 compatible-release documentation at 9c3d9961c82c87e5c5e2af9c2ab8e7bbc3e4418f. Not a fresh Cloud API read.",
+  "documentedCapture": {
+    "revision": "commitrefereecommand-00009-jij",
+    "sourceGeneration": "1794939464063954"
+  },
+  "candidateScoringSha256": "aed04819b97a1bdfed2feb6a9a9a097363c5a3381155cf1c0445c618494bd15e",
+  "reviewedDifferences": [
+    "Legacy transition delegates to perform(context,true); new transitionLocal limits six court-local actions and disables global propagation.",
+    "Public projection carries physical court count.",
+    "Existing exported methods remain; transitionLocal is an additional export."
+  ],
+  "unverified": [
+    "Current deployed generation, source package and Rules",
+    "Actual index/engine/dispatch bytes against latest production",
+    "Compatibility with pending PR817 automatic PASS return and UI",
+    "Controlled production trial and real App Check"
+  ],
+  "nextReadOnlyCollector": "operator/BXH816_readonly_inventory.py"
+}
