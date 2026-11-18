@@ -123,7 +123,7 @@ jobs:
         env:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules
           GCLOUD_PROJECT: demo-bxh-four-court-buckets
-        run: node tests/four-court-buckets/prepare_callable_lab.cjs
+        run: node tests/four-court-buckets/prepare-callable-lab.cjs
       - name: Verify native Callable protocol and explicitly enabled frontend session
         env:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules
