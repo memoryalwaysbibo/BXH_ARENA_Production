@@ -49,7 +49,8 @@ async function readReservedTicket({db,tx,room,pub,state,roomId,code,uid,user,now
  const access=room.ticketAccessV1;
  if(!access||access.version!==1||access.ownerUid!==uid||access.roomId!==roomId||
     typeof access.ticketId!=='string'||!/^BXH-SO-[A-Z0-9]{24}$/.test(access.ticketId)||
-    pub.ticketRoomVersion!==1||state.meta?.eventAuthority!=='ticket')throw Error('ticket-binding-invalid');
+    pub.ticketRoomVersion!==1||state.meta?.eventAuthority!=='ticket'||
+    [room.ladderMode,pub.ladderMode,state.meta?.ladderMode].some(mode=>mode!=='ranked'))throw Error('ticket-binding-invalid');
  const ref=db.doc('commerceTickets/'+access.ticketId);
  const settings=db.doc('systemSettings/commerceTicketLifecycleV1');
  const [ticketSnap,releaseSnap]=await tx.getAll(ref,settings);
