@@ -16,16 +16,16 @@ test('reserved activation ticket is consumed only by a successful trusted start'
  const ticket=db.doc('commerceTickets/'+ticketId);
  const release=db.doc('systemSettings/commerceTicketLifecycleV1');
  const state={id:roomId,cloudCode:code,updatedAt:now,meta:{
-  name:'Ticket start fixture',eventAuthority:'ticket',formatType:'single',battleMode:'individual',
+  name:'Ticket start fixture',eventAuthority:'ticket',ladderMode:'ranked',formatType:'single',battleMode:'individual',
   stations:1,registrationEnabled:true,registrationCapacity:32,checkinRequired:false
  },players:[{id:'first',name:'First'},{id:'second',name:'Second'}],matches:[],bracketSize:0,
  waitlistPlayers:[],registrationRosterRevision:0,courtAssignments:{}};
  const access={version:1,ticketId,ownerUid:owner,roomId,baseCapacity:32,addedCapacity:0};
  const initial=db.batch();
- initial.update(room,{eventAuthority:'ticket',registrationQueueVersion:2,createdBy:owner,ownerUid:owner,
+ initial.update(room,{eventAuthority:'ticket',ladderMode:'ranked',registrationQueueVersion:2,createdBy:owner,ownerUid:owner,
   createdByRole:'partner_organizer',partnerOrganizationCode:'fixture-org',partnerContractOrderCode:null,
   ticketAccessV1:access,data:JSON.stringify(state)});
- initial.update(pub,{eventAuthority:'ticket',ticketRoomVersion:1,bracketView:JSON.stringify(state)});
+ initial.update(pub,{eventAuthority:'ticket',ladderMode:'ranked',ticketRoomVersion:1,bracketView:JSON.stringify(state)});
  initial.update(db.doc('users/'+owner),{partnerOrganizer:{status:'active',scope:'manual',organizationId:'fixture-org',startsAtMs:now-1000,expiresAtMs:now+86400000}});
  initial.set(ticket,{id:ticketId,orderId:ticketId,version:1,ownerUid:owner,contractCode:null,status:'reserved',
   capacity:32,addedCapacity:0,boundRoomCode:code,boundRoomId:roomId,expiresAt:now+86400000});
@@ -39,6 +39,11 @@ test('reserved activation ticket is consumed only by a successful trusted start'
  await ticket.update({boundRoomId:'replaced-room'});
  await assert.rejects(draw(request),/ticket-binding-invalid/);
  await ticket.update({boundRoomId:roomId});
+ await pub.update({ladderMode:'general'});
+ await assert.rejects(draw(request),/ticket-binding-invalid/);
+ await pub.update({ladderMode:'ranked',capacity:64});
+ await assert.rejects(draw(request),/ticket-capacity-invalid/);
+ await pub.update({capacity:32});
  const result=await draw(request);
  assert.equal((await ticket.get()).data().status,'reserved');
 
