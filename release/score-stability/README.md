@@ -53,3 +53,11 @@ CI now includes the full original page and real Firestore-trigger publication ag
 ## Publication boundary
 
 Before preparing any actual deployment, freshly verify live generations, feature flags, room epochs, and the Rules hash; download each full immutable source archive, verify its original hash, and apply only this reviewed file overlay while retaining uncaptured files. Review the resulting full archives and run the scoped native/page/event checks. Keep rollout, per-court enablement, pilot migration, and rollback as explicit separate operations. No production release is performed by this package, and `deployableWithoutFreshReview` remains false.
+
+## Read-only full-archive preparation
+
+`python3 operator/BXH816_prepare_trial.py` runs from a clean pinned repository checkout in the operator's authenticated Cloud Shell. It validates the captured baseline and the reviewed overlay plan, checks live function generations, Rules, flags, allowlist and room storage, downloads the three immutable full source archives, verifies their original hashes, and preserves uncaptured files while building local candidate ZIPs. It rechecks live deployment/policy after preparation. Original ZIPs and Rules are retained in a mode-0700 local directory; no deployed code is executed, no dependencies are installed, and no deployment or room mutation command exists in the tool.
+
+Only a successful run creates `READY_FOR_REVIEW` and reports its directory. That marker is not deployment authorization. If preparation fails, incomplete local files must not be used. The operator can share the printed summary and `review.json` for the next review; source archives remain local.
+
+At candidate f660feb, all five workflows passed, including the original page with scoped runtime/Rules and real-event automatic publication with asynchronous PASS. This verifies tested behavior, not a production latency guarantee. The preparation tool is a separate follow-up and requires its own offline protection checks.
