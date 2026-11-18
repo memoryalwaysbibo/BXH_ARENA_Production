@@ -21,16 +21,20 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
    window.esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
    window.testView='shop';window.render=()=>document.querySelector('#app').innerHTML=window.testView==='admin'?BXHCommerce.adminPage():window.testView==='orders'?BXHCommerce.orders():BXHCommerce.shop();
    window.testProduct={id:'skin_test',version:1,name:'星空獵人 Skin（隔離測試）',description:'收藏外觀示範。這是隔離測試商品，沒有正式販售。',terms:'永久持有；測試商品說明。',priceTwd:100,imageUrl:'https://example.invalid/skin.svg',audience:'all',sort:0,status:'published',purchasable:true,delivery:{kind:'skin',assetId:'test_skin',quantity:1,durationDays:0}};
+   window.ticketOffer={...testProduct,id:'activation_ticket_32',version:4,name:'賽事啟動券｜32 人',priceTwd:300,audience:'partner_organizer',delivery:{kind:'ticket',assetId:'32',quantity:1,durationDays:30}};
    window.testOrders=[];window.testCalls=[];
    window.engagementService={commerce:async p=>{
     testCalls.push(p);
-    if(['catalog','admin-products'].includes(p.action))return {ok:true,products:[testProduct],nextCursor:null};
+    if(p.action==='catalog')return {ok:true,products:window.testUid==='ticket_buyer'?[ticketOffer]:[testProduct],nextCursor:null,storeOpen:true};
+    if(p.action==='admin-products')return {ok:true,products:[testProduct],nextCursor:null};
     if(['my-orders','admin-orders'].includes(p.action))return {ok:true,orders:testOrders,nextCursor:null};
     if(p.action==='admin-config')return {ok:true,config:null,capabilities:{}};
     if(p.action==='admin-config-save')return {ok:true,config:{...p,version:1}};
     if(p.action==='admin-product-save')return {ok:true,product:{...p.product,id:p.productId,version:1}};
     if(p.action==='create-order'){
-     const order={id:'BXH-SO-TEST001',ownerUid:'buyer',buyerName:'測試玩家',createdAt:Date.now(),expiresAt:Date.now()+86400000,amountTwd:100,productSnapshot:testProduct,paymentStatus:'pending',deliveryStatus:'not_started',bankSnapshot:{bankCode:'999',bankName:'隔離測試銀行',branch:'測試分行',accountName:'測試戶',accountNumber:'0000000000'}};
+     const product=p.productId===ticketOffer.id?ticketOffer:testProduct;
+     if(p.expectedVersion!==product.version)throw Error('product-changed');
+     const order={id:product===ticketOffer?'BXH-SO-TEST002':'BXH-SO-TEST001',ownerUid:currentAuthUid(),buyerName:'測試玩家',createdAt:Date.now(),expiresAt:Date.now()+86400000,amountTwd:product.priceTwd,productSnapshot:product,paymentStatus:'pending',deliveryStatus:'not_started',bankSnapshot:{bankCode:'999',bankName:'隔離測試銀行',branch:'測試分行',accountName:'測試戶',accountNumber:'0000000000'}};
      testOrders.push(order);return {ok:true,order};
     }
     const order=testOrders.find(o=>o.id===p.orderId);
@@ -80,7 +84,15 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
   assert.equal(await page.evaluate(()=>testCalls.filter(p=>p.action==='admin-product-save').at(-1).product.name),'測試外觀草稿');
   await page.evaluate(()=>{testUid='another_account';engagementSessionEpoch++;testAdmin=false;testView='orders';render();});
   assert.equal(await page.evaluate(()=>BXHCommerce.context().pending),null);
-  assert.deepEqual(errors,[]);console.log(`PASS ${width}px catalog/detail/order/report/admin-confirm/config/session isolation`);await page.close();
+  await page.evaluate(()=>{testUid='ticket_buyer';engagementSessionEpoch++;testView='shop';render();});
+  await page.locator('[data-action="commerce-category"][data-id="ticket"]').click();
+  await page.locator('[data-action="commerce-product"][data-id="tournament_activation_32"]').click();
+  await page.getByText('同時最多持有 2 張，每月五款合計限購 4 張。').waitFor();
+  await page.locator('[data-commerce-consent]').check();
+  await page.locator('[data-action="commerce-buy"]').click();
+  await page.getByText('BXH-SO-TEST002',{exact:true}).waitFor();
+  assert.equal(await page.evaluate(()=>testCalls.filter(p=>p.action==='create-order').at(-1).productId),'activation_ticket_32');
+  assert.deepEqual(errors,[]);console.log(`PASS ${width}px catalog/detail/order/report/admin-confirm/config/session isolation/ticket checkout`);await page.close();
  }
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
