@@ -3,7 +3,8 @@
 const assert=require('node:assert/strict');
 const {test,after}=require('node:test');
 const {randomBytes}=require('node:crypto');
-const {db}=require('./harness.cjs');
+const {db,service,handlers}=require('./harness.cjs');
+const {createApi}=require('../backend/api.cjs');
 const {createTicketRoomHandler,createTicketRoomStateHandler}=require('../backend/ticket-room-create.cjs');
 const {createStartHandler,createDrawHandler}=require('../backend/lifecycle.cjs');
 
@@ -34,7 +35,7 @@ test('ticket room creation reserves once and only a successful start consumes th
  const create=createTicketRoomHandler({db,clock:()=>now});
  const creation={auth:{uid:owner},app:{appId:'fixture-app'},data:{action:'create-ticket-room',code,ticketId,
   operationId:'ticket-fixture-create',name:'Fixture',location:'Tainan',stations:1,
-  registrationOpenAt:now-2000,registrationCloseAt:now+500,startAt:now+1000}};
+  registrationOpenAt:now-2000,registrationCloseAt:now+300000,startAt:now+600000}};
  await assert.rejects(create(creation),/ticket-lifecycle-disabled/);
  await release.set({bindingEnabled:true,enabled:false,roomCode:code,roomId,ownerUid:owner});
  await assert.rejects(create({...creation,app:null}),/permission-denied/);
@@ -63,18 +64,35 @@ test('ticket room creation reserves once and only a successful start consumes th
  const statusRequest={auth:creation.auth,app:creation.app,data:{action:'ticket-room-state',code}};
  await assert.rejects(status({...statusRequest,auth:{uid:other}}),/permission-denied/);
  const waiting=await status(statusRequest);
- assert.deepEqual(waiting,{ok:true,code,roomId,name:'Fixture',phase:'waiting',startAt:now+1000,drawId:null,rosterRevision:0,eligibleCount:0});
+ assert.deepEqual(waiting,{ok:true,code,roomId,name:'Fixture',phase:'waiting',startAt:now+600000,drawId:null,rosterRevision:0,eligibleCount:0});
  await assert.rejects(create({...creation,data:{...creation.data,name:'Changed'}}),/operation-conflict/);
  const otherCode=code+'B';
  await release.update({roomCode:otherCode});
  await assert.rejects(create({...creation,data:{...creation.data,code:otherCode,operationId:'ticket-other-room'}}),/ticket-unavailable/);
  await release.update({roomCode:code});
- const state=JSON.parse(createdRoom.data().data);
- state.players=[{id:'first',name:'First'},{id:'second',name:'Second'}];
- await room.update({data:JSON.stringify(state)});
+ assert.equal(createdPub.data().registrationQueueVersion,2);
+ const playerIds=Array.from({length:33},(_,i)=>'ticket-'+code+'-'+i);
+ const profiles=db.batch();
+ for(const uid of playerIds)profiles.set(db.doc('users/'+uid),{active:true,role:'player',realName:'Fixture '+uid,phone:'0000000000',profileCompleted:true});
+ await profiles.commit();
+ const queue=service({requireRoomOwnership:true});
+ const api=createApi({queue,family:handlers.family(db),enabled:async candidate=>candidate===code});
+ const submit=(uid,action,operationId)=>api({auth:{uid},data:{action:'submit',code,operation:{route:'family',code,operationId,
+  payload:{action,code,operationId,...(action==='join'?{childIds:[null],childEligibilityConfirmed:true}:{registrationId:uid,intent:'player'})}}}});
+ const ops=playerIds.map((uid,i)=>({uid,id:'join-ticket-'+i}));
+ for(const {uid,id} of ops)assert.equal((await submit(uid,'join',id)).operation.state,'queued');
+ await queue.drain(code,{limit:40,budgetMs:45000});
+ const results=await Promise.all(ops.map(({uid,id})=>queue.status(uid,code,id)));
+ assert.equal(results.filter(x=>x.operation.state==='completed').length,32);
+ assert.equal(results.filter(x=>x.operation.state==='rejected'&&x.operation.reason==='full').length,1);
+ const cancelUid=ops[results.findIndex(x=>x.operation.state==='completed')].uid;
+ const synced=(await status(statusRequest));
+ assert.equal(synced.eligibleCount,32);
+ assert.equal((await pub.get()).data().confirmedCount,32);
+ assert.equal(JSON.parse((await pub.get()).data().bracketView).players.length,32);
  const options={db,clock:()=>now,enabled:async candidate=>candidate===code};
  const draw=createDrawHandler(options),start=createStartHandler(options);
- const request={auth:{uid:owner},data:{code,roomId,baseDrawId:null,rosterRevision:0,operationId:'ticket-fixture-draw'}};
+ const request={auth:{uid:owner},data:{code,roomId,baseDrawId:null,rosterRevision:synced.rosterRevision,operationId:'ticket-fixture-draw'}};
  await assert.rejects(draw(request),/ticket-lifecycle-disabled/);
  await release.update({enabled:true});
  await assert.rejects(draw({...request,auth:{uid:other}}),/permission-denied/);
@@ -86,10 +104,19 @@ test('ticket room creation reserves once and only a successful start consumes th
  await pub.update({ladderMode:'ranked',capacity:64});
  await assert.rejects(draw(request),/ticket-capacity-invalid/);
  await pub.update({capacity:32});
- const result=await draw(request);
+ const firstDraw=await draw(request);
  assert.equal((await ticket.get()).data().status,'reserved');
+ await submit(cancelUid,'cancel','cancel-ticket-first');
+ await queue.drain(code);
+ assert.equal((await queue.status(cancelUid,code,'cancel-ticket-first')).operation.state,'completed');
+ const latest=await status(statusRequest);
+ assert.equal(latest.eligibleCount,31);
+ await assert.rejects(start({auth:{uid:owner},data:{code,roomId,drawId:firstDraw.drawId,
+  rosterRevision:synced.rosterRevision,confirmEarlyStart:true,operationId:'ticket-stale-start'}}),/registration-roster-stale/);
+ const result=await draw({auth:{uid:owner},data:{...request.data,baseDrawId:firstDraw.drawId,
+  rosterRevision:latest.rosterRevision,operationId:'ticket-fixture-redraw'}});
 
- const startData={code,roomId,drawId:result.drawId,rosterRevision:0,confirmEarlyStart:true,operationId:'ticket-fixture-start'};
+ const startData={code,roomId,drawId:result.drawId,rosterRevision:latest.rosterRevision,confirmEarlyStart:true,operationId:'ticket-fixture-start'};
  const startRequest={auth:{uid:owner},data:startData};
  await assert.rejects(start({...startRequest,data:{...startData,drawId:'wrong-draw'}}),/bracket-version-conflict/);
  await ticket.update({expiresAt:now});
@@ -111,7 +138,7 @@ test('ticket room creation reserves once and only a successful start consumes th
  assert.equal(savedPub.data().ticketAccessV1,undefined);
  const live=await status(statusRequest);
  assert.equal(live.phase,'live');
- assert.equal(live.eligibleCount,2);
+ assert.equal(live.eligibleCount,31);
  assert.equal(live.drawId,result.drawId);
  await release.update({enabled:false});
  assert.equal((await start(startRequest)).replayed,true);
