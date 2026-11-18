@@ -36,7 +36,7 @@ on:
       - 'scripts/build-score-stability-release.py'
       - 'release/score-stability/**'
       - 'referee-seats/reference/BXH816_bucket_sources-20261118.zip'
-      - 'referee-seats/firebase.scoped-callable-lab.json'
+      - 'firebase.scoped-callable-lab.json'
       - 'docs/four-court-buckets.md'
       - '.github/workflows/four-court-buckets-lab.yml'
 permissions:
@@ -153,6 +153,7 @@ jobs:
           GCLOUD_PROJECT: demo-bxh-four-court-buckets
         run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore,auth,functions --project demo-bxh-four-court-buckets --config referee-seats/firebase.buckets-callable-lab.json 'node tests/four-court-buckets/projection-trigger-emulator.cjs'
       - name: Verify current-live Rules and scoped transaction sources
+        if: ${{ !cancelled() && steps.prepare_callable_lab.outcome == 'success' }}
         env:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules
           GCLOUD_PROJECT: demo-bxh-four-court-buckets
@@ -172,13 +173,13 @@ jobs:
         env:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules
           GCLOUD_PROJECT: demo-bxh-four-court-buckets
-        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore,auth,functions --project demo-bxh-four-court-buckets --config referee-seats/firebase.scoped-callable-lab.json 'node tests/four-court-buckets/full-page-emulator.cjs'
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore,auth,functions --project demo-bxh-four-court-buckets --config firebase.scoped-callable-lab.json 'node tests/four-court-buckets/full-page-emulator.cjs'
       - name: Verify scoped-source automatic publication and async PASS
         if: ${{ !cancelled() && steps.prepare_scoped_callable_lab.outcome == 'success' }}
         env:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules
           GCLOUD_PROJECT: demo-bxh-four-court-buckets
-        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore,auth,functions --project demo-bxh-four-court-buckets --config referee-seats/firebase.scoped-callable-lab.json 'node tests/four-court-buckets/projection-trigger-emulator.cjs'
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore,auth,functions --project demo-bxh-four-court-buckets --config firebase.scoped-callable-lab.json 'node tests/four-court-buckets/projection-trigger-emulator.cjs'
       - name: Retain measured results
         if: always()
         uses: actions/upload-artifact@v4

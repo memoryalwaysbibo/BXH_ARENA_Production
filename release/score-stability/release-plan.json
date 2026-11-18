@@ -53,7 +53,7 @@
         },
         "bucket-projection-trigger.cjs": {
           "before": "cb887517fbb88c8cd9074c09c7a8d8c63b35a43f9561e76a6b349fab1d004feb",
-          "after": "150500b068f0eef8218a527866badb3174aaf1bde5896af04346ec70b73ecac5"
+          "after": "1b7c8f93cb4888b93f6a87dd5233e3525b7919cfb793b61f8109d6d5e5153239"
         },
         "bucket-public-projection.cjs": {
           "before": "d95937e6e626855f998612b8a44256008f36e7b3f38ac094ab85bac7750e5092",
@@ -192,7 +192,7 @@
         },
         "bucket-projection-trigger.cjs": {
           "before": "cb887517fbb88c8cd9074c09c7a8d8c63b35a43f9561e76a6b349fab1d004feb",
-          "after": "150500b068f0eef8218a527866badb3174aaf1bde5896af04346ec70b73ecac5"
+          "after": "1b7c8f93cb4888b93f6a87dd5233e3525b7919cfb793b61f8109d6d5e5153239"
         },
         "bucket-public-projection.cjs": {
           "before": "d95937e6e626855f998612b8a44256008f36e7b3f38ac094ab85bac7750e5092",
@@ -331,7 +331,7 @@
         },
         "bucket-projection-trigger.cjs": {
           "before": "cb887517fbb88c8cd9074c09c7a8d8c63b35a43f9561e76a6b349fab1d004feb",
-          "after": "150500b068f0eef8218a527866badb3174aaf1bde5896af04346ec70b73ecac5"
+          "after": "1b7c8f93cb4888b93f6a87dd5233e3525b7919cfb793b61f8109d6d5e5153239"
         },
         "bucket-public-projection.cjs": {
           "before": "d95937e6e626855f998612b8a44256008f36e7b3f38ac094ab85bac7750e5092",

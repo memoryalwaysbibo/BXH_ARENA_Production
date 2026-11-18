@@ -1,9 +1,9 @@
 {
   "firestore": {
-    "rules": "../release/score-stability/firestore.rules"
+    "rules": "release/score-stability/firestore.rules"
   },
   "functions": {
-    "source": "../test-results/scoped-callable-source",
+    "source": "test-results/scoped-callable-source",
     "codebase": "bucket-scoped-lab"
   },
   "emulators": {
