@@ -82,6 +82,32 @@ class TrialRelease(unittest.TestCase):
         self.assertEqual([k for k in a if a[k]!=b[k]],['eventTrigger.retryPolicy'])
         self.assertNotIn('PRIVATE',json.dumps(a));self.assertNotIn('secret-token',json.dumps(a))
 
+    def test_filter_order_recovery_requires_the_entire_old_fingerprint(self):
+        info={'serviceConfig':{'timeoutSeconds':30},'eventTrigger':{'eventFilters':[{'attribute':'database','value':'(default)'},{'attribute':'document','value':'tournaments/{code}/matchBuckets/{bucketId}'}],'retryPolicy':'RETRY_POLICY_RETRY'}}
+        expected=M.digest(M.protected(info));changed=copy.deepcopy(info)
+        changed['eventTrigger']['eventFilters'].reverse()
+        self.assertEqual(M.settings_comparison(changed,expected),'event-filter-order-only')
+        changed['eventTrigger']['eventFilters'][0]['value']='different'
+        self.assertIsNone(M.settings_comparison(changed,expected))
+        changed=copy.deepcopy(info);changed['eventTrigger']['eventFilters'].reverse();changed['serviceConfig']['timeoutSeconds']=60
+        self.assertIsNone(M.settings_comparison(changed,expected))
+
+    def test_verify_pending_release_never_uploads_or_patches(self):
+        with tempfile.TemporaryDirectory() as d:
+            directory=Path(d);info,report,raw=self.fixture(directory)
+            state={'action':'release','status':'pending','operation':M.PARENT+'/operations/one', 'protectedSha256':M.digest(M.protected(info))}
+            journal=directory/('release-'+NAME+'.json');journal.write_text(json.dumps(state))
+            info['serviceConfig']['revision']='released'
+            info['buildConfig']['source']['storageSource']['generation']='2'
+            def api(resource,method='GET',body=None):
+                self.assertEqual(method,'GET')
+                return {'done':True} if '/operations/' in resource else copy.deepcopy(info)
+            def command(args):Path(args[4]).write_bytes(raw);return ''
+            with patch.object(M,'load_review',return_value=(directory,report)),patch.object(M,'token',return_value='test-only'),patch.object(M.PREP,'policy_snapshot'),patch.object(M,'api',side_effect=api),patch.object(M,'upload') as upload,patch.object(M.CAP,'command',side_effect=command),patch.dict(M.CANDIDATES,{NAME:M.digest(raw)}):
+                result=M.run(directory,NAME,verify=True)
+                self.assertTrue(result['verificationOnly']);self.assertEqual(result['status'],'complete');upload.assert_not_called()
+            self.assertEqual(json.loads(journal.read_text())['protectedSha256'],state['protectedSha256'])
+
     def test_signed_upload_rejects_non_google_host(self):
         with self.assertRaises(ValueError):M.upload('https://evil.example/upload',b'zip')
 

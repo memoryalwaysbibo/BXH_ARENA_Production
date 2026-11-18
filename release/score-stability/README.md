@@ -73,3 +73,9 @@ The exact candidate archive hashes are pinned to the operator-verified preparati
 References: [Functions v2 upload protocol](https://cloud.google.com/functions/docs/reference/rest/v2/projects.locations.functions/generateUploadUrl), [source field-mask update](https://cloud.google.com/functions/docs/reference/rest/v2/projects.locations.functions/patch).
 
 Five mocked release tests cover cloud-read-only default, source-only update, protected settings, idempotent completion, original-source rollback, ambiguous network outcomes, and signed-upload host validation. They do not represent an actual production deployment test. Existing runtime CI remains tied to f660feb until the operator-only follow-up completes its own checks.
+
+### Confirmed publisher verification interruption
+
+The operator verified that revision `projectbucketpublicscore-00003-deh` matches the pinned full candidate archive, and that reordering only `eventTrigger.eventFilters` restores the complete original protected-settings SHA-256. This establishes an order-sensitive verifier false alarm, not a changed filter value. The operator now accepts this case only when an exact permutation of that array (bounded to six filters) reproduces the entire old hash; changed filter content or any other changed setting still fails. Original journal fingerprints are retained.
+
+`--verify` reconciles an existing pending release using GET/poll/source-download operations and local journal writes only. It cannot start a release, upload sources, or submit another PATCH. Eight mocked tests cover this recovery and cloud-read-only behavior. This verification does not enable per-court storage or establish incident latency is resolved.

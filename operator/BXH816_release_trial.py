@@ -5,6 +5,8 @@ import fcntl
 import hashlib
 import importlib.util
 import json
+import copy
+import itertools
 import os
 from pathlib import Path
 import time
@@ -54,6 +56,21 @@ def protected(info):
     return {'serviceConfig': service, 'buildConfig': {k: build[k] for k in
         ('runtime', 'entryPoint', 'environmentVariables', 'serviceAccount', 'workerPool', 'dockerRegistry', 'dockerRepository') if k in build},
         'eventTrigger': info.get('eventTrigger'), 'environment': info.get('environment'), 'kmsKeyName': info.get('kmsKeyName')}
+
+
+def settings_comparison(info, expected):
+    current = protected(info)
+    if digest(current) == expected: return 'exact'
+    # Legacy journals stored the API's filter array order. Reorder only this
+    # array and require the entire original fingerprint to match exactly.
+    trigger = current.get('eventTrigger')
+    filters = trigger.get('eventFilters') if isinstance(trigger, dict) else None
+    if not isinstance(filters, list) or len(filters) > 6: return None
+    candidate = copy.deepcopy(current)
+    for order in itertools.permutations(filters):
+        candidate['eventTrigger']['eventFilters'] = list(order)
+        if digest(candidate) == expected: return 'event-filter-order-only'
+    return None
 
 
 def protected_fields(value, path=''):
@@ -115,7 +132,7 @@ def wait_operation(operation):
         print('Deployment operation pending; no additional mutation issued.', flush=True); time.sleep(15)
 
 
-def run(directory, name, apply=False, rollback=False):
+def run(directory, name, apply=False, rollback=False, verify=False):
     os.umask(0o077)
     directory, review = load_review(directory)
     import zipfile
@@ -126,6 +143,8 @@ def run(directory, name, apply=False, rollback=False):
     journal = directory / ('release-' + name + '.json')
     state = json.loads(journal.read_text()) if journal.exists() else None
     action = 'rollback' if rollback else 'release'
+    if verify and (apply or rollback or not state or state.get('action') != 'release' or state.get('status') not in ('pending', 'complete')):
+        raise ValueError('Verify-only requires an existing pending or complete release; no deployment submitted')
     source = info['buildConfig']['source']['storageSource']
     if state and state.get('action') == action and state.get('status') == 'complete':
         validate_live(info, name)
@@ -133,7 +152,7 @@ def run(directory, name, apply=False, rollback=False):
         return {'function': name, 'alreadyComplete': True, 'action': action, 'revision': state['resultRevision']}
     resuming = bool(state and state.get('action') == action and state.get('status') == 'pending')
     if resuming:
-        if apply: wait_operation({'name': state['operation']})
+        if apply or verify: wait_operation({'name': state['operation']})
         else: return {'function': name, 'readOnly': True, 'operationPending': True, 'action': action}
     else:
         validate_live(info, name)
@@ -170,7 +189,8 @@ def run(directory, name, apply=False, rollback=False):
         state.update(status='pending', operation=operation['name']); save(journal, state)
         wait_operation(operation)
     result = api(resource); validate_live(result, name)
-    if digest(protected(result)) != state['protectedSha256']:
+    comparison = settings_comparison(result, state['protectedSha256'])
+    if comparison is None:
         observed = protected_fields(protected(result))
         before = state.get('protectedFields')
         state.update(verification='settings-mismatch', observedRevision=result['serviceConfig']['revision'],
@@ -187,10 +207,11 @@ def run(directory, name, apply=False, rollback=False):
     CAP.command(['gcloud', 'storage', 'cp', uri, str(verified), '--project=bxh-arena', '--quiet'])
     expected = review['archives'][name]['backupSha256'] if rollback else CANDIDATES[name]
     if digest(verified.read_bytes()) != expected: raise ValueError('Deployed source archive hash mismatch')
-    state.update(status='complete', resultRevision=result['serviceConfig']['revision'], resultSource=deployed)
+    state.update(status='complete', settingsComparison=comparison, resultRevision=result['serviceConfig']['revision'], resultSource=deployed)
     save(journal, state)
     return {'function': name, 'action': action, 'status': 'complete', 'revision': state['resultRevision'],
-            'protectedSettingsPreserved': True, 'rulesChanged': False, 'roomsMigrated': False}
+            'protectedSettingsPreserved': True, 'settingsComparison': comparison,
+            'verificationOnly': verify, 'rulesChanged': False, 'roomsMigrated': False}
 
 
 if __name__ == '__main__':
@@ -199,12 +220,13 @@ if __name__ == '__main__':
     parser.add_argument('--function', required=True, choices=sorted(CANDIDATES))
     parser.add_argument('--apply', action='store_true')
     parser.add_argument('--rollback', action='store_true')
+    parser.add_argument('--verify', action='store_true', help='Verify an existing release using cloud reads only')
     args = parser.parse_args()
     try:
         # One local process owns the preparation at a time; default remains cloud-read-only.
         with (args.directory / '.release.lock').open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            print(json.dumps(run(args.directory, args.function, args.apply, args.rollback), indent=2))
+            print(json.dumps(run(args.directory, args.function, args.apply, args.rollback, args.verify), indent=2))
     except Exception as error:
         # Do not print network error bodies, signed URLs or credentials.
         message = str(error) if isinstance(error, ValueError) else 'Cloud request or local file check failed'
