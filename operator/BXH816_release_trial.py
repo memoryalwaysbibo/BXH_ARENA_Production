@@ -56,6 +56,16 @@ def protected(info):
         'eventTrigger': info.get('eventTrigger'), 'environment': info.get('environment'), 'kmsKeyName': info.get('kmsKeyName')}
 
 
+def protected_fields(value, path=''):
+    # Hash environment maps as a whole: no names or secret values in the journal.
+    if isinstance(value, dict) and value and not path.endswith('environmentVariables'):
+        result = {}
+        for key, child in value.items():
+            result.update(protected_fields(child, path + '.' + key if path else key))
+        return result
+    return {path: digest(value)}
+
+
 def validate_live(info, name):
     if info.get('name') != PARENT + '/functions/' + name or info.get('state') != 'ACTIVE': raise ValueError('Function not active')
     if info.get('buildConfig', {}).get('entryPoint') != name or info.get('buildConfig', {}).get('runtime') != 'nodejs22':
@@ -141,7 +151,8 @@ def run(directory, name, apply=False, rollback=False):
                     'sourceOnly': True, 'rulesChanged': False, 'roomsMigrated': False,
                     'candidateSha256': CANDIDATES[name], 'currentRevision': info['serviceConfig']['revision']}
         state = {'action': action, 'status': 'uploading', 'beforeRevision': info['serviceConfig']['revision'],
-                 'protectedSha256': digest(protected(info))}
+                 'protectedSha256': digest(protected(info)),
+                 'protectedFields': protected_fields(protected(info))}
         save(journal, state)
         if rollback:
             target = review['functions'][name]['source']
@@ -160,6 +171,13 @@ def run(directory, name, apply=False, rollback=False):
         wait_operation(operation)
     result = api(resource); validate_live(result, name)
     if digest(protected(result)) != state['protectedSha256']:
+        observed = protected_fields(protected(result))
+        before = state.get('protectedFields')
+        state.update(verification='settings-mismatch', observedRevision=result['serviceConfig']['revision'],
+                     observedProtectedFields=observed,
+                     protectedDifferencePaths=None if before is None else sorted(
+                         key for key in set(before) | set(observed) if before.get(key) != observed.get(key)))
+        save(journal, state)
         raise ValueError('Protected cloud settings differ; inspect before proceeding')
     deployed = result['buildConfig']['source']['storageSource']
     if not str(deployed.get('generation', '')).isdigit() or int(deployed['generation']) < 1:

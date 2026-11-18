@@ -75,6 +75,13 @@ class TrialRelease(unittest.TestCase):
             self.assertEqual(json.loads((directory/('release-'+NAME+'.json')).read_text())['status'],'patching')
             with self.assertRaisesRegex(ValueError,'Ambiguous'):self.exercise(directory,info,report,raw,True)
 
+    def test_protected_field_snapshots_identify_changes_without_secret_values(self):
+        original={'serviceConfig':{'environmentVariables':{'PRIVATE':'secret-token'},'timeoutSeconds':30},'eventTrigger':{'retryPolicy':'RETRY_POLICY_RETRY'}}
+        changed=copy.deepcopy(original);changed['eventTrigger']['retryPolicy']='RETRY_POLICY_DO_NOT_RETRY'
+        a=M.protected_fields(original);b=M.protected_fields(changed)
+        self.assertEqual([k for k in a if a[k]!=b[k]],['eventTrigger.retryPolicy'])
+        self.assertNotIn('PRIVATE',json.dumps(a));self.assertNotIn('secret-token',json.dumps(a))
+
     def test_signed_upload_rejects_non_google_host(self):
         with self.assertRaises(ValueError):M.upload('https://evil.example/upload',b'zip')
 
