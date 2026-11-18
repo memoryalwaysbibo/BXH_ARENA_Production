@@ -6,6 +6,7 @@ const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
 const {advance:advanceQrCheckinFence}=require('../../qr-checkin/backend/qr-checkin-fence.cjs');
 const {startMs}=require('../../qr-checkin/backend/overlays/lifecycle/operations-core.js');
 const {registrationQueueOwnsRoom}=require('./legacy-writer.cjs');
+const {ticketHostGrant,checkTicketContract}=require('./ticket-host.cjs');
 
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const commonFields=['code','roomId','rosterRevision','operationId'];
@@ -25,27 +26,12 @@ function currentEligiblePlayers(state,registrations,confirmedCount){
  return eligible;
 }
 
-function grantTime(value){
- if((typeof value!=='number'&&typeof value!=='string')||(typeof value==='string'&&!value.trim()))return NaN;
- const n=Number(value);
- return Number.isFinite(n)?n:Date.parse(value);
+function ownsTicketRoom(room,grant,uid){
+ return grant&&room?.createdByRole==='partner_organizer'&&room.createdBy===uid&&room.ownerUid===uid
+  &&room.partnerOrganizationCode===grant.organizationId&&(room.partnerContractOrderCode||null)===grant.order;
 }
 
-function ownsTicketRoom(room,user,uid,now){
- const g=user.partnerOrganizer;
- const started=g?.startsAtMs??g?.startsAt;
- const from=started==null&&g?.scope!=='contract'?0:grantTime(started);
- const until=grantTime(g?.expiresAtMs??g?.expiresAt);
- const order=g?.orderCode||user.partnerContractOrderCode||null;
- return user.role==='player'&&g?.status==='active'&&typeof g.organizationId==='string'&&g.organizationId.trim()
-  &&Number.isFinite(from)&&from>=0&&from<=now&&Number.isFinite(until)&&until>now
-  &&(g.scope==='contract'?typeof order==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(order)
-    :(!order&&(g.scope==null||g.scope==='manual')))
-  &&room?.createdByRole==='partner_organizer'&&room.createdBy===uid&&room.ownerUid===uid
-  &&room.partnerOrganizationCode===g.organizationId&&(room.partnerContractOrderCode||null)===order;
-}
-
-async function readReservedTicket({db,tx,room,pub,state,roomId,code,uid,user,now}){
+async function readReservedTicket({db,tx,room,pub,state,roomId,code,uid,grant,now}){
  const access=room.ticketAccessV1;
  if(!access||access.version!==1||access.ownerUid!==uid||access.roomId!==roomId||
     typeof access.ticketId!=='string'||!/^BXH-SO-[A-Z0-9]{24}$/.test(access.ticketId)||
@@ -66,11 +52,7 @@ async function readReservedTicket({db,tx,room,pub,state,roomId,code,uid,user,now
     state.meta.registrationCapacity!==capacity||state.players.length>capacity)throw Error('ticket-capacity-invalid');
  if(ticket.contractCode){
   const contract=(await tx.get(db.doc('partnerContracts/'+ticket.contractCode))).data();
-  const g=user.partnerOrganizer;
-  if(contract?.orderCode!==ticket.contractCode||contract.targetUid!==uid||contract.status!=='active'||
-     contract.signedBy!==uid||!contract.signatureHash||!contract.signedAt||
-     grantTime(contract.startsAt)!==grantTime(g.startsAtMs??g.startsAt)||
-     grantTime(contract.expiresAt)!==grantTime(g.expiresAtMs??g.expiresAt))throw Error('permission-denied');
+  checkTicketContract(contract,grant,uid);
  }
  return ref;
 }
@@ -97,8 +79,9 @@ function createLifecycleHandler(action,{db,enabled=async()=>false,clock=Date.now
    const user=userSnap.data();
    const room=roomSnap.data(),pub=publicSnap.data();
    const ticketRoom=room?.eventAuthority==='ticket'||pub?.eventAuthority==='ticket'||!!room?.ticketAccessV1||!!pub?.ticketRoomVersion;
+   const grant=ticketRoom?ticketHostGrant(user,now):null;
    if(user?.active!==true||user.deleted||user.isTestAccount||['deleted','disabled','frozen'].includes(user.accountStatus)||
-      (ticketRoom?!ownsTicketRoom(room,user,uid,now):!['admin','super_admin'].includes(user.role)))throw Error('permission-denied');
+      (ticketRoom?!ownsTicketRoom(room,grant,uid):!['admin','super_admin'].includes(user.role)))throw Error('permission-denied');
    if(!room||!pub)throw Error('not-found');
    const state=JSON.parse(room.data),mirror=JSON.parse(pub.bracketView);
    if(state.id!==roomId)throw Error('bracket-room-changed');
@@ -137,7 +120,7 @@ function createLifecycleHandler(action,{db,enabled=async()=>false,clock=Date.now
    if(!pending.empty)throw Error('registration-queue-pending');
    if(registrations.size>320||room.confirmedCount!==pub.confirmedCount)throw Error('registration-roster-stale');
    const eligible=currentEligiblePlayers(state,registrations,room.confirmedCount);
-   const ticketRef=ticketRoom?await readReservedTicket({db,tx,room,pub,state,roomId,code,uid,user,now}):null;
+   const ticketRef=ticketRoom?await readReservedTicket({db,tx,room,pub,state,roomId,code,uid,grant,now}):null;
    const phaseFields=draw?{}:{tournamentPhase:'live',registrationStatus:'started'};
    const result=draw
     ? commitDraw({state,mirror,uid,now,id:'v2-'+digest(JSON.stringify([code,roomId,operationKey])),drawSeed})
