@@ -84,3 +84,18 @@ scoring-core.transition → engine.markMatchSkipped → rebuildCourtAssignments�
 雙房混合 62 筆零失敗，15 次重試，最慢 3,915 ms；不是受控效能比較。
 本機實際事件測試因 Functions socket EPERM 無法啟動，尚未驗證自動補齊；
 同一組案例已加入 CI 自動事件路徑，正式部署與啟用仍未進行。
+
+## 連續 CI 測試資料隔離修正（2026-11-18）
+
+ca07aaf 的 CI run 44151083446 在混合負載步驟失敗，後續完整頁面及
+自動事件步驟均尚未執行。檢查發現同步 v2 與非同步 v2 測試重用房號、
+epoch 與 operation ID；seed 覆寫根文件及桶不會刪除舊操作收據，導致
+後一輪新資料讀到上一輪成功回覆，出現 0 !== 1。這是本次 CI 測試資料
+隔離缺陷，不是正式賽事卡頓原因的證明。
+
+各模式現有獨立房號與 epoch；seed 若發現舊收據就明確停止，新 score
+與 PASS 也必須不是 replay。同一 Emulator 接續跑同步/非同步 v2，各
+62 筆（共 124 筆）新操作均成功，比分、收據、PASS 重播及補同步正確。
+134 項相關單元/adapter 測試通過。此次同步最慢 13,274 ms、非同步
+最慢 7,651 ms；不是受控比較，也不能宣稱已排除卡頓。公開事件與完整
+裁判頁面仍待新 CI。摘要 docs/validation/mixed-fixture-isolation-20261118.json。

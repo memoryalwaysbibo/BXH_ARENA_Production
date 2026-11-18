@@ -9,6 +9,7 @@ const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
 const {createBucketScoringHandler}=require('../../referee-seats/functions/bucket-scoring-service.cjs');
 const {createBucketPublicProjection}=require('../../referee-seats/functions/bucket-public-projection.cjs');
 const {fixture,request}=require('./trusted-fixture.cjs');
+const {mixedFixtureContext}=require('./mixed-fixture-context.cjs');
 const deferredPassPublic=process.env.BXH_SCORE_LAB_ASYNC_PASS==='true';
 const targetSchema=process.env.BXH_SCORE_LAB_SCHEMA||B.schema;assert([B.schema,B.perCourtSchema].includes(targetSchema));
 const app=initializeApp({projectId:process.env.GCLOUD_PROJECT},'pass-contention-test'),db=getFirestore(app);
@@ -16,13 +17,15 @@ const records=[];let serial=0;
 const op=()=> 'mixed-pass-operation-'+String(++serial).padStart(8,'0');
 const cycles=2;
 async function seed(players,courts){
- const f=fixture('BXH-MIX'+players+(targetSchema===B.perCourtSchema?'V2':''),courts,false);
+ const context=mixedFixtureContext(players,targetSchema,deferredPassPublic);
+ const f=fixture(context.code,courts,false);
  f.state.players=Array.from({length:players},(_,i)=>({id:'p'+i,name:'Synthetic '+i,checkedIn:true}));
  f.state.startedAt=null;
  const engine=createEngine(f.state,{uid:'host'},1000,'draw-'+players,'synthetic-fixed-seed-'+players);
  assert(engine.generateSingleElim());f.state.startedAt=1;engine.rebuildCourtAssignments();
- f.room.scoreStorage=B.makeManifest(f.state,'mixed-pass-epoch-'+players,targetSchema);f.room.data=JSON.stringify(f.state);
+ f.room.scoreStorage=B.makeManifest(f.state,context.epoch,targetSchema);f.room.data=JSON.stringify(f.state);
  const root=db.doc('tournaments/'+f.state.cloudCode),pub=db.doc('publicTournaments/'+f.state.cloudCode),batch=db.batch();
+ assert.equal((await root.collection('bucketScoreOperations').limit(1).get()).empty,true,'mixed fixture namespace already contains receipts; use a fresh isolated Emulator');
  batch.set(root,f.room);batch.set(pub,{bracketView:JSON.stringify(f.state),updatedAt:1});
  for(const b of B.encode(f.state,f.room.scoreStorage))batch.set(root.collection('matchBuckets').doc(b.bucketId),b);
  for(let i=1;i<=courts;i++)batch.set(db.doc('users/ref'+i),f.user);
@@ -62,7 +65,7 @@ async function workload(room){
   const id=state.courtAssignments['court'+station].currentMatchId;assert(id);
   for(let i=0;i<cycles*2;i++){
    const command=request(state,initial.room,id,i%2?'undo':'score',op(),i%2?{}:{side:'A',finish:'spin'});
-   const result=await measured(room,command);assert(result.ok);
+   const result=await measured(room,command);assert(result.ok);assert.notEqual(result.replayed,true,'fresh score unexpectedly reused a receipt');
    state=(await read(room)).state;
    const match=state.matches.find(m=>m.id===id);assert.equal(match.scoreA,i%2?0:1);assert.equal(match.log.length,i%2?0:1);
   }
@@ -73,6 +76,7 @@ async function workload(room){
  const publishTask=(async()=>{for(let i=0;i<cycles;i++){for(let attempt=0;;attempt++){try{assert((await createBucketPublicProjection(db)(room.state.cloudCode)).ok);break;}catch(error){if(error.message!=='projection-source-changed'||attempt>=2)throw error;}}}})();
  const results=await Promise.allSettled([...scoreTasks,passTask,publishTask]);
  const errors=results.filter(r=>r.status==='rejected');assert.equal(errors.length,0,JSON.stringify(errors.map(r=>r.reason?.message)));
+ assert.notEqual(results[room.courts-1].value.replayed,true,'fresh PASS unexpectedly reused a receipt');
  const beforeReplay=await room.root.get(),auditBefore=await room.root.collection('bucketScoreAudit').get();
  const replay=await measured(room,pass);assert(replay.replayed);
  assert((await room.root.get()).updateTime.isEqual(beforeReplay.updateTime));
