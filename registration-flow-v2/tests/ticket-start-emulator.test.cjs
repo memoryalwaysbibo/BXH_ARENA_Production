@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const {test,after}=require('node:test');
 const {randomBytes}=require('node:crypto');
 const {db}=require('./harness.cjs');
-const {createTicketRoomHandler}=require('../backend/ticket-room-create.cjs');
+const {createTicketRoomHandler,createTicketRoomStateHandler}=require('../backend/ticket-room-create.cjs');
 const {createStartHandler,createDrawHandler}=require('../backend/lifecycle.cjs');
 
 after(()=>db.terminate());
@@ -59,6 +59,11 @@ test('ticket room creation reserves once and only a successful start consumes th
  assert.equal(createdPub.data().ticketAccessV1,undefined);
  assert.equal(createdPub.data().capacity,32);
  assert.doesNotMatch(JSON.stringify(createdPub.data()),new RegExp(ticketId));
+ const status=createTicketRoomStateHandler({db,clock:()=>now});
+ const statusRequest={auth:creation.auth,app:creation.app,data:{action:'ticket-room-state',code}};
+ await assert.rejects(status({...statusRequest,auth:{uid:other}}),/permission-denied/);
+ const waiting=await status(statusRequest);
+ assert.deepEqual(waiting,{ok:true,code,roomId,name:'Fixture',phase:'waiting',startAt:now+1000,drawId:null,rosterRevision:0,eligibleCount:0});
  await assert.rejects(create({...creation,data:{...creation.data,name:'Changed'}}),/operation-conflict/);
  const otherCode=code+'B';
  await release.update({roomCode:otherCode});
@@ -71,7 +76,7 @@ test('ticket room creation reserves once and only a successful start consumes th
  const draw=createDrawHandler(options),start=createStartHandler(options);
  const request={auth:{uid:owner},data:{code,roomId,baseDrawId:null,rosterRevision:0,operationId:'ticket-fixture-draw'}};
  await assert.rejects(draw(request),/ticket-lifecycle-disabled/);
- await release.set({enabled:true,roomCode:code,roomId});
+ await release.update({enabled:true});
  await assert.rejects(draw({...request,auth:{uid:other}}),/permission-denied/);
  await ticket.update({boundRoomId:'replaced-room'});
  await assert.rejects(draw(request),/ticket-binding-invalid/);
@@ -104,6 +109,10 @@ test('ticket room creation reserves once and only a successful start consumes th
  assert.equal(savedTicket.data().status,'consumed');
  assert.equal(savedTicket.data().usedAt,now);
  assert.equal(savedPub.data().ticketAccessV1,undefined);
+ const live=await status(statusRequest);
+ assert.equal(live.phase,'live');
+ assert.equal(live.eligibleCount,2);
+ assert.equal(live.drawId,result.drawId);
  await release.update({enabled:false});
  assert.equal((await start(startRequest)).replayed,true);
  await assert.rejects(start({...startRequest,data:{...startData,operationId:'ticket-fresh-start'}}),/bracket-started/);
