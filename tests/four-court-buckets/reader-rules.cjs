@@ -7,8 +7,10 @@ const {create}=require('../../modules/scoring/four-court-firestore-transport.cjs
 assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-four-court-buckets');assert.equal(process.env.FIRESTORE_EMULATOR_HOST,'127.0.0.1:8188');
 async function until(check,message){const start=Date.now();while(!check()){if(Date.now()-start>15000)throw Error(message);await new Promise(resolve=>setTimeout(resolve,25));}}
 (async()=>{
- const env=await initializeTestEnvironment({projectId:process.env.GCLOUD_PROJECT,firestore:{host:'127.0.0.1',port:8188,rules:fs.readFileSync(path.resolve(__dirname,'../../referee-seats/firestore.candidate.rules'),'utf8')}});
- const clients=[],report={kind:'bucket-web-sdk-rules',productionWrites:0,cases:[]};
+ const scopedRules=process.env.BXH_READER_SCOPED_RULES==='1';
+ const rulesPath=scopedRules?'../../release/score-stability/firestore.rules':'../../referee-seats/firestore.candidate.rules';
+ const env=await initializeTestEnvironment({projectId:process.env.GCLOUD_PROJECT,firestore:{host:'127.0.0.1',port:8188,rules:fs.readFileSync(path.resolve(__dirname,rulesPath),'utf8')}});
+ const clients=[],report={kind:'bucket-web-sdk-rules',rulesVariant:scopedRules?'current-live-plus-v2-opt-in':'generic-candidate',productionWrites:0,cases:[]};
  const admin=fn=>env.withSecurityRulesDisabled(context=>fn(context.firestore()));
  try{
   for(const [uid,profile]of Object.entries({ref1:{active:true,role:'staff'},unseated:{active:true,role:'staff'},admin:{active:true,role:'super_admin'},player:{active:true,role:'player'},disabled:{active:false,role:'staff'},tester:{active:true,role:'staff',isTestAccount:true}}))await admin(db=>setDoc(doc(db,'users',uid),profile));

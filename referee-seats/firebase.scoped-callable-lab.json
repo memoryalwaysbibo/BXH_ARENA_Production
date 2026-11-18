@@ -1,0 +1,27 @@
+{
+  "firestore": {
+    "rules": "../release/score-stability/firestore.rules"
+  },
+  "functions": {
+    "source": "../test-results/scoped-callable-source",
+    "codebase": "bucket-scoped-lab"
+  },
+  "emulators": {
+    "firestore": {
+      "host": "127.0.0.1",
+      "port": 8188
+    },
+    "auth": {
+      "host": "127.0.0.1",
+      "port": 9198
+    },
+    "functions": {
+      "host": "127.0.0.1",
+      "port": 5008
+    },
+    "ui": {
+      "enabled": false
+    },
+    "singleProjectMode": true
+  }
+}
