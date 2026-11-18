@@ -112,3 +112,17 @@ test('ordinary players, closed checkout and invalid offers cannot create a ticke
  assert.equal(t.calls.length,0);
  assert.match(t.ui.shop(),/暫停購買/);
 });
+
+test('my tickets shows an owned bound ticket, and resets on account switch',async()=>{
+ const t=setup();t.ui.shop();await t.ui.handle('commerce-category',{dataset:{id:'ticket'}});
+ assert.match(t.ui.shop(),/我的啟動券/);
+ await t.ui.handle('commerce-open-tickets',{});
+ t.sandbox.window.engagementService.commerce=async p=>{
+  t.calls.push(p);return {ok:true,tickets:[{id:'ticket-a',status:'reserved',capacity:32,boundRoomCode:'BXH-FIXTURE',expiresAt:Date.parse('2026-12-19T12:00:00Z')}]};
+ };
+ await t.ui.load('my-tickets');
+ const html=t.ui.shop();assert.match(html,/已綁定房間 BXH-FIXTURE/);assert.match(html,/2026\/12\/19/);
+ assert.equal(t.calls[0].action,'my-tickets');
+ t.setUid('other');assert.doesNotMatch(t.ui.shop(),/BXH-FIXTURE/);
+ assert.equal(t.ui.context().tickets,null);
+});
