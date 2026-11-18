@@ -28,6 +28,9 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
     if(p.action==='catalog')return {ok:true,products:window.testUid==='ticket_buyer'?[ticketOffer]:[testProduct],nextCursor:null,storeOpen:true};
     if(p.action==='admin-products')return {ok:true,products:[testProduct],nextCursor:null};
     if(['my-orders','admin-orders'].includes(p.action))return {ok:true,orders:testOrders,nextCursor:null};
+    if(p.action==='my-tickets')return {ok:true,tickets:window.testUid==='ticket_buyer'?[{
+     id:'fixture-ticket',capacity:32,status:'reserved',issuedAt:Date.now(),expiresAt:Date.now()+86400000,boundRoomCode:'BXH-TICKETTEST'
+    }]:[]};
     if(p.action==='admin-config')return {ok:true,config:null,capabilities:{}};
     if(p.action==='admin-config-save')return {ok:true,config:{...p,version:1}};
     if(p.action==='admin-product-save')return {ok:true,product:{...p.product,id:p.productId,version:1}};
@@ -86,6 +89,10 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
   assert.equal(await page.evaluate(()=>BXHCommerce.context().pending),null);
   await page.evaluate(()=>{testUid='ticket_buyer';engagementSessionEpoch++;testView='shop';render();});
   await page.locator('[data-action="commerce-category"][data-id="ticket"]').click();
+  await page.locator('[data-action="commerce-open-tickets"]').click();
+  await page.getByText('已綁定房間 BXH-TICKETTEST',{exact:true}).waitFor();
+  await page.getByText('到期時間（台灣時間）',{exact:false}).waitFor();
+  await page.locator('[data-action="commerce-close-tickets"]').click();
   await page.locator('[data-action="commerce-product"][data-id="tournament_activation_32"]').click();
   await page.getByText('同時最多持有 2 張，每月五款合計限購 4 張。').waitFor();
   await page.locator('[data-commerce-consent]').check();
