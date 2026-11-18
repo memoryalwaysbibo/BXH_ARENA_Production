@@ -6,6 +6,7 @@ const {createQueue}=require('./queue.cjs');
 const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
 const {createStartHandler,createDrawHandler}=require('./lifecycle.cjs');
+const {createTicketRoomHandler}=require('./ticket-room-create.cjs');
 function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled,pilotRoom=null,retiredRoom=null,retiredRooms=[]}){
  if(createFamilyRegistration?.v2CapacityAware!==true)throw Error('queue-family-capacity-source-required');
  const familyFactory=store=>createFamilyRegistration(store,Date.now,{myEventsProofEnabled:true});
@@ -40,7 +41,12 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   }
  });
  const registrationQueueV2=bind(api,{allowRetired:data=>data.action==='status'||data.action==='mine'});
- const registrationRosterQueueV2=bind(managementApi,{allowRetired:data=>data.action==='status'});
+ const createTicketRoom=createTicketRoomHandler({db});
+ const registrationRosterQueueV2=bind(req=>req.data?.action==='create-ticket-room'?createTicketRoom(req):managementApi(req),{
+  allowRetired:data=>data.action==='status',
+  preconditions:['ticket-lifecycle-disabled','ticket-binding-invalid','ticket-expired','ticket-unavailable',
+   'room-code-conflict','room-receipt-inconsistent'],
+ });
  const lifecycleOptions={
   options:{enforceAppCheck:true},
   // Lifecycle validates the original receipt before checking the write gate.
