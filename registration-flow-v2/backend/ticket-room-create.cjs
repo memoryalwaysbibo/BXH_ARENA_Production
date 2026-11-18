@@ -95,4 +95,32 @@ function createTicketRoomHandler({db,clock=Date.now}){
   });
  };
 }
-module.exports={createTicketRoomHandler};
+function createTicketRoomStateHandler({db,clock=Date.now}){
+ return async request=>{
+  const uid=request.auth?.uid, data=request.data;
+  if(!uid)throw Error('auth-required');
+  if(!request.app)throw Error('permission-denied');
+  if(data?.action!=='ticket-room-state'||Object.keys(data).some(key=>!['action','code'].includes(key))||
+     typeof data.code!=='string'||!/^BXH-[A-Z0-9]{4,16}$/.test(data.code))throw Error('invalid-operation');
+  const code=data.code;
+  return db.runTransaction(async tx=>{
+   const [actor,gateSnap,roomSnap]=await tx.getAll(db.doc('users/'+uid),
+    db.doc('systemSettings/commerceTicketLifecycleV1'),db.doc('tournaments/'+code));
+   const grant=ticketHostGrant(actor.data(),clock()),gate=gateSnap.data(),room=roomSnap.data();
+   if(!grant||gate?.roomCode!==code||gate.ownerUid!==uid)throw Error('permission-denied');
+   if(gate.bindingEnabled!==true&&gate.enabled!==true)throw Error('ticket-lifecycle-disabled');
+   if(!room)throw Error('not-found');
+   if(room.eventAuthority!=='ticket'||room.createdBy!==uid||room.ownerUid!==uid||
+      room.partnerOrganizationCode!==grant.organizationId||
+      (room.partnerContractOrderCode||null)!==grant.order||room.ticketAccessV1?.roomId!==gate.roomId)throw Error('permission-denied');
+   const state=JSON.parse(room.data);
+   if(state.id!==gate.roomId)throw Error('ticket-binding-invalid');
+   const rosterRevision=state.registrationRosterRevision??0;
+   if(!Array.isArray(state.players)||!Number.isSafeInteger(rosterRevision)||rosterRevision<0)throw Error('ticket-binding-invalid');
+   const eligibleCount=state.players.filter(player=>!state.meta?.checkinRequired||player.checkedIn===true).length;
+   return {ok:true,code,roomId:state.id,name:room.name,phase:room.tournamentPhase,startAt:room.startAt,
+    drawId:state.bracketDraw?.id??null,rosterRevision,eligibleCount};
+  });
+ };
+}
+module.exports={createTicketRoomHandler,createTicketRoomStateHandler};
