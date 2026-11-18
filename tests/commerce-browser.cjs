@@ -29,7 +29,7 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
     if(p.action==='admin-products')return {ok:true,products:[testProduct],nextCursor:null};
     if(['my-orders','admin-orders'].includes(p.action))return {ok:true,orders:testOrders,nextCursor:null};
     if(p.action==='my-tickets')return {ok:true,tickets:window.testUid==='ticket_buyer'?[{
-     id:'fixture-ticket',capacity:32,status:'reserved',issuedAt:Date.now(),expiresAt:Date.now()+86400000,boundRoomCode:'BXH-TICKETTEST'
+     id:'fixture-ticket',capacity:32,status:window.BXH_TICKET_ROOM_PILOT_CODE&&!testTicketRoom?'available':'reserved',issuedAt:Date.now(),expiresAt:Date.now()+86400000,boundRoomCode:'BXH-TICKETTEST'
     }]:[]};
     if(p.action==='admin-config')return {ok:true,config:null,capabilities:{}};
     if(p.action==='admin-config-save')return {ok:true,config:{...p,version:1}};
@@ -46,6 +46,20 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
     if(p.action==='admin-confirm-payment'){order.paymentStatus='paid';order.deliveryStatus='delivered';order.paidAt=Date.now();order.deliveredAt=Date.now();return {ok:true,order};}
     throw Error('unsupported-test-action');
    }};
+   window.testTicketRoom=null;
+   window.engagementService.ticketRoomOperation=async p=>{
+    testCalls.push(p);
+    if(p.action==='create-ticket-room'){
+     testTicketRoom={ok:true,code:p.code,roomId:'fixture-room-generation',name:p.name,phase:'waiting',
+      startAt:p.startAt,drawId:null,rosterRevision:7,eligibleCount:2};
+     return {ok:true,code:p.code,roomId:testTicketRoom.roomId};
+    }
+    if(p.action==='ticket-room-state')return {...testTicketRoom};
+    if(p.roomId!==testTicketRoom.roomId||p.rosterRevision!==7)throw Error('invalid-operation');
+    if(p.action==='ticket-room-draw'){testTicketRoom.drawId='fixture-draw';return {ok:true,drawId:testTicketRoom.drawId};}
+    if(p.action==='ticket-room-start'&&p.drawId===testTicketRoom.drawId){testTicketRoom.phase='live';return {ok:true,startedAt:Date.now()};}
+    throw Error('unsupported-ticket-room-action');
+   };
    document.addEventListener('click',e=>{const t=e.target.closest('[data-action^="commerce-"]');if(t){e.preventDefault();void BXHCommerce.handle(t.dataset.action,t);}});
   });
   await page.addScriptTag({content:fs.readFileSync(path.join(root,'commerce-ui.js'),'utf8')});
@@ -92,6 +106,27 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
   await page.locator('[data-action="commerce-open-tickets"]').click();
   await page.getByText('已綁定房間 BXH-TICKETTEST',{exact:true}).waitFor();
   await page.getByText('到期時間（台灣時間）',{exact:false}).waitFor();
+  assert.equal(await page.locator('[data-action="commerce-ticket-bind"]').count(),0);
+  await page.evaluate(()=>{window.BXH_TICKET_ROOM_PILOT_CODE='BXH-TICKETTEST';});
+  await page.locator('[data-action="commerce-refresh-tickets"]').click();
+  await page.locator('[data-action="commerce-ticket-bind"]').click();
+  await page.locator('[name="name"]').fill('票券試點賽事');
+  await page.locator('[name="location"]').fill('台南');
+  await page.locator('[name="registrationOpenAt"]').fill('2026-12-19T12:00');
+  await page.locator('[name="registrationCloseAt"]').fill('2026-12-19T13:00');
+  await page.locator('[name="startAt"]').fill('2026-12-19T14:00');
+  await page.getByRole('button',{name:'建立房間並綁券'}).click();
+  await page.getByRole('heading',{name:'票券試點賽事'}).waitFor();
+  await page.locator('[data-action="commerce-ticket-draw"]').click();
+  await page.getByText('可出賽 2 人｜已抽籤',{exact:true}).waitFor();
+  await page.locator('[data-action="commerce-ticket-start"]').click();
+  await page.getByText('BXH-TICKETTEST｜已開賽',{exact:true}).waitFor();
+  const flow=await page.evaluate(()=>testCalls.filter(p=>['create-ticket-room','ticket-room-draw','ticket-room-start'].includes(p.action)));
+  assert.deepEqual(flow.map(p=>p.action),['create-ticket-room','ticket-room-draw','ticket-room-start']);
+  assert.equal(flow[0].startAt,Date.parse('2026-12-19T14:00:00+08:00'));
+  assert.equal(flow[2].drawId,'fixture-draw');
+  assert.ok(flow.every(p=>p.operationId));
+  await page.locator('[data-action="commerce-ticket-back"]').click();
   await page.locator('[data-action="commerce-close-tickets"]').click();
   await page.locator('[data-action="commerce-product"][data-id="tournament_activation_32"]').click();
   await page.getByText('同時最多持有 2 張，每月五款合計限購 4 張。').waitFor();
@@ -99,7 +134,7 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
   await page.locator('[data-action="commerce-buy"]').click();
   await page.getByText('BXH-SO-TEST002',{exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>testCalls.filter(p=>p.action==='create-order').at(-1).productId),'activation_ticket_32');
-  assert.deepEqual(errors,[]);console.log(`PASS ${width}px catalog/detail/order/report/admin-confirm/config/session isolation/ticket checkout`);await page.close();
+  assert.deepEqual(errors,[]);console.log(`PASS ${width}px catalog/detail/order/report/admin-confirm/config/session isolation/ticket checkout and lifecycle`);await page.close();
  }
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
