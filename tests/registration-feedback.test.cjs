@@ -236,7 +236,7 @@ test('a cancellation rejection ends waiting only for the matching operation',asy
  await flush();await f.advance(1000);await rejected;
  assert.equal(f.api.snapshot()[0].state,'failed');assert.equal(f.storage.length,0);f.api.dispose();
 });
-test('only the pilot rooms use their current server ownership markers',async()=>{
+test('any valid room follows its current server ownership marker without a hardcoded pilot list',async()=>{
  const cloud=fs.readFileSync(require.resolve('../modules/cloud/cloud-runtime.js'),'utf8');
  const start=cloud.indexOf('  const registrationV2RouteHints=new Map();');
  const end=cloud.indexOf('  const managementQueueOperations=',start);
@@ -253,11 +253,12 @@ test('only the pilot rooms use their current server ownership markers',async()=>
  });
  const enabled=vm.runInContext(cloud.slice(start,end)+'\nregistrationFlowV2Enabled;',context);
  assert.equal(await enabled('BXH-OTHER1'),false);
- assert.deepEqual(reads,[]);
+ assert.deepEqual(reads,['publicTournaments/BXH-OTHER1']);
  assert.equal(await enabled(newPilot),false);
  assert.equal(await enabled(nextPilot),false);
  assert.equal(await enabled(pilot),false);
  marker=2;
+ assert.equal(await enabled('BXH-OTHER1'),true);
  assert.equal(await enabled(newPilot),true);
  assert.equal(await enabled(nextPilot),true);
  assert.equal(await enabled(pilot),true);
@@ -267,7 +268,7 @@ test('only the pilot rooms use their current server ownership markers',async()=>
  await assert.rejects(enabled(pilot),/registration-route-unavailable/);
  changeAccount=true;
  await assert.rejects(enabled(pilot),/stale-session/);
- assert.deepEqual(reads,[newPilot,nextPilot,pilot,newPilot,nextPilot,pilot,pilot,pilot,pilot].map(code=>'publicTournaments/'+code));
+ assert.deepEqual(reads,['BXH-OTHER1',newPilot,nextPilot,pilot,'BXH-OTHER1',newPilot,nextPilot,pilot,pilot,pilot,pilot].map(code=>'publicTournaments/'+code));
 });
 test('the shipped cancellation action uses the V2 queue and avoids a legacy resend after rollback',async()=>{
  let response=null;
@@ -322,6 +323,8 @@ test('management queue restores the same promotion receipt after a lost response
  function open(enabled){
   const context={
    window:{sessionStorage,BXH_REGISTRATION_FLOW_V2_ROOMS:enabled?[CODE]:[]},
+   dbHandle:{},engagementSessionEpoch:1,withTimeout:promise=>promise,
+   fx:{doc:()=>null,getDocFromServer:async()=>({exists:()=>true,data:()=>({})})},
    authReady:true,authHandle:{currentUser:{uid:'staff1'}},
    crypto:{randomUUID:()=>assert.fail('unexpected new operation ID')},
    callEngagementFunction:async(name,request)=>{

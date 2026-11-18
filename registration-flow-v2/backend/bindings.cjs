@@ -6,7 +6,7 @@ const {createQueue}=require('./queue.cjs');
 const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
 const {createStartHandler,createDrawHandler}=require('./lifecycle.cjs');
-function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled,pilotRoom=null,retiredRoom=null,retiredRooms=[]}){
+function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled,pilotRoom=null,retiredRoom=null,retiredRooms=[],roomAllowed:allowedRoom,workerRoomAllowed=async()=>true,readEnabled=async()=>false,sweepAllowedRoom}){
  if(createFamilyRegistration?.v2CapacityAware!==true)throw Error('queue-family-capacity-source-required');
  const familyFactory=store=>createFamilyRegistration(store,Date.now,{myEventsProofEnabled:true});
  if(typeof promotionFactory!=='function')throw Error('queue-promotion-factory-required');
@@ -14,20 +14,20 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
  const {onDocumentCreated}=require('firebase-functions/v2/firestore');
  const {onSchedule}=require('firebase-functions/v2/scheduler');
  const workersReady=async()=>!stagedOnly&&await workersEnabled()===true;
- const roomAllowed=code=>pilotRoom===null||code===pilotRoom;
+ const roomAllowed=allowedRoom||(code=>pilotRoom===null||code===pilotRoom);
  const retired=new Set([...(retiredRoom===null?[]:[retiredRoom]),...retiredRooms]);
  const isRetired=code=>retired.has(code);
- const intakeEnabled=async(code,tx)=>roomAllowed(code)&&!stagedOnly&&
+ const intakeEnabled=async(code,tx)=>await roomAllowed(code)&&!stagedOnly&&
   (pilotRoom!==null||await workersReady())&&await enabled(code,tx)===true;
  const queue=createQueue(db,{FieldValue,requireRoomOwnership:true,
   onTiming:fields=>console.info(JSON.stringify({event:'registration-v2-worker-phase',...fields})),
-  authorizeIntake:pilotRoom===null?undefined:intakeEnabled,
+  authorizeIntake:pilotRoom===null&&!allowedRoom?undefined:intakeEnabled,
   handlers:{family:familyFactory,roster:rosterFactory,promotion:promotionFactory}});
- const api=createApi({queue,family:familyFactory(db),enabled:code=>isRetired(code)||intakeEnabled(code)});
+ const api=createApi({queue,family:familyFactory(db),enabled:code=>isRetired(code)||intakeEnabled(code),readEnabled});
  const managementApi=createManagementApi({queue,enabled:intakeEnabled,authorize:authorizeManagement});
  const bind=(handler,{options,preconditions=[],allowRetired=()=>false}={})=>onCall({region:'asia-east1',cors:true,timeoutSeconds:30,maxInstances:5,...options},async req=>{
   const data=req.data;
-  if(stagedOnly||(!roomAllowed(data?.code)&&!(isRetired(data?.code)&&allowRetired(data)))){
+  if(stagedOnly||(!await roomAllowed(data?.code)&&!(isRetired(data?.code)&&allowRetired(data)))){
    throw new HttpsError('failed-precondition','registration-queue-disabled');
   }
   try{return await handler(req);}catch(error){
@@ -51,10 +51,13 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
  const registrationStartV2=bind(createStartHandler({db,enabled:startEnabled}),lifecycleOptions);
  const registrationDrawV2=bind(createDrawHandler({db,enabled:drawEnabled}),lifecycleOptions);
  const registrationQueueV2Worker=onDocumentCreated({region:'asia-east1',document:'_registrationQueueV2/{code}/_registrationQueueJobsV2/{job}',timeoutSeconds:60,maxInstances:5,retry:true},async event=>{
-  if(roomAllowed(event.params.code)&&await workersReady())await queue.drainCreatedJob(event.params.code,event.params.job,{limit:200,budgetMs:45000});
+  if(await roomAllowed(event.params.code)&&await workersReady()&&await workerRoomAllowed(event.params.code))await queue.drainCreatedJob(event.params.code,event.params.job,{limit:200,budgetMs:45000});
  });
  const registrationQueueV2Sweep=onSchedule({region:'asia-east1',schedule:'every 1 minutes',timeoutSeconds:540,maxInstances:1},async()=>{
-  if(await workersReady())await queue.sweep(pilotRoom);
+  if(await workersReady()){
+   if(sweepAllowedRoom)await queue.sweep(null,{allowRoom:sweepAllowedRoom});
+   else await queue.sweep(pilotRoom);
+  }
  });
  return {registrationQueueV2,registrationRosterQueueV2,registrationQueueV2Worker,registrationQueueV2Sweep,registrationStartV2,registrationDrawV2};
 }

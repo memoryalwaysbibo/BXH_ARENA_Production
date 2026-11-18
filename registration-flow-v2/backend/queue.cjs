@@ -173,20 +173,21 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
   // stopped early. Leave the event retryable until its own job is settled.
   if(await pending())throw fail('queue-delivery-pending');
  }
- async function sweep(pilotRoom=null){
+ async function sweep(pilotRoom=null,{allowRoom=async()=>true}={}){
   if(pilotRoom!==null){
    const pending=await jobsRef(pilotRoom).where('state','in',['queued','running']).limit(1).get();
    if(pending.empty)return {rooms:0};
+   if(!await allowRoom(pilotRoom))return {rooms:0};
    await drain(pilotRoom);
    return {rooms:1};
   }
   // A sweeper is a recovery path, not an unbounded scan of every tournament.
   const pending=await db.collectionGroup('_registrationQueueJobsV2').where('state','in',['queued','running']).limit(200).get();
   const codes=[...new Set(pending.docs.filter(s=>s.ref.parent.parent?.parent.path==='_registrationQueueV2').map(s=>s.data().code))];
-  for(const code of codes)await drain(code);
-  return {rooms:codes.length};
+  let rooms=0;
+  for(const code of codes)if(await allowRoom(code)){await drain(code);rooms++;}
+  return {rooms};
  }
  return {enqueue,status,drain,drainCreatedJob,sweep,jobRef};
 }
 module.exports={createQueue,validate,businessRejections,safeResult};
-
