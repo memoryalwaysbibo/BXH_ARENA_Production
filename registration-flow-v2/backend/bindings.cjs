@@ -6,7 +6,7 @@ const {createQueue}=require('./queue.cjs');
 const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
 const {createStartHandler,createDrawHandler}=require('./lifecycle.cjs');
-const {createTicketRoomHandler}=require('./ticket-room-create.cjs');
+const {createTicketRoomHandler,createTicketRoomStateHandler}=require('./ticket-room-create.cjs');
 function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled,pilotRoom=null,retiredRoom=null,retiredRooms=[]}){
  if(createFamilyRegistration?.v2CapacityAware!==true)throw Error('queue-family-capacity-source-required');
  const familyFactory=store=>createFamilyRegistration(store,Date.now,{myEventsProofEnabled:true});
@@ -41,8 +41,14 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   }
  });
  const registrationQueueV2=bind(api,{allowRetired:data=>data.action==='status'||data.action==='mine'});
- const createTicketRoom=createTicketRoomHandler({db});
- const registrationRosterQueueV2=bind(req=>req.data?.action==='create-ticket-room'?createTicketRoom(req):managementApi(req),{
+ const ticketRoomActions={
+  'create-ticket-room':createTicketRoomHandler({db}),
+  'ticket-room-state':createTicketRoomStateHandler({db}),
+ };
+ const registrationRosterQueueV2=bind(req=>{
+  const action=req.data?.action;
+  return Object.hasOwn(ticketRoomActions,action)?ticketRoomActions[action](req):managementApi(req);
+ },{
   allowRetired:data=>data.action==='status',
   preconditions:['ticket-lifecycle-disabled','ticket-binding-invalid','ticket-expired','ticket-unavailable',
    'room-code-conflict','room-receipt-inconsistent'],
