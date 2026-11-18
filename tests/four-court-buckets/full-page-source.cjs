@@ -34,4 +34,9 @@ const boot=`(function(){
   return {token:encode({alg:'none',typ:'JWT'})+'.'+encode({sub:'1:123456:web:bucket-emulator',aud:['projects/123456'],iss:'https://firebaseappcheck.googleapis.com/123456',iat:now,exp:now+3600})+'.',expireTimeMillis:(now+3600)*1000};
  }};
 })();`;
-module.exports={build,boot,project};
+function pageFixtureCode(count,storageSchema){
+ const B=require('../../referee-seats/functions/bucket-state.cjs');
+ assert([6,12].includes(count)&&[B.schema,B.perCourtSchema].includes(storageSchema),'invalid full-page fixture');
+ return 'BXH-PG'+String(count).padStart(2,'0')+(storageSchema===B.perCourtSchema?'V2':'V1');
+}
+module.exports={build,boot,project,pageFixtureCode};

@@ -1,0 +1,59 @@
+{
+  "kind": "operator-inventory-and-pass-return-integration",
+  "evidence": "User-posted output from pinned BXH816_readonly_inventory.py, readOnly true / productionWrites 0 / errors empty.",
+  "observedLegacy": {
+    "revision": "commitrefereecommand-00010-pid",
+    "updateTime": "2026-11-18T00:36:00.519544894Z",
+    "sourceGeneration": "1794962124424514",
+    "hashes": {
+      "engine/index.cjs": "920f3428a1ef0743eb621378d27ff97299a6c81d7ce65b5f44bdc985fea99e49",
+      "dispatch-core.cjs": "bafe5bc97546c50795b727a7c05d4e6d40c9f9995ad8adc1985c2f1f09fe0764",
+      "scoring-core.cjs": "2a6f5ee9e59c8d25a82b043e7e49f1382d5d3dbb1576402ef9db14652dfd89d3"
+    },
+    "matchesReviewedPR817Overlay": true,
+    "matchesOlderCapture": false
+  },
+  "observedBuckets": {
+    "commitBucketRefereeCommand": {
+      "revision": "commitbucketrefereecommand-00006-won",
+      "generation": "1794722128839589",
+      "runtimeEnabled": true
+    },
+    "manageBucketRefereeSeats": {
+      "revision": "managebucketrefereeseats-00002-jay",
+      "generation": "1794722195891401",
+      "runtimeEnabled": true
+    },
+    "projectBucketPublicScore": {
+      "revision": "projectbucketpublicscore-00002-hol",
+      "generation": "1794722273213484",
+      "runtimeEnabled": true
+    }
+  },
+  "observedRelease": {
+    "enabled": true,
+    "productionEnabled": true,
+    "privateReadsEnabled": true,
+    "automaticPublicProjectionEnabled": true,
+    "productionRoomCount": 2,
+    "migrationEnabled": false,
+    "perCourtStorageEnabled": null,
+    "skipPublicProjectionAsyncEnabled": null,
+    "rulesSha256": "23f7acd2e06c428f3a628d1dad02d703b746cd28d1f48e6caf8c606248982e68"
+  },
+  "integration": {
+    "mainCommit": "e6a2c6b",
+    "reviewedPassReleaseCommit": "9c3d9961c82c87e5c5e2af9c2ab8e7bbc3e4418f",
+    "relatedUnitTestsPassed": 163,
+    "nativeEmulator": [
+      "6/12 courts async PASS overlaps score/pause/confirmation; authoritative state, replay and explicit public catch-up",
+      "native v2 activation, independent scores, PASS/replay, resize, disabled-release rollback, final progression"
+    ],
+    "changedProduction": false
+  },
+  "remaining": [
+    "Current bucket-source archives and current Rules content are not captured by fingerprint-only inventory.",
+    "Do not overwrite legacy package or Rules using generic repository candidates.",
+    "New integration requires full page/event CI on the merged source and real controlled trial."
+  ]
+}

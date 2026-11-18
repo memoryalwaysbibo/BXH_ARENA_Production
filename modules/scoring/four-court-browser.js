@@ -2,23 +2,24 @@
 (function(){const module={exports:{}};
 'use strict';
 const clone=x=>JSON.parse(JSON.stringify(x));
-const schema='bxh-match-buckets-v1';
-function route(station,count){
+const schema='bxh-match-buckets-v1',perCourtSchema='bxh-court-buckets-v2';
+function width(storageSchema){if(storageSchema===schema)return 4;if(storageSchema===perCourtSchema)return 1;throw Error('bucket-not-ready');}
+function route(station,count,storageSchema=schema){
  if(!Number.isSafeInteger(station)||station<1||station>count)throw Error('invalid-station');
- return 'court-'+Math.ceil(station/4);
+ return 'court-'+Math.ceil(station/width(storageSchema));
 }
 function context(room,state){
  const m=room.scoreStorage,count=Number(state.meta?.stations);
- if(m?.schema!==schema||m.status!=='active'||typeof m.epoch!=='string'||!m.epoch||m.roomId!==state.id||m.code!==state.cloudCode||!Number.isSafeInteger(count)||count<1||m.courtCount!==count||m.bucketCount!==Math.ceil(count/4))throw Error('bucket-not-ready');
+ if(![schema,perCourtSchema].includes(m?.schema)||m.status!=='active'||typeof m.epoch!=='string'||!m.epoch||m.roomId!==state.id||m.code!==state.cloudCode||!Number.isSafeInteger(count)||count<1||m.courtCount!==count||m.bucketCount!==Math.ceil(count/width(m.schema)))throw Error('bucket-not-ready');
  return m;
 }
-function makeManifest(state,epoch){return {schema,status:'active',epoch,roomId:state.id,code:state.cloudCode,courtCount:state.meta.stations,bucketCount:Math.ceil(state.meta.stations/4)};}
+function makeManifest(state,epoch,storageSchema=schema){return {schema:storageSchema,status:'active',epoch,roomId:state.id,code:state.cloudCode,courtCount:state.meta.stations,bucketCount:Math.ceil(state.meta.stations/width(storageSchema))};}
 function encode(state,m,previous=[]){
  const old=new Map(previous.map(b=>[b.bucketId,b]));
  return Array.from({length:m.bucketCount},(_,i)=>{
-  const bucketId='court-'+(i+1),matches=JSON.stringify(state.matches.filter(x=>Number(x.station)>0&&Number(x.station)<=m.courtCount&&route(Number(x.station),m.courtCount)===bucketId));
+  const bucketId='court-'+(i+1),matches=JSON.stringify(state.matches.filter(x=>Number(x.station)>0&&Number(x.station)<=m.courtCount&&route(Number(x.station),m.courtCount,m.schema)===bucketId));
   const before=old.get(bucketId),revision=before?before.revision+(before.matches===matches?0:1):0;
-  return {schema,code:m.code,roomId:m.roomId,epoch:m.epoch,bucketId,revision,matches};
+  return {schema:m.schema,code:m.code,roomId:m.roomId,epoch:m.epoch,bucketId,revision,matches};
  });
 }
 function materialize(base,m,buckets,partialId=null){
@@ -26,14 +27,14 @@ function materialize(base,m,buckets,partialId=null){
  if(buckets.length!==expected.length)throw Error('bucket-missing');
  const state=clone(base),seen=new Set(),replacements=new Map();
  for(const bucket of buckets){
-  if(!bucket||bucket.schema!==schema||bucket.code!==m.code||bucket.roomId!==m.roomId||bucket.epoch!==m.epoch||!expected.includes(bucket.bucketId)||seen.has(bucket.bucketId)||!Number.isSafeInteger(bucket.revision)||bucket.revision<0)throw Error('bucket-context');
+  if(!bucket||bucket.schema!==m.schema||bucket.code!==m.code||bucket.roomId!==m.roomId||bucket.epoch!==m.epoch||!expected.includes(bucket.bucketId)||seen.has(bucket.bucketId)||!Number.isSafeInteger(bucket.revision)||bucket.revision<0)throw Error('bucket-context');
   seen.add(bucket.bucketId);let rows;try{rows=JSON.parse(bucket.matches);}catch{throw Error('bucket-corrupt');}
   if(!Array.isArray(rows))throw Error('bucket-corrupt');
-  const originals=state.matches.filter(x=>Number(x.station)>0&&Number(x.station)<=m.courtCount&&route(Number(x.station),m.courtCount)===bucket.bucketId);
+  const originals=state.matches.filter(x=>Number(x.station)>0&&Number(x.station)<=m.courtCount&&route(Number(x.station),m.courtCount,m.schema)===bucket.bucketId);
   if(rows.length!==originals.length)throw Error('bucket-match-set');
   for(const match of rows){
    const original=originals.find(x=>x.id===match.id);
-   if(!original||replacements.has(match.id)||original.station!==match.station||route(Number(match.station),m.courtCount)!==bucket.bucketId||!Number.isSafeInteger(Number(match.refereeSeatScoreRevision||0))||Number(match.refereeSeatScoreRevision||0)<0)throw Error('bucket-match-set');
+   if(!original||replacements.has(match.id)||original.station!==match.station||route(Number(match.station),m.courtCount,m.schema)!==bucket.bucketId||!Number.isSafeInteger(Number(match.refereeSeatScoreRevision||0))||Number(match.refereeSeatScoreRevision||0)<0)throw Error('bucket-match-set');
    if((original.a?.playerId||null)!==(match.a?.playerId||null)||(original.b?.playerId||null)!==(match.b?.playerId||null)||Number(original.dispatchRevision||0)!==Number(match.dispatchRevision||0)||!!original.completed!==!!match.completed)throw Error('bucket-structure-stale');
    replacements.set(match.id,match);
   }
@@ -45,7 +46,7 @@ function materialize(base,m,buckets,partialId=null){
  }
  return state;
 }
-module.exports={schema,route,context,makeManifest,encode,materialize};
+module.exports={schema,perCourtSchema,route,context,makeManifest,encode,materialize};
 globalThis.BXHMatchBuckets=module.exports;})();
 (function(root,factory){
  if(typeof module==='object'&&module.exports)module.exports=factory(require('../../referee-seats/functions/bucket-state.cjs'));
@@ -106,7 +107,7 @@ globalThis.BXHMatchBuckets=module.exports;})();
      const nextRoom=clone(event.room),nextBase=JSON.parse(nextRoom.data),nextManifest=B.context(nextRoom,nextBase);
      if(nextManifest.code!==code)throw Error('room-mismatch');
      if(rootVersion===nextVersion&&!sameJsonValue(nextRoom,rootRoom))throw Error('room-version-conflict');
-     const reset=!manifest||nextManifest.epoch!==manifest.epoch||nextManifest.courtCount!==manifest.courtCount||nextManifest.bucketCount!==manifest.bucketCount;
+     const reset=!manifest||nextManifest.epoch!==manifest.epoch||nextManifest.schema!==manifest.schema||nextManifest.courtCount!==manifest.courtCount||nextManifest.bucketCount!==manifest.bucketCount;
      rootRoom=nextRoom;base=nextBase;manifest=nextManifest;rootVersion=nextVersion;
      if(reset){
       stopBuckets();const bucketToken=bucketGeneration;emit('syncing');
@@ -115,7 +116,7 @@ globalThis.BXHMatchBuckets=module.exports;})();
        bucketStops.push(transport.watchBucket(code,id,event=>{
         if(!active||token!==generation||bucketToken!==bucketGeneration||event.fromCache||event.pending)return;
         const value=event.bucket;
-        if(!value||value.bucketId!==id||value.epoch!==manifest.epoch||value.code!==manifest.code||value.roomId!==manifest.roomId||value.schema!==B.schema||!Number.isSafeInteger(value.revision)||value.revision<0){buckets.delete(id);return emit('syncing','bucket-context');}
+        if(!value||value.bucketId!==id||value.epoch!==manifest.epoch||value.code!==manifest.code||value.roomId!==manifest.roomId||value.schema!==manifest.schema||!Number.isSafeInteger(value.revision)||value.revision<0){buckets.delete(id);return emit('syncing','bucket-context');}
         const previous=bucketWatermarks.get(id);
         if(previous&&value.revision<previous.revision)return;
         if(previous&&value.revision===previous.revision&&!sameJsonValue(value,previous)){subscriptionFailed=true;return emit('error','bucket-version-conflict');}
@@ -134,7 +135,7 @@ globalThis.BXHMatchBuckets=module.exports;})();
   function acceptCommittedScore(result,record){
    if(record.type!=='score'||!['score','fault','undo','rematch','pause','resume'].includes(record.data.action)||result.structural!==false||result.matchId!==record.data.matchId||result.scoreRevision!==Number(record.data.expectedScoreRevision)+1||!active||status!=='ready'||record.epoch!==manifest?.epoch)return;
    const patch=result.buckets?.[0],id=result.bucketId;
-   if(!Array.isArray(result.buckets)||result.buckets.length!==1||!patch||patch.bucketId!==id||id!==B.route(Number(record.data.station),manifest.courtCount))return;
+   if(!Array.isArray(result.buckets)||result.buckets.length!==1||!patch||patch.bucketId!==id||id!==B.route(Number(record.data.station),manifest.courtCount,manifest.schema))return;
    const previous=bucketWatermarks.get(id);
    if(!previous||patch.revision<previous.revision||patch.revision===previous.revision&&!sameJsonValue(patch,previous))return;
    const candidate=[...buckets.values()].map(bucket=>bucket.bucketId===id?patch:bucket);
@@ -257,7 +258,7 @@ globalThis.BXHMatchBuckets=module.exports;})();
  'use strict';
  const clone=x=>JSON.parse(JSON.stringify(x));
  const actions=new Set(['score','fault','undo','rematch','pause','resume','confirm','quick']);
- const dispatches=new Set(['idle-claim','claim-skipped','manual-assign','swap','force-exit','reopen','claim-detached','retirement-transfer','resize']);
+ const dispatches=new Set(['skip','idle-claim','claim-skipped','manual-assign','swap','force-exit','reopen','claim-detached','retirement-transfer','resize']);
  const dispatchRevision=Symbol('dispatch-revision');
  function create({client,code,uid,getUid,legacy={},timeoutMs=8000}){
   let view=client.getView(),closed=false,lastSignature=null;const states=new Set(),seats=new Set(),waiters=new Set();
@@ -357,12 +358,12 @@ globalThis.BXHMatchBuckets=module.exports;})();
    if(!manifest){markers.delete(code);if(active?.code===code)stop();return;}
    markers.set(code,clone(manifest));
    const uid=auth.currentUser?.uid;
-   if(active?.code===code&&active.epoch===manifest.epoch&&active.uid===uid)return;
+   if(active?.code===code&&active.epoch===manifest.epoch&&active.manifest.schema===manifest.schema&&active.uid===uid)return;
    stop();const entry={code,epoch:manifest.epoch,manifest:clone(manifest),uid,generation:++generation,session:null,host:{cloudSync:{}},view:null,waiters:new Set()};active=entry;
    status(entry,{status:'syncing',state:null});
    if(enabled!==true)return fail(entry,'bucket-client-disabled');
    if(!uid)return fail(entry,'auth-required');
-   if(manifest.schema!=='bxh-match-buckets-v1'||manifest.status!=='active'||manifest.code!==code||typeof manifest.epoch!=='string'||!manifest.epoch)return fail(entry,'bucket-not-ready');
+   if(!['bxh-match-buckets-v1','bxh-court-buckets-v2'].includes(manifest.schema)||manifest.status!=='active'||manifest.code!==code||typeof manifest.epoch!=='string'||!manifest.epoch)return fail(entry,'bucket-not-ready');
    // App Check setup may finish after a room switch or sign-out. No stale start.
    Promise.resolve().then(()=>ensureAppCheck()).then(()=>{
     if(!current(entry))return;

@@ -35,6 +35,7 @@ async function until(check,message){const start=Date.now();while(!await check())
    assert((await root.get()).updateTime.isEqual(rootBefore.updateTime));
    report.cases.push({courts:count,buckets:Math.ceil(count/4),automaticEventPublication:true,allScoresPreserved:true,rootUnchanged:true,duplicateVectorSkipped:true,oldEpochSkipped:true,disabledWriterSkipped:true,reEnabledConverges:true});
   }
+  report.cases.push(...await require('./async-pass-cases.cjs').run(db,{automatic:true}));
   // Reproduce two simultaneous rooms (four courts and two courts), rather
   // than inferring cross-room behavior from a single six-court tournament.
   {

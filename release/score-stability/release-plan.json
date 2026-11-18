@@ -1,0 +1,509 @@
+{
+  "project": "bxh-arena",
+  "productionWrites": 0,
+  "deployableWithoutFreshReview": false,
+  "captureSha256": "aefe79320490411e4fc8b2f4b91c5a2fb8f710b98ecb59d52a727a31731d5eac",
+  "functions": {
+    "commitBucketRefereeCommand": {
+      "generation": "1794722128839589",
+      "revision": "commitbucketrefereecommand-00006-won",
+      "changedFiles": [
+        "bucket-migration-operator.cjs",
+        "bucket-migration-plan.cjs",
+        "bucket-migration-service.cjs",
+        "bucket-projection-trigger.cjs",
+        "bucket-public-projection.cjs",
+        "bucket-runtime.cjs",
+        "bucket-scoring-service.cjs",
+        "bucket-state.cjs",
+        "dispatch-core.cjs",
+        "engine/index.cjs",
+        "engine/pass-return.cjs",
+        "score-diagnostics.cjs",
+        "scoring-core.cjs"
+      ],
+      "files": {
+        "bucket-callable.cjs": {
+          "before": "41dba4f6bd4be82912270f49a33e8dd03648284b31e36302261d53c04b926928",
+          "after": "41dba4f6bd4be82912270f49a33e8dd03648284b31e36302261d53c04b926928"
+        },
+        "bucket-cutover.cjs": {
+          "before": "5a19667c1f967d3ee8ee5957419f041dcfa665e4710bb5749386eb15c8dd90d2",
+          "after": "5a19667c1f967d3ee8ee5957419f041dcfa665e4710bb5749386eb15c8dd90d2"
+        },
+        "bucket-general-archive.cjs": {
+          "before": "670781294f21c0b9c9230b706f1f539b9254d87756a76e5a83b2666bb344421b",
+          "after": "670781294f21c0b9c9230b706f1f539b9254d87756a76e5a83b2666bb344421b"
+        },
+        "bucket-legacy-fence.cjs": {
+          "before": "0620fcf6f405b4c355043da59ac2c47976003010bec0d07d856f9e5bca1c9d12",
+          "after": "0620fcf6f405b4c355043da59ac2c47976003010bec0d07d856f9e5bca1c9d12"
+        },
+        "bucket-migration-operator.cjs": {
+          "before": "67023ba3345bac1822391d6bc9ed899704134afc4e387ff885164c7d9f202f0c",
+          "after": "b4a84c9af7d30331240781e8549bf8c6c3146731a7f697ffe3a8b9efa461fdbe"
+        },
+        "bucket-migration-plan.cjs": {
+          "before": "8423d18faac375478dda4b9949f3f3ac147fa46c4c6e1aaebec6c6b1b324d29f",
+          "after": "06746d45741a43b69063fd4718d2a8a1a048ba4941573701c802bceed94458dc"
+        },
+        "bucket-migration-service.cjs": {
+          "before": "8053e61d4b98d0f5be13e6c9da3fb54e6f3077435f39ca7282068d80d3513d08",
+          "after": "110a6f818f4447d133e53f8b9cbf4fcee1481f68e2fa5b24237cb575372f6040"
+        },
+        "bucket-projection-trigger.cjs": {
+          "before": "cb887517fbb88c8cd9074c09c7a8d8c63b35a43f9561e76a6b349fab1d004feb",
+          "after": "1b7c8f93cb4888b93f6a87dd5233e3525b7919cfb793b61f8109d6d5e5153239"
+        },
+        "bucket-public-projection.cjs": {
+          "before": "d95937e6e626855f998612b8a44256008f36e7b3f38ac094ab85bac7750e5092",
+          "after": "964a6a446984d298641055e22fc038f884adb962f207b144e6e53cae533c88e1"
+        },
+        "bucket-runtime-entry.cjs": {
+          "before": "f0dec45b5f790869bd6010aae516cc57f6138f339718b71678fa6c7eac267698",
+          "after": "f0dec45b5f790869bd6010aae516cc57f6138f339718b71678fa6c7eac267698"
+        },
+        "bucket-runtime.cjs": {
+          "before": "b84daf88c3b5a4c93bc40d9a85c0eb6079d2f6cd46308e587dc4f9291d6e0df0",
+          "after": "fadefbf9bd5738a919524de07cbf75d180b07ba051441d84626d316369e4283d"
+        },
+        "bucket-scoring-service.cjs": {
+          "before": "1cf80b0e2c022ea9b8123f41881e0decfcce53e0453c7ea11e80843fd7949fb8",
+          "after": "c7323badd106455a22b4d8358cdf0b91d5fbe826e0dfabf4ab0d5909e2c0bd5f"
+        },
+        "bucket-seat-service.cjs": {
+          "before": "3c0bab8e1e3cb4d2df6292bda0a2bc3e3d168147485e6f3a43fca3b7600762b4",
+          "after": "3c0bab8e1e3cb4d2df6292bda0a2bc3e3d168147485e6f3a43fca3b7600762b4"
+        },
+        "bucket-state.cjs": {
+          "before": "e9fa3ae6cd379a94fda711070e4dc36bc311b62ff67e12e810f0db1caa407c3a",
+          "after": "c9ae89188a9b9ffccf3d7c19d7bc1ac50de10530b4a778967c800ae2c18079ec"
+        },
+        "core.cjs": {
+          "before": "f20226850b30dc6d2d800d11f49d45b36c03b6ca7447863c1923d2e83114a9e6",
+          "after": "f20226850b30dc6d2d800d11f49d45b36c03b6ca7447863c1923d2e83114a9e6"
+        },
+        "dispatch-core.cjs": {
+          "before": "49afa1d4792cdbf4e151435ce2c176021a75565ac2534f6a6b4ad5dccb17f6a1",
+          "after": "8a10f7dbb759559b965ea39a1cfb02addbc288f5957c7798b51ebe96b5b8a91b"
+        },
+        "engine/court-retirement.cjs": {
+          "before": "597add4bf231a629e62385d61f970610ab59638055b45f3dfc834f04a5b447b0",
+          "after": "597add4bf231a629e62385d61f970610ab59638055b45f3dfc834f04a5b447b0"
+        },
+        "engine/double-elimination.cjs": {
+          "before": "db9a6b0d815a10c2853c2d48794f297385b23798ce441e904c24246ddf32ab1c",
+          "after": "db9a6b0d815a10c2853c2d48794f297385b23798ce441e904c24246ddf32ab1c"
+        },
+        "engine/fault.cjs": {
+          "before": "26da0500abd88622bf9f49555287dd5ed7a7e311f232dc5adae027fce6e25266",
+          "after": "26da0500abd88622bf9f49555287dd5ed7a7e311f232dc5adae027fce6e25266"
+        },
+        "engine/index.cjs": {
+          "before": "12d2e5b330ca8580b10c03630aac297b0956121acff11b10600bbec44c313a6e",
+          "after": "66d149eb988e59dbdcabbb1412b41942b35da1490a940fb2477c66f4449f8ad3"
+        },
+        "engine/match-utils.cjs": {
+          "before": "60fdd13744d49acc2c28b42d12ff8c975841b8f6e891bd80cbd6832ef0c3fb53",
+          "after": "60fdd13744d49acc2c28b42d12ff8c975841b8f6e891bd80cbd6832ef0c3fb53"
+        },
+        "engine/pass-return.cjs": {
+          "before": null,
+          "after": "9e4b291a3951a7399e4732fe0841989afeb7e47b0529e314588369177d5d6db2"
+        },
+        "event-staff-core.cjs": {
+          "before": "1287fb6e3dbc43c03e56cc133888ee5d874846939addff79df3b6b7f215218c6",
+          "after": "1287fb6e3dbc43c03e56cc133888ee5d874846939addff79df3b6b7f215218c6"
+        },
+        "index.js": {
+          "before": "de7260bc4d257574bf020bc81a8111fc0107b9d4834503dbe4acf03ab0fcb236",
+          "after": "de7260bc4d257574bf020bc81a8111fc0107b9d4834503dbe4acf03ab0fcb236"
+        },
+        "package.json": {
+          "before": "58baa94158f07df2262cfc28db8b33236e5fd876274126a9f9a73219b051e4b7",
+          "after": "58baa94158f07df2262cfc28db8b33236e5fd876274126a9f9a73219b051e4b7"
+        },
+        "score-diagnostics.cjs": {
+          "before": "fad4f0e3c6474681160fa52b0d0e020ced2c1301ae7256420d5fbb7ab8976444",
+          "after": "53ed591115bb95871a6c972bf0be3936d04eae2b0d4d4aae5c6c817c6ce795ce"
+        },
+        "scoring-core.cjs": {
+          "before": "b88a284308980512707d179a7b755d9e85026c9abb6bd4901f667530ce9ecd36",
+          "after": "ce8fe167f742dfc559d13969f56630bba1aeae8bddbeab0047383b204b95f1d7"
+        },
+        "scoring-service.cjs": {
+          "before": "34a248d4ba8d8bfff607b1d21806ee8d44eb61269a44317dc2f49a0d3adc946b",
+          "after": "34a248d4ba8d8bfff607b1d21806ee8d44eb61269a44317dc2f49a0d3adc946b"
+        },
+        "service.cjs": {
+          "before": "b544d88866bd6f87b3fa37b2db6e9e40add26f974620699907e1adbc54420eb2",
+          "after": "b544d88866bd6f87b3fa37b2db6e9e40add26f974620699907e1adbc54420eb2"
+        }
+      },
+      "protectedFilesUnchanged": true
+    },
+    "manageBucketRefereeSeats": {
+      "generation": "1794722195891401",
+      "revision": "managebucketrefereeseats-00002-jay",
+      "changedFiles": [
+        "bucket-general-archive.cjs",
+        "bucket-migration-operator.cjs",
+        "bucket-migration-plan.cjs",
+        "bucket-migration-service.cjs",
+        "bucket-projection-trigger.cjs",
+        "bucket-public-projection.cjs",
+        "bucket-runtime.cjs",
+        "bucket-scoring-service.cjs",
+        "bucket-state.cjs",
+        "dispatch-core.cjs",
+        "engine/index.cjs",
+        "engine/pass-return.cjs",
+        "score-diagnostics.cjs",
+        "scoring-core.cjs"
+      ],
+      "files": {
+        "bucket-callable.cjs": {
+          "before": "41dba4f6bd4be82912270f49a33e8dd03648284b31e36302261d53c04b926928",
+          "after": "41dba4f6bd4be82912270f49a33e8dd03648284b31e36302261d53c04b926928"
+        },
+        "bucket-cutover.cjs": {
+          "before": "5a19667c1f967d3ee8ee5957419f041dcfa665e4710bb5749386eb15c8dd90d2",
+          "after": "5a19667c1f967d3ee8ee5957419f041dcfa665e4710bb5749386eb15c8dd90d2"
+        },
+        "bucket-general-archive.cjs": {
+          "before": null,
+          "after": "670781294f21c0b9c9230b706f1f539b9254d87756a76e5a83b2666bb344421b"
+        },
+        "bucket-legacy-fence.cjs": {
+          "before": "0620fcf6f405b4c355043da59ac2c47976003010bec0d07d856f9e5bca1c9d12",
+          "after": "0620fcf6f405b4c355043da59ac2c47976003010bec0d07d856f9e5bca1c9d12"
+        },
+        "bucket-migration-operator.cjs": {
+          "before": "67023ba3345bac1822391d6bc9ed899704134afc4e387ff885164c7d9f202f0c",
+          "after": "b4a84c9af7d30331240781e8549bf8c6c3146731a7f697ffe3a8b9efa461fdbe"
+        },
+        "bucket-migration-plan.cjs": {
+          "before": "8423d18faac375478dda4b9949f3f3ac147fa46c4c6e1aaebec6c6b1b324d29f",
+          "after": "06746d45741a43b69063fd4718d2a8a1a048ba4941573701c802bceed94458dc"
+        },
+        "bucket-migration-service.cjs": {
+          "before": "8053e61d4b98d0f5be13e6c9da3fb54e6f3077435f39ca7282068d80d3513d08",
+          "after": "110a6f818f4447d133e53f8b9cbf4fcee1481f68e2fa5b24237cb575372f6040"
+        },
+        "bucket-projection-trigger.cjs": {
+          "before": "cb887517fbb88c8cd9074c09c7a8d8c63b35a43f9561e76a6b349fab1d004feb",
+          "after": "1b7c8f93cb4888b93f6a87dd5233e3525b7919cfb793b61f8109d6d5e5153239"
+        },
+        "bucket-public-projection.cjs": {
+          "before": "d95937e6e626855f998612b8a44256008f36e7b3f38ac094ab85bac7750e5092",
+          "after": "964a6a446984d298641055e22fc038f884adb962f207b144e6e53cae533c88e1"
+        },
+        "bucket-runtime-entry.cjs": {
+          "before": "f0dec45b5f790869bd6010aae516cc57f6138f339718b71678fa6c7eac267698",
+          "after": "f0dec45b5f790869bd6010aae516cc57f6138f339718b71678fa6c7eac267698"
+        },
+        "bucket-runtime.cjs": {
+          "before": "b84daf88c3b5a4c93bc40d9a85c0eb6079d2f6cd46308e587dc4f9291d6e0df0",
+          "after": "fadefbf9bd5738a919524de07cbf75d180b07ba051441d84626d316369e4283d"
+        },
+        "bucket-scoring-service.cjs": {
+          "before": "cbea221312657339d24b17aca0f31788fd28e599ff624d5b3bbc0ac4ed3fe13b",
+          "after": "c7323badd106455a22b4d8358cdf0b91d5fbe826e0dfabf4ab0d5909e2c0bd5f"
+        },
+        "bucket-seat-service.cjs": {
+          "before": "3c0bab8e1e3cb4d2df6292bda0a2bc3e3d168147485e6f3a43fca3b7600762b4",
+          "after": "3c0bab8e1e3cb4d2df6292bda0a2bc3e3d168147485e6f3a43fca3b7600762b4"
+        },
+        "bucket-state.cjs": {
+          "before": "e9fa3ae6cd379a94fda711070e4dc36bc311b62ff67e12e810f0db1caa407c3a",
+          "after": "c9ae89188a9b9ffccf3d7c19d7bc1ac50de10530b4a778967c800ae2c18079ec"
+        },
+        "core.cjs": {
+          "before": "f20226850b30dc6d2d800d11f49d45b36c03b6ca7447863c1923d2e83114a9e6",
+          "after": "f20226850b30dc6d2d800d11f49d45b36c03b6ca7447863c1923d2e83114a9e6"
+        },
+        "dispatch-core.cjs": {
+          "before": "49afa1d4792cdbf4e151435ce2c176021a75565ac2534f6a6b4ad5dccb17f6a1",
+          "after": "8a10f7dbb759559b965ea39a1cfb02addbc288f5957c7798b51ebe96b5b8a91b"
+        },
+        "engine/court-retirement.cjs": {
+          "before": "597add4bf231a629e62385d61f970610ab59638055b45f3dfc834f04a5b447b0",
+          "after": "597add4bf231a629e62385d61f970610ab59638055b45f3dfc834f04a5b447b0"
+        },
+        "engine/double-elimination.cjs": {
+          "before": "db9a6b0d815a10c2853c2d48794f297385b23798ce441e904c24246ddf32ab1c",
+          "after": "db9a6b0d815a10c2853c2d48794f297385b23798ce441e904c24246ddf32ab1c"
+        },
+        "engine/fault.cjs": {
+          "before": "26da0500abd88622bf9f49555287dd5ed7a7e311f232dc5adae027fce6e25266",
+          "after": "26da0500abd88622bf9f49555287dd5ed7a7e311f232dc5adae027fce6e25266"
+        },
+        "engine/index.cjs": {
+          "before": "12d2e5b330ca8580b10c03630aac297b0956121acff11b10600bbec44c313a6e",
+          "after": "66d149eb988e59dbdcabbb1412b41942b35da1490a940fb2477c66f4449f8ad3"
+        },
+        "engine/match-utils.cjs": {
+          "before": "60fdd13744d49acc2c28b42d12ff8c975841b8f6e891bd80cbd6832ef0c3fb53",
+          "after": "60fdd13744d49acc2c28b42d12ff8c975841b8f6e891bd80cbd6832ef0c3fb53"
+        },
+        "engine/pass-return.cjs": {
+          "before": null,
+          "after": "9e4b291a3951a7399e4732fe0841989afeb7e47b0529e314588369177d5d6db2"
+        },
+        "event-staff-core.cjs": {
+          "before": "1287fb6e3dbc43c03e56cc133888ee5d874846939addff79df3b6b7f215218c6",
+          "after": "1287fb6e3dbc43c03e56cc133888ee5d874846939addff79df3b6b7f215218c6"
+        },
+        "index.js": {
+          "before": "de7260bc4d257574bf020bc81a8111fc0107b9d4834503dbe4acf03ab0fcb236",
+          "after": "de7260bc4d257574bf020bc81a8111fc0107b9d4834503dbe4acf03ab0fcb236"
+        },
+        "package.json": {
+          "before": "58baa94158f07df2262cfc28db8b33236e5fd876274126a9f9a73219b051e4b7",
+          "after": "58baa94158f07df2262cfc28db8b33236e5fd876274126a9f9a73219b051e4b7"
+        },
+        "score-diagnostics.cjs": {
+          "before": null,
+          "after": "53ed591115bb95871a6c972bf0be3936d04eae2b0d4d4aae5c6c817c6ce795ce"
+        },
+        "scoring-core.cjs": {
+          "before": "b88a284308980512707d179a7b755d9e85026c9abb6bd4901f667530ce9ecd36",
+          "after": "ce8fe167f742dfc559d13969f56630bba1aeae8bddbeab0047383b204b95f1d7"
+        },
+        "scoring-service.cjs": {
+          "before": "34a248d4ba8d8bfff607b1d21806ee8d44eb61269a44317dc2f49a0d3adc946b",
+          "after": "34a248d4ba8d8bfff607b1d21806ee8d44eb61269a44317dc2f49a0d3adc946b"
+        },
+        "service.cjs": {
+          "before": "b544d88866bd6f87b3fa37b2db6e9e40add26f974620699907e1adbc54420eb2",
+          "after": "b544d88866bd6f87b3fa37b2db6e9e40add26f974620699907e1adbc54420eb2"
+        }
+      },
+      "protectedFilesUnchanged": true
+    },
+    "projectBucketPublicScore": {
+      "generation": "1794722273213484",
+      "revision": "projectbucketpublicscore-00002-hol",
+      "changedFiles": [
+        "bucket-general-archive.cjs",
+        "bucket-migration-operator.cjs",
+        "bucket-migration-plan.cjs",
+        "bucket-migration-service.cjs",
+        "bucket-projection-trigger.cjs",
+        "bucket-public-projection.cjs",
+        "bucket-runtime.cjs",
+        "bucket-scoring-service.cjs",
+        "bucket-state.cjs",
+        "dispatch-core.cjs",
+        "engine/index.cjs",
+        "engine/pass-return.cjs",
+        "score-diagnostics.cjs",
+        "scoring-core.cjs"
+      ],
+      "files": {
+        "bucket-callable.cjs": {
+          "before": "41dba4f6bd4be82912270f49a33e8dd03648284b31e36302261d53c04b926928",
+          "after": "41dba4f6bd4be82912270f49a33e8dd03648284b31e36302261d53c04b926928"
+        },
+        "bucket-cutover.cjs": {
+          "before": "5a19667c1f967d3ee8ee5957419f041dcfa665e4710bb5749386eb15c8dd90d2",
+          "after": "5a19667c1f967d3ee8ee5957419f041dcfa665e4710bb5749386eb15c8dd90d2"
+        },
+        "bucket-general-archive.cjs": {
+          "before": null,
+          "after": "670781294f21c0b9c9230b706f1f539b9254d87756a76e5a83b2666bb344421b"
+        },
+        "bucket-legacy-fence.cjs": {
+          "before": "0620fcf6f405b4c355043da59ac2c47976003010bec0d07d856f9e5bca1c9d12",
+          "after": "0620fcf6f405b4c355043da59ac2c47976003010bec0d07d856f9e5bca1c9d12"
+        },
+        "bucket-migration-operator.cjs": {
+          "before": "67023ba3345bac1822391d6bc9ed899704134afc4e387ff885164c7d9f202f0c",
+          "after": "b4a84c9af7d30331240781e8549bf8c6c3146731a7f697ffe3a8b9efa461fdbe"
+        },
+        "bucket-migration-plan.cjs": {
+          "before": "8423d18faac375478dda4b9949f3f3ac147fa46c4c6e1aaebec6c6b1b324d29f",
+          "after": "06746d45741a43b69063fd4718d2a8a1a048ba4941573701c802bceed94458dc"
+        },
+        "bucket-migration-service.cjs": {
+          "before": "8053e61d4b98d0f5be13e6c9da3fb54e6f3077435f39ca7282068d80d3513d08",
+          "after": "110a6f818f4447d133e53f8b9cbf4fcee1481f68e2fa5b24237cb575372f6040"
+        },
+        "bucket-projection-trigger.cjs": {
+          "before": "cb887517fbb88c8cd9074c09c7a8d8c63b35a43f9561e76a6b349fab1d004feb",
+          "after": "1b7c8f93cb4888b93f6a87dd5233e3525b7919cfb793b61f8109d6d5e5153239"
+        },
+        "bucket-public-projection.cjs": {
+          "before": "d95937e6e626855f998612b8a44256008f36e7b3f38ac094ab85bac7750e5092",
+          "after": "964a6a446984d298641055e22fc038f884adb962f207b144e6e53cae533c88e1"
+        },
+        "bucket-runtime-entry.cjs": {
+          "before": "f0dec45b5f790869bd6010aae516cc57f6138f339718b71678fa6c7eac267698",
+          "after": "f0dec45b5f790869bd6010aae516cc57f6138f339718b71678fa6c7eac267698"
+        },
+        "bucket-runtime.cjs": {
+          "before": "b84daf88c3b5a4c93bc40d9a85c0eb6079d2f6cd46308e587dc4f9291d6e0df0",
+          "after": "fadefbf9bd5738a919524de07cbf75d180b07ba051441d84626d316369e4283d"
+        },
+        "bucket-scoring-service.cjs": {
+          "before": "cbea221312657339d24b17aca0f31788fd28e599ff624d5b3bbc0ac4ed3fe13b",
+          "after": "c7323badd106455a22b4d8358cdf0b91d5fbe826e0dfabf4ab0d5909e2c0bd5f"
+        },
+        "bucket-seat-service.cjs": {
+          "before": "3c0bab8e1e3cb4d2df6292bda0a2bc3e3d168147485e6f3a43fca3b7600762b4",
+          "after": "3c0bab8e1e3cb4d2df6292bda0a2bc3e3d168147485e6f3a43fca3b7600762b4"
+        },
+        "bucket-state.cjs": {
+          "before": "e9fa3ae6cd379a94fda711070e4dc36bc311b62ff67e12e810f0db1caa407c3a",
+          "after": "c9ae89188a9b9ffccf3d7c19d7bc1ac50de10530b4a778967c800ae2c18079ec"
+        },
+        "core.cjs": {
+          "before": "f20226850b30dc6d2d800d11f49d45b36c03b6ca7447863c1923d2e83114a9e6",
+          "after": "f20226850b30dc6d2d800d11f49d45b36c03b6ca7447863c1923d2e83114a9e6"
+        },
+        "dispatch-core.cjs": {
+          "before": "49afa1d4792cdbf4e151435ce2c176021a75565ac2534f6a6b4ad5dccb17f6a1",
+          "after": "8a10f7dbb759559b965ea39a1cfb02addbc288f5957c7798b51ebe96b5b8a91b"
+        },
+        "engine/court-retirement.cjs": {
+          "before": "597add4bf231a629e62385d61f970610ab59638055b45f3dfc834f04a5b447b0",
+          "after": "597add4bf231a629e62385d61f970610ab59638055b45f3dfc834f04a5b447b0"
+        },
+        "engine/double-elimination.cjs": {
+          "before": "db9a6b0d815a10c2853c2d48794f297385b23798ce441e904c24246ddf32ab1c",
+          "after": "db9a6b0d815a10c2853c2d48794f297385b23798ce441e904c24246ddf32ab1c"
+        },
+        "engine/fault.cjs": {
+          "before": "26da0500abd88622bf9f49555287dd5ed7a7e311f232dc5adae027fce6e25266",
+          "after": "26da0500abd88622bf9f49555287dd5ed7a7e311f232dc5adae027fce6e25266"
+        },
+        "engine/index.cjs": {
+          "before": "12d2e5b330ca8580b10c03630aac297b0956121acff11b10600bbec44c313a6e",
+          "after": "66d149eb988e59dbdcabbb1412b41942b35da1490a940fb2477c66f4449f8ad3"
+        },
+        "engine/match-utils.cjs": {
+          "before": "60fdd13744d49acc2c28b42d12ff8c975841b8f6e891bd80cbd6832ef0c3fb53",
+          "after": "60fdd13744d49acc2c28b42d12ff8c975841b8f6e891bd80cbd6832ef0c3fb53"
+        },
+        "engine/pass-return.cjs": {
+          "before": null,
+          "after": "9e4b291a3951a7399e4732fe0841989afeb7e47b0529e314588369177d5d6db2"
+        },
+        "event-staff-core.cjs": {
+          "before": "1287fb6e3dbc43c03e56cc133888ee5d874846939addff79df3b6b7f215218c6",
+          "after": "1287fb6e3dbc43c03e56cc133888ee5d874846939addff79df3b6b7f215218c6"
+        },
+        "index.js": {
+          "before": "de7260bc4d257574bf020bc81a8111fc0107b9d4834503dbe4acf03ab0fcb236",
+          "after": "de7260bc4d257574bf020bc81a8111fc0107b9d4834503dbe4acf03ab0fcb236"
+        },
+        "package.json": {
+          "before": "58baa94158f07df2262cfc28db8b33236e5fd876274126a9f9a73219b051e4b7",
+          "after": "58baa94158f07df2262cfc28db8b33236e5fd876274126a9f9a73219b051e4b7"
+        },
+        "score-diagnostics.cjs": {
+          "before": null,
+          "after": "53ed591115bb95871a6c972bf0be3936d04eae2b0d4d4aae5c6c817c6ce795ce"
+        },
+        "scoring-core.cjs": {
+          "before": "b88a284308980512707d179a7b755d9e85026c9abb6bd4901f667530ce9ecd36",
+          "after": "ce8fe167f742dfc559d13969f56630bba1aeae8bddbeab0047383b204b95f1d7"
+        },
+        "scoring-service.cjs": {
+          "before": "34a248d4ba8d8bfff607b1d21806ee8d44eb61269a44317dc2f49a0d3adc946b",
+          "after": "34a248d4ba8d8bfff607b1d21806ee8d44eb61269a44317dc2f49a0d3adc946b"
+        },
+        "service.cjs": {
+          "before": "b544d88866bd6f87b3fa37b2db6e9e40add26f974620699907e1adbc54420eb2",
+          "after": "b544d88866bd6f87b3fa37b2db6e9e40add26f974620699907e1adbc54420eb2"
+        }
+      },
+      "protectedFilesUnchanged": true
+    }
+  },
+  "rules": {
+    "before": "23f7acd2e06c428f3a628d1dad02d703b746cd28d1f48e6caf8c606248982e68",
+    "after": "c3bd501001bcfb5f7bd7d727800e694bb97f68c364164ca7ad5dfe63ac4909f9",
+    "onlyChange": "Opt-in v2 schema in scoreBucketReadable; every other byte preserved"
+  },
+  "rooms": [
+    {
+      "code": "BXH-SCR4AA",
+      "exists": true,
+      "allowlistEpoch": "field-20261115-v1",
+      "updateTime": "2026-11-15T06:06:39.752959Z",
+      "scoreStorage": {
+        "mapValue": {
+          "fields": {
+            "bucketCount": {
+              "integerValue": "1"
+            },
+            "status": {
+              "stringValue": "active"
+            },
+            "epoch": {
+              "stringValue": "field-20261115-v1"
+            },
+            "roomId": {
+              "stringValue": "field-room-BXH-SCR4AA"
+            },
+            "code": {
+              "stringValue": "BXH-SCR4AA"
+            },
+            "courtCount": {
+              "integerValue": "4"
+            },
+            "schema": {
+              "stringValue": "bxh-match-buckets-v1"
+            }
+          }
+        }
+      }
+    },
+    {
+      "code": "BXH-SCR2AA",
+      "exists": true,
+      "allowlistEpoch": "field-20261115-v1",
+      "updateTime": "2026-11-17T09:44:13.409231Z",
+      "scoreStorage": {
+        "mapValue": {
+          "fields": {
+            "status": {
+              "stringValue": "active"
+            },
+            "epoch": {
+              "stringValue": "field-20261115-v1"
+            },
+            "courtCount": {
+              "integerValue": "2"
+            },
+            "roomId": {
+              "stringValue": "field-room-BXH-SCR2AA"
+            },
+            "code": {
+              "stringValue": "BXH-SCR2AA"
+            },
+            "bucketCount": {
+              "integerValue": "1"
+            },
+            "schema": {
+              "stringValue": "bxh-match-buckets-v1"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "release": {
+    "updateTime": "2026-11-15T06:06:39.752959Z",
+    "flags": {
+      "enabled": true,
+      "productionEnabled": true,
+      "privateReadsEnabled": true,
+      "automaticPublicProjectionEnabled": true,
+      "perCourtStorageEnabled": null,
+      "skipPublicProjectionAsyncEnabled": null,
+      "migrationEnabled": false
+    }
+  }
+}

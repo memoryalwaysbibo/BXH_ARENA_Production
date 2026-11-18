@@ -16,3 +16,17 @@ test('closed releases/removed rooms are skipped, while integrity and transient e
  for(const reason of ['release-not-ready','not-found','bucket-not-ready','bucket-room-not-enabled'])assert.equal((await createBucketProjectionEventHandler({wait:async()=>{},publish:async()=>{throw Error(reason);}})(event())).reason,reason);
  for(const reason of ['bucket-context','unavailable'])await assert.rejects(createBucketProjectionEventHandler({wait:async()=>{},publish:async()=>{throw Error(reason);}})(event()),new RegExp(reason));
 });
+test('same-room events queue without losing later work and other rooms remain independent',async()=>{
+ let release,started=0,active=0,max=0;const hold=new Promise(r=>release=r);
+ const handle=createBucketProjectionEventHandler({wait:async()=>{},publish:async(code)=>{started++;active++;max=Math.max(max,active);if(started===1)await hold;active--;return {ok:true,code};}});
+ const first=handle(event());await new Promise(setImmediate);const second=handle(event());
+ const other=event();other.params.code='BXH-PROJECT2';other.data.after.data=()=>({...event().data.after.data(),code:'BXH-PROJECT2'});
+ await handle(other);assert.equal(started,2);release();await Promise.all([first,second]);assert.equal(started,3);assert.equal(max,2);
+});
+test('source changes are re-captured with bounded retries and exhaustion releases the queue',async()=>{
+ let calls=0;const handle=createBucketProjectionEventHandler({wait:async()=>{},publish:async()=>{if(++calls<=3)throw Error('projection-source-changed');return {ok:true};}});
+ await assert.rejects(handle(event()),/projection-source-changed/);assert.equal(calls,3);
+ assert.equal((await handle(event())).ok,true);assert.equal(calls,4);
+ let attempts=0;const recover=createBucketProjectionEventHandler({wait:async()=>{},publish:async()=>{if(++attempts===1)throw Error('projection-source-changed');return {ok:true};}});
+ assert.equal((await recover(event())).ok,true);assert.equal(attempts,2);
+});

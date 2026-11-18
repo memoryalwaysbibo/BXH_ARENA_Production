@@ -73,7 +73,7 @@
     },
     "score-diagnostics.cjs": {
       "baselineSha256": null,
-      "candidateSha256": "fad4f0e3c6474681160fa52b0d0e020ced2c1301ae7256420d5fbb7ab8976444"
+      "candidateSha256": "53ed591115bb95871a6c972bf0be3936d04eae2b0d4d4aae5c6c817c6ce795ce"
     },
     "scoring-core.cjs": {
       "baselineSha256": "790274ea86481c82bca7a9a22fb36a7c07a0b4c12defe2d076626628130b89bd",

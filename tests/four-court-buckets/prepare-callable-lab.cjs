@@ -1,11 +1,13 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-four-court-buckets');
-const root=path.resolve(__dirname,'../..'),dest=path.join(root,'test-results/four-court-callable-source');
+const root=path.resolve(__dirname,'../..'),scoped=process.env.BXH_SCOPED_CALLABLE_SOURCE==='1';
+const sourceRoot=scoped?path.join(root,'test-results/score-stability-scoped/commitBucketRefereeCommand'):path.join(root,'referee-seats/functions');
+const dest=path.join(root,scoped?'test-results/scoped-callable-source':'test-results/four-court-callable-source');
 assert(!fs.existsSync(dest),'refuse to overwrite an existing function lab');fs.mkdirSync(dest,{recursive:true});
-for(const name of fs.readdirSync(path.join(root,'referee-seats/functions')))if(name.endsWith('.cjs')||name==='engine')fs.cpSync(path.join(root,'referee-seats/functions',name),path.join(dest,name),{recursive:true});
+for(const name of fs.readdirSync(sourceRoot))if(name.endsWith('.cjs')||name==='engine')fs.cpSync(path.join(sourceRoot,name),path.join(dest,name),{recursive:true});
 fs.copyFileSync(path.join(__dirname,'callable-lab-index.cjs'),path.join(dest,'index.js'));
-fs.copyFileSync(path.join(root,'referee-seats/functions/package.json'),path.join(dest,'package.json'));
+fs.copyFileSync(path.join(sourceRoot,'package.json'),path.join(dest,'package.json'));
 let deps=path.dirname(require.resolve('firebase-functions/v2/https'));
 while(path.basename(deps)!=='firebase-functions'&&path.dirname(deps)!==deps)deps=path.dirname(deps);
 assert.equal(path.basename(deps),'firebase-functions');fs.symlinkSync(path.dirname(deps),path.join(dest,'node_modules'),'dir');

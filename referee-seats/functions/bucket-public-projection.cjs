@@ -6,7 +6,8 @@ function createBucketPublicProjection(db,{clock=Date.now,runtime='emulator'}={})
  return async (code,{automatic=false,expectedEpoch=null}={})=>{
   if(!/^BXH-[A-Z0-9]{4,16}$/.test(code))throw Error('invalid-request');
   const root=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code);
-  return db.runTransaction(async tx=>{
+  // Snapshot reads do not lock score buckets. Serialize outside the write transaction.
+  const captured=await db.runTransaction(async tx=>{
    const [roomSnap,config]=await tx.getAll(root,db.doc('systemConfig/fourCourtScoreBuckets'));
    if(config.data()?.enabled!==true)throw Error('release-not-ready');
    if(automatic&&config.data()?.automaticPublicProjectionEnabled!==true)return {ok:true,skipped:true,reason:'automatic-projection-disabled'};
@@ -17,14 +18,31 @@ function createBucketPublicProjection(db,{clock=Date.now,runtime='emulator'}={})
    if(expectedEpoch!==null&&expectedEpoch!==m.epoch)return {ok:true,skipped:true,reason:'epoch-mismatch'};
    const snaps=await tx.getAll(...Array.from({length:m.bucketCount},(_,i)=>root.collection('matchBuckets').doc('court-'+(i+1))));
    const buckets=snaps.map(s=>s.exists?s.data():null),state=B.materialize(base,m,buckets);
-   // Match the structural scorer's lock order: room, buckets, then public view.
    const pubSnap=await tx.get(pub);if(!pubSnap.exists)throw Error('not-found');
    let previous;try{previous=JSON.parse(pubSnap.data().bracketView);}catch{throw Error('corrupt-data');}
    const versions=Object.fromEntries(buckets.map(b=>[b.bucketId,b.revision])),projection={epoch:m.epoch,versions};
-   const previousVector=pubSnap.data().scoreBucketProjection;
-   if(previousVector?.epoch===m.epoch&&Object.keys(previousVector.versions||{}).length===buckets.length&&buckets.every(b=>previousVector.versions[b.bucketId]===b.revision))return {ok:true,skipped:true,projection};
-   state.updatedAt=Math.max(clock(),Number(pubSnap.data().updatedAt||0)+1);
-   tx.update(pub,{bracketView:JSON.stringify(S.publicProjection(state,previous)),scoreBucketProjection:projection,updatedAt:state.updatedAt});
+   return {roomSnap,pubSnap,m,projection,mirror:S.publicProjection(state,previous)};
+  },{readOnly:true});
+  if(captured.ok)return captured;
+  return db.runTransaction(async tx=>{
+   // Only structural authority, rollout configuration and public output are locked.
+   const [roomSnap,config,pubSnap]=await tx.getAll(root,db.doc('systemConfig/fourCourtScoreBuckets'),pub);
+   if(config.data()?.enabled!==true)throw Error('release-not-ready');
+   if(automatic&&config.data()?.automaticPublicProjectionEnabled!==true)return {ok:true,skipped:true,reason:'automatic-projection-disabled'};
+   if(!roomSnap.exists||!pubSnap.exists)throw Error('not-found');
+   if(!roomSnap.updateTime?.isEqual(captured.roomSnap.updateTime))throw Error('projection-source-changed');
+   gate.assertRoom(config.data(),captured.m);
+   const {projection,m}=captured,previousVector=pubSnap.data().scoreBucketProjection;
+   if(previousVector?.epoch===m.epoch){
+    const versions=previousVector.versions||{},ids=Object.keys(projection.versions);
+    if(Object.keys(versions).length!==ids.length||ids.some(id=>!Number.isSafeInteger(versions[id])||versions[id]<0))throw Error('bucket-context');
+    if(ids.some(id=>versions[id]>projection.versions[id]))return {ok:true,skipped:true,reason:'newer-projection',projection:previousVector};
+    if(ids.every(id=>versions[id]===projection.versions[id]))return {ok:true,skipped:true,projection};
+   }
+   // Preserve unrelated public updates instead of publishing a stale mirror base.
+   if(!pubSnap.updateTime?.isEqual(captured.pubSnap.updateTime))throw Error('projection-source-changed');
+   const updatedAt=Math.max(clock(),Number(pubSnap.data().updatedAt||0)+1);
+   tx.update(pub,{bracketView:JSON.stringify({...captured.mirror,updatedAt}),scoreBucketProjection:projection,updatedAt});
    return {ok:true,skipped:false,projection};
   });
  };
