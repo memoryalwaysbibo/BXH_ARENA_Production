@@ -1,0 +1,15 @@
+name: Manual PASS source release checks
+on:
+  pull_request:
+    paths: ['operator/BXH819_*', 'tests/fixtures/pass-manual-source-baseline.zip', '.github/workflows/pass-manual-release.yml']
+permissions:
+  contents: read
+jobs:
+  source-overlay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m unittest discover -s operator -p 'BXH819_release_test.py' -v
