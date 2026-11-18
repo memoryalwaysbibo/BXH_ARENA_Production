@@ -46,6 +46,7 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   // Lifecycle validates the original receipt before checking the write gate.
   allowRetired:()=>true,
   preconditions:['bracket-room-changed','bracket-started','draw-mode-not-supported','start-mode-not-supported','early-start-confirmation-required',
+   'ticket-lifecycle-disabled','ticket-binding-invalid','ticket-expired','ticket-capacity-invalid',
    'registration-roster-stale','bracket-version-conflict','qr-checkin-state-stale','registration-queue-pending','bracket-roster-changed'],
  };
  const registrationStartV2=bind(createStartHandler({db,enabled:startEnabled}),lifecycleOptions);
