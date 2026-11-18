@@ -154,3 +154,9 @@ migrationEnabled=false。這只能證明目前開關與部署摘要，不能推�
 Emulator 的 6/12 台 async PASS 並行、v2啟用、擴台、關閉後回復與
 決賽推進通過。尚需合併後完整頁面與事件 CI、現行分桶來源與 Rules
 內容盤查，才能製作必要差異發布包。此輪未部署、未改正式房間或開關。
+
+已備妥 BXH816_capture_bucket_sources.py：只下載本次盤查的三個分桶函式
+固定世代，挑選程式/套件檔並擷取當前Rules、公開開關及兩房scoreStorage
+欄位；不讀room.data、玩家或帳號。下載前後都重讀版本，變動則停止；
+不執行來源、不部署。產生本地審查ZIP供回傳。三項來源邊界離線測試
+通過，實際Cloud擷取尚待已登入的Cloud Shell執行。
