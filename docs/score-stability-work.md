@@ -134,3 +134,23 @@ Rules 指紋；不執行來源、不解壓到可執行目錄、不輸出 token/�
 不部署、不寫雲端。缺少或無權讀的函式統一標示 unavailable，不能誤判
 為未部署。六項離線測試通過。必須由已登入 Cloud Shell 執行後，才能
 核對正式來源並準備限房啟用；目前沒有 GCP 登入，未做正式讀回或部署。
+
+## 當前正式盤查與 PASS 回補整合（2026-11-18）
+
+使用者貼回的當前盤查為零寫入、無讀取錯誤。commitRefereeCommand 已為
+00010-pid，來源世代 1794962124424514；engine/dispatch/scoring 三個指紋
+逐一吻合 9c3d996 的 PR817 正式相容 overlay 預期。因此相對舊 capture
+的 false 為預期版本變動，不是損壞證據。
+
+正式三個分桶服務均 ACTIVE、runtime enabled，設定已有兩房 allowlist；
+perCourtStorageEnabled / skipPublicProjectionAsyncEnabled 尚未設定，
+migrationEnabled=false。這只能證明目前開關與部署摘要，不能推斷兩房
+的實際儲存 schema，也不能證明新功能已在正式環境啟用。當前 Rules
+指紋 23f7acd2e06c428f3a628d1dad02d703b746cd28d1f48e6caf8c606248982e68
+與本候選產物不同，需要內容核對，不能直接覆蓋。
+
+已把 main e6a2c6b 的 PR817 原樣合入分桶候選，保留 PASS 原台回補、
+空台入口及新保護條件；相關單元/UI測試 163 項通過。原生 Firestore
+Emulator 的 6/12 台 async PASS 並行、v2啟用、擴台、關閉後回復與
+決賽推進通過。尚需合併後完整頁面與事件 CI、現行分桶來源與 Rules
+內容盤查，才能製作必要差異發布包。此輪未部署、未改正式房間或開關。

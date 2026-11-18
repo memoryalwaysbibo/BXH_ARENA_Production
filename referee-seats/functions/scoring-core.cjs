@@ -1,6 +1,7 @@
 'use strict';
 const C=require('./core.cjs'),Fault=require('./engine/fault.cjs'),{createEngine}=require('./engine/index.cjs');
 const EventStaff=require('./event-staff-core.cjs');
+const PassReturn=require('./engine/pass-return.cjs').BXHPassReturn;
 const POINTS=Object.freeze({spin:1,knockout:2,burst:2,extreme:3});
 const fail=reason=>{throw Object.assign(new Error(reason),{seatCode:reason});};
 function communitySupport(room,user,uid,authority={}){
@@ -36,6 +37,7 @@ function perform({room,state,user,uid,d,now,authority={}},propagate){
  if(d.playerAId!==m.a?.playerId||d.playerBId!==m.b?.playerId||!m.a?.playerId||!m.b?.playerId||m.isBye)fail('player-mismatch');
  // A deferred PASS cannot be completed through quick judgement or restarted early.
  if(m.callPass?.waitFor?.some(id=>!state.matches.find(x=>x.id===id)?.completed))fail('pass-protected');
+ if(m.skippedAt&&PassReturn.supported(state))fail(PassReturn.readiness(state,m).ok?'pass-awaiting-dispatch':'pass-protected');
  m.scoringMode=m.scoringMode||state.meta.roundScoringModes?.[m.bracket+':'+m.round]||state.meta.scoringMode||'standard';
  const identity={uid,name:String(user.realName||user.gameId||user.displayName||'裁判').slice(0,80)},engine=createEngine(state,identity,now,d.operationId),action=d.action;
  if(action==='correct'){
@@ -84,7 +86,7 @@ function perform({room,state,user,uid,d,now,authority={}},propagate){
 function publicProjection(state,previous){
  const mirror=JSON.parse(JSON.stringify(previous));
  mirror.meta={...mirror.meta,stations:state.meta.stations};
- mirror.matches=state.matches.map(m=>({id:m.id,seq:m.seq??null,bracket:m.bracket||null,round:m.round??0,indexInRound:m.indexInRound??0,station:m.station??null,a:m.a?{playerId:m.a.playerId}:null,b:m.b?{playerId:m.b.playerId}:null,isBye:!!m.isBye,scoreA:m.scoreA??null,scoreB:m.scoreB??null,log:m.log||[],winnerId:m.winnerId||null,loserId:m.loserId||null,completed:!!m.completed,resultMethod:m.resultMethod||null,completedAt:m.completedAt||null,confirmedAt:m.confirmedAt||null,status:m.status||'pending',skippedAt:m.skippedAt||null,callPass:m.callPass||null,skipWaitFor:m.skipWaitFor||[],skipManualOnly:m.skipManualOnly===true,resumeQueuedAt:m.resumeQueuedAt||null}));
+ mirror.matches=state.matches.map(m=>({id:m.id,seq:m.seq??null,bracket:m.bracket||null,round:m.round??0,indexInRound:m.indexInRound??0,station:m.station??null,a:m.a?{playerId:m.a.playerId}:null,b:m.b?{playerId:m.b.playerId}:null,isBye:!!m.isBye,scoreA:m.scoreA??null,scoreB:m.scoreB??null,log:m.log||[],winnerId:m.winnerId||null,loserId:m.loserId||null,completed:!!m.completed,resultMethod:m.resultMethod||null,completedAt:m.completedAt||null,confirmedAt:m.confirmedAt||null,status:m.status||'pending',skippedAt:m.skippedAt||null,callPass:m.callPass||null,skipWaitFor:m.skipWaitFor||[],skipManualOnly:m.skipManualOnly===true,resumeQueuedAt:m.resumeQueuedAt||null,passReturn:m.passReturn?{version:1,originStation:m.passReturn.originStation,status:m.passReturn.status,skippedAt:m.passReturn.skippedAt,readyAt:m.passReturn.readyAt||null,assignedAt:m.passReturn.assignedAt||null,assignedStation:m.passReturn.assignedStation||null,requestedStation:m.passReturn.requestedStation||null,waitFor:m.passReturn.waitFor||[]}:null}));
  mirror.courtAssignments=Object.fromEntries(Object.entries(state.courtAssignments||{}).map(([key,c])=>[key,{currentMatchId:c.currentMatchId||null,nextMatchId:c.nextMatchId||null,status:c.status||'idle'}]));
  mirror.forcedCourtExits=Object.fromEntries(Object.entries(state.forcedCourtExits||{}).map(([n,c])=>[n,{closed:!!c.closed,revision:Number(c.revision||0),at:c.at||null,reopenedAt:c.reopenedAt||null,matchId:c.matchId||null}]));
  mirror.callRevision=Number(state.callRevision||0);mirror.courtLifecycleEpoch=Number(state.courtLifecycleEpoch||0);

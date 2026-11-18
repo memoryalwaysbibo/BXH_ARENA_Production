@@ -6360,7 +6360,7 @@ function beginRefereeUpload(m){
 function finishRefereeUpload(entry,result){
   if(!entry||refereeUploads.get(entry.key)!==entry)return;
   clearTimeout(entry.timer);entry.pending=false;
-  const definite=new Set(["station-not-assigned","station-mismatch","seat-stale","score-stale","dispatch-stale","already-completed","invalid-score","invalid-request","not-found","not-started","nothing-to-undo","permission-denied","fault-state-stale"]);
+  const definite=new Set(["station-not-assigned","station-mismatch","seat-stale","score-stale","dispatch-stale","already-completed","invalid-score","invalid-request","not-found","not-started","nothing-to-undo","permission-denied","fault-state-stale","no-pass-alternative","pass-awaiting-dispatch","pass-protected"]);
   entry.phase=result===true||result?.ok===true?"saved":definite.has(result?.reason)?"failed":"unknown";
   if(entry.current())render();
   // Clear success only. Errors remain visible until a new operation or navigation.
@@ -6372,6 +6372,7 @@ async function executeRefereeSeatCommand(matchId,command){
   if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再操作。",true);return false;}
   const code=state.cloudCode,actorUid=currentAuthUid(),roomId=state.id,m=getMatch(matchId);
   if(!code||!m||!canUseRefereeSeatCommands()||!requireStationPermission(m))return false;
+  if(command.action==="skip"&&window.BXHPassReturn?.supported(state)&&!window.BXHPassReturn.predecessors(state,m).length){showToast("本輪沒有其他可延後場次，請使用暫停比賽。",true);return false;}
   if(typeof navigator!=="undefined"&&navigator.onLine===false){showToast("三席裁判計分需要連線確認；本次操作尚未送出，請連線後重試。",true);return false;}
   const key=code+":"+actorUid+":"+matchId;if(refereeSeatCommandBusy.has(key))return false;
   refereeSeatCommandBusy.add(key);
@@ -6386,7 +6387,7 @@ async function executeRefereeSeatCommand(matchId,command){
     if(state.id!==roomId||state.cloudCode!==code||currentAuthUid()!==actorUid)return false;
     if(!result?.ok){
       const reason=result?.reason||"cloud-unavailable";
-      showToast(({"seat-stale":"裁判席位已變更，請確認權限後再操作。","seat-command-required":"請使用最新版裁判台送分。","release-not-ready":"後端計分服務尚未開放。","not-started":"賽事尚未正式開始。","nothing-to-undo":"目前沒有可撤銷的紀錄。"})[reason]||stationMutationErrorMessage(reason),true);
+      showToast(({"seat-stale":"裁判席位已變更，請確認權限後再操作。","seat-command-required":"請使用最新版裁判台送分。","release-not-ready":"後端計分服務尚未開放。","not-started":"賽事尚未正式開始。","nothing-to-undo":"目前沒有可撤銷的紀錄。","no-pass-alternative":"本輪沒有其他可延後場次，請使用暫停比賽。"})[reason]||stationMutationErrorMessage(reason),true);
       const fresh=await window.cloudSync?.joinRoom?.(code);
       if(state.id===roomId&&currentAuthUid()===actorUid&&fresh?.ok&&fresh.data)applyRemoteState(fresh.data,true);
       return false;
@@ -6424,7 +6425,7 @@ async function executeRefereeDispatchCommand(command){
     const result=await window.cloudSync?.commitRefereeCommand?.(request);
     if(state.id!==roomId||currentAuthUid()!==actorUid)return false;
     if(!result?.ok){
-      showToast(({"pass-protected":"PASS 回補及前置場次尚未完成，暫時不能移台或退場。","target-has-play-data":"目標台已有比分或失誤紀錄，不能覆蓋目前場次。","seat-stale":"裁判席位已變更，請確認後重新操作。","unsupported-resize-settings":"請先單獨調整台數，再儲存其他賽事設定。"})[result?.reason]||stationMutationErrorMessage(result?.reason||"cloud-unavailable"),true);
+      showToast(({"pass-protected":"PASS 回補及前置場次尚未完成，暫時不能移台或退場。","pass-waiting":"PASS 前置場次尚未完成。","offline-pending":"原裝置有離線資料待同步，暫不可移台。","target-has-play-data":"目標台已有比分或失誤紀錄，不能覆蓋目前場次。","seat-stale":"裁判席位已變更，請確認後重新操作。","unsupported-resize-settings":"請先單獨調整台數，再儲存其他賽事設定。"})[result?.reason]||stationMutationErrorMessage(result?.reason||"cloud-unavailable"),true);
       const fresh=await window.cloudSync?.joinRoom?.(code);if(state.id===roomId&&currentAuthUid()===actorUid&&fresh?.ok&&fresh.data)applyRemoteState(fresh.data,true);
       return false;
     }
@@ -7755,8 +7756,13 @@ function pauseMatchStatus(matchId){
 function markMatchSkipped(matchId){
   const m=getMatch(matchId);
   const queue=stationExecutionQueue(m.station);
-  m.skipWaitFor=queue.filter(x=>x.id!==matchId&&!x.skippedAt).slice(0,2).map(x=>x.id);
-  m.skipManualOnly=m.skipWaitFor.length===0;
+  if(window.BXHPassReturn?.supported(state)){
+    const planned=window.BXHPassReturn.create(state,m,Date.now());
+    if(!planned.ok)throw Object.assign(new Error(planned.reason),{seatCode:planned.reason});
+  }else{
+    m.skipWaitFor=queue.filter(x=>x.id!==matchId&&!x.skippedAt).slice(0,2).map(x=>x.id);
+    m.skipManualOnly=m.skipWaitFor.length===0;
+  }
   m.status="pending"; m.skippedAt=Date.now(); m.resumeQueuedAt=null;
   m.dispatchRevision=Number(m.dispatchRevision||0)+1;
   m.updatedAt=Date.now();
@@ -7765,6 +7771,8 @@ function markMatchSkipped(matchId){
 }
 async function skipMatch(matchId){
   if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeSeatCommand(matchId,{action:"skip"});
+  const current=getMatch(matchId);
+  if(window.BXHPassReturn?.supported(state)&&current&&!window.BXHPassReturn.predecessors(state,current).length){showToast("本輪沒有其他可延後場次，請使用暫停比賽。",true);return;}
   if(!canOperateCurrentTournament() || !requireTournamentStartedForMatchAction()) return;
   const m=getMatch(matchId);
   if(!m || m.completed || !requireStationPermission(m)) return;
@@ -7806,6 +7814,12 @@ async function runCourtQueueAction(matchId,station,options,mutateFn,message){
   }finally{courtQueueBusy=false;renderPreservingScroll();}
 }
 function applySkippedDispatch(remote,m,target,expectedRevision){
+  if(window.BXHPassReturn?.supported(remote)&&m?.skippedAt){
+    if(Number(m.dispatchRevision||0)!==expectedRevision)return {ok:false,reason:"dispatch-stale"};
+    const result=window.BXHPassReturn.request(remote,m,target,Date.now(),n=>window.BXHCourtRetirement.accepts(remote,n),x=>singleElimDispatchBlocked(x,remote.matches,remote.meta));
+    if(result.ok)rebuildPropagationForState(remote);
+    return result;
+  }
   if(callPassProtected(remote,m))return {ok:false,reason:"dispatch-stale"};
   if(!m || m.completed || !m.skippedAt || m.resumeQueuedAt || !m.a || !m.b || (m.dispatchRevision||0)!==expectedRevision) return {ok:false,reason:"dispatch-stale"};
   if(!Number.isInteger(target)||target<1||target>(window.BXHCourtRetirement?window.BXHCourtRetirement.target(remote):Number(remote.meta.stations||1))) return {ok:false,reason:"station-mismatch"};
@@ -8138,7 +8152,7 @@ function stationExecutionQueue(stationNum){
     if(ap&&bp&&ap!==bp) return bp-ap;
     return Number(a.seq||0)-Number(b.seq||0);
   });
-  const skipped=available.filter(m=>m.skippedAt&&!m.resumeQueuedAt&&!m.skipManualOnly).sort((a,b)=>a.skippedAt-b.skippedAt || String(a.id).localeCompare(String(b.id)));
+  const skipped=available.filter(m=>m.skippedAt&&!m.resumeQueuedAt&&!m.skipManualOnly&&!m.passReturn).sort((a,b)=>a.skippedAt-b.skippedAt || String(a.id).localeCompare(String(b.id)));
   for(const m of skipped){
     if(!Array.isArray(m.skipWaitFor)) m.skipWaitFor=normal.slice(0,2).map(x=>x.id); // legacy rooms
   }
@@ -8196,6 +8210,9 @@ function rebuildCourtAssignments(authoritative=false){
     next[key] = existing[key] ? Object.assign({}, existing[key]) : { currentMatchId:null, nextMatchId:null, status:"idle", lockedBy:null, lockedAt:null, updatedAt:null };
   }
   state.courtAssignments = next;
+  if(authoritative&&window.BXHPassReturn)window.BXHPassReturn.reconcile(state,Date.now(),{
+    accepts:n=>window.BXHCourtRetirement.accepts(state,n),blocked:m=>singleElimDispatchBlocked(m,state.matches,state.meta)
+  });
 
   for(let i=1;i<=n;i++){
     const key = courtKey(i);
@@ -8250,6 +8267,7 @@ function rebuildCourtAssignments(authoritative=false){
           if(!current.startedAt) current.startedAt = Date.now();
           current.updatedAt = Date.now();
           current.dispatchPriorityAt = null;
+          window.BXHPassReturn?.started(current,Date.now());
           current.skippedAt = null; current.resumeQueuedAt=null; current.skipWaitFor=[]; current.skipManualOnly=false;
         }else{
           // 產生對戰表／預排裁判台不等於開賽。未按「開始賽事」前只能保持預備狀態。
@@ -8261,6 +8279,7 @@ function rebuildCourtAssignments(authoritative=false){
     // Preassigned first matches must become live when the tournament starts.
     if(current && state.startedAt && ["pending","ready"].includes(current.status)){
       current.status="in_progress";current.startedAt=current.startedAt||Date.now();current.updatedAt=Date.now();
+      if(current.skippedAt&&current.resumeQueuedAt){window.BXHPassReturn?.started(current,Date.now());current.skippedAt=null;current.resumeQueuedAt=null;current.skipWaitFor=[];current.skipManualOnly=false;}
     }
     const remaining = queue.filter(m=>m.id!==court.currentMatchId);
     // Single elimination forecasts follow queue order too. Other formats
@@ -12146,11 +12165,14 @@ function canCourtSwapTarget(m,sourceMatch,st=state){
 // court's current match can be underway before its first score is entered.
 function idleCourtCandidates(st,stationNum){
   if(window.BXHCourtRetirement&&!window.BXHCourtRetirement.accepts(st,stationNum))return [];
+  if(st.courtAssignments?.[courtKey(stationNum)]?.status==="paused")return [];
   if(!window.BXHCourtRetirement?.movableQueuedMatches)return [];
-  const movable=new Set(window.BXHCourtRetirement.movableQueuedMatches(st).map(m=>m.id));
+  const sequential=(st.meta?.formatType||"single")==="single";
+  const routing=sequential?{...st,courtAssignments:Object.fromEntries(Object.entries(st.courtAssignments||{}).map(([k,c])=>[k,{...c,nextMatchId:null}]))}:st;
+  const movable=new Set(window.BXHCourtRetirement.movableQueuedMatches(routing).map(m=>m.id));
   const courts=st.courtAssignments||{};
   const busy=new Set(Object.values(courts).map(c=>c&&c.currentMatchId).filter(Boolean));
-  return (st.matches||[]).filter(m=>m&&movable.has(m.id)&&Number(m.station)!==Number(stationNum)&&!busy.has(m.id)&&
+  return (st.matches||[]).filter(m=>m&&movable.has(m.id)&&(!sequential||!m.dispatchPriorityAt)&&(sequential||Number(m.station)!==Number(stationNum))&&!busy.has(m.id)&&
     !m.isBye&&!m.completed&&m.a&&m.b&&!m.skippedAt&&!m.callPass&&
     !matchHasDecisionData(m)&&["pending","ready"].includes(m.status||"pending")&&
     !singleElimDispatchBlocked(m,st.matches,st.meta))
@@ -12158,7 +12180,7 @@ function idleCourtCandidates(st,stationNum){
 }
 function applyIdleCourtClaim(st,matchId,stationNum){
   const court=st.courtAssignments&&st.courtAssignments[courtKey(stationNum)];
-  if(!court||court.currentMatchId) return {ok:false,reason:"court-no-longer-idle"};
+  if(!court||court.status==="paused"||court.currentMatchId&&!window.BXHPassReturn?.idle(st,stationNum)) return {ok:false,reason:"court-no-longer-idle"};
   const match=idleCourtCandidates(st,stationNum).find(m=>m.id===matchId);
   if(!match) return {ok:false,reason:"match-no-longer-available"};
   const now=Date.now();
@@ -12461,7 +12483,7 @@ function renderCourtCard(stationNum){
     return `<div class="panel court-card court-card-idle referee-workstation referee-workstation-waiting" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
       ${refereeWorkstationHeader(null,stationNum)}
       <div class="empty-state"><div class="big">${canReceiveSkipped ? "本台閒置，可承接跳過場次" : stationHasFutureWork ? "等待晉級結果" : "本台賽程已完成"}</div>${canReceiveSkipped?'<div>請至上方「待承接場次」選擇安排。</div>':''}</div>
-      ${claimButtons?`<div class="msc-btns" style="padding:0 16px 16px;display:flex;flex-wrap:wrap;gap:8px">${claimButtons}</div>`:""}
+      ${claimButtons&&(!window.BXHPassReturnUI||!window.BXHPassReturn?.supported(state))?`<div class="msc-btns" style="padding:0 16px 16px;display:flex;flex-wrap:wrap;gap:8px">${claimButtons}</div>`:""}
       ${refereeWaitingControls(stationNum)}
     </div>`;
   }
@@ -12470,7 +12492,7 @@ function renderCourtCard(stationNum){
     return `<div class="panel court-card court-card-idle referee-workstation referee-workstation-waiting" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
       ${refereeWorkstationHeader(m,stationNum)}${renderCourtCallReferee(m)}
       ${liveNextMatchCardHtml(court, stationNum)}
-      <div class="empty-state"><div class="big">此對戰尚未確定選手</div><div>請等待前面輪次的比賽完成</div></div>
+      <div class="empty-state"><div class="big">此對戰尚未確定選手</div><div>請等待前面輪次的比賽完成</div></div>${refereeWaitingControls(stationNum)}
     </div>`;
   }
 
@@ -12566,6 +12588,12 @@ function renderRefereeScorePanel(match,stationNum){
 
 
 function renderSkippedMatches(){
+  if(window.BXHPassReturn?.supported(state)&&window.BXHPassReturnUI)return window.BXHPassReturnUI.skipped(state,{
+    canOperate:canOperateStation,name:playerName,label:displayMatchLabel,now:Date.now(),busy:courtQueueBusy,
+    canManage:canOperateCurrentTournament()&&state.archiveStatus!=="completed",
+    courtCount:window.BXHCourtRetirement.target(state),accepts:n=>window.BXHCourtRetirement.accepts(state,n),
+    blocked:m=>singleElimDispatchBlocked(m,state.matches,state.meta)
+  });
   const skipped=refereeMatches().filter(m=>!m.completed&&m.skippedAt&&m.a&&m.b);
   if(!skipped.length) return "";
   const targets=Array.from({length:window.BXHCourtRetirement?window.BXHCourtRetirement.target(state):Math.max(1,state.meta.stations||1)},(_,i)=>i+1).filter(i=>canOperateStation(i));
@@ -12658,7 +12686,11 @@ function renderCourtRetirementPanel(){
   return `<section class="panel"><div class="panel-title">安全退場｜目標保留 ${p.targetCount} 台</div><div class="hint">保留台照常運作。退場狀態與場次保存在賽事資料中，重新開啟可接續。</div>${rows}</section>`;
 }
 function refereeWaitingControls(stationNum){
-  return renderRefereeScorePanel(null,stationNum);
+  const tools=window.BXHPassReturnUI?.idle(state,stationNum,{
+    canOperate:canOperateStation,candidates:n=>idleCourtCandidates(state,n),name:playerName,label:displayMatchLabel,
+    blocked:m=>singleElimDispatchBlocked(m,state.matches,state.meta)
+  })||"";
+  return tools+renderRefereeScorePanel(null,stationNum);
 }
 function renderWaitingRefereeCourt(stationNum){
   const seatsEnabled=state.meta?.refereeSeatsV1?.version===1;
