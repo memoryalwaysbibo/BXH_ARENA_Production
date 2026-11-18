@@ -41,7 +41,7 @@ function roomDocuments({input,capacity,owner,grant,roomId,now}){
   privateRoom:{...common,createdBy:owner,ownerUid:owner,partnerOrganizationCode:grant.organizationId,
    partnerContractOrderCode:grant.order,ticketAccessV1,registrationQueueVersion:2,
    data:JSON.stringify({...state,ownerUid:owner,createdBy:owner,createdByRole:common.createdByRole})},
-  publicRoom:{...common,ticketRoomVersion:1,bracketView:JSON.stringify(state)}
+  publicRoom:{...common,ticketRoomVersion:1,registrationQueueVersion:2,bracketView:JSON.stringify(state)}
  };
 }
 
