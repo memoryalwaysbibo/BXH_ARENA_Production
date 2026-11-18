@@ -16,3 +16,13 @@ test('test bootstrap refuses non-loopback execution before touching any SDK',()=
 test('adapter refuses source drift that could bypass pinned project, rollout or emulator connections',()=>{
  for(const anchor of ['const FOUR_COURT_CLIENT_ROLLOUT = true;','FIREBASE_CONFIG.projectId === "bxh-arena"','dbHandle = fsMod.getFirestore(app);','functionsHandle = functionsMod.getFunctions(app,"asia-east1");','new mod.ReCaptchaEnterpriseProvider(ARENA_APP_CHECK_SITE_KEY)'])assert.throws(()=>build(source.replace(anchor,'/* source changed */')),/source anchor changed/);
 });
+
+test('every full-page schema/court fixture passes the unmodified shipped six-character room validator',()=>{
+ const {pageFixtureCode}=require('./full-page-source.cjs'),B=require('../../referee-seats/functions/bucket-state.cjs');
+ const context={window:{}};vm.runInNewContext(fs.readFileSync(path.resolve(__dirname,'../../modules/main-app/tournament-entry-utils.js'),'utf8'),context);
+ const valid=context.window.BXHTournamentEntryUtils.isValidRoomCode;
+ const codes=[6,12].flatMap(count=>[B.schema,B.perCourtSchema].map(schema=>pageFixtureCode(count,schema)));
+ assert.equal(new Set(codes).size,4);for(const code of codes)assert.equal(valid(code),true,code);
+ assert.equal(valid('BXH-PAGE6'),false);assert.equal(valid('BXH-PAGE6V2'),false);
+ assert.throws(()=>pageFixtureCode(7,B.schema),/invalid full-page fixture/);
+});

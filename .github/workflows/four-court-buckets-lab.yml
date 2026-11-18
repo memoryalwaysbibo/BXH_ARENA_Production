@@ -119,10 +119,11 @@ jobs:
           GCLOUD_PROJECT: demo-bxh-four-court-buckets
         run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore,auth --project demo-bxh-four-court-buckets --config referee-seats/firebase.buckets-auth-lab.json 'node tests/four-court-buckets/auth-browser-emulator.cjs'
       - name: Prepare isolated Callable source package
+        id: prepare_callable_lab
         env:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules
           GCLOUD_PROJECT: demo-bxh-four-court-buckets
-        run: node tests/four-court-buckets/prepare-callable-lab.cjs
+        run: node tests/four-court-buckets/prepare_callable_lab.cjs
       - name: Verify native Callable protocol and explicitly enabled frontend session
         env:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules
@@ -135,6 +136,7 @@ jobs:
           GCLOUD_PROJECT: demo-bxh-four-court-buckets
         run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore,auth,functions --project demo-bxh-four-court-buckets --config referee-seats/firebase.buckets-callable-lab.json 'node tests/four-court-buckets/full-page-emulator.cjs'
       - name: Verify automatic public projection from real Firestore events
+        if: ${{ !cancelled() && steps.prepare_callable_lab.outcome == 'success' }}
         env:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules
           GCLOUD_PROJECT: demo-bxh-four-court-buckets

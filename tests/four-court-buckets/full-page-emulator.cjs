@@ -31,7 +31,9 @@ const server=http.createServer((req,res)=>{
    await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
    await page.goto('http://127.0.0.1:'+server.address().port+'/');
    await page.waitForFunction(()=>window.cloudAuth?.isReady()&&typeof defaultState==='function'&&typeof processAuthStateChange==='function');
-   const code='BXH-PAGE'+count+(storageSchema===B.perCourtSchema?'V2':''),f=fixture(code,count,false),defaults=await page.evaluate(id=>defaultState(id),f.state.id);
+   const code=adapter.pageFixtureCode(count,storageSchema);report.activeCase={code,courts:count,schema:storageSchema};
+   assert.equal(await page.evaluate(code=>window.BXHTournamentEntryUtils.isValidRoomCode(code),code),true,'fixture rejected by shipped room-code validator');
+   const f=fixture(code,count,false),defaults=await page.evaluate(id=>defaultState(id),f.state.id);
    f.state={...defaults,...f.state,meta:{...defaults.meta,...f.state.meta,name:'完整頁分桶 '+count+' 台'},courtAssignments:Object.fromEntries(f.state.matches.map(m=>['court'+m.station,{currentMatchId:m.id,nextMatchId:null,status:'in_progress'}]))};
    f.room.scoreStorage=B.makeManifest(f.state,'full-page-epoch-'+code,storageSchema);
    f.room.data=JSON.stringify(f.state);await db.doc('tournaments/'+code).set(f.room);await db.doc('publicTournaments/'+code).set({bracketView:JSON.stringify(f.state),updatedAt:1});for(const bucket of B.encode(f.state,f.room.scoreStorage))await db.doc('tournaments/'+code+'/matchBuckets/'+bucket.bucketId).set(bucket);
@@ -39,7 +41,7 @@ const server=http.createServer((req,res)=>{
    // entire app's existing onAuthStateChanged/profile flow performs routing.
    assert.equal((await page.evaluate(()=>cloudAuth.signIn('ref1@full-page.invalid','Emulator-only-pass-2026'))).ok,true);
    await page.waitForFunction(()=>currentAuthUid()==='ref1'&&currentRole==='admin'&&userProfile?.role==='staff'&&appPhase==='app');
-   assert.equal((await page.evaluate(code=>resolveAndJoinTournamentByCode(code,{forcePrivate:true}),code)).ok,true);
+   const joined=await page.evaluate(code=>resolveAndJoinTournamentByCode(code,{forcePrivate:true}),code);assert.equal(joined.ok,true,JSON.stringify(joined));
    await page.waitForFunction(count=>state.matches.length===count&&cloudSync.bucketView(state.cloudCode)?.status==='ready',count);
    await page.locator('[data-action="switch-tab"][data-tab="referee"]').first().click();
    const button=page.locator('[data-action="score"][data-id="m1"][data-side="A"][data-type="spin"]');await button.waitFor();assert.equal(await button.isEnabled(),true);
@@ -81,7 +83,7 @@ const server=http.createServer((req,res)=>{
    assert.equal(await page.evaluate(()=>state.matches.find(m=>m.id==='m1').station),0);assert.equal(await page.evaluate(()=>state.matches.find(m=>m.id==='m1').scoreA),2);assert.equal(await page.locator('#court-card-1 [data-action="score"]').count(),0);
    assert.equal(JSON.parse((await db.doc('tournaments/'+code).get()).data().data).matches.find(m=>m.id==='m1').scoreA,2);
    assert.equal((await page.evaluate(()=>cloudAuth.signIn('host@full-page.invalid','Emulator-only-pass-2026'))).ok,true);await page.waitForFunction(()=>currentAuthUid()==='host'&&userProfile?.role==='staff'&&appPhase==='app');
-   assert.equal((await page.evaluate(code=>resolveAndJoinTournamentByCode(code,{forcePrivate:true}),code)).ok,true);await page.waitForFunction(()=>cloudSync.bucketView(state.cloudCode)?.status==='ready'&&state.createdBy==='host');await page.locator('[data-action="switch-tab"][data-tab="referee"]').first().click();
+   const hostJoined=await page.evaluate(code=>resolveAndJoinTournamentByCode(code,{forcePrivate:true}),code);assert.equal(hostJoined.ok,true,JSON.stringify(hostJoined));await page.waitForFunction(()=>cloudSync.bucketView(state.cloudCode)?.status==='ready'&&state.createdBy==='host');await page.locator('[data-action="switch-tab"][data-tab="referee"]').first().click();
    await page.locator('#court-card-1 .ref-court-maintenance summary').click();await page.locator('[data-action="court-force-reopen"][data-station="1"]').click();await page.locator('[data-action="modal-confirm"]').click();await page.waitForFunction(()=>state.forcedCourtExits?.[1]?.closed===false&&cloudSync.bucketView(state.cloudCode)?.pending.length===0);
    await page.locator('[data-action="court-force-claim"][data-id="m1"][data-station="5"]').click();await page.locator('[data-action="modal-confirm"]').click();await page.waitForFunction(()=>state.matches.find(m=>m.id==='m1').station===5&&cloudSync.bucketView(state.cloudCode)?.pending.length===0);
    assert.equal(await page.evaluate(()=>state.matches.find(m=>m.id==='m1').scoreA),2);assert.equal(await page.evaluate(()=>state.matches.find(m=>m.id==='m1').log.length),2);
@@ -100,7 +102,7 @@ const server=http.createServer((req,res)=>{
    await db.doc('users/host').update({active:false});await page.waitForFunction(()=>cloudStatus==='error'&&state.matches.length===0);assert.equal(await page.locator('[data-action="score"]').count(),0);await db.doc('users/host').update({active:true});
    assert.deepEqual(errors,[],'uncaught full-page errors');report.cases.push({schema:storageSchema,courts:count,buckets:f.room.scoreStorage.bucketCount,refereePassButton:true,passLostReplyNoDuplicate:true,fullPageBoot:true,realAuthRouting:true,composedJoin:true,realScoreButton:true,reconnectButton:true,sameOperationRetryButton:true,noDuplicateScore:true,forceExitWithAck:true,dispatchLostReplySameOperation:true,detachedScorePreserved:true,verifiedCreatorHydrated:true,hostReopenAndCrossBucketClaimButtons:true,rootAndPublicUnchangedForScoring:true,legacyCallableCalls:0,revocationClearsPage:true,uncaughtPageErrors:0});await context.close();page=null;
   }
-  assert.deepEqual([...missing].filter(p=>/\.(js|css)$/.test(p)),[],'full page required asset missing');report.missingLocalAssets=[...missing];fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2)+'\n');console.log('PASS full ARENA page: '+JSON.stringify(report));
- }catch(error){if(page){await page.screenshot({path:path.join(out,'failure.png'),fullPage:true}).catch(()=>{});const diagnostic={message:error.message,missing:[...missing],page:await page.evaluate(()=>({text:document.body.innerText.slice(-6000),phase:typeof appPhase==='undefined'?null:appPhase,role:typeof currentRole==='undefined'?null:currentRole})).catch(()=>null)};fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify(diagnostic,null,2));console.error('full-page diagnostic '+JSON.stringify(diagnostic));}throw error;}
+  assert.deepEqual([...missing].filter(p=>/\.(js|css)$/.test(p)),[],'full page required asset missing');delete report.activeCase;report.missingLocalAssets=[...missing];fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2)+'\n');console.log('PASS full ARENA page: '+JSON.stringify(report));
+ }catch(error){if(page){await page.screenshot({path:path.join(out,'failure.png'),fullPage:true}).catch(()=>{});const diagnostic={message:error.message,activeCase:report.activeCase,missing:[...missing],page:await page.evaluate(()=>({text:document.body.innerText.slice(-6000),phase:typeof appPhase==='undefined'?null:appPhase,role:typeof currentRole==='undefined'?null:currentRole})).catch(()=>null)};fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify(diagnostic,null,2));console.error('full-page diagnostic '+JSON.stringify(diagnostic));}throw error;}
  finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));await deleteApp(app);}
 })().catch(error=>{console.error(error);process.exitCode=1;});
