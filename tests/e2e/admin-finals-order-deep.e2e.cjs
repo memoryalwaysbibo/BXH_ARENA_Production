@@ -77,7 +77,12 @@ test('official single elimination enforces bronze before championship final', as
   await expect(page.locator('#f-bronze')).toBeVisible({timeout:20000});
   await page.locator('#f-name').fill('E2E 季殿順序驗證');
   await page.locator('#f-bronze').check();
+  // New official drafts use online registration. Supply its required capacity
+  // before saving, rather than continuing with an unsaved bronze-match setting.
+  await expect(page.locator('#reg-capacity')).toBeVisible();
+  await page.locator('#reg-capacity').fill('4');
   await page.locator('[data-action="save-meta"]').click();
+  await page.waitForFunction(()=>state.meta.bronzeMatch===true&&state.meta.registrationEnabled===true&&state.meta.registrationCapacity===4);
 
   await page.locator('[data-action="switch-tab"][data-tab="people"]').click();
   await page.locator('[data-action="people-section"][data-section="tools"]').click();
