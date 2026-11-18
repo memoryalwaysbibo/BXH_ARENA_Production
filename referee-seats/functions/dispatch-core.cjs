@@ -1,6 +1,7 @@
 'use strict';
 const C=require('./core.cjs'),S=require('./scoring-core.cjs'),{createEngine}=require('./engine/index.cjs');
 const R=require('./engine/court-retirement.cjs').BXHCourtRetirement,{matchHasDecisionData}=require('./engine/match-utils.cjs');
+const PassReturn=require('./engine/pass-return.cjs').BXHPassReturn;
 const ACTIONS=new Set(['idle-claim','claim-skipped','manual-assign','swap','force-exit','reopen','claim-detached','retirement-transfer','resize']);
 const fail=reason=>{throw Object.assign(new Error(reason),{seatCode:reason});};
 function authorizationStation(d){return ['idle-claim','claim-skipped','claim-detached','retirement-transfer','manual-assign'].includes(d.action)?Number(d.targetStation):Number(d.station);}
@@ -37,7 +38,7 @@ function transition({room,state,user,uid,d,now,authority={}}){
  }else{
   if(!state.startedAt)fail('not-started');
   matchVersion(m);if(Number(m.station)!==station)fail('station-mismatch');
-  if(protectedPass(state,m))fail('pass-protected');
+  if(protectedPass(state,m)&&!(action==='claim-skipped'&&PassReturn.supported(state)&&PassReturn.readiness(state,m).ok))fail('pass-protected');
   if(action==='swap'){
    permission(station);const target=state.matches.find(x=>x.id===d.targetMatchId);matchVersion(target,true);permission(Number(target.station));
    if(protectedPass(state,target))fail('pass-protected');

@@ -31,6 +31,7 @@ const suites = {
     { name: 'Core module exports, shared state, and stale callback guards', args: ['--test', 'tests/module-seam-contracts.test.cjs'] },
     { name: 'public lobby ordering utility and Core seam', args: ['--test', 'tests/lobby-ordering.test.cjs'] },
     { name: 'round dispatch waits until every earlier match has started', args: ['--test', 'tests/round-dispatch-gate.test.cjs'] },
+    { name: 'PASS automatic return and idle controls', args: ['--test', 'tests/pass-return.test.cjs', 'tests/pass-return-ui.test.cjs'] },
     { name: 'same-round sequential automatic dispatch', args: ['--test', 'tests/sequential-court-dispatch.test.cjs'] },
     { name: 'idle court dispatch', args: ['tests/idle-court-dispatch.test.cjs'] },
     { name: 'safe court expansion, reserved queues and transaction retry fences', args: ['--test', 'tests/court-expansion.test.cjs', 'tests/court-retirement.test.cjs'] },

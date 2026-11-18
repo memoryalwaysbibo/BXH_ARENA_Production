@@ -58,6 +58,13 @@ def build():
     files = dict(original)
     for name in (*OVERLAYS, *ADDITIONS):
         files[name] = (ROOT / 'referee-seats/functions' / name).read_bytes()
+        if name == 'dispatch-core.cjs':
+            # This frozen authorization candidate deliberately preserves its
+            # captured engine. PASS return ships separately with a matching engine.
+            text = files[name].decode()
+            text = text.replace("const PassReturn=require('./engine/pass-return.cjs').BXHPassReturn;\n", '')
+            text = text.replace("if(protectedPass(state,m)&&!(action==='claim-skipped'&&PassReturn.supported(state)&&PassReturn.readiness(state,m).ok))fail('pass-protected');", "if(protectedPass(state,m))fail('pass-protected');")
+            files[name] = text.encode()
     files['scoring-core.cjs'] = community_scoring(original['scoring-core.cjs'].decode(),
                                                (ROOT / 'referee-seats/functions/scoring-core.cjs').read_text()).encode()
     changed = sorted(name for name in files if name not in original or files[name] != original[name])

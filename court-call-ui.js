@@ -407,6 +407,7 @@ function renderCourtCallReferee(m){
      <div><b>目前場次｜${esc(displayMatchLabel(m)||matchLabel(m))}</b><p class="hint">正式叫號後，選手可回覆 OK／PASS。</p></div>
      <button class="btn btn-primary" data-action="court-call-notify" data-code="${esc(c.code)}" data-match="${esc(m.id)}" ${c.busy||c.pending?'disabled':''}>通知雙方選手上場</button>
    </div>
+   ${window.BXHPassReturnUI?.notice(state,m,c.busy||c.pending)||""}
    ${renderCourtCallNextPrepare(m,c)}
    ${courtCallCommon(c)}
    ${c.rows.filter(r=>r.isReferee&&r.station===m.station).map(r=>courtCallRow(c,r,true)).join('')}
@@ -840,6 +841,8 @@ async function handleCourtCall(action,target){
   if(reason)payload.reason=reason;
  }
  const storageKey=c.storageKey;
+ const notifiedMatch=typeof state!=="undefined"&&state.cloudCode===code?getMatch(payload.matchId):null;
+ const notifiedVersion=notifiedMatch?{id:notifiedMatch.id,station:notifiedMatch.station,dispatchRevision:notifiedMatch.dispatchRevision}:null;
  try{
   sessionStorage.setItem(storageKey,JSON.stringify(payload));c.pending=payload;c.busy=true;c.error='';
   syncCourtCallGlobalOverlay();
@@ -855,7 +858,11 @@ async function handleCourtCall(action,target){
   if(r.state&&typeof state!=='undefined'&&state.cloudCode===code)applyRemoteState(r.state,true);
   c.busy=false;
   await loadCourtCalls(code);
-  if(payload.action==='notify')showToast('叫號已送出雙方選手');
+  if(payload.action==='notify'){
+   const current=typeof state!=='undefined'&&state.cloudCode===code?getMatch(payload.matchId):null;
+   if(current&&notifiedVersion&&Number(current.station)===Number(notifiedVersion.station)&&Number(current.dispatchRevision||0)===Number(notifiedVersion.dispatchRevision||0))window.BXHPassReturnUI?.acknowledge(code,current);
+   showToast('叫號已送出雙方選手');
+  }
   else if(payload.action==='prepare')showToast('已提前通知下一場雙方選手準備');
   else if(requestedResponse==='pass'||payload.response==='pass')showToast('PASS 已接受，本場自動延後 1 場');
   else if(requestedResponse==='coming'||payload.response==='coming')showToast('已回覆裁判：正在前往');
@@ -879,7 +886,7 @@ async function handleCourtCall(action,target){
 function courtCallPublicQueue(s,station){
  const all=(s.matches||[]).filter(m=>!m.isBye&&!m.completed&&m.station===station&&m.a&&m.b&&m.status!=='paused').sort((a,b)=>Number(a.seq)-Number(b.seq));
  const result=all.filter(m=>!m.skippedAt);
- const skipped=all.filter(m=>m.skippedAt&&!m.resumeQueuedAt&&!m.skipManualOnly).sort((a,b)=>a.skippedAt-b.skippedAt||String(a.id).localeCompare(String(b.id)));
+ const skipped=all.filter(m=>m.skippedAt&&!m.resumeQueuedAt&&!m.skipManualOnly&&!m.passReturn).sort((a,b)=>a.skippedAt-b.skippedAt||String(a.id).localeCompare(String(b.id)));
  for(const m of skipped.slice().reverse()){
   const ids=m.skipWaitFor||[];
   if(m.callPass&&ids.some(id=>!s.matches.find(x=>x.id===id)?.completed&&!result.some(x=>x.id===id)))continue;
