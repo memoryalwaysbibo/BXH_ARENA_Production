@@ -112,7 +112,7 @@ function renderMailboxPage(){
   const c=mailboxContext(),messages=c.messages||[];
   const selectable=messages.filter(m=>m.deletable===true).length;
   const selected=c.deleteSelection.size,allSelected=selectable>0&&selectable===selected;
-  return `<section class="panel" data-mailbox-page><div class="panel-title"><span>✉️ 站內信</span><div class="btn-row">${isSuperAdmin()?`<button class="btn btn-primary btn-sm" data-action="mailbox-self-card-test" ${c.busy?"disabled":""}>🎴 發送測試卡給我</button>`:""}<button class="btn btn-ghost btn-sm" data-action="mailbox-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button><button class="btn btn-ghost btn-sm" data-action="mailbox-close">返回賽事大廳</button></div></div>
+  return `<section class="panel" data-mailbox-page><div class="panel-title"><span>✉️ 站內信</span><div class="btn-row">${isSuperAdmin()?`<button class="btn btn-primary btn-sm" data-action="mailbox-self-card-test" ${c.busy?"disabled":""}>🎴 發送測試卡給我</button>`:""}<button class="btn btn-ghost btn-sm" data-action="mailbox-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button><button class="btn btn-ghost btn-sm" data-action="mailbox-close">返回上一頁</button></div></div>
     <p class="hint">未讀 ${c.unreadCount} 封｜系統通知、活動及中獎訊息會集中在這裡。</p>
     ${c.canDelete&&(messages.length||c.deleting)?`<div class="btn-row">
       <button type="button" class="btn btn-ghost btn-sm" data-action="mailbox-delete-mode" ${c.busy?'disabled':''}>${c.deleting?'取消選擇':'選擇'}</button>
