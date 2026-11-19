@@ -2,6 +2,7 @@
 
 const {createHash}=require('node:crypto');
 const {ticketHostGrant,checkTicketContract}=require('./ticket-host.cjs');
+const {authorizeTicketRemoval}=require('./queue.cjs');
 
 const fields=new Set(['action','code','ticketId','operationId','name','location','stations',
  'registrationOpenAt','registrationCloseAt','startAt']);
@@ -119,8 +120,23 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
    if(!Array.isArray(state.players)||!Number.isSafeInteger(rosterRevision)||rosterRevision<0)throw Error('ticket-binding-invalid');
    const eligibleCount=state.players.filter(player=>!state.meta?.checkinRequired||player.checkedIn===true).length;
    return {ok:true,code,roomId:state.id,name:room.name,phase:room.tournamentPhase,startAt:room.startAt,
-    drawId:state.bracketDraw?.id??null,rosterRevision,eligibleCount};
+    drawId:state.bracketDraw?.id??null,drawReady:state.bracketDraw?.rosterRevision===rosterRevision,rosterRevision,eligibleCount,
+    participants:room.tournamentPhase==='waiting'?state.players.filter(player=>player.source==='online'&&player.registrationId)
+     .map(player=>({registrationId:player.registrationId,name:player.name})):[]};
   });
  };
 }
-module.exports={createTicketRoomHandler,createTicketRoomStateHandler};
+function createTicketRemoveHandler({db,queue,enabled,clock=Date.now}){
+ return async request=>{
+  if(!request.auth?.uid)throw Error('auth-required');
+  if(!request.app)throw Error('permission-denied');
+  const input=request.data;
+  if(input?.action!=='ticket-room-remove'||Object.keys(input).some(k=>!['action','code','operationId','registrationId'].includes(k))||
+     typeof input.registrationId!=='string'||!(/^[A-Za-z0-9_-]{1,128}$/).test(input.registrationId))throw Error('invalid-operation');
+  const {code,operationId,registrationId}=input;
+  if(!await enabled(code))throw Error('registration-queue-disabled');
+  return queue.enqueue(request.auth.uid,{code,operationId,route:'family',payload:{code,operationId,registrationId,
+   action:'cancel',intent:'ticket-host'}},(tx,user,operation,room)=>authorizeTicketRemoval(tx,db,user,operation,room,clock()));
+ };
+}
+module.exports={createTicketRoomHandler,createTicketRoomStateHandler,createTicketRemoveHandler};
