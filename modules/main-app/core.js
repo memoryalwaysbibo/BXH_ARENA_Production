@@ -21180,6 +21180,18 @@ function renderRefereeCourtView(app,html){
   return false;
 }
 
+let adminMailboxRefreshTimer=null;
+function ensureAdminMailboxRefresh(){
+  if(adminMailboxRefreshTimer)return;
+  adminMailboxRefreshTimer=setTimeout(()=>{
+    adminMailboxRefreshTimer=null;
+    if(appPhase==='app'&&isSuperAdmin()&&firebaseUser?.uid){
+      if(document.visibilityState!=='hidden')loadMailbox(true);
+      ensureAdminMailboxRefresh();
+    }
+  },120000);
+}
+
 function renderApp(){
   const app = document.getElementById("app");
   const allTabs = [["management","賽事管理"],["ladder","排行榜"],["live","即時戰況"],["bracket","對戰表"],["referee","裁判台"],["duty","我的執勤"],["registrations","報名管理"],["settings","賽事設定"],["people","人員管理"],["operations","抽獎與維護"],["history","賽事紀錄"],["version","版本更新"]];
@@ -21199,8 +21211,12 @@ function renderApp(){
   if((activeTab==='commerce-shop'||activeTab==='commerce-orders')&&!isPartnerOrganizerMode())activeTab='management';
   if(window.BXHTeamAdminPreview?.visible?.())tabs.push(["team-preview","戰隊"]);
   if(activeTab==='team-preview'&&!window.BXHTeamAdminPreview?.visible?.())activeTab='live';
+  const adminMail=mailboxContext();
+  if(isSuperAdmin()&&adminMail.messages===null&&!adminMail.loading&&!adminMail.busy&&!adminMail.error)setTimeout(()=>loadMailbox(false),0);
+  if(isSuperAdmin())ensureAdminMailboxRefresh();
   let content = "";
-  if(activeTab==="management") content = renderTournamentManagementTab();
+  if(isSuperAdmin()&&adminMail.open) content = renderMailboxPage();
+  else if(activeTab==="management") content = renderTournamentManagementTab();
   else if(activeTab==="member-raffles") content = renderRafflePage();
   else if(activeTab==="inventory-admin") content = renderInventoryAdminPage();
   else if(activeTab==="commerce-admin") content = window.BXHCommerce.adminPage();
@@ -21230,7 +21246,7 @@ function renderApp(){
           ${topbarConnectionRailHtml()}
         </div>
         <div class="spacer"></div><span class="three-gods-puzzle-layer" aria-hidden="true"></span><span class="hunter-license-layer" aria-hidden="true"></span><span class="akatsuki-red-cloud-layer" aria-hidden="true"></span><span class="clow-seal-layer" aria-hidden="true"></span><span class="zeon-emblem-layer" aria-hidden="true"></span><span class="gundam-haro-layer" aria-hidden="true"></span><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
-        <div class="header-account-controls">${accountMenuHtml()}</div>
+        <div class="header-account-controls">${isSuperAdmin()?mailboxButtonHtml():""}${accountMenuHtml()}</div>
       </header>
       ${tournamentViewContextHeaderHtml()}
       ${(typeof window!=="undefined" && window.BXH_INTERFACE_PREFERENCE?.get?.()==="v2")

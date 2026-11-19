@@ -18,7 +18,7 @@ function between(source, start, end) {
 const declarations = between(core, 'let adminTournamentListOpen = false;', 'let refereeDirectoryUsers = null;');
 const renderer = between(core, 'function renderTournamentManagementTab(){', '\nfunction adminTournamentListIdentityKey()');
 const loading = between(core, 'function adminTournamentListIdentityKey()', '\nfunction renderAdminNoTournamentScreen(){');
-const app = between(core, 'function renderApp(){', '\nfunction startLockoutCountdown(){');
+const app = between(core, 'let adminMailboxRefreshTimer=null;', '\nfunction startLockoutCountdown(){');
 const switchAction = between(core, '  if(action==="switch-tab"){', '\n  if(action==="force-refresh-version"){');
 const refreshAction = between(core, '  if(action==="cloud-refresh-admin-list"){', '\n  if(action==="cloud-admin-copy-code"){');
 const managementActions = between(core, '  if(action==="admin-tournament-filter"){', '\n  if(action==="load-duty-logs"){');
@@ -26,7 +26,7 @@ const searchBinding = between(core, 'function bindAdminTournamentSearchInput(){'
 const cloudMethods = between(cloud, '    async queryAdminTournaments(){', '\n    // v13.13.4：玩家');
 const cloudDeadline = between(cloud, '  function withTimeout(promise, ms, fallbackValue){', '\n  async function tryInitFirebase(){');
 const styles = ['core-competition', 'auth-player', 'player-center-hunter', 'lobby-community', 'call-admin-tail', 'referee-tail', 'tail-p7'];
-const scripts = ['/modules/management-v2/navigation.js', '/modules/management-v2/adapter.js', '/event-poster-ui.js'];
+const scripts = ['/modules/management-v2/navigation.js', '/modules/management-v2/adapter.js', '/event-poster-ui.js', '/modules/main-app/mailbox.js'];
 function row(name = 'Fixture room', extra = {}) {
   return { code: 'BXH-MOCK01', name, createdBy: 'fixture-owner', createdByName: 'Fixture creator',
     eventAuthority: 'official', tournamentPhase: 'waiting', archiveStatus: 'ongoing', registrationStatus:'open',registrationEnabled:true, ...extra };
@@ -42,6 +42,7 @@ ${scripts.map(src => '<script src="' + src + '"></script>').join('\n')}
 const copy = value => JSON.parse(JSON.stringify(value));
 window.fixture = Object.assign(${JSON.stringify(seed).replace(/</g, '\\u003c')}, { queries: [], names: [], repairs: [], actions: [], renders: 0 });
 let firebaseUser = null, userProfile = null, currentRole = null, activeMode = null;
+let accountMenuOpen = false, engagementSessionEpoch = 0;
 let appPhase = 'landing', activeTab = 'management', publicTournamentsCache = {}, myRegistrationsCache = {};
 let state = { cloudCode: null, meta: {} }, celebrationOpen = false, shareModalOpen = false, pendingModal = null;
 let historyCloudSyncBusy = false, historyCloudSyncLoaded = false, registrationFormDraftDirty = false;
@@ -51,6 +52,16 @@ let refereeAssignmentDraftEnabled = null, mainTabNavScrollLeft = 0, mainTabNavCe
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const hasAdminAccess = () => currentRole === 'admin' || currentRole === 'tester';
 const currentAuthUid = () => firebaseUser?.uid || '';
+const { mailboxContext, loadMailbox, mailboxButtonHtml, renderMailboxPage, handleMailbox } = window.BXHMailbox;
+const mailboxDate = () => '';
+window.engagementService = {
+  mailbox: async ({ action, messageId }) => {
+    const messages = fixture.mail || [];
+    if (action === 'markRead') messages.find(message => message.id === messageId).readAt = Date.now();
+    else if (action !== 'list') throw Error('Unexpected mailbox action: ' + action);
+    return { ok: true, messages: copy(messages), unreadCount: messages.filter(message => !message.readAt).length };
+  }
+};
 const currentUserUidForWrites = currentAuthUid;
 const isTester = () => userProfile?.role === 'tester';
 const isAdminTierOrAbove = () => ['admin', 'super_admin'].includes(userProfile?.role);
@@ -110,6 +121,7 @@ function render() {
 }
 function handleAction(action, target) {
   fixture.actions.push(action);
+  if (action.startsWith('mailbox-')) return handleMailbox(action, target);
   if (action === 'switch-tab' && target.getAttribute('data-tab') !== 'management') throw Error('Unrelated navigation forbidden in this fixture');
   ${switchAction}
   ${refreshAction}
@@ -117,7 +129,7 @@ function handleAction(action, target) {
   throw Error('Unexpected fixture action: ' + action);
 }
 fixture.enter = () => {
-  firebaseUser = { uid: 'fixture-owner' }; userProfile = { role: 'admin', active: true };
+  firebaseUser = { uid: 'fixture-owner' }; userProfile = { role: fixture.superAdmin ? 'super_admin' : 'admin', active: true };
   currentRole = 'admin'; activeMode = 'admin'; appPhase = 'app'; activeTab = 'management';
   if(fixture.lastManaged)localStorage.setItem(managedRoomStorageKey(),JSON.stringify({uid:currentAuthUid(),mode:activeMode,code:fixture.lastManaged,tab:'referee'}));
   render();
@@ -149,9 +161,10 @@ async function openManagement(page, options = {}) {
   });
   await page.goto('/?management_fixture=1', { waitUntil: 'load' });
   await page.locator('[data-fixture-enter]').click();
+  expect(errors).toEqual([]);
   await expect(page.locator('[data-management-v2-group="event"]')).toHaveClass('active');
   await expect(page.locator('[data-management-v2-tab="management"]')).toHaveClass('active');
-  await expect(page.getByText('賽事管理中心', { exact: true })).toBeVisible();
+  await expect(page.getByRole('searchbox', { name: '搜尋賽事名稱、房號或地點' })).toBeVisible();
   expect(errors).toEqual([]);
   return errors;
 }
@@ -159,6 +172,27 @@ const cards = page => page.locator('.tournament-management-card');
 const refresh = page => page.locator('[data-action="cloud-refresh-admin-list"]').first();
 const getState = page => page.evaluate(() => fixture.state());
 async function settle(page) { await expect.poll(() => getState(page).then(state => state.busy)).toBe(false); }
+
+test('highest administrator receives an unread order notification in management mode', async ({ page }) => {
+  await page.clock.install();
+  const errors = await openManagement(page, { superAdmin: true, mail: [] });
+  await settle(page);
+  const mailbox = page.locator('.header-account-controls [data-action="mailbox-open"]');
+  await expect(mailbox).toBeVisible();
+  await expect(mailbox.locator('.mailbox-unread')).toHaveCount(0);
+  await page.evaluate(() => fixture.mail.push({
+    id: 'order-notice', subject: '商城新訂單', body: '有一筆訂單等待審核', readAt: null
+  }));
+  await page.clock.fastForward(120000);
+  await expect(mailbox.locator('.mailbox-unread')).toHaveText('1');
+  await mailbox.click();
+  await page.getByRole('button', { name: /商城新訂單/ }).click();
+  await expect(page.getByText('有一筆訂單等待審核')).toBeVisible();
+  await expect(mailbox.locator('.mailbox-unread')).toHaveCount(0);
+  await page.getByRole('button', { name: '返回上一頁' }).click();
+  await expect(page.getByRole('searchbox', { name: '搜尋賽事名稱、房號或地點' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
 
 // All tests stay inside Management identity → Events → Tournament Management.
 const manyRows=()=>Array.from({length:12},(_,i)=>row('Paged room '+i,{code:'BXH-'+String(i).padStart(6,'0')}));
