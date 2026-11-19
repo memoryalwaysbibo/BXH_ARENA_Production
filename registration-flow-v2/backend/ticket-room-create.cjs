@@ -1,4 +1,5 @@
 'use strict';
+const {forfeitMatchAvailable}=require('./lifecycle.cjs');
 
 const {createHash}=require('node:crypto');
 const {ticketHostGrant,checkTicketContract}=require('./ticket-host.cjs');
@@ -119,8 +120,13 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
    const rosterRevision=state.registrationRosterRevision??0;
    if(!Array.isArray(state.players)||!Number.isSafeInteger(rosterRevision)||rosterRevision<0)throw Error('ticket-binding-invalid');
    const eligibleCount=state.players.filter(player=>!state.meta?.checkinRequired||player.checkedIn===true).length;
+   const names=new Map(state.players.map(player=>[player.id,player.name]));
+   const matches=room.tournamentPhase==='live'&&!state.championId&&gate.enabled===true
+    ?state.matches.filter(forfeitMatchAvailable).map(match=>({id:match.id,seq:match.seq,round:match.round,
+     a:{id:match.a.playerId,name:names.get(match.a.playerId)||'選手 A'},
+     b:{id:match.b.playerId,name:names.get(match.b.playerId)||'選手 B'},updatedAt:match.updatedAt||0})):[];
    return {ok:true,code,roomId:state.id,name:room.name,phase:room.tournamentPhase,startAt:room.startAt,
-    drawId:state.bracketDraw?.id??null,drawReady:state.bracketDraw?.rosterRevision===rosterRevision,rosterRevision,eligibleCount,
+    drawId:state.bracketDraw?.id??null,drawReady:state.bracketDraw?.rosterRevision===rosterRevision,rosterRevision,eligibleCount,matches,
     participants:room.tournamentPhase==='waiting'?state.players.filter(player=>player.source==='online'&&player.registrationId)
      .map(player=>({registrationId:player.registrationId,name:player.name})):[]};
   });

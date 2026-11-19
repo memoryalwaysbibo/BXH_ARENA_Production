@@ -6,7 +6,7 @@ const {randomBytes}=require('node:crypto');
 const {db,service,handlers}=require('./harness.cjs');
 const {createApi}=require('../backend/api.cjs');
 const {createTicketRoomHandler,createTicketRoomStateHandler,createTicketRemoveHandler}=require('../backend/ticket-room-create.cjs');
-const {createStartHandler,createDrawHandler}=require('../backend/lifecycle.cjs');
+const {createStartHandler,createDrawHandler,createTicketForfeitHandler}=require('../backend/lifecycle.cjs');
 
 after(()=>db.terminate());
 
@@ -166,6 +166,31 @@ test('ticket room creation reserves once and only a successful start consumes th
  assert.equal(live.drawId,result.drawId);
  await assert.rejects(remove({...removal,data:{...removal.data,operationId:'late-host-cancel'}}),/tournament-started/);
  await assert.rejects(submit(other,'cancel','late-player-cancel'),/tournament-started/);
+ const forfeit=createTicketForfeitHandler(options);
+ const match=live.matches.find(item=>item.round===0);
+ assert.ok(match);
+ const forfeitData={action:'ticket-room-forfeit',code,roomId,matchId:match.id,
+  playerId:match.a.id,opponentId:match.b.id,matchUpdatedAt:match.updatedAt,operationId:'ticket-forfeit-once'};
+ const forfeitRequest={auth:creation.auth,app:creation.app,data:forfeitData};
+ await assert.rejects(forfeit({...forfeitRequest,app:null}),/permission-denied/);
+ await assert.rejects(forfeit({...forfeitRequest,auth:{uid:other}}),/permission-denied/);
+ await assert.rejects(forfeit({...forfeitRequest,data:{...forfeitData,opponentId:'missing-player'}}),/forfeit-match-stale/);
+ const decisions=await Promise.all([forfeit(forfeitRequest),forfeit(forfeitRequest)]);
+ assert.equal(decisions.filter(decision=>decision.replayed).length,1);
+ const [forfeitedRoom,forfeitedPub,unchangedTicket]=await db.getAll(room,pub,ticket);
+ const finalState=JSON.parse(forfeitedRoom.data().data),finalMirror=JSON.parse(forfeitedPub.data().bracketView);
+ for(const state of [finalState,finalMirror]){
+  const completed=state.matches.find(item=>item.id===match.id);
+  assert.equal(completed.resultMethod,'forfeit');
+  assert.equal(completed.winnerId,match.b.id);
+  assert.equal(completed.loserId,match.a.id);
+  assert.equal(completed.scoreA,null);
+  assert.equal(completed.scoreB,null);
+  assert.ok(state.matches.some(item=>item.round===1&&[item.a?.playerId,item.b?.playerId].includes(match.b.id)));
+  assert.equal(state.players.length,29);
+ }
+ assert.deepEqual(unchangedTicket.data(),savedTicket.data());
+ await assert.rejects(forfeit({...forfeitRequest,data:{...forfeitData,operationId:'another-forfeit'}}),/forfeit-match-stale/);
  await release.update({enabled:false});
  assert.equal((await start(startRequest)).replayed,true);
  await assert.rejects(start({...startRequest,data:{...startData,operationId:'ticket-fresh-start'}}),/bracket-started/);

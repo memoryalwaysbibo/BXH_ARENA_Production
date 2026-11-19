@@ -177,4 +177,88 @@ function commitStart({state,mirror,uid,now,operationId,drawId,eligible}){
 
 const createStartHandler=options=>createLifecycleHandler('start',options);
 const createDrawHandler=options=>createLifecycleHandler('draw',options);
-module.exports={createStartHandler,createDrawHandler};
+
+const forfeitFields=new Set(['action','code','roomId','matchId','playerId','opponentId','matchUpdatedAt','operationId']);
+
+function forfeitMatchAvailable(match){
+ return !!(match?.a?.playerId&&match?.b?.playerId&&match.a.playerId!==match.b.playerId&&
+  !match.isBye&&!match.completed&&!match.winnerId&&['pending','ready','in_progress','paused'].includes(match.status)&&
+  !match.callPass&&!match.skippedAt);
+}
+
+function createTicketForfeitHandler({db,enabled=async()=>false,clock=Date.now}){
+ return async request=>{
+  const uid=request.auth?.uid,input=request.data||{};
+  if(!uid)throw Error('auth-required');
+  if(!request.app)throw Error('permission-denied');
+  const {action,code,roomId,matchId,playerId,opponentId,matchUpdatedAt,operationId}=input;
+  if(action!=='ticket-room-forfeit'||Object.keys(input).some(key=>!forfeitFields.has(key))||
+     typeof code!=='string'||!/^BXH-[A-Z0-9]{4,16}$/.test(code)||
+     ![roomId,matchId,playerId,opponentId].every(validId)||playerId===opponentId||
+     !Number.isSafeInteger(matchUpdatedAt)||matchUpdatedAt<0||
+     typeof operationId!=='string'||!/^[A-Za-z0-9_-]{8,100}$/.test(operationId))throw Error('invalid-operation');
+  const roomRef=db.doc('tournaments/'+code),publicRef=db.doc('publicTournaments/'+code);
+  const operation=roomRef.collection('operationLog').doc('registration-v2-forfeit-'+digest(JSON.stringify([uid,operationId])));
+  const requestHash=digest(JSON.stringify([roomId,matchId,playerId,opponentId,matchUpdatedAt]));
+  const now=clock();
+  return db.runTransaction(async tx=>{
+   const [actor,roomSnap,publicSnap,gateSnap,prior]=await tx.getAll(db.doc('users/'+uid),roomRef,publicRef,
+    db.doc('systemSettings/commerceTicketLifecycleV1'),operation);
+   const user=actor.data(),room=roomSnap.data(),pub=publicSnap.data(),gate=gateSnap.data();
+   const grant=ticketHostGrant(user,now);
+   if(!ownsTicketRoom(room,grant,uid)||room.eventAuthority!=='ticket'||gate?.ownerUid!==uid||gate.roomCode!==code)throw Error('permission-denied');
+   if(gate.roomId!==roomId||room.ticketAccessV1?.roomId!==roomId||room.ticketAccessV1?.ownerUid!==uid||
+      pub?.ticketRoomVersion!==1||pub.eventAuthority!=='ticket')throw Error('ticket-binding-invalid');
+   const state=JSON.parse(room.data),mirror=JSON.parse(pub.bracketView);
+   if(state.id!==roomId)throw Error('bracket-room-changed');
+   if(prior.exists){
+    if(prior.data().requestHash!==requestHash)throw Error('operation-conflict');
+    return {...prior.data().result,replayed:true};
+   }
+   if(gate.enabled!==true||!registrationQueueOwnsRoom(room)||!await enabled(code,tx))throw Error('ticket-lifecycle-disabled');
+   if(room.tournamentPhase!=='live'||pub.tournamentPhase!=='live'||!state.startedAt||!state.rosterLocked||
+      state.championId||[room,pub,state].some(doc=>doc.systemClosed||doc.eventCancelled||doc.deletionStatus||
+       ['completed','archived'].includes(doc.archiveStatus)||'scoreStorage' in doc||'scoreBucketProjection' in doc)||
+      state.meta?.eventCancelled||state.meta?.eventAuthority!=='ticket'||state.meta?.formatType!=='single')throw Error('forfeit-room-not-live');
+   const match=state.matches.find(candidate=>candidate.id===matchId);
+   const publicMatch=mirror.matches.find(candidate=>candidate.id===matchId);
+   const playerIds=[match?.a?.playerId,match?.b?.playerId];
+   if(!forfeitMatchAvailable(match)||!playerIds.includes(playerId)||!playerIds.includes(opponentId)||
+      (match.updatedAt||0)!==matchUpdatedAt||publicMatch?.completed||publicMatch?.a?.playerId!==playerIds[0]||
+      publicMatch?.b?.playerId!==playerIds[1])throw Error('forfeit-match-stale');
+   const actorName=String(user.realName||user.gameId||user.displayName||'合作主辦').slice(0,80);
+   const engine=createEngine(state,{uid,name:actorName},now,operationId);
+   if(engine.singleElimRoundDispatchBlocked(match,state.matches,state.meta)||
+      engine.singleElimBronzeBeforeFinalBlocked(match,state.matches,state.meta))throw Error('forfeit-round-waiting');
+   const decision=engine.evaluateQuickDecision(match,opponentId);
+   if(!decision.ok)throw Error('forfeit-match-stale');
+   const partialScore={scoreA:match.scoreA??null,scoreB:match.scoreB??null,log:match.log||[],faultActions:match.faultActions||[]};
+   engine.applyQuickDecisionFields(match,decision,actorName);
+   match.resultMethod='forfeit';
+   match.forfeit=true;
+   match.hunterData={...match.hunterData,reason:'forfeit'};
+   match.faultActions=[];
+   match.refereeSeatScoreRevision=Number(match.refereeSeatScoreRevision||0)+1;
+   engine.rebuildPropagationForState(state);
+   const updatedAt=Math.max(now,Number(room.updatedAt||0)+1,Number(state.updatedAt||0)+1);
+   state.updatedAt=updatedAt;
+   const priorMatches=new Map(mirror.matches.map(item=>[item.id,item]));
+   mirror.matches=state.matches.map(item=>({...priorMatches.get(item.id),
+    a:item.a?.playerId?{playerId:item.a.playerId}:null,b:item.b?.playerId?{playerId:item.b.playerId}:null,
+    station:item.station??null,status:item.status,isBye:!!item.isBye,completed:!!item.completed,
+    scoreA:item.scoreA??null,scoreB:item.scoreB??null,log:item.log||[],
+    winnerId:item.winnerId||null,loserId:item.loserId||null,completedAt:item.completedAt||null,
+    confirmedAt:item.confirmedAt||null,resultMethod:item.resultMethod||null,forfeit:item.forfeit===true}));
+   Object.assign(mirror,{updatedAt,courtAssignments:publicCourts(state),callRevision:Number(state.callRevision||0)});
+   for(const key of ['championId','runnerUpId','thirdId','fourthId'])mirror[key]=state[key]??null;
+   const fence=room.qrCheckinManaged===true?advanceQrCheckinFence(room,state):{};
+   tx.update(roomRef,{...fence,updatedAt,data:JSON.stringify(state)});
+   tx.update(publicRef,{...fence,updatedAt,bracketView:JSON.stringify(mirror)});
+   const result={ok:true,matchId,winnerId:decision.winnerId,loserId:decision.loserId};
+   tx.create(operation,{requestHash,result,actorUid:uid,at:now,partialScore});
+   return result;
+  });
+ };
+}
+
+module.exports={createStartHandler,createDrawHandler,createTicketForfeitHandler,forfeitMatchAvailable};
