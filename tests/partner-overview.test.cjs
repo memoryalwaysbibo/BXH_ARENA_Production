@@ -57,6 +57,9 @@ test('own contract is read-only, escapes terms, closes on Escape and on identity
 test('overview is wired into management and permission errors do not claim exhausted quota',()=>{
   const app=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
   const management=app.slice(app.indexOf('function renderTournamentManagementTab(){'),app.indexOf('function renderAdminTournamentListModal(){'));
-  assert.match(management,/isPartnerOrganizerMode\(\)\?window\.BXHPartnerOrganizer\?\.renderOverview/);
+  assert.doesNotMatch(management,/isPartnerOrganizerMode/);
+  assert.match(app,/function canCreateOfficialTournament\\(\\)\\{[^\\n]*role===\"staff\"\\)\\);/);
+  const cloud=fs.readFileSync(path.join(__dirname,'../modules/cloud/cloud-runtime.js'),'utf8');
+  assert.match(cloud,/if\\(partnerSession\\)\\{\\s*throw Object\\.assign\\(new Error\\(\"partner-contract-room-retired\"\\)/);
   assert.match(app,/此訊息不代表場次已用完/);
 });
