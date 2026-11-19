@@ -29,3 +29,5 @@ timeout 120s node engine-browser.mjs 2>&1 | tee evidence/engine-browser.txt
 bash run-full-app.sh
 
 bash run-callable.sh
+
+bash run-durable.sh
