@@ -3005,8 +3005,8 @@
         const creatorUid=currentUserUidForWrites();
         const partnerGrant=isPartnerOrganizerMode()?partnerOrganizerGrant():null;
         const partnerSession=!!(partnerGrant&&creatorUid);
-        if(partnerSession&&partnerGrant.scope==="contract"&&window.BXHPartnerOrganizer?.remainingRooms?.(partnerGrant.orderCode)===0){
-          throw Object.assign(new Error("partner-room-quota-exhausted"),{code:"partner-room-quota-exhausted"});
+        if(partnerSession){
+          throw Object.assign(new Error("partner-contract-room-retired"),{code:"partner-contract-room-retired"});
         }
         const testerSession=!!(userProfile&&userProfile.active!==false&&(userProfile.role==="tester"||userProfile.isTestAccount===true)&&creatorUid);
         if(testerSession){
