@@ -81,3 +81,140 @@ test('storefront hides room quota and VIP categories, all-products results and c
  c.category='vip';t.ui.shop();assert.equal(c.category,'');
 });
 
+
+function ticketOffer(changes={}){
+ return {id:'activation-32-sku',name:'賽事啟動券｜32 人',status:'published',purchasable:true,
+  audience:'partner_organizer',version:4,priceTwd:300,
+  delivery:{kind:'ticket',assetId:'32',quantity:1,durationDays:30},...changes};
+}
+test('an eligible ticket offer replaces its preview and uses its real checkout SKU',async()=>{
+ const t=setup();t.ui.shop();
+ const c=t.ui.context();c.storeOpen=true;c.products=[ticketOffer()];
+ await t.ui.handle('commerce-category',{dataset:{id:'ticket'}});
+ assert.equal((t.ui.shop().match(/暫停購買/g)||[]).length,4);
+ await t.ui.handle('commerce-product',{dataset:{id:'tournament_activation_32'}});
+ const details=t.ui.shop();
+ assert.match(details,/有效合作主辦/);assert.match(details,/30 天/);assert.match(details,/最多持有 2 張/);
+ assert.match(details,/data-action="commerce-buy"[^>]*>建立訂單｜NT\$ 300/);
+ await t.ui.handle('commerce-buy',{dataset:{id:'tournament_activation_32'}});
+ assert.deepEqual(t.calls,[{action:'create-order',productId:'activation-32-sku',expectedVersion:4,operationId:'same-operation'}]);
+});
+test('ordinary players, closed checkout and invalid offers cannot create a ticket order',async()=>{
+ const t=setup();t.ui.shop();const c=t.ui.context();const id='tournament_activation_32';
+ c.storeOpen=true;c.products=[ticketOffer({purchasable:false,unavailableReason:'partner-organizer-required'})];
+ await t.ui.handle('commerce-product',{dataset:{id}});
+ assert.match(t.ui.shop(),/此商品限授權有效的合作主辦購買/);
+ await t.ui.handle('commerce-buy',{dataset:{id}});
+ c.storeOpen=false;c.products=[ticketOffer()];
+ await t.ui.handle('commerce-buy',{dataset:{id}});
+ c.storeOpen=true;c.products=[ticketOffer({audience:'all'}),ticketOffer({status:'draft'})];
+ await t.ui.handle('commerce-buy',{dataset:{id}});
+ assert.equal(t.calls.length,0);
+ assert.match(t.ui.shop(),/暫停購買/);
+});
+
+test('my tickets shows an owned bound ticket, and resets on account switch',async()=>{
+ const t=setup();t.ui.shop();await t.ui.handle('commerce-category',{dataset:{id:'ticket'}});
+ assert.match(t.ui.shop(),/我的啟動券/);
+ await t.ui.handle('commerce-open-tickets',{});
+ t.sandbox.window.engagementService.commerce=async p=>{
+  t.calls.push(p);return {ok:true,tickets:[{id:'ticket-a',status:'reserved',capacity:32,boundRoomCode:'BXH-FIXTURE',expiresAt:Date.parse('2026-12-19T12:00:00Z')}]};
+ };
+ await t.ui.load('my-tickets');
+ const html=t.ui.shop();assert.match(html,/已綁定房間 BXH-FIXTURE/);assert.match(html,/2026\/12\/19/);
+ assert.equal(t.calls[0].action,'my-tickets');
+ t.setUid('other');assert.doesNotMatch(t.ui.shop(),/BXH-FIXTURE/);
+ assert.equal(t.ui.context().tickets,null);
+});
+
+test('scoped ticket room form uses Taiwan time and replays the exact V2 start request',async()=>{
+ const t=setup();const c=t.ui.context(),code='BXH-TICKETTEST',roomId='ticket-fixture-generation';
+ const room={ok:true,code,roomId,name:'測試賽事',phase:'waiting',eligibleCount:2,rosterRevision:5,drawId:null,startAt:Date.now()+60000};
+ const operations=[];let failStart=true;
+ t.sandbox.FormData=function(form){return Object.entries(form.values);};
+ t.sandbox.window.engagementService.ticketRoomOperation=async payload=>{
+  operations.push(JSON.parse(JSON.stringify(payload)));
+  if(payload.action==='ticket-room-state')return {...room};
+  if(payload.action==='create-ticket-room')return {ok:true,code,roomId};
+  if(payload.action==='ticket-room-draw'){room.drawId='draw-fixture';return {ok:true,drawId:room.drawId};}
+  if(failStart){failStart=false;throw Error('network-timeout');}
+  room.phase='live';return {ok:true,startedAt:Date.now()};
+ };
+ t.ui.shop();await t.ui.handle('commerce-category',{dataset:{id:'ticket'}});
+ await t.ui.handle('commerce-open-tickets',{});
+ c.tickets=[{id:'fixture-ticket',status:'available',capacity:32,expiresAt:Date.now()+86400000}];
+ assert.doesNotMatch(t.ui.shop(),/選這張券建房/);
+ t.sandbox.window.BXH_TICKET_ROOM_PILOT_CODE=code;
+ await t.ui.handle('commerce-ticket-bind',{dataset:{id:'fixture-ticket'}});
+ assert.match(t.ui.shop(),/正取上限 32 人/);
+ const form={dataset:{commerceForm:'ticket-room'},values:{name:'測試賽事',location:'台南',stations:'2',
+  registrationOpenAt:'2026-11-21T09:00',registrationCloseAt:'2026-11-21T10:00',startAt:'2026-11-21T11:00'}};
+ await t.listeners.submit({target:{closest:()=>form},preventDefault(){}});
+ assert.equal(operations[0].startAt,Date.parse('2026-11-21T11:00:00+08:00'));
+ assert.equal(operations[0].ticketId,'fixture-ticket');
+ assert.equal('capacity' in operations[0],false);
+ await t.ui.load('ticket-room-state');
+ await t.ui.handle('commerce-ticket-draw',{});
+ assert.equal(operations[2].rosterRevision,5);
+ await t.ui.load('ticket-room-state');
+ await t.ui.handle('commerce-ticket-start',{});
+ assert.equal(c.pending.payload.drawId,'draw-fixture');
+ assert.equal(c.pending.payload.roomId,roomId);
+ assert.equal(c.pending.payload.confirmEarlyStart,true);
+ await t.ui.handle('commerce-retry',{});
+ assert.deepEqual(operations.at(-2),operations.at(-1));
+ await t.ui.load('ticket-room-state');
+ assert.match(t.ui.shop(),/BXH-TICKETTEST｜已開賽/);
+});
+
+test('ticket organizer can remove an entrant before start and must redraw',async()=>{
+ const t=setup(),code='BXH-TICKETTEST',calls=[];
+ const room={ok:true,code,roomId:'test-ticket-room',phase:'waiting',name:'Fixture',eligibleCount:3,
+  rosterRevision:4,drawId:'old-draw',drawReady:true,participants:[{registrationId:'entry-1',name:'參賽者甲'}]};
+ t.sandbox.window.BXH_TICKET_ROOM_PILOT_CODE=code;
+ t.sandbox.window.engagementService.ticketRoomOperation=async payload=>{
+  calls.push(payload);
+  if(payload.action==='ticket-room-state')return {...room};
+  if(payload.action==='ticket-room-remove'){
+   room.participants=[];room.eligibleCount=2;room.rosterRevision++;room.drawReady=false;
+   return {ok:true};
+  }
+  throw Error('unexpected-action');
+ };
+ t.ui.shop();await t.ui.handle('commerce-open-tickets',{});
+ await t.ui.handle('commerce-ticket-room',{});
+ assert.match(t.ui.shop(),/參賽者甲/);
+ await t.ui.handle('commerce-ticket-remove',{dataset:{id:'entry-1'}});
+ assert.equal(calls.at(-1).registrationId,'entry-1');
+ await t.ui.load('ticket-room-state');
+ assert.match(t.ui.shop(),/名單已變更，請重新抽籤/);
+ await t.ui.handle('commerce-ticket-start',{});
+ assert.equal(calls.filter(p=>p.action==='ticket-room-start').length,0);
+ room.phase='live';await t.ui.load('ticket-room-state');
+ assert.doesNotMatch(t.ui.shop(),/commerce-ticket-remove/);
+});
+
+test('ticket organizer can record a single match forfeit only after start',async()=>{
+ const t=setup(),code='BXH-TICKETTEST',calls=[];
+ const match={id:'match-1',seq:0,round:0,a:{id:'a',name:'選手甲'},b:{id:'b',name:'選手乙'},updatedAt:123};
+ const room={ok:true,code,roomId:'test-ticket-room',phase:'waiting',name:'Fixture',eligibleCount:2,
+  rosterRevision:4,drawId:'draw',drawReady:true,matches:[match]};
+ t.sandbox.window.BXH_TICKET_ROOM_PILOT_CODE=code;
+ t.sandbox.window.engagementService.ticketRoomOperation=async payload=>{
+  calls.push(JSON.parse(JSON.stringify(payload)));
+  return payload.action==='ticket-room-state'?{...room}:{ok:true};
+ };
+ t.ui.shop();await t.ui.handle('commerce-open-tickets',{});
+ t.ui.context().tickets=[];
+ assert.match(t.ui.shop(),/管理試點賽事/);
+ await t.ui.handle('commerce-ticket-room',{});
+ const target={dataset:{id:match.id,side:'b'}};
+ await t.ui.handle('commerce-ticket-forfeit',target);
+ assert.equal(calls.length,1);
+ room.phase='live';await t.ui.load('ticket-room-state');
+ assert.match(t.ui.shop(),/選手乙 棄權/);
+ await t.ui.handle('commerce-ticket-forfeit',target);
+ assert.deepEqual(calls.at(-1),{action:'ticket-room-forfeit',code,roomId:room.roomId,matchId:match.id,
+  playerId:'b',opponentId:'a',matchUpdatedAt:123,operationId:'same-operation'});
+ assert.match(t.ui.shop(),/已登記棄權，對手晉級/);
+});

@@ -891,7 +891,7 @@
     if(!allowAnonymous&&(!authReady || !authHandle || !authHandle.currentUser)) throw new Error("auth-required");
     if(!functionsHandle || !fnx) throw new Error("service-unavailable");
     try{
-      if(['hunterClashCommand','groupStageCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','adminOverrideRoster','adminRecoverOnsiteWaitlist','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload','ladderTeamDisplay','registrationDrawV2','registrationStartV2'].includes(name)){
+      if(['hunterClashCommand','groupStageCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','adminOverrideRoster','adminRecoverOnsiteWaitlist','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload','ladderTeamDisplay','registrationDrawV2','registrationStartV2'].includes(name)||(name==='registrationRosterQueueV2'&&['create-ticket-room','ticket-room-state','ticket-room-remove','ticket-room-forfeit'].includes(payload?.action))){
         const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);
         if(!verified){const err=new Error('網站驗證未完成，請重新嘗試。');err.code='functions/permission-denied';err.details={reason:'app-check-unavailable'};throw err;}
         if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
@@ -909,13 +909,16 @@
   }
   const registrationV2RouteHints=new Map();
   const registrationV2PilotCodes=new Set(['BXH-BZ2JW6','BXH-XJ7WJ5','BXH-XXDNAH']);
+  function ticketRegistrationPilot(code){
+    return typeof code==='string'&&/^BXH-[A-Z0-9]{4,16}$/.test(code)&&code===window.BXH_TICKET_ROOM_PILOT_CODE;
+  }
   function rememberRegistrationV2Route(code,room){
-    if(!registrationV2PilotCodes.has(code)||room?.registrationQueueVersion!==2)return;
+    if((!registrationV2PilotCodes.has(code)&&!ticketRegistrationPilot(code))||room?.registrationQueueVersion!==2)return;
     registrationV2RouteHints.set(code,{uid:authHandle?.currentUser?.uid,epoch:engagementSessionEpoch,at:Date.now()});
   }
   async function registrationFlowV2Enabled(code){
     if(Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code))return true;
-    if(!registrationV2PilotCodes.has(code))return false;
+    if(!registrationV2PilotCodes.has(code)&&!ticketRegistrationPilot(code))return false;
     if(!dbHandle||!fx?.getDocFromServer)throw Error('registration-route-unavailable');
     const uid=authHandle?.currentUser?.uid,epoch=engagementSessionEpoch;
     // The player flow has already read this public document. Reuse its V2
@@ -998,7 +1001,8 @@
   let playerRegistrationFeedback=null;
   function submitRegistrationCancellation(payload){
     const {code,operationId}=payload;
-    return callEngagementFunction('registrationQueueV2',{action:'submit',code,operation:{code,route:'roster',operationId,payload}},20000);
+    const route=code&&code===window.BXH_TICKET_ROOM_PILOT_CODE?'family':'roster';
+    return callEngagementFunction('registrationQueueV2',{action:'submit',code,operation:{code,route,operationId,payload}},20000);
   }
   function getPlayerRegistrationFeedback(){
     if(!window.BXHRegistrationFeedback)return null;
@@ -1030,6 +1034,27 @@
   window.engagementService={
     registrationFlowV2Enabled,
     registrationManagementOperation,
+    async ticketRoomOperation({action,code,...payload}){
+      if(code!==window.BXH_TICKET_ROOM_PILOT_CODE||typeof code!=='string'||!/^BXH-[A-Z0-9]{4,16}$/.test(code))throw Error('ticket-lifecycle-disabled');
+      if(action==='ticket-room-remove'){
+        const {operationId,registrationId}=payload;
+        const poll=()=>callEngagementFunction('registrationRosterQueueV2',{action:'status',code,operationId},8000);
+        let reply=await callEngagementFunction('registrationRosterQueueV2',{action,code,operationId,registrationId},8000);
+        const deadline=Date.now()+18000;
+        while(reply?.operation?.operationId===operationId){
+          const operation=reply.operation;
+          if(operation.state==='rejected')throw Error(operation.reason);
+          if(operation.state==='completed'&&operation.result?.ok===true&&operation.result.status==='cancelled'&&operation.result.registrationId===registrationId)return {ok:true};
+          if(!['queued','running'].includes(operation.state)||Date.now()>=deadline)break;
+          await new Promise(resolve=>setTimeout(resolve,1000));
+          reply=await poll();
+        }
+        throw Error('registration-operation-unconfirmed');
+      }
+      if(['create-ticket-room','ticket-room-state','ticket-room-forfeit'].includes(action))return callEngagementFunction('registrationRosterQueueV2',{...payload,action,code},30000);
+      if(['ticket-room-draw','ticket-room-start'].includes(action))return callEngagementFunction(action==='ticket-room-draw'?'registrationDrawV2':'registrationStartV2',{...payload,code},30000);
+      throw Error('invalid-action');
+    },
     async myEventOperationStatus(payload){
       if(!payload||typeof payload!=='object'||Array.isArray(payload)||Object.keys(payload).some(k=>!['route','operationId','code','nonce'].includes(k)))throw Error('unsupported-operation-status-input');
       return callEngagementFunction('queryMyEventOperationStatus',payload,10000);
