@@ -1,6 +1,7 @@
 """Verify and publish the staged BXH822 registration functions."""
 import argparse
 import fcntl
+from io import BytesIO
 import json
 import os
 from pathlib import Path
@@ -8,6 +9,7 @@ import sys
 import tempfile
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+from zipfile import ZipFile
 
 import BXH822_stage_fixed as stage
 
@@ -44,6 +46,24 @@ def load_publisher(repo, directory):
     return publisher
 
 
+def matches_rebuilt_package(candidate, rebuilt):
+    added_paths = {stage.BACKEND + filename for filename in stage.EXTRA}
+    with ZipFile(BytesIO(candidate)) as actual, ZipFile(BytesIO(rebuilt)) as expected:
+        names = actual.namelist()
+        if names != expected.namelist() or len(set(names)) != len(names) or actual.comment != expected.comment:
+            return False
+        for path in names:
+            entry, baseline = actual.getinfo(path), expected.getinfo(path)
+            if (entry.create_system != baseline.create_system
+                    or entry.external_attr != baseline.external_attr
+                    or entry.flag_bits != baseline.flag_bits
+                    or entry.extra != baseline.extra or entry.comment != baseline.comment
+                    or (path not in added_paths and entry.date_time != baseline.date_time)
+                    or actual.read(entry) != expected.read(baseline)):
+                return False
+    return True
+
+
 def prepare(repo, directory, publisher):
     manifest = json.loads((directory / "manifest.json").read_bytes())
     stage.need(set(manifest) == set(ORDER) == set(stage.VERSIONS), "stage function set differs")
@@ -53,10 +73,15 @@ def prepare(repo, directory, publisher):
         row = manifest[name]
         original = directory / f"{name}.original.zip"
         candidate = (directory / f"{name}.candidate.zip").read_bytes()
-        stage.need(row["revision"] == revision and row["generation"] == generation
-                   and row["originalSha256"] == stage.digest(original.read_bytes())
-                   and row["candidateSha256"] == stage.digest(candidate)
-                   and candidate == stage.prepare(name, original, repo), f"{name}: staged package differs")
+        stage.need(row["revision"] == revision and row["generation"] == generation,
+                   f"{name}: staged version differs")
+        stage.need(row["originalSha256"] == stage.digest(original.read_bytes()),
+                   f"{name}: original ZIP fingerprint differs")
+        stage.need(row["candidateSha256"] == stage.digest(candidate),
+                   f"{name}: candidate ZIP fingerprint differs")
+        rebuilt = stage.prepare(name, original, repo)
+        stage.need(matches_rebuilt_package(candidate, rebuilt),
+                   f"{name}: staged ZIP entries differ from rebuild")
         plan[name] = {"beforeRevision": revision, "beforeSource": None,
                       "candidateSha256": row["candidateSha256"]}
 
