@@ -1,7 +1,8 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),crypto=require('node:crypto');
 if(process.env.FIRESTORE_EMULATOR_HOST!=='127.0.0.1:8080')throw Error('emulator-only');
-const {initializeApp}=require('./function-runtime/node_modules/firebase-admin/app'),{getFirestore,FieldValue}=require('./function-runtime/node_modules/firebase-admin/firestore');
+const runtimeRequire=require('node:module').createRequire(__dirname+'/function-runtime/package.json');
+const {initializeApp}=runtimeRequire('firebase-admin/app'),{getFirestore,FieldValue}=runtimeRequire('firebase-admin/firestore');
 for(const [name,expected] of Object.entries({'ladder-settlement.js':'3ea58fe50263ed20e2d7fa7e2415d83b44a28b80d75ee84dc05bc515def95d29','ladder-v1.js':'acc793297324e78cf1a0363d6c63834690a333c7300e9bba798add6418191d11'}))assert.equal(crypto.createHash('sha256').update(fs.readFileSync(__dirname+'/settlement-source/'+name)).digest('hex'),expected);
 const {createLadderSettlement}=require('./settlement-source/ladder-settlement.js'),{fixture}=require('./engine-fixture.cjs');
 initializeApp({projectId:'demo-bxh-arena-e2e'});const db=getFirestore(),f=fixture(),code='BXH-SETL96';f.state.cloudCode=code;
