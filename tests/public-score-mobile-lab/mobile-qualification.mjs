@@ -10,7 +10,7 @@ const server=http.createServer((req,res)=>{
 let browser;
 try{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
- browser=await chromium.launch({headless:true,chromiumSandbox:true});
+ browser=await chromium.launch({channel:'chrome',headless:true,chromiumSandbox:true});
  for(const viewport of [{width:390,height:844},{width:844,height:390}]){
   const room='mobile96-'+viewport.width;await seed(room);
   const context=await browser.newContext({viewport,isMobile:true,hasTouch:true});

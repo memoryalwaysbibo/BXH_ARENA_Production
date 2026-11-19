@@ -29,9 +29,13 @@ jobs:
       - name: Install locked isolated dependencies
         working-directory: tests/public-score-mobile-lab
         run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Install supported Chromium
-        working-directory: tests/public-score-mobile-lab
-        run: ./node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify hosted Google Chrome stable (no security changes)
+        run: |
+          command -v google-chrome
+          google-chrome --version
+          test -x /opt/google/chrome/chrome
+          test -r /etc/apparmor.d/chrome
+          cat /etc/apparmor.d/chrome
       - name: Run demo-only SDK and mobile viewport qualification
         run: bash tests/public-score-mobile-lab/run-ci.sh
       - name: Retain synthetic lab evidence
