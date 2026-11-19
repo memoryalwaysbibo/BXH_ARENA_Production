@@ -54,12 +54,13 @@ test('own contract is read-only, escapes terms, closes on Escape and on identity
   h.click('[data-partner-own-contract]');h.state.value=null;h.state.observe();await h.settle();assert.equal(h.state.dialog,null);assert.equal(h.c.BXHPartnerOrganizer.remainingRooms('order'),null);
 });
 
-test('overview is wired into management and permission errors do not claim exhausted quota',()=>{
+test('contract creation is retired while partner management remains',()=>{
   const app=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
   const management=app.slice(app.indexOf('function renderTournamentManagementTab(){'),app.indexOf('function renderAdminTournamentListModal(){'));
-  assert.doesNotMatch(management,/BXHPartnerOrganizer\?\.renderOverview/);
-  assert.match(app,/function canCreateOfficialTournament\\(\\)\\{[^\\n]*role===\"staff\"\\)\\);/);
+  assert.equal(management.includes('BXHPartnerOrganizer?.renderOverview'),false);
+  const createPermission=app.slice(app.indexOf('function canCreateOfficialTournament(){'),app.indexOf('function currentAuthUid(){'));
+  assert.equal(createPermission.includes('isPartnerOrganizerMode()'),false);
   const cloud=fs.readFileSync(path.join(__dirname,'../modules/cloud/cloud-runtime.js'),'utf8');
-  assert.match(cloud,/if\\(partnerSession\\)\\{\\s*throw Object\\.assign\\(new Error\\(\"partner-contract-room-retired\"\\)/);
+  assert.equal(cloud.includes('if(partnerSession){\n          throw Object.assign(new Error("partner-contract-room-retired")'),true);
   assert.match(app,/此訊息不代表場次已用完/);
 });
