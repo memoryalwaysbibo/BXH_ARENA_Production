@@ -22436,6 +22436,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       return;
     }
     const doSwitch = ()=>{
+      accountMenuOpen=false;
       resetRegistrationFormDraft();
       refereeAssignmentDraftEnabled = null;
       if(targetTab!=="people") stopAdminRosterWatch();

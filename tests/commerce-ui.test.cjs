@@ -39,6 +39,7 @@ test('partner organizer can open the storefront and orders in both management in
  assert.match(core,/activeTab==="commerce-orders"\) content = window\.BXHCommerce\.orders\(\)/);
  assert.match(core,/targetTab==='commerce-shop'\|\|targetTab==='commerce-orders'\)\&\&!isPartnerOrganizerMode\(\)/);
  assert.match(core,/data-action="switch-tab" data-tab="commerce-shop">商城/);
+ assert.match(core,/const doSwitch = \(\)=>\{\s*accountMenuOpen=false;/);
  const s={window:{}};
  vm.runInNewContext(fs.readFileSync(path.join(root,'modules/management-v2/navigation.js'),'utf8'),s);
  const nav=s.window.BXH_MANAGEMENT_UI_V2;
