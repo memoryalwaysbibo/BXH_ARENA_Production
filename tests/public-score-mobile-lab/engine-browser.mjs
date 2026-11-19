@@ -30,6 +30,7 @@ let browser;try{
  await action('[data-action="score"][data-side="A"][data-type="extreme"]');await action('[data-action="score"][data-side="A"][data-type="spin"]');await action('[data-action="confirm-result"]');
  assert.equal(await watch.locator(`[data-id="${id}"] .winner`).count(),1);assert.equal(view.matches.find(m=>m.id===id).winnerId,player);assert(view.matches.some(m=>m.id!==id&&(m.a?.playerId===player||m.b?.playerId===player)),'winner advancement absent');
  const pass=f.current().find(m=>m.status==='in_progress');await action('[data-action="skip-match"]',pass.id);assert(view.matches.find(m=>m.id===pass.id).skippedAt);
- await ref.screenshot({path:'evidence/actual-renderer-referee-390.png'});await watch.screenshot({path:'evidence/actual-renderer-spectator-390.png'});
+ console.log('PASS actual renderer score/undo/confirm/PASS and advancement assertions; capturing evidence');
+ await ref.bringToFront();await ref.screenshot({path:'evidence/actual-renderer-referee-390.png',animations:'disabled',timeout:15000});await watch.bringToFront();await watch.screenshot({path:'evidence/actual-renderer-spectator-390.png',animations:'disabled',timeout:15000});
  console.log(JSON.stringify({passed:true,actualEngine:'scoring-core.transition',generatedBracketPlayers:96,courts:6,browser:true,rendererFunctions:'source extracted from ARENA core',commands:revision,scoreUndoConfirmPass:true,advancement:true,transport:'local demo HTTP command adapter -> Firestore emulator -> public SDK spectator',productionCallable:false,productionRouter:false,realMobile:false}));
 }finally{await browser?.close();server.closeAllConnections();await new Promise(r=>server.close(r));}
