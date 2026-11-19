@@ -1,0 +1,6 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),{evaluate,EXPECTED}=require('./preflight.cjs');
+const good=()=>({platform:'win32',nodeVersion:'22.23.2',jdkRelease:'JAVA_VERSION="21.0.9"',jarSha:EXPECTED.jarSha,declared:{...EXPECTED.dependencies},locked:{...EXPECTED.dependencies},installed:{...EXPECTED.dependencies},cliVersion:'14.27.0',cliLocked:'14.27.0'});
+test('static pins pass but never authorize or claim Windows integration',()=>{const r=evaluate(good());assert(r.sourceAndDependencyChecksPassed);assert.equal(r.launchApproved,false);assert.equal(r.windowsIntegrationPassed,false);});
+for(const [field,value]of [['platform','linux'],['nodeVersion','24.22.3'],['jdkRelease','JAVA_VERSION="17.0.1"'],['jarSha','bad'],['cliVersion','latest'],['cliLocked','14.28.0']])test('reject '+field,()=>{const x=good();x[field]=value;assert(!evaluate(x).sourceAndDependencyChecksPassed);});
+for(const field of ['declared','locked','installed'])test('reject unpinned '+field,()=>{const x=good();x[field]['firebase-admin']='^13.10.0';assert(!evaluate(x).sourceAndDependencyChecksPassed);});
+test('missing files reported without download',()=>{const x=good();x.missing=['official-firestore-jar'];assert(evaluate(x).blockers.includes('missing:official-firestore-jar'));});
