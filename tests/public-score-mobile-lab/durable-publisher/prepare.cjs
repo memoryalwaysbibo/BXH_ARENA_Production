@@ -10,7 +10,7 @@ let entry=fs.readFileSync('full-app-entry.mjs','utf8').replace("projectId:'demo-
 let b=fs.readFileSync('referee-full-app-browser.mjs','utf8').replaceAll('BXH-REFU96','BXH-DEMOBROW96').replaceAll("'e-'+code","'demo-browser96'");
 b=b.replace("import {commit} from './mobile-fixture.mjs';","import {commit as unusedCommit} from './mobile-fixture.mjs';");
 b=b.replace('async function publish(', 'async function commit(rows){return seedApp(rows);}\nasync function publish(');
-const a=b.index('  Object.assign(f.state,saved);'),z=b.index('  await page.waitForFunction(at=>',a);if(a<0||z<0)throw Error('browser-anchor');
+const a=b.indexOf('  Object.assign(f.state,saved);'),z=b.indexOf('  await page.waitForFunction(at=>',a);if(a<0||z<0)throw Error('browser-anchor');
 b=b.slice(0,a)+`  Object.assign(f.state,saved);view=S.publicProjection(saved,{meta:{stations:6},players:saved.players});
   if(requests.length===1){
    for(let i=0;i<100&&!fs.existsSync('evidence/worker-failure-observed.flag');i++)await new Promise(r=>setTimeout(r,100));
