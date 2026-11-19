@@ -25,3 +25,5 @@ cp mobile-*.png evidence/ 2>/dev/null || true
 node build-renderers.cjs
 ./node_modules/.bin/esbuild engine-entry.mjs --bundle --format=esm --platform=browser --outfile=engine-bundle.js
 timeout 120s node engine-browser.mjs 2>&1 | tee evidence/engine-browser.txt
+
+bash run-full-app.sh

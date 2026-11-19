@@ -29,6 +29,9 @@ jobs:
       - name: Install locked isolated dependencies
         working-directory: tests/public-score-mobile-lab
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install locked Auth emulator tools
+        working-directory: tests/public-score-mobile-lab/emulator-tools
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Verify hosted Google Chrome stable (no security changes)
         run: |
           command -v google-chrome
