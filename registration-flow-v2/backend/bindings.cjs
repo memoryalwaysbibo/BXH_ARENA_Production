@@ -5,7 +5,8 @@
 const {createQueue}=require('./queue.cjs');
 const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
-const {createStartHandler,createDrawHandler}=require('./lifecycle.cjs');
+const {createStartHandler,createDrawHandler,createTicketForfeitHandler}=require('./lifecycle.cjs');
+const {createTicketRoomHandler,createTicketRoomStateHandler,createTicketRemoveHandler}=require('./ticket-room-create.cjs');
 function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled,pilotRoom=null,retiredRoom=null,retiredRooms=[]}){
  if(createFamilyRegistration?.v2CapacityAware!==true)throw Error('queue-family-capacity-source-required');
  const familyFactory=store=>createFamilyRegistration(store,Date.now,{myEventsProofEnabled:true});
@@ -40,12 +41,27 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   }
  });
  const registrationQueueV2=bind(api,{allowRetired:data=>data.action==='status'||data.action==='mine'});
- const registrationRosterQueueV2=bind(managementApi,{allowRetired:data=>data.action==='status'});
+ const ticketRoomActions={
+  'create-ticket-room':createTicketRoomHandler({db}),
+  'ticket-room-state':createTicketRoomStateHandler({db}),
+  'ticket-room-forfeit':createTicketForfeitHandler({db,enabled:startEnabled}),
+  'ticket-room-remove':createTicketRemoveHandler({db,queue,enabled:intakeEnabled}),
+ };
+ const registrationRosterQueueV2=bind(req=>{
+  const action=req.data?.action;
+  return Object.hasOwn(ticketRoomActions,action)?ticketRoomActions[action](req):managementApi(req);
+ },{
+  allowRetired:data=>data.action==='status',
+  preconditions:['ticket-lifecycle-disabled','ticket-binding-invalid','ticket-expired','ticket-unavailable',
+   'room-code-conflict','room-receipt-inconsistent','bracket-room-changed',
+   'forfeit-room-not-live','forfeit-match-stale','forfeit-round-waiting'],
+ });
  const lifecycleOptions={
   options:{enforceAppCheck:true},
   // Lifecycle validates the original receipt before checking the write gate.
   allowRetired:()=>true,
   preconditions:['bracket-room-changed','bracket-started','draw-mode-not-supported','start-mode-not-supported','early-start-confirmation-required',
+   'ticket-lifecycle-disabled','ticket-binding-invalid','ticket-expired','ticket-capacity-invalid',
    'registration-roster-stale','bracket-version-conflict','qr-checkin-state-stale','registration-queue-pending','bracket-roster-changed'],
  };
  const registrationStartV2=bind(createStartHandler({db,enabled:startEnabled}),lifecycleOptions);

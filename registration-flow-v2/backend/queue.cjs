@@ -1,6 +1,7 @@
 'use strict';
 const {createHash, randomUUID}=require('node:crypto');
 const {registrationQueueOwnsRoom}=require('./legacy-writer.cjs');
+const {ticketHostGrant,checkTicketContract}=require('./ticket-host.cjs');
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const canonical=value=>JSON.stringify(value===null||typeof value!=='object'?value:Array.isArray(value)?value.map(x=>JSON.parse(canonical(x))):Object.fromEntries(Object.keys(value).sort().map(k=>[k,JSON.parse(canonical(value[k]))])));
 const active=u=>u?.active===true&&!u.deleted&&!['deleted','disabled','frozen'].includes(u.accountStatus);
@@ -35,6 +36,17 @@ function validate(uid,input){
 // Private server-only operation journal. This is a candidate, not an installed
 // Cloud Tasks deployment. onCreate + a scheduled sweep must both be wired before
 // rollout. Queue acceptance is NOT a reservation or proof of registration.
+async function authorizeTicketRemoval(tx,db,user,operation,room,now){
+ const uid=operation.uid,grant=ticketHostGrant(user,now);
+ if(!grant||room?.eventAuthority!=='ticket'||room.createdBy!==uid||room.ownerUid!==uid||
+    room.partnerOrganizationCode!==grant.organizationId||(room.partnerContractOrderCode||null)!==grant.order||
+    room.ticketAccessV1?.version!==1||room.ticketAccessV1?.ownerUid!==uid)throw fail('permission-denied');
+ const gate=(await tx.get(db.doc('systemSettings/commerceTicketLifecycleV1'))).data();
+ if(gate?.roomCode!==operation.code||gate.ownerUid!==uid||gate.roomId!==room.ticketAccessV1.roomId||
+    (gate.bindingEnabled!==true&&gate.enabled!==true))throw fail('permission-denied');
+ if(grant.order)checkTicketContract((await tx.get(db.doc('partnerContracts/'+grant.order))).data(),grant,uid);
+}
+
 function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAttempts=5,requireRoomOwnership=false,authorizeIntake,workerId=randomUUID(),beforeExecute=async()=>{},onTiming=()=>{}}={}){
  if(!handlers?.family||!handlers?.roster||!FieldValue)throw Error('queue-dependencies-required');
  const rooms=db.collection('_registrationQueueV2');
@@ -108,7 +120,20 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
      const roomReads=requireRoomOwnership?[target.doc('tournaments/'+code)]:[];
      const [ls,js,room]=await tx.getAll(roomRef(code),ref,...roomReads);checkLease(ls.data(),token);
      if(js.data()?.state!=='running'||js.data()?.workerToken!==token)throw fail('queue-lease-lost');
-     if(requireRoomOwnership&&!registrationQueueOwnsRoom(room?.data()))throw fail('registration-queue-disabled');
+     const currentRoom=room?.data();
+     if(requireRoomOwnership&&!registrationQueueOwnsRoom(currentRoom))throw fail('registration-queue-disabled');
+     if(js.data().payload.action==='cancel'&&(currentRoom?.eventAuthority==='ticket'||currentRoom?.ticketAccessV1)){
+      let state;
+      try{state=JSON.parse(currentRoom.data);}catch{throw fail('corrupt-state');}
+      if(!state||!Array.isArray(state.players))throw fail('corrupt-state');
+      if(currentRoom.tournamentPhase!=='waiting'||currentRoom.startedAt||state.startedAt)throw fail('tournament-started');
+      if(js.data().route!=='family')throw fail('invalid-operation');
+     }
+     if(js.data().payload.intent==='ticket-host'){
+      const job=js.data();
+      const actor=(await tx.get(target.doc('users/'+job.uid))).data();
+      await authorizeTicketRemoval(tx,target,actor,job,currentRoom,clock());
+     }
      // The operation result and all registration mutations commit atomically.
      // A lost response cannot leave a committed registration with an absent
      // completion marker. A new lease invalidates the old transaction's read.
@@ -188,5 +213,5 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
  }
  return {enqueue,status,drain,drainCreatedJob,sweep,jobRef};
 }
-module.exports={createQueue,validate,businessRejections,safeResult};
+module.exports={authorizeTicketRemoval,createQueue,validate,businessRejections,safeResult};
 

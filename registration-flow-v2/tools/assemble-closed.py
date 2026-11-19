@@ -22,6 +22,8 @@ APPLICATION_FILES = (
     "registration-flow-v2/backend/bindings.cjs",
     "registration-flow-v2/backend/legacy-writer.cjs",
     "registration-flow-v2/backend/lifecycle.cjs",
+    "registration-flow-v2/backend/ticket-host.cjs",
+    "registration-flow-v2/backend/ticket-room-create.cjs",
     "registration-flow-v2/backend/management.cjs",
     "registration-flow-v2/backend/prepare-family.cjs",
     "registration-flow-v2/backend/prepare-roster.cjs",

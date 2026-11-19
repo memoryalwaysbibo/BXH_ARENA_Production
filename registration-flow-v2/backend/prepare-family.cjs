@@ -35,6 +35,30 @@ const admit=createAdmission();
   let occupied=participants?participants.count:Math.max(players.length,confirmed+onsite);`
  );
  patch(':confirmed<Number(t.capacity)',':occupied<t.capacity');
+ patch(
+  '  const quick=quickPolicy(t,pub);let mirror;\n  if(quick){',
+  `  const quick=quickPolicy(t,pub);
+  const anyTicket=t.eventAuthority==='ticket'||pub.eventAuthority==='ticket'||!!t.ticketAccessV1||!!pub.ticketRoomVersion;
+  const ticket=t.eventAuthority==='ticket'&&pub.eventAuthority==='ticket'&&t.ticketAccessV1?.version===1&&
+   t.ticketAccessV1.roomId===s.id&&pub.ticketRoomVersion===1&&t.registrationQueueVersion===2&&pub.registrationQueueVersion===2&&
+   [32,64,96,128,160].includes(t.capacity)&&t.capacity===pub.capacity&&t.capacity===s.meta?.registrationCapacity&&
+   t.ticketAccessV1.baseCapacity===t.capacity&&t.ticketAccessV1.addedCapacity===0&&!t.waitlistEnabled&&!pub.waitlistEnabled;
+  if(anyTicket&&!ticket)throw Error('registration-state-conflict');
+  const projectOnline=!!quick||ticket;
+  let mirror;
+  if(projectOnline){`
+ );
+ patch('  const quickRows=quick?', '  const quickRows=projectOnline?');
+ patch('  if(quick){\n   if(pub.systemClosed', '  if(projectOnline){\n   if(pub.systemClosed');
+ patch("   const id=String(d.registrationId||uid);", "   const ticketHostRemoval=ticket&&d.intent==='ticket-host';\n   const id=String(d.registrationId||uid);");
+ patch("if(!reg||(id!==uid&&reg.guardianUid!==uid))", "if(!reg||(!ticketHostRemoval&&id!==uid&&reg.guardianUid!==uid))");
+ patch("if(quick ? (quick.cancellationDeadline", "if(!ticketHostRemoval&&(quick ? (quick.cancellationDeadline");
+ patch("now>=ms(t.cancellationDeadline)))throw", "now>=ms(t.cancellationDeadline))))throw");
+ patch("const result={ok:true};if(reg.status!=='cancelled')", "const result=ticket?{ok:true,status:'cancelled',registrationId:id}:{ok:true};if(reg.status!=='cancelled')");
+ patch("const proofFields=myEventsProofEnabled===true?operationFields(uid,code,'cancel'", "const proofFields=myEventsProofEnabled===true&&!ticketHostRemoval?operationFields(uid,code,'cancel'");
+ patch("(quick?project(quickRows.map","(projectOnline?project(quickRows.map");
+ patch("  if(quick){\n   const next=new Map(quickRows","  if(projectOnline){\n   const next=new Map(quickRows");
+ patch("const fields={communityParticipantCount:result.communityParticipantCount,","const fields={...(!ticket?{communityParticipantCount:result.communityParticipantCount}:{}),");
  patch('module.exports={createFamilyRegistration};','createFamilyRegistration.v2CapacityAware=true;\nmodule.exports={createFamilyRegistration};');
  return source;
 }
