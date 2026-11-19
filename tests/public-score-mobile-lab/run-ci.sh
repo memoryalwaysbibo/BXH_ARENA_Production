@@ -15,9 +15,13 @@ for i in $(seq 1 100); do
  sleep .2
 done
 if [ "$ready" != true ]; then echo 'emulator readiness timeout';exit 1;fi
-node --test schema.test.cjs browser-lifecycle.test.mjs | tee evidence/unit.txt
+node --test schema.test.cjs browser-lifecycle.test.mjs engine.test.cjs | tee evidence/unit.txt
 timeout 60s node integration.mjs 2>&1 | tee evidence/sdk.txt
 timeout 60s node spectator.test.mjs 2>&1 | tee evidence/spectator.txt
 ./node_modules/.bin/esbuild mobile-entry.mjs --bundle --format=esm --platform=browser --outfile=mobile-bundle.js
 timeout 120s node mobile-qualification.mjs 2>&1 | tee evidence/mobile.txt
 cp mobile-*.png evidence/ 2>/dev/null || true
+
+node build-renderers.cjs
+./node_modules/.bin/esbuild engine-entry.mjs --bundle --format=esm --platform=browser --outfile=engine-bundle.js
+timeout 120s node engine-browser.mjs 2>&1 | tee evidence/engine-browser.txt
