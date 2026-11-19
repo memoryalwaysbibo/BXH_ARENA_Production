@@ -166,3 +166,30 @@ test('scoped ticket room form uses Taiwan time and replays the exact V2 start re
  await t.ui.load('ticket-room-state');
  assert.match(t.ui.shop(),/BXH-TICKETTEST｜已開賽/);
 });
+
+test('ticket organizer can remove an entrant before start and must redraw',async()=>{
+ const t=setup(),code='BXH-TICKETTEST',calls=[];
+ const room={ok:true,code,roomId:'test-ticket-room',phase:'waiting',name:'Fixture',eligibleCount:3,
+  rosterRevision:4,drawId:'old-draw',drawReady:true,participants:[{registrationId:'entry-1',name:'參賽者甲'}]};
+ t.sandbox.window.BXH_TICKET_ROOM_PILOT_CODE=code;
+ t.sandbox.window.engagementService.ticketRoomOperation=async payload=>{
+  calls.push(payload);
+  if(payload.action==='ticket-room-state')return {...room};
+  if(payload.action==='ticket-room-remove'){
+   room.participants=[];room.eligibleCount=2;room.rosterRevision++;room.drawReady=false;
+   return {ok:true};
+  }
+  throw Error('unexpected-action');
+ };
+ t.ui.shop();await t.ui.handle('commerce-open-tickets',{});
+ await t.ui.handle('commerce-ticket-room',{});
+ assert.match(t.ui.shop(),/參賽者甲/);
+ await t.ui.handle('commerce-ticket-remove',{dataset:{id:'entry-1'}});
+ assert.equal(calls.at(-1).registrationId,'entry-1');
+ await t.ui.load('ticket-room-state');
+ assert.match(t.ui.shop(),/名單已變更，請重新抽籤/);
+ await t.ui.handle('commerce-ticket-start',{});
+ assert.equal(calls.filter(p=>p.action==='ticket-room-start').length,0);
+ room.phase='live';await t.ui.load('ticket-room-state');
+ assert.doesNotMatch(t.ui.shop(),/commerce-ticket-remove/);
+});
