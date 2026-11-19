@@ -1,0 +1,1 @@
+{"functions":{"source":"function-runtime","runtime":"nodejs22"},"emulators":{"auth":{"host":"127.0.0.1","port":9099},"functions":{"host":"127.0.0.1","port":5011},"ui":{"enabled":false},"singleProjectMode":true}}
