@@ -120,9 +120,15 @@ test('ticket room creation reserves once and only a successful start consumes th
   registrationId:removalUid,operationId:'organizer-removal'}};
  await assert.rejects(remove({...removal,auth:{uid:other}}),/permission-denied/);
  await submit(remainingUid,'cancel','cancel-after-draw');
- assert.equal((await remove(removal)).operation.state,'queued');
  await queue.drain(code);
  assert.equal((await queue.status(remainingUid,code,'cancel-after-draw')).operation.state,'completed');
+ await room.update({cancellationDeadline:now-1});
+ await pub.update({cancellationDeadline:now-1});
+ await submit(removalUid,'cancel','cancel-after-deadline');
+ await queue.drain(code);
+ assert.equal((await queue.status(removalUid,code,'cancel-after-deadline')).operation.reason,'cancel-deadline-passed');
+ assert.equal((await remove(removal)).operation.state,'queued');
+ await queue.drain(code);
  assert.equal((await queue.status(owner,code,'organizer-removal')).operation.result.registrationId,removalUid);
  for(const uid of [remainingUid,removalUid])assert.equal((await room.collection('registrations').doc(uid).get()).data().status,'cancelled');
  assert.equal((await ticket.get()).data().status,'reserved');
