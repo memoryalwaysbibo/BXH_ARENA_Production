@@ -21,7 +21,7 @@ function fixture(){
   'firebase-functions/v2/firestore':{onDocumentCreated:bind},
   'firebase-functions/v2/scheduler':{onSchedule:bind},
   './queue.cjs':{createQueue:()=>queue},
-  './lifecycle.cjs':{createDrawHandler:()=>async()=>{},createStartHandler:()=>async()=>{}}
+  './lifecycle.cjs':{createDrawHandler:()=>async()=>{},createStartHandler:()=>async()=>{},createTicketForfeitHandler:()=>async()=>{}}
  };
  const module={exports:{}};
  runInNewContext(readFileSync(file,'utf8'),{module,require:id=>stubs[id]??localRequire(id)});
