@@ -32,7 +32,7 @@ async function mount(page){
     window.currentAuthUid=()=>window.actor;
     window.partnerOrganizerGrant=()=>window.activeMode==='partner_organizer'?window.BXHPartnerOrganizer?.grant(window.userProfile):null;
     window.isPartnerOrganizerMode=()=>!!window.partnerOrganizerGrant();
-    window.hasAdminAccess=()=>true;window.isAdminTierOrAbove=()=>false;window.canCreateOfficialTournament=()=>true;window.canSupportCommunityRooms=()=>false;
+    window.hasAdminAccess=()=>true;window.isAdminTierOrAbove=()=>false;window.canCreateOfficialTournament=()=>false;window.canSupportCommunityRooms=()=>false;
     window.firebaseUser={uid:'host'};window.state={};
     window.adminTournamentListLoaded=true;window.adminTournamentListBusy=false;window.adminTournamentListError='';window.adminTournamentListFilter='all';window.adminTournamentListItems=[];
     window.adminTournamentListSearch='';window.adminTournamentListSearchDraft='';window.adminTournamentListKind='official';window.adminTournamentListCounts=null;window.adminTournamentListHasMore=false;
@@ -62,43 +62,14 @@ async function testViewport(browser,width){
   try{
     await mount(page);
     assert.deepEqual(errors,[],'partner overview renderer must initialize without page errors');
-    const panel=page.getByRole('region',{name:'我的合作方案'});
-    await expect(panel.getByText('8 場',{exact:true})).toBeVisible();
-    assert.equal(await page.evaluate(()=>window.mock.calls),1);
+    await expect(page.getByRole('region',{name:'我的合作方案'})).toHaveCount(0);
+    await expect(page.getByRole('button',{name:'＋ 新增賽事'})).toHaveCount(0);
+    await expect(page.getByText('賽事管理中心')).toBeVisible();
+    assert.equal(await page.evaluate(()=>window.mock.calls),0);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'horizontal overflow at '+width);
-    await snapshot(page,'contract-'+width);
-    await panel.getByRole('button',{name:'查看合約',exact:true}).click();
-    const dialog=page.getByRole('dialog',{name:'我的合作合約'});
-    await expect(dialog).toBeVisible();
-    await expect(dialog).toContainText('<script>window.unsafeContract=true</script>');
-    assert.equal(await page.evaluate(()=>window.unsafeContract),undefined);
-    assert.equal(await dialog.locator('input,textarea,script').count(),0);
-    const box=await dialog.boundingBox();assert(box.x>=0&&box.x+box.width<=width+1,'dialog overflows at '+width);
-    await snapshot(page,'contract-dialog-'+width);
-    await page.keyboard.press('Tab');await expect(dialog.getByRole('button',{name:'關閉'})).toBeFocused();
-    await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
-    await page.evaluate(()=>{window.mock.used=3;window.dispatchEvent(new Event('bxh-partner-room-created'));});
-    await expect(panel.getByText('7 場',{exact:true})).toBeVisible();
-    await page.evaluate(()=>window.mock.fail=true);
-    await panel.getByRole('button',{name:'重新整理場次'}).click();
-    await expect(panel.getByText(/目前無法讀取合作合約/)).toBeVisible();
-    await expect(panel.getByRole('button',{name:'查看合約',exact:true})).toBeDisabled();
-    assert.equal(await page.evaluate(()=>window.BXHPartnerOrganizer.remainingRooms('DEMO-CONTRACT-001')),null);
-    await snapshot(page,'read-error-'+width);
-    await page.evaluate(()=>window.mock.fail=false);
-    await panel.getByRole('button',{name:'重新整理場次'}).click();await expect(panel.getByText('7 場',{exact:true})).toBeVisible();
-    await page.evaluate(()=>{window.mock.used=10;});await panel.getByRole('button',{name:'重新整理場次'}).click();
-    await expect(panel.getByText('場次已用完',{exact:true})).toBeVisible();await expect(panel.getByText('0 場',{exact:true})).toBeVisible();
-    await snapshot(page,'exhausted-'+width);
-    await page.evaluate(()=>{window.userProfile.partnerOrganizer.scope='manual';delete window.userProfile.partnerOrganizer.orderCode;window.render();});
-    await expect(panel.getByText('手動授權',{exact:true})).toBeVisible();await expect(panel.getByText(/場次額度未設定/)).toBeVisible();
-    await expect(panel.getByRole('button',{name:'查看合約',exact:true})).toHaveCount(0);
-    await snapshot(page,'manual-'+width);
-    // A previous account's delayed contract may not appear after a mode change.
-    await page.evaluate(()=>{window.userProfile.partnerOrganizer.scope='contract';window.userProfile.partnerOrganizer.orderCode='DEMO-CONTRACT-001';window.mock.pending=true;window.render();});
-    await page.waitForFunction(()=>typeof window.mock.resolveOld==='function');
-    await page.evaluate(()=>{window.activeMode='player';window.render();window.mock.resolveOld({orderCode:'DEMO-CONTRACT-001',targetUid:'host',status:'active',includedEvents:999,usedEvents:0});});
-    await expect(panel).toHaveCount(0);assert.equal(await page.getByText('999 場',{exact:true}).count(),0);
+    await snapshot(page,'retired-contract-'+width);
+    await page.evaluate(()=>{window.activeMode='player';window.render();});
+    await expect(page.getByRole('region',{name:'我的合作方案'})).toHaveCount(0);
     assert.deepEqual(errors,[]);results.push({viewport:width,status:'passed'});
   }catch(error){await snapshot(page,'failure-'+width);throw error;}
   finally{await page.close();}
