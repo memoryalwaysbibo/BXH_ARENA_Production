@@ -37,7 +37,15 @@ try{
  await refContext.route('**/*',async route=>{const h=new URL(route.request().url()).hostname;if(h==='firestore.googleapis.com'||h==='identitytoolkit.googleapis.com'||h==='securetoken.googleapis.com'||h.endsWith('.firebaseio.com')||h.endsWith('.cloudfunctions.net')||h.endsWith('.run.app')||h==='bxh-arena.firebaseapp.com'){blocked.push(route.request().url());return route.abort('blockedbyclient');}return route.continue();});
  const ref=await refContext.newPage();debugPages.push(ref);ref.on('pageerror',e=>errors.push(String(e)));ref.setDefaultTimeout(30000);
  await ref.goto('http://127.0.0.1:4173/?bxh_e2e=1');await ref.locator('[data-action="select-role-admin"]').click();await ref.waitForFunction(()=>window.cloudAuth?.isReady());
- await ref.locator('#auth-username').fill(refEmail);await ref.locator('#auth-password').fill(password);await ref.locator('[data-action="admin-login-submit"]').click();await ref.locator('[data-action="switch-tab"][data-tab="referee"]').waitFor();
+ // Auth initialization can re-render login inputs after isReady. Retry only UI filling, never bypass auth.
+ for(let attempt=0;attempt<3;attempt++){
+  await ref.locator('#auth-username').fill(refEmail);await ref.locator('#auth-password').fill(password);
+  await ref.waitForTimeout(200);
+  if(await ref.locator('#auth-username').inputValue()!==refEmail||await ref.locator('#auth-password').inputValue()!==password)continue;
+  await ref.locator('[data-action="admin-login-submit"]').click();
+  try{await ref.locator('[data-action="switch-tab"][data-tab="referee"]').waitFor({timeout:10000});break;}catch(e){if(attempt===2)throw e;}
+ }
+ await ref.locator('[data-action="switch-tab"][data-tab="referee"]').waitFor();
  console.log('PASS full app staff Auth/session login');
  // Synthetic entry exposes the real management join handler; scoring controls are original app DOM.
  await ref.evaluate(code=>{const b=document.createElement('button');b.id='demo-managed-entry';b.style.cssText='position:fixed;bottom:12px;right:12px;z-index:100';b.dataset.action='cloud-admin-open-tournament';b.dataset.code=code;b.textContent='Demo managed room';document.body.append(b);},code);
