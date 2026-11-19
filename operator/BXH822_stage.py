@@ -114,7 +114,7 @@ def queue_source(live, base, candidate):
 
 
 def family_source(live, patcher):
-    need(digest(live) == "92facece6ca742aaa4e0e375a2fcbb9e6b9c47449f8ae790f6fe95f5dde72d",
+    need(digest(live) == "92facece6ca742aaa4e0e375a2fcbb9e6b9b9c47449f8ae790f6fe95f5dde72d",
          "family writer changed")
     lines = patcher.decode().splitlines(keepends=True)
     start = [i for i, line in enumerate(lines) if "'  const quick=quickPolicy" in line]
