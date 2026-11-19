@@ -1,4 +1,5 @@
 """Prepare local #822 candidates from the six verified revisions."""
+from copy import copy
 import hashlib
 import io
 import json
@@ -162,7 +163,8 @@ def prepare(name, original, repo):
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as result:
             for entry in source.infolist():
                 payload = replacements[entry.filename] if entry.filename in replacements else source.read(entry)
-                result.writestr(entry, payload)
+                # ZIP writes update offsets on the supplied entry.
+                result.writestr(copy(entry), payload)
             for filename in EXTRA:
                 path = BACKEND + filename
                 result.writestr(path, replacements[path])
