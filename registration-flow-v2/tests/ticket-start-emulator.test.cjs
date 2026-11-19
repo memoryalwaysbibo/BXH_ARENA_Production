@@ -5,7 +5,7 @@ const {test,after}=require('node:test');
 const {randomBytes}=require('node:crypto');
 const {db,service,handlers}=require('./harness.cjs');
 const {createApi}=require('../backend/api.cjs');
-const {createTicketRoomHandler,createTicketRoomStateHandler}=require('../backend/ticket-room-create.cjs');
+const {createTicketRoomHandler,createTicketRoomStateHandler,createTicketRemoveHandler}=require('../backend/ticket-room-create.cjs');
 const {createStartHandler,createDrawHandler}=require('../backend/lifecycle.cjs');
 
 after(()=>db.terminate());
@@ -64,7 +64,7 @@ test('ticket room creation reserves once and only a successful start consumes th
  const statusRequest={auth:creation.auth,app:creation.app,data:{action:'ticket-room-state',code}};
  await assert.rejects(status({...statusRequest,auth:{uid:other}}),/permission-denied/);
  const waiting=await status(statusRequest);
- assert.deepEqual(waiting,{ok:true,code,roomId,name:'Fixture',phase:'waiting',startAt:now+600000,drawId:null,rosterRevision:0,eligibleCount:0});
+ assert.deepEqual(waiting,{ok:true,code,roomId,name:'Fixture',phase:'waiting',startAt:now+600000,drawId:null,rosterRevision:0,eligibleCount:0,drawReady:false,participants:[]});
  await assert.rejects(create({...creation,data:{...creation.data,name:'Changed'}}),/operation-conflict/);
  const otherCode=code+'B';
  await release.update({roomCode:otherCode});
@@ -110,27 +110,31 @@ test('ticket room creation reserves once and only a successful start consumes th
  await pub.update({ladderMode:'ranked',capacity:64});
  await assert.rejects(draw(request),/ticket-capacity-invalid/);
  await pub.update({capacity:32});
- const result=await draw(request);
+ const firstDraw=await draw(request);
  assert.equal((await ticket.get()).data().status,'reserved');
- const [drawnPrivate,drawnPublic]=await db.getAll(room,pub);
- const registration=room.collection('registrations').doc(remainingUid);
- assert.equal((await registration.get()).data().status,'confirmed');
+ const confirmed=await status(statusRequest);
+ assert.equal(confirmed.drawReady,true);
+ const removalUid=confirmed.participants.find(player=>player.registrationId!==remainingUid).registrationId;
+ const remove=createTicketRemoveHandler({db,queue,enabled:async candidate=>candidate===code,clock:()=>now});
+ const removal={auth:creation.auth,app:creation.app,data:{action:'ticket-room-remove',code,
+  registrationId:removalUid,operationId:'organizer-removal'}};
+ await assert.rejects(remove({...removal,auth:{uid:other}}),/permission-denied/);
  await submit(remainingUid,'cancel','cancel-after-draw');
- await submit(remainingUid,'cancel','cancel-legacy-route','roster');
+ assert.equal((await remove(removal)).operation.state,'queued');
  await queue.drain(code);
- for(const id of ['cancel-after-draw','cancel-legacy-route']){
-  const rejected=(await queue.status(remainingUid,code,id)).operation;
-  assert.equal(rejected.state,'rejected');
-  assert.equal(rejected.reason,'roster-locked');
- }
- assert.equal((await registration.get()).data().status,'confirmed');
- const [lockedPrivate,lockedPublic]=await db.getAll(room,pub);
- assert.deepEqual(lockedPrivate.data(),drawnPrivate.data());
- assert.deepEqual(lockedPublic.data(),drawnPublic.data());
+ assert.equal((await queue.status(remainingUid,code,'cancel-after-draw')).operation.state,'completed');
+ assert.equal((await queue.status(owner,code,'organizer-removal')).operation.result.registrationId,removalUid);
+ for(const uid of [remainingUid,removalUid])assert.equal((await room.collection('registrations').doc(uid).get()).data().status,'cancelled');
  assert.equal((await ticket.get()).data().status,'reserved');
- assert.equal((await status(statusRequest)).rosterRevision,synced.rosterRevision);
-
- const startData={code,roomId,drawId:result.drawId,rosterRevision:synced.rosterRevision,confirmEarlyStart:true,operationId:'ticket-fixture-start'};
+ const changed=await status(statusRequest);
+ assert.equal(changed.eligibleCount,29);
+ assert.equal(changed.drawReady,false);
+ assert.equal(changed.drawId,firstDraw.drawId);
+ await assert.rejects(start({auth:{uid:owner},data:{code,roomId,drawId:firstDraw.drawId,
+  rosterRevision:changed.rosterRevision,confirmEarlyStart:true,operationId:'stale-ticket-bracket'}}),/bracket-roster-changed/);
+ const result=await draw({auth:{uid:owner},data:{...request.data,baseDrawId:firstDraw.drawId,
+  rosterRevision:changed.rosterRevision,operationId:'ticket-reshuffle'}});
+ const startData={code,roomId,drawId:result.drawId,rosterRevision:changed.rosterRevision,confirmEarlyStart:true,operationId:'ticket-fixture-start'};
  const startRequest={auth:{uid:owner},data:startData};
  await assert.rejects(start({...startRequest,data:{...startData,drawId:'wrong-draw'}}),/bracket-version-conflict/);
  await ticket.update({expiresAt:now});
@@ -152,8 +156,10 @@ test('ticket room creation reserves once and only a successful start consumes th
  assert.equal(savedPub.data().ticketAccessV1,undefined);
  const live=await status(statusRequest);
  assert.equal(live.phase,'live');
- assert.equal(live.eligibleCount,31);
+ assert.equal(live.eligibleCount,29);
  assert.equal(live.drawId,result.drawId);
+ await assert.rejects(remove({...removal,data:{...removal.data,operationId:'late-host-cancel'}}),/tournament-started/);
+ await assert.rejects(submit(other,'cancel','late-player-cancel'),/tournament-started/);
  await release.update({enabled:false});
  assert.equal((await start(startRequest)).replayed,true);
  await assert.rejects(start({...startRequest,data:{...startData,operationId:'ticket-fresh-start'}}),/bracket-started/);
