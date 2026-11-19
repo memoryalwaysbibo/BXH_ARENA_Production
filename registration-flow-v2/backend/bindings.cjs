@@ -6,7 +6,7 @@ const {createQueue}=require('./queue.cjs');
 const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
 const {createStartHandler,createDrawHandler}=require('./lifecycle.cjs');
-const {createTicketRoomHandler,createTicketRoomStateHandler}=require('./ticket-room-create.cjs');
+const {createTicketRoomHandler,createTicketRoomStateHandler,createTicketRemoveHandler}=require('./ticket-room-create.cjs');
 function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled,pilotRoom=null,retiredRoom=null,retiredRooms=[]}){
  if(createFamilyRegistration?.v2CapacityAware!==true)throw Error('queue-family-capacity-source-required');
  const familyFactory=store=>createFamilyRegistration(store,Date.now,{myEventsProofEnabled:true});
@@ -44,6 +44,7 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
  const ticketRoomActions={
   'create-ticket-room':createTicketRoomHandler({db}),
   'ticket-room-state':createTicketRoomStateHandler({db}),
+  'ticket-room-remove':createTicketRemoveHandler({db,queue,enabled:intakeEnabled}),
  };
  const registrationRosterQueueV2=bind(req=>{
   const action=req.data?.action;
