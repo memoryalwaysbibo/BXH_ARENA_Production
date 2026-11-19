@@ -193,3 +193,28 @@ test('ticket organizer can remove an entrant before start and must redraw',async
  room.phase='live';await t.ui.load('ticket-room-state');
  assert.doesNotMatch(t.ui.shop(),/commerce-ticket-remove/);
 });
+
+test('ticket organizer can record a single match forfeit only after start',async()=>{
+ const t=setup(),code='BXH-TICKETTEST',calls=[];
+ const match={id:'match-1',seq:0,round:0,a:{id:'a',name:'選手甲'},b:{id:'b',name:'選手乙'},updatedAt:123};
+ const room={ok:true,code,roomId:'test-ticket-room',phase:'waiting',name:'Fixture',eligibleCount:2,
+  rosterRevision:4,drawId:'draw',drawReady:true,matches:[match]};
+ t.sandbox.window.BXH_TICKET_ROOM_PILOT_CODE=code;
+ t.sandbox.window.engagementService.ticketRoomOperation=async payload=>{
+  calls.push(JSON.parse(JSON.stringify(payload)));
+  return payload.action==='ticket-room-state'?{...room}:{ok:true};
+ };
+ t.ui.shop();await t.ui.handle('commerce-open-tickets',{});
+ t.ui.context().tickets=[];
+ assert.match(t.ui.shop(),/管理試點賽事/);
+ await t.ui.handle('commerce-ticket-room',{});
+ const target={dataset:{id:match.id,side:'b'}};
+ await t.ui.handle('commerce-ticket-forfeit',target);
+ assert.equal(calls.length,1);
+ room.phase='live';await t.ui.load('ticket-room-state');
+ assert.match(t.ui.shop(),/選手乙 棄權/);
+ await t.ui.handle('commerce-ticket-forfeit',target);
+ assert.deepEqual(calls.at(-1),{action:'ticket-room-forfeit',code,roomId:room.roomId,matchId:match.id,
+  playerId:'b',opponentId:'a',matchUpdatedAt:123,operationId:'same-operation'});
+ assert.match(t.ui.shop(),/已登記棄權，對手晉級/);
+});
