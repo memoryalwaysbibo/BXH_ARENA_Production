@@ -108,7 +108,14 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
      const roomReads=requireRoomOwnership?[target.doc('tournaments/'+code)]:[];
      const [ls,js,room]=await tx.getAll(roomRef(code),ref,...roomReads);checkLease(ls.data(),token);
      if(js.data()?.state!=='running'||js.data()?.workerToken!==token)throw fail('queue-lease-lost');
-     if(requireRoomOwnership&&!registrationQueueOwnsRoom(room?.data()))throw fail('registration-queue-disabled');
+     const currentRoom=room?.data();
+     if(requireRoomOwnership&&!registrationQueueOwnsRoom(currentRoom))throw fail('registration-queue-disabled');
+     if(js.data().payload.action==='cancel'&&(currentRoom?.eventAuthority==='ticket'||currentRoom?.ticketAccessV1)){
+      let state;
+      try{state=JSON.parse(currentRoom.data);}catch{throw fail('corrupt-state');}
+      if(!state||!Array.isArray(state.players))throw fail('corrupt-state');
+      if(currentRoom.bracketSize||state.bracketDraw?.id||state.drawnAt||state.bracketSize||state.matches?.length)throw fail('roster-locked');
+     }
      // The operation result and all registration mutations commit atomically.
      // A lost response cannot leave a committed registration with an absent
      // completion marker. A new lease invalidates the old transaction's read.
