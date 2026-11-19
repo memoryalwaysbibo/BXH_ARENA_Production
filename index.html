@@ -196,6 +196,11 @@
 
 <script src="modules/main-app/ladder-location.js?v=20261019.1"></script>
 <link rel="stylesheet" href="commerce.css?v=20261031.1">
+<script>
+  if (new URLSearchParams(location.search).get("ticketPilot") === "BXH-TKFB6E3F94") {
+    window.BXH_TICKET_ROOM_PILOT_CODE = "BXH-TKFB6E3F94";
+  }
+</script>
 <script src="commerce-ui.js?v=20261119-ticket-room.1"></script>
 <script src="inventory-ui.js?v=13.31.6"></script>
 <script src="inventory-catalog-ui.js?v=3"></script>
