@@ -1,0 +1,44 @@
+name: Public Score Mobile Isolated Lab
+on:
+  push:
+    branches: ['lab/public-score-mobile-20261119']
+    paths:
+      - 'tests/public-score-mobile-lab/**'
+      - '.github/workflows/public-score-mobile-lab.yml'
+permissions:
+  contents: read
+concurrency:
+  group: public-score-mobile-lab-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  mobile-lab:
+    if: github.ref == 'refs/heads/lab/public-score-mobile-20261119'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install locked isolated dependencies
+        working-directory: tests/public-score-mobile-lab
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install supported Chromium
+        working-directory: tests/public-score-mobile-lab
+        run: ./node_modules/.bin/playwright install --with-deps chromium
+      - name: Run demo-only SDK and mobile viewport qualification
+        run: bash tests/public-score-mobile-lab/run-ci.sh
+      - name: Retain synthetic lab evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-score-mobile-lab
+          path: tests/public-score-mobile-lab/evidence/
+          retention-days: 7
+          if-no-files-found: warn

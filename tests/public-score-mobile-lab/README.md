@@ -1,0 +1,11 @@
+# Isolated public-score mobile lab, NOT release code
+
+Dedicated lab branch only. No production pages, rules, functions, frontend assets or cloudUnsub changed. No secrets, cloud credentials, deploy, PR or merge. Workflow has contents:read, exact branch filter and a unique name not referenced by the production deployment workflow. Reviewed main baseline: 2cee2efaebefcd876103aeac3cd1ffd6c604f427. Its existing push workflows are main/refactor/preview-specific; production deploy only follows Validate Production Frontend RC1 push success on main.
+
+Only synthetic data in fixed demo-arena-public-delta at 127.0.0.1:18786. REST owner header is the emulator's local test bypass, NOT a real credential. Recursive narrow public schema rejects unknown private fields. Client writes/private reads are denied by LAB rules. Fixtures import the repository publicProjection but do not execute real scoring commands or generate a valid tournament bracket.
+
+Versions: firebase 11.10.0, Playwright 1.55.0, esbuild 0.25.5, package-lock; emulator 1.19.8 official URL with SHA-256 check. Browser uses Playwright-installed Chromium, sandbox enabled. Do not disable security settings or use another launch path to evade a denied operation.
+
+Run `bash tests/public-score-mobile-lab/run-ci.sh` after npm ci and supported Playwright Chromium installation; RUNNER_TEMP required. Logs and screenshots are synthetic. Browser tests cover a miniature lab page at 390x844 and 844x390, route buttons, reconnect, rollback and visibility revocation. pagehide/pageshow are synthetic DOM events, NOT real mobile OS suspension. This is not production ARENA visual QA. SDK fixture is 96 players / 95 match records / 6 test courts, not a chosen live room.
+
+No claim of production readiness: actual room baseline, scoring engine/ranked settlement, browser/device production UI, real auth transitions, operational writer concurrency and migration/rollback still needed. JSON byte counts are not network or billing savings. Current spectator scope is active room/route, not viewport-level match pagination.

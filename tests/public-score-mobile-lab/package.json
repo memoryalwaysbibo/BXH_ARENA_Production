@@ -1,0 +1,12 @@
+{
+  "name": "arena-public-score-mobile-lab",
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": {
+    "firebase": "11.10.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.5",
+    "playwright": "1.55.0"
+  }
+}

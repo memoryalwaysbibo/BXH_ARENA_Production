@@ -1,0 +1,17 @@
+import {initializeApp} from 'firebase/app';
+import {initializeFirestore,connectFirestoreEmulator} from 'firebase/firestore';
+import schema from './public-schema.cjs';
+import {spectatorTransport} from './spectator-transport.mjs';
+import {createSpectator} from './spectator-lifecycle.mjs';
+import {bindSpectatorLifecycle} from './browser-lifecycle.mjs';
+const app=initializeApp({projectId:'demo-arena-public-delta',apiKey:'demo',appId:'demo-mobile'});
+const db=initializeFirestore(app,{experimentalForceLongPolling:true});connectFirestoreEmulator(db,'127.0.0.1',18786);
+const room=new URL(location.href).searchParams.get('room');if(!/^mobile96-(390|844)$/.test(room))throw Error('invalid-lab-room');
+let active=0,callbacks=0,route='spectator',identity='guest';const states=[],raw=spectatorTransport(db);
+const wrap=stop=>{active++;let closed=false;return()=>{if(!closed){closed=true;active--;stop();}};};
+const transport={...raw,subscribe(r,c,e){const s=raw.subscribe(r,p=>{callbacks++;c(p);},e);return {...s,stop:wrap(s.stop)};},legacy(r,c,e){return wrap(raw.legacy(r,v=>{callbacks++;c(v);},e));},watchAccess(r,c,e){return wrap(raw.watchAccess(r,c,e));}};
+const spectator=createSpectator({transport,validateView:schema.validate,onClear(){document.querySelector('#score').textContent='';},onView(v,m){document.querySelector('#score').textContent=String(v.matches[0].scoreA);document.querySelector('#source').textContent=m.source;},onStatus(s){states.push(s);document.querySelector('#status').textContent=s.state;}});
+const binding=bindSpectatorLifecycle({window,document,spectator,context:()=>({route,identity,room,epoch:'e-'+room}),onError:e=>states.push({state:'error',message:String(e)})});
+for(const button of document.querySelectorAll('[data-route]'))button.onclick=()=>{route=button.dataset.route;window.dispatchEvent(new Event('spectator-route-change'));};
+window.lab={binding,spectator,states,metrics:()=>({active,callbacks}),identity(value){identity=value;window.dispatchEvent(new Event('spectator-identity-change'));}};
+await binding.sync();window.lab.ready=true;
