@@ -77,7 +77,7 @@ test('ticket room creation reserves once and only a successful start consumes th
  await profiles.commit();
  const queue=service({requireRoomOwnership:true});
  const api=createApi({queue,family:handlers.family(db),enabled:async candidate=>candidate===code});
- const submit=(uid,action,operationId)=>api({auth:{uid},data:{action:'submit',code,operation:{route:'family',code,operationId,
+ const submit=(uid,action,operationId,route='family')=>api({auth:{uid},data:{action:'submit',code,operation:{route,code,operationId,
   payload:{action,code,operationId,...(action==='join'?{childIds:[null],childEligibilityConfirmed:true}:{registrationId:uid,intent:'player'})}}}});
  const ops=playerIds.map((uid,i)=>({uid,id:'join-ticket-'+i}));
  for(const {uid,id} of ops)assert.equal((await submit(uid,'join',id)).operation.state,'queued');
@@ -86,10 +86,16 @@ test('ticket room creation reserves once and only a successful start consumes th
  assert.equal(results.filter(x=>x.operation.state==='completed').length,32);
  assert.equal(results.filter(x=>x.operation.state==='rejected'&&x.operation.reason==='full').length,1);
  const cancelUid=ops[results.findIndex(x=>x.operation.state==='completed')].uid;
- const synced=(await status(statusRequest));
- assert.equal(synced.eligibleCount,32);
+ const full=await status(statusRequest);
+ assert.equal(full.eligibleCount,32);
  assert.equal((await pub.get()).data().confirmedCount,32);
  assert.equal(JSON.parse((await pub.get()).data().bracketView).players.length,32);
+ await submit(cancelUid,'cancel','cancel-before-draw');
+ await queue.drain(code);
+ assert.equal((await queue.status(cancelUid,code,'cancel-before-draw')).operation.state,'completed');
+ const synced=await status(statusRequest);
+ assert.equal(synced.eligibleCount,31);
+ const remainingUid=ops.find(({uid},i)=>uid!==cancelUid&&results[i].operation.state==='completed').uid;
  const options={db,clock:()=>now,enabled:async candidate=>candidate===code};
  const draw=createDrawHandler(options),start=createStartHandler(options);
  const request={auth:{uid:owner},data:{code,roomId,baseDrawId:null,rosterRevision:synced.rosterRevision,operationId:'ticket-fixture-draw'}};
@@ -104,19 +110,27 @@ test('ticket room creation reserves once and only a successful start consumes th
  await pub.update({ladderMode:'ranked',capacity:64});
  await assert.rejects(draw(request),/ticket-capacity-invalid/);
  await pub.update({capacity:32});
- const firstDraw=await draw(request);
+ const result=await draw(request);
  assert.equal((await ticket.get()).data().status,'reserved');
- await submit(cancelUid,'cancel','cancel-ticket-first');
+ const [drawnPrivate,drawnPublic]=await db.getAll(room,pub);
+ const registration=room.collection('registrations').doc(remainingUid);
+ assert.equal((await registration.get()).data().status,'confirmed');
+ await submit(remainingUid,'cancel','cancel-after-draw');
+ await submit(remainingUid,'cancel','cancel-legacy-route','roster');
  await queue.drain(code);
- assert.equal((await queue.status(cancelUid,code,'cancel-ticket-first')).operation.state,'completed');
- const latest=await status(statusRequest);
- assert.equal(latest.eligibleCount,31);
- await assert.rejects(start({auth:{uid:owner},data:{code,roomId,drawId:firstDraw.drawId,
-  rosterRevision:synced.rosterRevision,confirmEarlyStart:true,operationId:'ticket-stale-start'}}),/registration-roster-stale/);
- const result=await draw({auth:{uid:owner},data:{...request.data,baseDrawId:firstDraw.drawId,
-  rosterRevision:latest.rosterRevision,operationId:'ticket-fixture-redraw'}});
+ for(const id of ['cancel-after-draw','cancel-legacy-route']){
+  const rejected=(await queue.status(remainingUid,code,id)).operation;
+  assert.equal(rejected.state,'rejected');
+  assert.equal(rejected.reason,'roster-locked');
+ }
+ assert.equal((await registration.get()).data().status,'confirmed');
+ const [lockedPrivate,lockedPublic]=await db.getAll(room,pub);
+ assert.deepEqual(lockedPrivate.data(),drawnPrivate.data());
+ assert.deepEqual(lockedPublic.data(),drawnPublic.data());
+ assert.equal((await ticket.get()).data().status,'reserved');
+ assert.equal((await status(statusRequest)).rosterRevision,synced.rosterRevision);
 
- const startData={code,roomId,drawId:result.drawId,rosterRevision:latest.rosterRevision,confirmEarlyStart:true,operationId:'ticket-fixture-start'};
+ const startData={code,roomId,drawId:result.drawId,rosterRevision:synced.rosterRevision,confirmEarlyStart:true,operationId:'ticket-fixture-start'};
  const startRequest={auth:{uid:owner},data:startData};
  await assert.rejects(start({...startRequest,data:{...startData,drawId:'wrong-draw'}}),/bracket-version-conflict/);
  await ticket.update({expiresAt:now});
