@@ -891,7 +891,7 @@
     if(!allowAnonymous&&(!authReady || !authHandle || !authHandle.currentUser)) throw new Error("auth-required");
     if(!functionsHandle || !fnx) throw new Error("service-unavailable");
     try{
-      if(['hunterClashCommand','groupStageCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','adminOverrideRoster','adminRecoverOnsiteWaitlist','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload','ladderTeamDisplay','registrationDrawV2','registrationStartV2'].includes(name)||(name==='registrationRosterQueueV2'&&['create-ticket-room','ticket-room-state'].includes(payload?.action))){
+      if(['hunterClashCommand','groupStageCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','adminOverrideRoster','adminRecoverOnsiteWaitlist','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload','ladderTeamDisplay','registrationDrawV2','registrationStartV2'].includes(name)||(name==='registrationRosterQueueV2'&&['create-ticket-room','ticket-room-state','ticket-room-remove'].includes(payload?.action))){
         const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);
         if(!verified){const err=new Error('網站驗證未完成，請重新嘗試。');err.code='functions/permission-denied';err.details={reason:'app-check-unavailable'};throw err;}
         if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
@@ -1036,6 +1036,21 @@
     registrationManagementOperation,
     async ticketRoomOperation({action,code,...payload}){
       if(code!==window.BXH_TICKET_ROOM_PILOT_CODE||typeof code!=='string'||!/^BXH-[A-Z0-9]{4,16}$/.test(code))throw Error('ticket-lifecycle-disabled');
+      if(action==='ticket-room-remove'){
+        const {operationId,registrationId}=payload;
+        const poll=()=>callEngagementFunction('registrationRosterQueueV2',{action:'status',code,operationId},8000);
+        let reply=await callEngagementFunction('registrationRosterQueueV2',{action,code,operationId,registrationId},8000);
+        const deadline=Date.now()+18000;
+        while(reply?.operation?.operationId===operationId){
+          const operation=reply.operation;
+          if(operation.state==='rejected')throw Error(operation.reason);
+          if(operation.state==='completed'&&operation.result?.ok===true&&operation.result.status==='cancelled'&&operation.result.registrationId===registrationId)return {ok:true};
+          if(!['queued','running'].includes(operation.state)||Date.now()>=deadline)break;
+          await new Promise(resolve=>setTimeout(resolve,1000));
+          reply=await poll();
+        }
+        throw Error('registration-operation-unconfirmed');
+      }
       if(['create-ticket-room','ticket-room-state'].includes(action))return callEngagementFunction('registrationRosterQueueV2',{...payload,action,code},30000);
       if(['ticket-room-draw','ticket-room-start'].includes(action))return callEngagementFunction(action==='ticket-room-draw'?'registrationDrawV2':'registrationStartV2',{...payload,code},30000);
       throw Error('invalid-action');
