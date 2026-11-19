@@ -148,7 +148,7 @@ function commitDraw({state,mirror,uid,now,id,drawSeed}){
  if(!Number.isSafeInteger(revision)||revision<1)throw Error('bracket-version-conflict');
  if(!engine.generateSingleElim())throw Error('bracket-roster-changed');
  engine.rebuildCourtAssignments();
- state.bracketDraw={id,revision,at:now,actorUid:uid};
+ state.bracketDraw={id,revision,at:now,actorUid:uid,...(state.meta?.eventAuthority==='ticket'?{rosterRevision:state.registrationRosterRevision??0}:{})};
  state.bracketDrawHistory=[...(state.bracketDrawHistory||[]),state.bracketDraw].slice(-20);
  Object.assign(mirror,{bracketSize:state.bracketSize,drawnAt:now,championId:null,runnerUpId:null,thirdId:null,fourthId:null});
  mirror.matches=state.matches.map(match=>({
