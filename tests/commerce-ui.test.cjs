@@ -32,6 +32,20 @@ test('management UI and backend wrapper are wired without granting staff commerc
  assert.ok(!s.window.BXH_MANAGEMENT_UI_V2.renderRails('live',['live','duty']).includes('commerce-admin'));
  assert.match(fs.readFileSync(path.join(root,'modules/cloud/cloud-runtime.js'),'utf8'),/commerce\(payload\).*commerceService/);
 });
+test('partner organizer can open the storefront and orders in both management interfaces',()=>{
+ const root=path.join(__dirname,'..'),core=fs.readFileSync(path.join(root,'modules/main-app/core.js'),'utf8');
+ assert.match(core,/if\(isPartnerOrganizerMode\(\)\)tabs\.splice\([^\n]+commerce-shop[^\n]+commerce-orders/);
+ assert.match(core,/activeTab==="commerce-shop"\) content = window\.BXHCommerce\.shop\(\)/);
+ assert.match(core,/activeTab==="commerce-orders"\) content = window\.BXHCommerce\.orders\(\)/);
+ assert.match(core,/targetTab==='commerce-shop'\|\|targetTab==='commerce-orders'\)\&\&!isPartnerOrganizerMode\(\)/);
+ assert.match(core,/data-action="switch-tab" data-tab="commerce-shop">商城/);
+ const s={window:{}};
+ vm.runInNewContext(fs.readFileSync(path.join(root,'modules/management-v2/navigation.js'),'utf8'),s);
+ const nav=s.window.BXH_MANAGEMENT_UI_V2;
+ assert.match(nav.renderRails('commerce-shop',['management','commerce-shop','commerce-orders']),/data-management-v2-tab="commerce-shop"/);
+ assert.match(nav.renderRails('commerce-orders',['management','commerce-shop','commerce-orders']),/data-management-v2-tab="commerce-orders"/);
+ assert.ok(!nav.renderRails('management',['management','live']).includes('data-management-v2-group="commerce"'));
+});
 test('an old admin catalog response cannot populate the player shop after navigation',async()=>{
  const t=setup();t.setAdmin(true);t.ui.adminPage();
  let resolve;t.sandbox.window.engagementService.commerce=()=>new Promise(r=>resolve=r);

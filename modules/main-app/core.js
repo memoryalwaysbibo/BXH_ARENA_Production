@@ -20259,6 +20259,7 @@ function accountMenuItemsHtml(){
     <button data-action="account-logout" class="danger">登出系統</button>
   ` : `
     <button data-action="account-goto-home">返回系統首頁</button>
+    ${isPartnerOrganizerMode() ? `<button data-action="switch-tab" data-tab="commerce-shop">商城</button><button data-action="switch-tab" data-tab="commerce-orders">我的訂單</button>` : ""}
     ${isSuperAdmin() ? `<button data-action="open-account-management">帳號管理</button>` : ""}
     ${(userProfile && roleAllowsMode(userProfile.role,"player")) ? `<button data-action="switch-to-player-mode">切換至玩家模式</button><button data-action="account-open-checkin">每日簽到</button>` : ""}
     ${themePickerHtml()}
@@ -21186,6 +21187,7 @@ function renderApp(){
   if(!hasAdminAccess()&&state.meta?.eventAuthority==='community'&&canUseRefereeSeatCommands())tabs.splice(2,0,['referee','裁判台']);
   if(hasAdminAccess()&&canManageMemberRaffles())tabs.splice(1,0,["member-raffles","會員抽獎管理"]);
   if(isSuperAdmin())tabs.splice(1,0,["inventory-admin","道具管理"],["commerce-admin","商城管理"]);
+  if(isPartnerOrganizerMode())tabs.splice(1,0,["commerce-shop","商城"],["commerce-orders","我的訂單"]);
   if(window.BXH_REFEREE_CERTIFICATES_V1===true){
     tabs=tabs.filter(t=>t[0]!=='duty');
     if(canManageRefereeCertificates())tabs.splice(1,0,['referee-admin','裁判管理']);
@@ -21194,6 +21196,7 @@ function renderApp(){
   if(activeTab==='member-raffles'&&(!hasAdminAccess()||!canManageMemberRaffles()))activeTab='live';
   if(activeTab==='inventory-admin'&&!isSuperAdmin())activeTab='live';
   if(activeTab==='commerce-admin'&&!isSuperAdmin())activeTab='live';
+  if((activeTab==='commerce-shop'||activeTab==='commerce-orders')&&!isPartnerOrganizerMode())activeTab='management';
   if(window.BXHTeamAdminPreview?.visible?.())tabs.push(["team-preview","戰隊"]);
   if(activeTab==='team-preview'&&!window.BXHTeamAdminPreview?.visible?.())activeTab='live';
   let content = "";
@@ -21201,6 +21204,8 @@ function renderApp(){
   else if(activeTab==="member-raffles") content = renderRafflePage();
   else if(activeTab==="inventory-admin") content = renderInventoryAdminPage();
   else if(activeTab==="commerce-admin") content = window.BXHCommerce.adminPage();
+  else if(activeTab==="commerce-shop") content = window.BXHCommerce.shop();
+  else if(activeTab==="commerce-orders") content = window.BXHCommerce.orders();
   else if(activeTab==="referee-admin") content = renderRefereeLicensePage('admin');
   else if(activeTab==="team-preview") content = window.BXHTeamAdminPreview.page();
   else if(activeTab==="ladder") content = wrapBracketWatermark(renderLadderLeaderboardPage(hasAdminAccess()));
@@ -22422,6 +22427,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const targetTab = target.getAttribute("data-tab");
     if(targetTab==='member-raffles'&&(!hasAdminAccess()||!canManageMemberRaffles())){showToast('目前身分沒有此操作權限。',true);return;}
     if(targetTab==='commerce-admin'&&!isSuperAdmin()){showToast('目前身分沒有商城管理權限。',true);return;}
+    if((targetTab==='commerce-shop'||targetTab==='commerce-orders')&&!isPartnerOrganizerMode()){showToast('目前身分沒有此操作權限。',true);return;}
     if(targetTab==='inventory-admin'&&!isSuperAdmin()){showToast('目前身分沒有道具管理權限。',true);return;}
     if(targetTab==='team-preview'&&!window.BXHTeamAdminPreview?.visible?.()){showToast('目前身分沒有戰隊預覽權限。',true);return;}
     if((targetTab==="management" || targetTab==="settings" || targetTab==="registrations" || targetTab==="people"
