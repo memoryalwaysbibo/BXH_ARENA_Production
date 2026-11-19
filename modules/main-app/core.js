@@ -21180,6 +21180,18 @@ function renderRefereeCourtView(app,html){
   return false;
 }
 
+let adminMailboxRefreshTimer=null;
+function ensureAdminMailboxRefresh(){
+  if(adminMailboxRefreshTimer)return;
+  adminMailboxRefreshTimer=setTimeout(()=>{
+    adminMailboxRefreshTimer=null;
+    if(appPhase==='app'&&isSuperAdmin()&&firebaseUser?.uid){
+      if(document.visibilityState!=='hidden')loadMailbox(true);
+      ensureAdminMailboxRefresh();
+    }
+  },120000);
+}
+
 function renderApp(){
   const app = document.getElementById("app");
   const allTabs = [["management","賽事管理"],["ladder","排行榜"],["live","即時戰況"],["bracket","對戰表"],["referee","裁判台"],["duty","我的執勤"],["registrations","報名管理"],["settings","賽事設定"],["people","人員管理"],["operations","抽獎與維護"],["history","賽事紀錄"],["version","版本更新"]];
@@ -21201,6 +21213,7 @@ function renderApp(){
   if(activeTab==='team-preview'&&!window.BXHTeamAdminPreview?.visible?.())activeTab='live';
   const adminMail=mailboxContext();
   if(isSuperAdmin()&&adminMail.messages===null&&!adminMail.loading&&!adminMail.busy&&!adminMail.error)setTimeout(()=>loadMailbox(false),0);
+  if(isSuperAdmin())ensureAdminMailboxRefresh();
   let content = "";
   if(isSuperAdmin()&&adminMail.open) content = renderMailboxPage();
   else if(activeTab==="management") content = renderTournamentManagementTab();
