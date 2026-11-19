@@ -6177,7 +6177,7 @@ function canLinkGoogleAccount(){
 }
 function isAdminTierOrAbove(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="super_admin" || userProfile.role==="admin")); }
 function isStaffTier(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="staff" || isPartnerOrganizerMode() || isEventStaffMode())); }
-function canCreateOfficialTournament(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="super_admin" || userProfile.role==="admin" || userProfile.role==="staff" || isPartnerOrganizerMode())); }
+function canCreateOfficialTournament(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="super_admin" || userProfile.role==="admin" || userProfile.role==="staff")); }
 function currentAuthUid(){ return (firebaseUser&&firebaseUser.uid)||null; }
 function canManageRefereeCertificates(){
   return !!(currentAuthUid()&&userProfile?.active===true&&userProfile.isTestAccount!==true&&userProfile.deleted!==true&&userProfile.role==='super_admin'&&!['deleted','disabled','frozen'].includes(userProfile.accountStatus));
@@ -20731,7 +20731,7 @@ function renderTournamentManagementTab(){
   }
 
   if(savedNotice)locateSettingsSavedCard();
-  return `${savedNotice?`<div class="banner" role="status">✓ 賽事設定已儲存｜${esc(savedNotice.code)}</div>`:""}${isPartnerOrganizerMode()?window.BXHPartnerOrganizer?.renderOverview?.(userProfile)||'':''}<div class="panel">
+  return `${savedNotice?`<div class="banner" role="status">✓ 賽事設定已儲存｜${esc(savedNotice.code)}</div>`:""}<div class="panel">
     <div class="panel-title"><span>賽事管理中心</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="cloud-refresh-admin-list">重新整理</button>${canCreateOfficialTournament()?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-new-tournament">＋ 新增賽事</button>`:""}</div></div>
     <div class="hint">每次僅載入 5 場賽事摘要；需要更多時再按下方按鈕。搜尋涵蓋賽事名稱、房號與地點。</div>
     ${lastManaged?`<div class="btn-row" style="margin:10px 0;"><button class="btn btn-primary" data-action="cloud-admin-open-tournament" data-code="${esc(lastManaged.code)}">返回上次管理｜${esc(lastManaged.code)}</button></div>`:''}
