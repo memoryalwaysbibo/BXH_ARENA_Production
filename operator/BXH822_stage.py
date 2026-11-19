@@ -85,6 +85,34 @@ def merge_source(live, base, candidate, name):
     return merged.stdout
 
 
+def queue_source(live, base, candidate):
+    """Apply the ticket hunks without moving the release's worker timing code."""
+    def replace_once(source, before, after):
+        need(source.count(before) == 1, "queue.cjs: ticket patch anchor changed")
+        return source.replace(before, after, 1)
+
+    import_anchor = b"const {registrationQueueOwnsRoom}=require('./legacy-writer.cjs');\n"
+    next_import = b"const digest="
+    import_change = candidate.split(import_anchor, 1)[1].split(next_import, 1)[0]
+    commentary = b"// rollout. Queue acceptance is NOT a reservation or proof of registration.\n"
+    helper = candidate.split(commentary, 1)[1].split(b"function createQueue(", 1)[0]
+    before_guard = b"     if(requireRoomOwnership&&!registrationQueueOwnsRoom(room?.data()))throw fail('registration-queue-disabled');\n"
+    guard_change = b"     const currentRoom=room?.data();\n"
+    after_guard = b"     // The operation result and all registration mutations commit atomically.\n"
+    guard = guard_change + candidate.split(guard_change, 1)[1].split(after_guard, 1)[0]
+    before_exports = b"module.exports={createQueue,validate,businessRejections,safeResult};"
+    after_exports = b"module.exports={authorizeTicketRemoval,createQueue,validate,businessRejections,safeResult};"
+
+    def apply(source):
+        source = replace_once(source, import_anchor, import_anchor + import_change)
+        source = replace_once(source, commentary, commentary + helper)
+        source = replace_once(source, before_guard, guard)
+        return replace_once(source, before_exports, after_exports)
+
+    need(apply(base) == candidate, "queue.cjs: ticket patch differs from #822")
+    return apply(live)
+
+
 def family_source(live, patcher):
     need(digest(live) == "92facece6ca742aaa4e0e375a2fcbb9e6b9c47449f8ae790f6fe95f5dde72d",
          "family writer changed")
@@ -119,8 +147,10 @@ def prepare(name, original, repo):
             path = BACKEND + filename
             live = source.read(path)
             need(digest(live) == sha, f"{name}: {filename} changed")
-            replacements[path] = merge_source(live, git_source(repo, BASE, filename),
-                                               git_source(repo, CANDIDATE, filename), filename)
+            base = git_source(repo, BASE, filename)
+            candidate = git_source(repo, CANDIDATE, filename)
+            replacements[path] = (queue_source(live, base, candidate) if filename == "queue.cjs"
+                                  else merge_source(live, base, candidate, filename))
         for filename in EXTRA:
             path = BACKEND + filename
             need(path not in names, f"{name}: {filename} already exists")
