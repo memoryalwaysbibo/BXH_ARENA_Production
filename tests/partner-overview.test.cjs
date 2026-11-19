@@ -58,6 +58,7 @@ test('contract creation is retired while partner management remains',()=>{
   const app=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
   const management=app.slice(app.indexOf('function renderTournamentManagementTab(){'),app.indexOf('function renderAdminTournamentListModal(){'));
   assert.equal(management.includes('BXHPartnerOrganizer?.renderOverview'),false);
+  assert.equal(app.includes('<b>活動主辦模式</b>'),false);
   const createPermission=app.slice(app.indexOf('function canCreateOfficialTournament(){'),app.indexOf('function currentAuthUid(){'));
   assert.equal(createPermission.includes('isPartnerOrganizerMode()'),false);
   const cloud=fs.readFileSync(path.join(__dirname,'../modules/cloud/cloud-runtime.js'),'utf8');

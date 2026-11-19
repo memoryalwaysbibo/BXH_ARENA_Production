@@ -21238,7 +21238,7 @@ function renderApp(){
         : '<nav class="tabs">'+tabs.map(t=>'<button class="'+(activeTab===t[0]?'active':'')+'" data-action="switch-tab" data-tab="'+t[0]+'">'+t[1]+'</button>').join("")+'</nav>'}
     </div>
     ${accountMenuOverlayHtml()}
-    <main>${isPartnerOrganizerMode()?`<div class="banner warn"><span><b>活動主辦模式</b>｜${esc(partnerOrganizerGrant().organizationName||partnerOrganizerGrant().organizationId)}｜方案 ${esc(partnerOrganizerGrant().planCode||partnerOrganizerGrant().plan||"—")}；僅能管理本合作帳號建立的賽事。</span></div>`:""}${isEventStaffMode()?`<div class="banner warn"><span><b>工作人員（活動）模式</b>｜權限僅限受邀且仍有效的活動；活動主辦失去授權時會立即停止操作，既有資料不會刪除。</span></div>`:""}${renderSystemClosureNotice(state)}<div class="mode-management-context">${adminManagementContextHtml()}</div>${testSandboxBannerHtml()}${content}</main>
+    <main>${isEventStaffMode()?`<div class="banner warn"><span><b>工作人員（活動）模式</b>｜權限僅限受邀且仍有效的活動；活動主辦失去授權時會立即停止操作，既有資料不會刪除。</span></div>`:""}${renderSystemClosureNotice(state)}<div class="mode-management-context">${adminManagementContextHtml()}</div>${testSandboxBannerHtml()}${content}</main>
     <div id="print-bracket" style="display:none;">${renderPrintBracket()}</div>
     ${renderModal()}
     ${celebrationOpen ? renderCelebrationOverlay() : ""}
