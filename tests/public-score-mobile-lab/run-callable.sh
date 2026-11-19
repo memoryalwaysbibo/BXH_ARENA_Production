@@ -19,3 +19,5 @@ for i in $(seq 1 180);do
 done
 [ "$ready" = true ] || { cat evidence/callable-*.log;exit 1; }
 timeout 120s node callable-integration.mjs 2>&1 | tee evidence/callable-test.txt
+
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 timeout 90s node settlement-integration.cjs 2>&1 | tee evidence/settlement-test.txt

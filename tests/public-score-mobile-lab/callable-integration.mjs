@@ -16,7 +16,7 @@ try{
  const account=await createUserWithEmailAndPassword(auth,'referee@callable.demo.test','DemoOnlyReferee123!'),uid=account.user.uid;
  await seed([['users/'+uid,{active:true,role:'player',realName:'Synthetic Referee'}],['systemConfig/refereeSeatsV1',{enabled:true,perCourtScoringVerified:true}],['tournaments/'+code,{...f.room,data:JSON.stringify(f.state),visibility:'public',updatedAt:1}],['publicTournaments/'+code,{bracketView:JSON.stringify(view),visibility:'public',updatedAt:1}]]);
  await assert.rejects(call(payload('score',id,{side:'A',finish:'spin'})),e=>e.code==='functions/permission-denied');
- const seats=structuredClone(f.room);seats.assignedStaffUids=[uid];for(const seat of Object.values(seats.refereeSeatsV1.courts))seat.main.uid=uid;
+ const seats=structuredClone(f.room);seats.assignedStaffUids=[uid];for(const seat of Object.values(seats.refereeSeatsV1.courts)){seat.main.uid=uid;seat.main.name="Synthetic Referee";}
  await seed([['users/'+uid,{active:true,role:'staff',realName:'Synthetic Referee'}],['tournaments/'+code,{...seats,data:JSON.stringify(f.state),visibility:'public',updatedAt:1}]]);
  await mirror();adapter=createAdapter({transport:sdkTransport(db),validateView:schema.validate,onView:v=>observed=v});await adapter.open(code,'e-'+code);await wait(()=>observed!==null);
  async function command(action,mid=id,extra={}){const request=payload(action,mid,extra),response=(await call(request)).data;assert(response.ok);Object.assign(f.state,response.state);const previous=view;view=schema.validate(S.publicProjection(f.state,{meta:{stations:6},players:f.state.players}));revision++;await mirror(previous);await wait(()=>observed?.updatedAt===view.updatedAt);assert.deepEqual(observed,view);return {request,response};}
