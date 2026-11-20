@@ -217,7 +217,7 @@ function createTicketScheduleHandler({db,clock=Date.now}){
     registrationStatus:registrationOpenAt<=now?'open':'upcoming',updatedAt:revision};
    Object.assign(state.meta,schedule);
    Object.assign(publicState.meta,schedule);
-   tx.update(room,{...schedule,data:JSON.stringify({...state,updatedAt:revision})});
+   tx.update(roomRef,{...schedule,data:JSON.stringify({...state,updatedAt:revision})});
    tx.update(publicRef,{...schedule,bracketView:JSON.stringify({...publicState,updatedAt:revision})});
    tx.create(receipt,{requestHash,updatedAt:revision});
    return {ok:true};
