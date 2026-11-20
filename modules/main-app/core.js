@@ -20503,6 +20503,11 @@ function adminManagementContextHtml(){
   if(!hasAdminAccess()){
     return publicManagementContextHtml();
   }
+  const ticket=activeTab==='management'?window.BXHCommerce?.ticketManagementContext?.():null;
+  if(ticket){
+    const phase=ticket.verified?({waiting:'等待開賽',live:'進行中',done:'已結束',cancelled:'已取消'})[ticket.phase]||'票券房管理':'正在驗證管理權限';
+    return `<div class="admin-context-hud"><span class="badge ${ticket.phase==='live'?'badge-neon':'badge-metal'}">${esc(phase)}</span><span class="admin-context-code"><span>票券賽事 ${esc(ticket.code)}</span></span></div>`;
+  }
   const phase=statusBadge();
   const configured=(typeof window!=="undefined"&&window.cloudSync&&window.cloudSync.isConfigured&&window.cloudSync.isConfigured());
   let cloudAlert="";

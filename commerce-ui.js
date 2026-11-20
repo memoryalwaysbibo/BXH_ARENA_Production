@@ -148,7 +148,17 @@ function ticketRoomPanel(c){
   return `<section class="panel commerce">${back}<h2>選券建房</h2>${notices(c)}<p>${ptnCreation(c)?'建立時自動產生 PTN 房號':'房號 '+esc(pilotCode())}｜正取上限 ${Number(ticket.capacity)} 人</p><form data-commerce-form="ticket-room">${input('name','賽事名稱',v.name,'text','maxlength="80" required')}${input('location','場地',v.location,'text','maxlength="160"')}${input('stations','裁判台數',v.stations||1,'number','min="1" max="12" step="1" required')}${time('registrationOpenAt','報名開放（台灣時間）')}${time('registrationCloseAt','報名截止（台灣時間）')}${time('startAt','預定開賽（台灣時間）')}<button class="btn btn-primary" ${pending?'disabled':''}>建立房間並綁券</button></form></section>`;
  }
  const room=c.ticketRoom;
- return `<section class="panel commerce">${back}<h2>${room?esc(room.name):'票券賽事'}</h2>${notices(c)}${c.loading?'<p role="status">正在讀取賽事……</p>':''}${room?`<p>${esc(room.code)}｜${room.phase==='waiting'?'等待開賽':room.phase==='live'?'已開賽':'賽事已離開候賽階段'}</p>${room.ticketStatus==='consumed'?'<p role="status">已扣用 1 張啟動券</p>':room.ticketStatus==='reserved'?'<p>已綁定啟動券，開賽時扣用。</p>':''}<p>可出賽 ${Number(room.eligibleCount)} 人｜${room.drawId?(room.drawReady===false?'名單已變更，請重新抽籤':'已抽籤'):'尚未抽籤'}</p>${room.phase==='waiting'?`<div class="btn-row"><button class="btn btn-ghost" data-action="commerce-ticket-draw" ${pending||room.eligibleCount<2?'disabled':''}>${room.drawId?'重新抽籤':'抽籤'}</button><button class="btn btn-primary" data-action="commerce-ticket-start" ${pending||!room.drawId||room.drawReady===false||room.eligibleCount<2?'disabled':''}>正式開賽並扣券</button></div>${room.participants?.length?`<details><summary>管理參賽名單（${room.participants.length} 人）</summary><ul>${room.participants.map(player=>`<li>${esc(player.name)} <button type="button" class="btn btn-ghost" data-action="commerce-ticket-remove" data-id="${esc(player.registrationId)}" ${pending?'disabled':''}>移除</button></li>`).join('')}</ul></details>`:''}`:''}`:''}${room?ticketForfeitPanel(room,pending):''}<button class="btn btn-ghost" data-action="commerce-ticket-refresh" ${c.loading?'disabled':''}>重新整理賽事</button></section>`;
+ const registrationLink=room&&ticketManagementView(c)&&room.code===ticketRoomCode(c)
+  ?window.BXHTournamentEntryUtils?.buildTournamentEntryUrl?.(room.code,'register'):'';
+ return `<section class="panel commerce">${back}<h2>${room?esc(room.name):'票券賽事'}</h2>${notices(c)}${c.loading?'<p role="status">正在驗證票券房管理權限並讀取賽事……</p>':''}${room?`<p>${esc(room.code)}｜${room.phase==='waiting'?'等待開賽':room.phase==='live'?'已開賽':'賽事已離開候賽階段'}</p>${registrationLink?`<p><a class="btn btn-ghost btn-sm" href="${esc(registrationLink)}">查看玩家報名頁</a></p>`:''}${room.ticketStatus==='consumed'?'<p role="status">已扣用 1 張啟動券</p>':room.ticketStatus==='reserved'?'<p>已綁定啟動券，開賽時扣用。</p>':''}<p>可出賽 ${Number(room.eligibleCount)} 人｜${room.drawId?(room.drawReady===false?'名單已變更，請重新抽籤':'已抽籤'):'尚未抽籤'}</p>${room.phase==='waiting'?`<div class="btn-row"><button class="btn btn-ghost" data-action="commerce-ticket-draw" ${pending||room.eligibleCount<2?'disabled':''}>${room.drawId?'重新抽籤':'抽籤'}</button><button class="btn btn-primary" data-action="commerce-ticket-start" ${pending||!room.drawId||room.drawReady===false||room.eligibleCount<2?'disabled':''}>正式開賽並扣券</button></div>${room.participants?.length?`<details><summary>管理參賽名單（${room.participants.length} 人）</summary><ul>${room.participants.map(player=>`<li>${esc(player.name)} <button type="button" class="btn btn-ghost" data-action="commerce-ticket-remove" data-id="${esc(player.registrationId)}" ${pending?'disabled':''}>移除</button></li>`).join('')}</ul></details>`:''}`:''}`:''}${room?ticketForfeitPanel(room,pending):''}<button class="btn btn-ghost" data-action="commerce-ticket-refresh" ${c.loading?'disabled':''}>重新整理賽事</button></section>`;
+}
+function ticketManagementContext(){
+ const c=context();
+ if(!ticketManagementView(c))return null;
+ const room=c.ticketRoom;
+ return room?.ok===true&&room.code===ticketRoomCode(c)
+  ?{code:room.code,phase:room.phase,verified:true}
+  :{code:c.ownedPtn.code,verified:false};
 }
 
 async function discoverOwnedPtn(){
@@ -177,7 +187,7 @@ function ownedTicketRoomCard(){
  }
  if(c.ownedPtn.failed)return '<section class="panel"><p>暫時無法查詢票券賽事。</p><button class="btn btn-ghost" data-action="commerce-refresh-owned-ptn">重新查詢票券賽事</button></section>';
  if(!isPtnCode(c.ownedPtn.code))return '';
- return `<section class="panel tournament-management-card"><h3>我的票券賽事</h3><p>房號 ${esc(c.ownedPtn.code)}</p><button class="btn btn-primary btn-sm" data-action="commerce-open-owned-ptn">進入管理</button></section>`;
+ return `<section class="panel tournament-management-card"><h3>我的票券賽事</h3><p>房號 ${esc(c.ownedPtn.code)}</p><button class="btn btn-primary btn-sm" data-action="commerce-open-owned-ptn">接管票券賽事</button></section>`;
 }
 function ticketCreationPage(){
  const c=context();
@@ -371,5 +381,5 @@ document.addEventListener('input',e=>{
  if(form.dataset.commerceForm==='config')c.configDraft={...v,enabled:v.enabled==='on'};
 });
 document.addEventListener('change',e=>{if(!e.target.matches?.('[data-commerce-status]'))return;const c=context();if(c.loading||c.busy)return;c.status=e.target.value;c.orders=null;void load('admin-orders');});
-window.BXHCommerce={shop,orders,adminPage,handle,context,load,ticketPilot,ticketCreationPage,ownedTicketRoomCard};
+window.BXHCommerce={shop,orders,adminPage,handle,context,load,ticketPilot,ticketCreationPage,ownedTicketRoomCard,ticketManagementContext};
 })();
