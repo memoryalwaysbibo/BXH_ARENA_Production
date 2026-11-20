@@ -16,6 +16,7 @@ after(async()=>{await browser?.close();});
 async function fixture(t,options={}){
  const context=await browser.newContext({viewport:options.mobile?{width:390,height:844}:{width:1280,height:800},isMobile:!!options.mobile,deviceScaleFactor:1});
  t.after(()=>context.close());const page=await context.newPage(),errors=[],server={joins:[],reads:0,rows:[],mode:options.mode||'hold',hold:[],committed:new Map()};page.on('pageerror',e=>errors.push(e.message));
+ const code=options.code||'BXH-FEED01';
  const script=`
  let playerRegistrationFeedback=null,authReady=true,engagementSessionEpoch=1;
  const fixturePageId=crypto.randomUUID();
@@ -40,7 +41,7 @@ async function fixture(t,options={}){
  ${chooser}
  window.cloudSync={${method('joinTournamentAsPlayer')}, restoreRegistrationFeedback(){getPlayerRegistrationFeedback()?.restore();}};
  window.submissions=[];window.failures=[];
- for(const id of ['lobby','detail','children'])document.getElementById(id).onclick=()=>cloudSync.joinTournamentAsPlayer('BXH-FEED01',true,id==='children'?'children':'self').then(r=>submissions.push(r)).catch(e=>failures.push(e.message));
+ for(const id of ['lobby','detail','children'])document.getElementById(id).onclick=()=>cloudSync.joinTournamentAsPlayer(${JSON.stringify(code)},true,id==='children'?'children':'self').then(r=>submissions.push(r)).catch(e=>failures.push(e.message));
  cloudSync.restoreRegistrationFeedback();
  `;
  const font=process.env.FEEDBACK_FONT_CSS?fs.readFileSync(process.env.FEEDBACK_FONT_CSS,'utf8'):'';
@@ -70,6 +71,13 @@ test('desktop lobby and detail clicks coalesce and pending feedback is immediate
  await waitFor(page,()=>document.querySelector('.registration-feedback-panel')?.textContent.includes('報名送出中'));assert.equal(server.joins.length,1);
  server.rows=[{registrationId:'user1',status:'confirmed'}];await page.getByRole('button',{name:'查詢報名結果'}).click();await waitFor(page,()=>submissions.length===100);
  assert.equal(server.joins.length,1);assert.match(await page.locator('.registration-feedback-panel').innerText(),/正取/);
+});
+test('PTN detail registration submits and confirms in the shipped browser flow',async t=>{
+ const {page,server}=await fixture(t,{code:'PTN-E50A3E',mode:'commit',mobile:true});
+ await page.click('#detail');await waitFor(page,()=>submissions.length===1);
+ assert.equal(server.joins.length,1);
+ assert.equal(server.joins[0].code,'PTN-E50A3E');
+ assert.match(await page.locator('.registration-feedback-panel').innerText(),/正取/);
 });
 test('mobile user can close a sending prompt while the same request resolves in the background',async t=>{
  const {page,server}=await fixture(t,{mobile:true});await page.click('#lobby');

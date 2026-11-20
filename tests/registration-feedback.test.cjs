@@ -4,6 +4,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
 const {create,PREFIX}=require('../modules/main-app/registration-feedback.js');
 const CODE='BXH-FEED01';
+const PARTNER_CODE='PTN-E50A3E';
 const flush=async()=>{for(let i=0;i<15;i++)await Promise.resolve();};
 function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};}
 function memory(){const data=new Map();return {data,get length(){return data.size;},key:i=>[...data.keys()][i],getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)};}
@@ -14,6 +15,27 @@ function fixture(options={}){
  async function advance(ms){const end=clock+ms;for(let safety=0;safety<1000;safety++){const next=[...timers].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!next)break;clock=next[1].at;timers.delete(next[0]);next[1].fn();await flush();}clock=end;await flush();}
  return {api,storage,queries,changes,recoveries,timers,advance,setUid:value=>{uid=value;api.restore();}};
 }
+test('PTN registration accepts the room and restores its original request after reload',async()=>{
+ const storage=memory();
+ const request={action:'join',code:PARTNER_CODE,childIds:[null],childEligibilityConfirmed:true,operationId:'ptn-join-original'};
+ const first=fixture({storage});
+ await assert.rejects(first.api.run(PARTNER_CODE,async progress=>{
+  progress.submitting(['user1'],request);
+  throw Error('functions/unavailable');
+ }),/result-pending/);
+ assert.equal(JSON.parse(storage.getItem(PREFIX+'user1:'+PARTNER_CODE)).retry.operationId,request.operationId);
+ first.api.dispose();
+ let replayed,committed=false;
+ const restored=fixture({storage,read:async()=>({ok:true,rows:committed?[{registrationId:'user1',status:'confirmed'}]:[]}),retry:async payload=>{
+  replayed=payload;committed=true;return {ok:true,status:'confirmed'};
+ }});
+ restored.api.restore();await restored.advance(0);
+ assert.equal((await restored.api.retryOriginal(PARTNER_CODE)).status,'confirmed');
+ assert.deepEqual(replayed,request);
+ assert.equal(storage.length,0);
+ await assert.rejects(restored.api.run('PTN-TOOLONG1',async()=>{}),/invalid-code/);
+ restored.api.dispose();
+});
 test('100 repeated clicks share one request across the whole preflight and submit',async()=>{
  const f=fixture(),pending=deferred();let sends=0;const send=async p=>{sends++;p.submitting(['user1']);return pending.promise;};
  const calls=Array.from({length:100},()=>f.api.run(CODE,send));assert(calls.every(p=>p===calls[0]));await flush();assert.equal(sends,1);assert.equal(f.api.snapshot()[0].state,'submitting');

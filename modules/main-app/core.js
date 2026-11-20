@@ -17287,7 +17287,7 @@ function renderTournamentDetailScreen(){
           ${publicVenue.address?`<span class="venue-detail-address-row"><span class="venue-detail-address">${esc(publicVenue.address)}</span>${renderVenueNavigationMenu(publicVenue)}</span>`:renderVenueNavigationMenu(publicVenue)}
         </div></div>
         <div class="stat-box"><div class="label">報到時間</div><div class="value small">${esc(t.checkInAt||"—")}</div></div>
-        <div class="stat-box"><div class="label">開賽時間</div><div class="value small">${esc(t.startAt||"—")}</div></div>
+        <div class="stat-box"><div class="label">開賽時間</div><div class="value small">${esc(typeof t.startAt==='number'?formatTournamentDetailDateTime(t.startAt):t.startAt||"—")}</div></div>
         <div class="stat-box"><div class="label">對戰形式</div><div class="value small">${isTeamBattle?esc(teamSize+"V"+teamSize+" 團體戰"):"個人戰"}</div></div>
         <div class="stat-box"><div class="label">賽事制度</div><div class="value small">${esc(FORMAT_LABELS[t.formatType]||(t.formatType||"—"))}</div></div>
         <div class="stat-box"><div class="label">報名費</div><div class="value small">${t.fee!=null?esc(String(t.fee))+" 元":"免費"}</div></div>
