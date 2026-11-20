@@ -316,7 +316,7 @@ async function handle(action,target){
   if(!ticketRoomCode(c))return;
   c.ticketRoomOpen=true;c.ticketRoom=null;c.error='';c.success='';return load('ticket-room-state');
  }
- if(action==='commerce-ticket-back'&&ticketManagementView(c)){enter('management');render();return;}
+ if(action==='commerce-ticket-back'&&ticketManagementView(c)){const manual=c.ownedPtn?.manual;enter('management');if(manual)c.ownedPtn=null;render();return;}
  if(action==='commerce-ticket-open-manage'&&ticketManagementView(c)&&c.ticketRoom?.ok===true&&c.ticketRoom.code===ticketRoomCode(c)){
   c.roomManageOpen=true;window.BXHTicketManagementNavigate?.('registrations');render();return;
  }
@@ -383,7 +383,7 @@ document.addEventListener('submit',async e=>{
  if(type==='ticket-open-code'){
   const code=String(values.code||'').trim().toUpperCase();
   if(!canManagePtn()||!inManagement()||!isPtnCode(code)){c.error='請輸入 PTN-XXXXXX 房號。';render();return;}
-  enter('ticket-manage');c.ownedPtn={code};c.ticketRoomOpen=true;
+  enter('ticket-manage');c.ownedPtn={code,manual:true};c.ticketRoomOpen=true;
   await load('ticket-room-state');return;
  }
  if(type==='ticket-delegate'){
