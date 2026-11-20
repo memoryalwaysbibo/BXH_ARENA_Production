@@ -20,10 +20,13 @@ async function confirmSameContentLobbyWatch(page, request, run) {
   const runId = 'R1 metadata fixture ' + run;
   const text = stringValue => ({ stringValue });
   const integer = value => ({ integerValue: String(value) });
-  const profileTab = page.locator('[data-action="player-switch-tab"][data-tab="profile"]').first();
+  const hostTab = page.locator('[data-action="player-switch-tab"][data-tab="host"]').first();
   const homeTab = page.locator('[data-action="player-switch-tab"][data-tab="home"]').first();
-  await expect(profileTab).toBeVisible();
-  await profileTab.click();
+  // Leave the lobby so the next Home entry starts a new real Watch.
+  // The Community tab is public to this signed-in player; Profile is in a menu.
+  await expect(hostTab).toBeVisible();
+  await hostTab.click();
+  await expect(page.locator('.community-host-hero')).toBeVisible({ timeout: 20000 });
   await page.evaluate(async expectedProject => {
     const sdk = 'https://www.gstatic.com/firebasejs/10.13.0/';
     const [apps, auth, firestore] = await Promise.all(
@@ -88,7 +91,9 @@ async function confirmSameContentLobbyWatch(page, request, run) {
     }, {cache,server1})).toBe(true);
     await write({ confirmedCount: integer(2) }, { 'updateMask.fieldPaths': 'confirmedCount' });
     await index('server', server1, 2);
-    await expect(card).toContainText('2 / 16', { useInnerText: false });
+    const capacity = card.locator('.lobby-detail-grid').getByText('名額｜2 / 16', { exact: true });
+    if (!await card.evaluate(el => el.open)) await card.locator(':scope > summary').click();
+    await expect(capacity).toBeVisible();
   } finally {
     await page.evaluate(async () => {
       const v = window.__r1WatchWebE2E;
