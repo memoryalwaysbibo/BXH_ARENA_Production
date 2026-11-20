@@ -6,7 +6,8 @@ const paymentLabels={pending:'待付款',reported:'待對帳',paid:'已確認收
 const deliveryLabels={not_started:'尚未交付',pending:'交付處理中',failed:'交付待處理',delivered:'已交付',revoked:'已收回',cancelled:'已取消交付'};
 const kinds={room_quota:'開房次數',vip:'VIP 功能',skin:'Skin 外觀',item:'道具',ticket:'賽事啟動券'};
 const storefrontKinds=new Set(['skin','item','ticket']);
-const storefrontProduct=p=>storefrontKinds.has(p?.delivery?.kind);
+const canSeeTickets=()=>isPartnerOrganizerMode();
+const storefrontKindVisible=kind=>storefrontKinds.has(kind)&&(kind!=='ticket'||canSeeTickets());
 const ticketPreviews=[32,64,96,128,160].map((capacity,index)=>({
  id:`tournament_activation_${capacity}`,name:`賽事啟動券｜${capacity} 人`,capacity,
  imageUrl:`assets/commerce/tickets/tournament-activation-${capacity}-${['green','blue','purple','orange','red'][index]}.png`,
@@ -15,6 +16,8 @@ const ticketPreviews=[32,64,96,128,160].map((capacity,index)=>({
 const ticketPreviewIds=new Set(ticketPreviews.map(p=>p.id));
 function visibleProducts(c){
  const catalog=c.products||[];
+ const otherProducts=catalog.filter(p=>p?.delivery?.kind!=='ticket'&&storefrontKindVisible(p?.delivery?.kind)&&!ticketPreviewIds.has(p.id));
+ if(!canSeeTickets())return otherProducts;
  const ticketCards=ticketPreviews.map(preview=>{
   const offer=c.storeOpen===true&&catalog.find(p=>p?.delivery?.kind==='ticket'
    &&typeof p.id==='string'&&p.id&&p.status==='published'&&p.audience==='partner_organizer'
@@ -22,7 +25,7 @@ function visibleProducts(c){
    &&Number.isSafeInteger(p.priceTwd)&&p.priceTwd>0&&Number.isSafeInteger(p.version)&&p.version>0);
   return offer?{...offer,id:preview.id,orderProductId:offer.id,previewOnly:false}:preview;
  });
- return [...ticketCards,...catalog.filter(p=>storefrontProduct(p)&&p.delivery.kind!=='ticket'&&!ticketPreviewIds.has(p.id))];
+ return [...ticketCards,...otherProducts];
 }
 function purchasable(p){return p?.purchasable===true&&!p.previewOnly;}
 function audienceLabel(audience){
@@ -50,7 +53,7 @@ function image(url){if(/^assets\/commerce\/tickets\/tournament-activation-(32-gr
 function notices(c){return `${c.error?`<p class="commerce-error" role="alert">${esc(c.error)}</p>`:''}${c.success?`<p class="commerce-success" role="status">${esc(c.success)}</p>`:''}${c.pending?`<div class="banner"><span>有一筆操作尚待確認。</span><button class="btn btn-primary" data-action="commerce-retry" ${c.busy?'disabled':''}>確認原操作結果</button></div>`:''}`;}
 const pilotCode=()=>window.BXH_TICKET_ROOM_PILOT_CODE;
 const ticketActions=new Set(['create-ticket-room','ticket-room-state','ticket-room-draw','ticket-room-start','ticket-room-remove','ticket-room-forfeit']);
-const ticketPilot=()=>typeof pilotCode()==='string'&&/^BXH-[A-Z0-9]{4,16}$/.test(pilotCode());
+const ticketPilot=()=>canSeeTickets()&&typeof pilotCode()==='string'&&/^BXH-[A-Z0-9]{4,16}$/.test(pilotCode());
 async function call(payload){
  const service=window.engagementService;
  const handler=ticketActions.has(payload.action)?service?.ticketRoomOperation:service?.commerce;
@@ -62,6 +65,8 @@ async function call(payload){
 async function load(kind,more=false){
  const c=context();if(c.loading||c.busy||!currentAuthUid())return;
  if(kind.startsWith('admin-')&&!isSuperAdmin())return;
+ if(kind==='my-tickets'&&!canSeeTickets())return;
+ if(kind==='ticket-room-state'&&!ticketPilot())return;
  const generation=++c.generation;c.loading=true;c.error='';render();
  try{
   const cursor=more?(kind.includes('products')||kind==='catalog'?c.productsCursor:c.ordersCursor):null;
@@ -133,17 +138,20 @@ function ticketRoomPanel(c){
 
 function shop(){
  const c=enter('shop');
+ if(!canSeeTickets()){
+  c.ticketsOpen=false;c.tickets=null;c.ticketRoomOpen=false;c.ticketRoom=null;c.ticketDraft=null;
+ }
  if(c.ticketsOpen){
   if(ticketPilot()&&c.ticketRoomOpen){schedule('ticket-room-state',!c.ticketDraft&&c.ticketRoom===null);return ticketRoomPanel(c);}
   schedule('my-tickets',c.tickets===null);return ticketWallet(c);
  }
  schedule('catalog',c.products===null);
  if(c.order)return orderDetail(c.order,c,false);
- if(c.category&&c.category!=='all'&&!storefrontKinds.has(c.category))c.category='';
+ if(c.category&&c.category!=='all'&&!storefrontKindVisible(c.category))c.category='';
  const p=visibleProducts(c).find(p=>p.id===c.productId);
  let body;
  if(p)body=productDetails(p,c);
- else if(!c.category)body=`<div class="commerce-grid">${[['all','全部商品'],...Object.entries(kinds).filter(([id])=>storefrontKinds.has(id))].map(([id,name])=>`<button class="panel commerce-category" data-action="commerce-category" data-id="${id}"><strong>${name}</strong><span>查看商品 →</span></button>`).join('')}</div>`;
+ else if(!c.category)body=`<div class="commerce-grid">${[['all','全部商品'],...Object.entries(kinds).filter(([id])=>storefrontKindVisible(id))].map(([id,name])=>`<button class="panel commerce-category" data-action="commerce-category" data-id="${id}"><strong>${name}</strong><span>查看商品 →</span></button>`).join('')}</div>`;
  else body=`<button class="btn btn-ghost" data-action="commerce-categories">返回商品分類</button>${c.category==='ticket'?'<button class="btn btn-ghost" data-action="commerce-open-tickets">我的啟動券</button>':''}<h3>${esc(kinds[c.category]||'全部商品')}</h3><div class="commerce-grid">${visibleProducts(c).filter(p=>c.category==='all'||p.delivery.kind===c.category).map(p=>`<article class="panel commerce-card${p.delivery.kind==='ticket'?' commerce-ticket-card':''}">${image(p.imageUrl)?`<img src="${esc(image(p.imageUrl))}" alt="${esc(p.name)}" loading="lazy">`:''}<span class="hint">${esc(kinds[p.delivery.kind])}</span><h3>${esc(p.name)}</h3><strong class="commerce-price">${p.previewOnly?'價格待公告':money(p.priceTwd)}</strong>${p.previewOnly?'<p class="commerce-ticket-status">暫停購買</p>':p.delivery.kind==='ticket'?'<p class="hint">合作主辦限定</p>':''}<button class="btn btn-ghost" data-action="commerce-product" data-id="${esc(p.id)}">查看商品</button></article>`).join('')||'<div class="empty-state">此分類目前沒有上架商品。</div>'}</div>${c.productsCursor?'<button class="btn btn-ghost" data-action="commerce-products-more">載入更多商品</button>':''}`;
  return `<section class="commerce"><div class="panel-title"><h2>商城</h2><button class="btn btn-ghost" data-action="commerce-refresh-products">重新整理</button></div>${notices(c)}${c.storeOpen===false?'<p class="banner" role="status">商城準備中，目前尚未開放購買。</p>':''}${c.loading?'<p role="status">正在讀取商品……</p>':''}${body}</section>`;
 }
@@ -178,11 +186,12 @@ async function handle(action,target){
  if(action==='commerce-order')return readOrder(id);
  if(action==='commerce-refresh-order')return readOrder(c.order.id);
  if(action==='commerce-back-orders'){c.order=null;c.error='';c.success='';render();return;}
- if(action==='commerce-category'){if(id!=='all'&&!storefrontKinds.has(id))return;c.category=id;c.order=null;c.productId='';render();return;}
+ if(action==='commerce-category'){if(id!=='all'&&!storefrontKindVisible(id))return;c.category=id;c.order=null;c.productId='';render();return;}
  if(action==='commerce-categories'){c.category='';render();return;}
  if(action==='commerce-product'){if(!visibleProducts(c).some(p=>p.id===id))return;c.productId=id;render();return;}
  if(action==='commerce-back-products'){c.productId='';render();return;}
  if(action==='commerce-open-tickets'||action==='commerce-close-tickets'){
+  if(c.view!=='shop'||!canSeeTickets())return;
   c.ticketsOpen=action==='commerce-open-tickets';c.tickets=null;c.ticketRoomOpen=false;c.ticketDraft=null;c.error='';render();return;
  }
  if(action==='commerce-ticket-bind'&&ticketPilot()&&c.view==='shop'&&c.ticketsOpen&&!c.pending){
