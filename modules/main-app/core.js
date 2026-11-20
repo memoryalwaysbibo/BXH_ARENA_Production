@@ -14016,7 +14016,7 @@ function renderSettings(){
     <div class="btn-row">
       <button class="btn btn-ghost btn-sm" data-action="cloud-open-admin-list">返回賽事管理</button>
       ${aiCreateBetaActorAllowed()?'<button class="btn btn-ghost btn-sm ai-create-assist-btn" data-action="ai-create-open">✨ AI 協助建立 <span style="opacity:.62">BETA</span></button>':""}
-      <button class="btn btn-primary btn-sm" data-action="new-tournament-blank">＋ 新增賽事</button>
+      ${isPartnerOrganizerMode()?(window.BXHCommerce?.ticketPilot?.()?'<button class="btn btn-primary btn-sm" data-action="commerce-open-ticket-create">＋ 選券建房</button>':'<span class="hint">合作主辦建房目前僅開放指定票券試點</span>'):'<button class="btn btn-primary btn-sm" data-action="new-tournament-blank">＋ 新增賽事</button>'}
     </div>
   </div>
 
@@ -14167,8 +14167,8 @@ function renderSettings(){
 
   <div class="settings-save-bar">
     <div>
-      <strong>${settingsFormDraftDirty||registrationFormDraftDirty?'尚有未儲存設定':!state.cloudCode?'草稿已儲存，尚未發布':'設定已儲存'}</strong>
-      <span>活動資料、時間、賽制與線上報名資料會一起儲存。</span>
+      <strong>${settingsFormDraftDirty||registrationFormDraftDirty?'尚有未儲存設定':!state.cloudCode?(isPartnerOrganizerMode()?'本機草稿，尚未建立房號':'草稿已儲存，尚未發布'):'設定已儲存'}</strong>
+      <span>${isPartnerOrganizerMode()&&!state.cloudCode?'此頁設定僅儲存在目前裝置；選券建房後才會取得 PTN 房號。':'活動資料、時間、賽制與線上報名資料會一起儲存。'}</span>
     </div>
     <button class="btn btn-primary" data-action="save-meta" ${settingsReadOnly||onsiteRosterLocked?'disabled':''} ${onsiteRosterLocked?'aria-describedby="onsite-registration-lock-notice"':''}>${settingsReadOnly?'已完成・設定鎖定':onsiteRosterLocked?'候補抽選中・暫停儲存':'儲存賽事設定'}</button>
     ${renderTournamentPublishAction(settingsReadOnly)}
@@ -19739,8 +19739,7 @@ function renderHistory(){
     </div>
     <div class="btn-row">
       <button class="btn btn-ghost" data-action="refresh-history-cloud" ${historyCloudSyncBusy?'disabled':''}>${historyCloudSyncBusy?'同步雲端紀錄中…':'重新同步雲端紀錄'}</button>
-      <button class="btn btn-primary" data-action="new-tournament-copy">建立新賽事（複製目前設定）</button>
-      <button class="btn btn-ghost" data-action="new-tournament-blank">建立空白新賽事</button>
+      ${isPartnerOrganizerMode()?(window.BXHCommerce?.ticketPilot?.()?'<button class="btn btn-primary" data-action="commerce-open-ticket-create">選券建立合作賽事</button>':'<span class="hint">合作主辦建房目前僅開放指定票券試點</span>'):'<button class="btn btn-primary" data-action="new-tournament-copy">建立新賽事（複製目前設定）</button><button class="btn btn-ghost" data-action="new-tournament-blank">建立空白新賽事</button>'}
       <button class="btn btn-ghost" data-action="export-all-backup">全部備份匯出</button>
       <button class="btn btn-ghost" data-action="import-backup-trigger">匯入備份</button>
       ${hasActiveFilters ? `<button class="btn btn-ghost" data-action="clear-history-filters">清除篩選</button>` : ""}
@@ -20778,7 +20777,7 @@ async function saveTournamentSettingsAndReturn(previousMeta,message,save){
   const fromSettings=appPhase==="app"&&activeTab==="settings";
   const saved=save?await save():await saveRegistrationSettingsAndReport(previousMeta,message,true);
   if(!saved||!fromSettings||appPhase!=="app"||activeTab!=="settings"||state.id!==roomId||state.cloudCode!==code||currentAuthUid()!==actor||activeMode!==mode)return saved;
-  if(!code){showToast("草稿已儲存，請按「完成架構並發布」發布賽事");return true;}
+  if(!code){showToast(isPartnerOrganizerMode()?"設定僅儲存在此裝置，尚未建立賽事房號；請從賽事管理選券建房":"草稿已儲存，請按「完成架構並發布」發布賽事");return true;}
   if(!hasAdminAccess())return saved;
   rememberManagedRoomView({entered:true});
   tournamentSettingsSavedNotice={code,actor,mode,located:false};
@@ -22083,6 +22082,10 @@ function handleAction(action, target){
   if(action.startsWith("court-call-")){handleCourtCall(action,target);return;}
   if(action.startsWith("raffle-")){handleRaffle(action,target);return;}
   if(action.startsWith("mailbox-")){handleMailbox(action,target);return;}
+  if(action==="commerce-open-ticket-create" && isPartnerOrganizerMode() && activeTab!=="management"){
+    activeTab="management";
+    adminTournamentListOpen=false;
+  }
   if(action.startsWith("commerce-")){void window.BXHCommerce.handle(action,target);return;}
   if(action==='account-manage-referee'){
     const uid=target.getAttribute('data-uid'),directory=accountDirectoryContext();
@@ -25162,6 +25165,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   function doNewTournament(copySettings){
+    if(isPartnerOrganizerMode()){
+      showToast("合作主辦請從賽事管理選券建房；空白草稿不會建立房號。",true);
+      return;
+    }
     (async ()=>{
       const hasCurrentData = state.players.length>0 || state.matches.length>0;
       if(hasCurrentData && state.archiveStatus==="ongoing"){
@@ -25197,6 +25204,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     })();
   }
   if(action==="new-tournament-copy"){
+    if(isPartnerOrganizerMode()){
+      if(window.BXHCommerce?.ticketPilot?.()){activeTab="management";adminTournamentListOpen=false;window.BXHCommerce.handle("commerce-open-ticket-create",target);}
+      else showToast("合作主辦建房目前僅開放指定票券試點。",true);
+      return;
+    }
     const hasData = state.players.length>0 || state.matches.length>0;
     if(hasData){
       openModal({ type:"generic", title:"建立新賽事", message:"目前賽事將先保存為「已暫停」（不會被覆蓋或刪除），並複製目前的賽事設定與選手名單到新賽事（不包含比分與比賽結果）。是否繼續？", confirmLabel:"確定建立", onConfirm:()=>doNewTournament(true) });
@@ -25210,6 +25222,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="new-tournament-blank"){
+    if(isPartnerOrganizerMode()){
+      if(window.BXHCommerce?.ticketPilot?.()){activeTab="management";adminTournamentListOpen=false;window.BXHCommerce.handle("commerce-open-ticket-create",target);}
+      else showToast("合作主辦建房目前僅開放指定票券試點。",true);
+      return;
+    }
     const hasData = state.players.length>0 || state.matches.length>0;
     if(hasData){
       openModal({ type:"generic", title:"建立空白新賽事", message:"目前賽事將先保存為「已暫停」（不會被覆蓋或刪除），並建立一個完全空白的新賽事。是否繼續？", confirmLabel:"確定建立", onConfirm:()=>doNewTournament(false) });
