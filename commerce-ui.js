@@ -54,6 +54,9 @@ function notices(c){return `${c.error?`<p class="commerce-error" role="alert">${
 const pilotCode=()=>window.BXH_TICKET_ROOM_PILOT_CODE;
 const ticketActions=new Set(['create-ticket-room','ticket-room-state','ticket-room-draw','ticket-room-start','ticket-room-remove','ticket-room-forfeit']);
 const ticketPilot=()=>canSeeTickets()&&typeof pilotCode()==='string'&&/^BXH-[A-Z0-9]{4,16}$/.test(pilotCode());
+const ticketCreationView=c=>c.view==='ticket-create'&&typeof activeTab!=='undefined'&&activeTab==='management';
+const ticketViewOpen=c=>ticketCreationView(c)||c.view==='shop'&&c.ticketsOpen;
+const ticketAvailable=ticket=>ticket.status==='available'&&ticket.expiresAt>Date.now();
 async function call(payload){
  const service=window.engagementService;
  const handler=ticketActions.has(payload.action)?service?.ticketRoomOperation:service?.commerce;
@@ -95,7 +98,7 @@ async function mutate(payload){
   if(r.config){c.config=r.config;c.configDraft=null;}
   if(ticketActions.has(action)){
    c.tickets=null;c.ticketDraft=null;c.ticketRoom=null;
-   if(view===c.view&&view==='shop'){c.ticketsOpen=true;c.ticketRoomOpen=true;}
+   if(view===c.view&&ticketViewOpen(c))c.ticketRoomOpen=true;
   }
   c.success=({ 'create-ticket-room':'已建房並綁定啟動券。','ticket-room-draw':'抽籤完成。','ticket-room-start':'正式開賽，啟動券已扣用。','ticket-room-remove':'已移除選手。請重新抽籤。','ticket-room-forfeit':'已登記棄權，對手晉級。'})[action]||'操作已確認完成。';
  }catch(e){if(c===context()){
@@ -125,7 +128,7 @@ function ticketForfeitPanel(room,pending){
    <button type="button" class="btn btn-ghost" data-action="commerce-ticket-forfeit" data-id="${esc(match.id)}" data-side="b" ${pending?'disabled':''}>${esc(match.b.name)} 棄權</button></li>`).join('')}</ul></details>`;
 }
 function ticketRoomPanel(c){
- const back='<button class="btn btn-ghost" data-action="commerce-ticket-back">返回我的啟動券</button>';
+ const back=`<button class="btn btn-ghost" data-action="commerce-ticket-back">${ticketCreationView(c)?'返回選券':'返回我的啟動券'}</button>`;
  const pending=c.loading||c.busy||!!c.pending;
  if(c.ticketDraft){
   const {ticket,...v}=c.ticketDraft;
@@ -134,6 +137,26 @@ function ticketRoomPanel(c){
  }
  const room=c.ticketRoom;
  return `<section class="panel commerce">${back}<h2>${room?esc(room.name):'票券賽事'}</h2>${notices(c)}${c.loading?'<p role="status">正在讀取賽事……</p>':''}${room?`<p>${esc(room.code)}｜${room.phase==='waiting'?'等待開賽':room.phase==='live'?'已開賽':'賽事已離開候賽階段'}</p><p>可出賽 ${Number(room.eligibleCount)} 人｜${room.drawId?(room.drawReady===false?'名單已變更，請重新抽籤':'已抽籤'):'尚未抽籤'}</p>${room.phase==='waiting'?`<div class="btn-row"><button class="btn btn-ghost" data-action="commerce-ticket-draw" ${pending||room.eligibleCount<2?'disabled':''}>${room.drawId?'重新抽籤':'抽籤'}</button><button class="btn btn-primary" data-action="commerce-ticket-start" ${pending||!room.drawId||room.drawReady===false||room.eligibleCount<2?'disabled':''}>正式開賽並扣券</button></div>${room.participants?.length?`<details><summary>管理參賽名單（${room.participants.length} 人）</summary><ul>${room.participants.map(player=>`<li>${esc(player.name)} <button type="button" class="btn btn-ghost" data-action="commerce-ticket-remove" data-id="${esc(player.registrationId)}" ${pending?'disabled':''}>移除</button></li>`).join('')}</ul></details>`:''}`:''}`:''}${room?ticketForfeitPanel(room,pending):''}<button class="btn btn-ghost" data-action="commerce-ticket-refresh" ${c.loading?'disabled':''}>重新整理賽事</button></section>`;
+}
+
+function ticketCreationPage(){
+ const c=context();
+ if(!ticketPilot()||!ticketCreationView(c))return null;
+ if(c.ticketRoomOpen){
+  schedule('ticket-room-state',!c.ticketDraft&&c.ticketRoom===null);
+  return ticketRoomPanel(c);
+ }
+ schedule('my-tickets',c.tickets===null);
+ const bound=c.tickets?.some(ticket=>ticket.boundRoomCode===pilotCode());
+ const locked=c.loading||c.busy||!!c.pending;
+ const options=ticketPreviews.map(({capacity})=>{
+  const available=(c.tickets||[]).filter(ticket=>ticket.capacity===capacity&&ticketAvailable(ticket));
+  const first=available.sort((a,b)=>a.expiresAt-b.expiresAt)[0];
+  const enabled=first&&!bound&&!locked;
+  const status=c.tickets===null?'尚未取得持有狀態':available.length?`可用 ${available.length} 張`:'無可用票券';
+  return `<button class="panel commerce-category btn ${enabled?'btn-primary':'btn-ghost'}" data-action="commerce-ticket-bind" data-id="${esc(first?.id||'')}" ${enabled?'':'disabled'}><strong>${capacity} 人</strong><span>${status}</span></button>`;
+ }).join('');
+ return `<section class="commerce"><div class="panel-title"><h2>新增賽事｜選券建房</h2><button class="btn btn-ghost" data-action="commerce-close-ticket-create">返回賽事管理</button></div>${notices(c)}${c.loading?'<p role="status">正在讀取啟動券……</p>':''}<div class="commerce-grid">${options}</div>${bound?`<p>此試點房已綁券。</p><button class="btn btn-primary" data-action="commerce-ticket-room" ${locked?'disabled':''}>管理已建立的賽事</button>`:''}<button class="btn btn-ghost" data-action="commerce-refresh-tickets" ${locked?'disabled':''}>重新整理票券</button></section>`;
 }
 
 function shop(){
@@ -182,6 +205,14 @@ async function handle(action,target){
  const c=context(),adminMode=typeof activeTab!=='undefined'&&activeTab==='commerce-admin'&&isSuperAdmin();
  if(c.busy||c.loading)return;
  const id=target?.dataset?.id;
+ if(action==='commerce-open-ticket-create'){
+  if(ticketPilot()&&typeof activeTab!=='undefined'&&activeTab==='management'){enter('ticket-create');render();}
+  return;
+ }
+ if(action==='commerce-close-ticket-create'){
+  if(ticketCreationView(c)){enter('management');render();}
+  return;
+ }
  if(action==='commerce-retry'){if(c.pending)return mutate(c.pending.payload);return;}
  if(action==='commerce-order')return readOrder(id);
  if(action==='commerce-refresh-order')return readOrder(c.order.id);
@@ -194,23 +225,24 @@ async function handle(action,target){
   if(c.view!=='shop'||!canSeeTickets())return;
   c.ticketsOpen=action==='commerce-open-tickets';c.tickets=null;c.ticketRoomOpen=false;c.ticketDraft=null;c.error='';render();return;
  }
- if(action==='commerce-ticket-bind'&&ticketPilot()&&c.view==='shop'&&c.ticketsOpen&&!c.pending){
-  const ticket=c.tickets?.find(ticket=>ticket.id===id&&ticket.status==='available');
+ if(action==='commerce-ticket-bind'&&ticketPilot()&&ticketViewOpen(c)&&!c.pending){
+  if(ticketCreationView(c)&&c.tickets?.some(ticket=>ticket.boundRoomCode===pilotCode()))return;
+  const ticket=c.tickets?.find(ticket=>ticket.id===id&&ticketAvailable(ticket));
   if(ticket){c.ticketDraft={ticket};c.ticketRoomOpen=true;c.error='';c.success='';render();}
   return;
  }
- if(action==='commerce-ticket-room'&&ticketPilot()&&c.view==='shop'&&c.ticketsOpen){
+ if(action==='commerce-ticket-room'&&ticketPilot()&&ticketViewOpen(c)){
   c.ticketRoomOpen=true;c.ticketRoom=null;c.error='';c.success='';return load('ticket-room-state');
  }
  if(action==='commerce-ticket-back'){c.ticketRoomOpen=false;c.ticketDraft=null;c.error='';c.success='';render();return;}
- if(action==='commerce-ticket-refresh'&&ticketPilot()&&c.ticketRoomOpen)return load('ticket-room-state');
- if(action==='commerce-ticket-remove'&&ticketPilot()&&c.ticketRoomOpen&&!c.pending){
+ if(action==='commerce-ticket-refresh'&&ticketPilot()&&ticketViewOpen(c)&&c.ticketRoomOpen)return load('ticket-room-state');
+ if(action==='commerce-ticket-remove'&&ticketPilot()&&ticketViewOpen(c)&&c.ticketRoomOpen&&!c.pending){
   const room=c.ticketRoom;
   const player=room?.participants?.find(player=>player.registrationId===id);
   if(!player||room.code!==pilotCode()||room.phase!=='waiting'||!confirm('確定移除「'+player.name+'」？'))return;
   return mutate({action:'ticket-room-remove',code:room.code,registrationId:id});
  }
- if(action==='commerce-ticket-forfeit'&&ticketPilot()&&c.ticketRoomOpen&&!c.pending){
+ if(action==='commerce-ticket-forfeit'&&ticketPilot()&&ticketViewOpen(c)&&c.ticketRoomOpen&&!c.pending){
   const room=c.ticketRoom,side=target?.dataset?.side;
   const match=room?.matches?.find(item=>item.id===id);
   if(!match||room.code!==pilotCode()||room.phase!=='live'||!['a','b'].includes(side))return;
@@ -219,7 +251,7 @@ async function handle(action,target){
   return mutate({action:'ticket-room-forfeit',code:room.code,roomId:room.roomId,matchId:match.id,
    playerId:player.id,opponentId:opponent.id,matchUpdatedAt:match.updatedAt});
  }
- if(['commerce-ticket-draw','commerce-ticket-start'].includes(action)&&ticketPilot()&&c.ticketRoomOpen&&!c.pending){
+ if(['commerce-ticket-draw','commerce-ticket-start'].includes(action)&&ticketPilot()&&ticketViewOpen(c)&&c.ticketRoomOpen&&!c.pending){
   const room=c.ticketRoom,start=action==='commerce-ticket-start';
   if(!room||room.code!==pilotCode()||room.phase!=='waiting'||room.eligibleCount<2||start&&(!room.drawId||room.drawReady===false))return;
   const confirmEarlyStart=start&&Number(room.startAt)>Date.now();
@@ -229,7 +261,7 @@ async function handle(action,target){
   return mutate(start?{...data,action:'ticket-room-start',drawId:room.drawId,confirmEarlyStart}
    :{...data,action:'ticket-room-draw',baseDrawId:room.drawId});
  }
- if(action==='commerce-refresh-tickets'&&c.view==='shop'&&c.ticketsOpen)return load('my-tickets');
+ if(action==='commerce-refresh-tickets'&&ticketViewOpen(c))return load('my-tickets');
  if(action==='commerce-refresh-products')return load('catalog');
  if(action==='commerce-products-more')return load(adminMode?'admin-products':'catalog',true);
  if(action==='commerce-refresh-orders')return load('my-orders');
@@ -255,7 +287,7 @@ document.addEventListener('submit',async e=>{
  const values=Object.fromEntries(new FormData(form)),type=form.dataset.commerceForm;
  let payload;
  if(type==='ticket-room'){
-  if(!ticketPilot()||c.view!=='shop'||!c.ticketDraft)return;
+  if(!ticketPilot()||!ticketViewOpen(c)||!c.ticketDraft)return;
   const time=key=>Date.parse(values[key]+':00+08:00');
   payload={action:'create-ticket-room',code:pilotCode(),ticketId:c.ticketDraft.ticket.id,name:values.name,
    location:values.location,stations:Number(values.stations),registrationOpenAt:time('registrationOpenAt'),
@@ -280,5 +312,5 @@ document.addEventListener('input',e=>{
  if(form.dataset.commerceForm==='config')c.configDraft={...v,enabled:v.enabled==='on'};
 });
 document.addEventListener('change',e=>{if(!e.target.matches?.('[data-commerce-status]'))return;const c=context();if(c.loading||c.busy)return;c.status=e.target.value;c.orders=null;void load('admin-orders');});
-window.BXHCommerce={shop,orders,adminPage,handle,context,load};
+window.BXHCommerce={shop,orders,adminPage,handle,context,load,ticketPilot,ticketCreationPage};
 })();

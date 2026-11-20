@@ -20670,6 +20670,8 @@ function renderTournamentManagementTab(){
   if(!hasAdminAccess()){
     return `<div class="panel"><div class="empty-state">目前身分沒有賽事管理權限。</div></div>`;
   }
+  const ticketCreation=window.BXHCommerce?.ticketCreationPage?.();
+  if(ticketCreation)return ticketCreation;
   if(!adminTournamentListLoaded && !adminTournamentListBusy){
     setTimeout(()=>{ if(!adminTournamentListLoaded&&!adminTournamentListBusy)loadAdminTournamentList(); }, 0);
   }
@@ -20732,7 +20734,7 @@ function renderTournamentManagementTab(){
 
   if(savedNotice)locateSettingsSavedCard();
   return `${savedNotice?`<div class="banner" role="status">✓ 賽事設定已儲存｜${esc(savedNotice.code)}</div>`:""}<div class="panel">
-    <div class="panel-title"><span>賽事管理中心</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="cloud-refresh-admin-list">重新整理</button>${canCreateOfficialTournament()?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-new-tournament">＋ 新增賽事</button>`:""}</div></div>
+    <div class="panel-title"><span>賽事管理中心</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="cloud-refresh-admin-list">重新整理</button>${window.BXHCommerce?.ticketPilot?.()?`<button class="btn btn-primary btn-sm" data-action="commerce-open-ticket-create">＋ 新增賽事</button>`:canCreateOfficialTournament()?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-new-tournament">＋ 新增賽事</button>`:""}</div></div>
     <div class="hint">每次僅載入 5 場賽事摘要；需要更多時再按下方按鈕。搜尋涵蓋賽事名稱、房號與地點。</div>
     ${lastManaged?`<div class="btn-row" style="margin:10px 0;"><button class="btn btn-primary" data-action="cloud-admin-open-tournament" data-code="${esc(lastManaged.code)}">返回上次管理｜${esc(lastManaged.code)}</button></div>`:''}
     ${filterBar}

@@ -168,6 +168,48 @@ test('my tickets shows an owned bound ticket, and resets on account switch',asyn
  assert.equal(t.ui.context().tickets,null);
 });
 
+test('event management offers five capacities and binds the first valid held ticket',async()=>{
+ const t=setup({partner:true}),code='BXH-TICKETTEST',now=Date.now(),operations=[];
+ t.sandbox.activeTab='management';
+ assert.equal(t.ui.ticketPilot(),false);
+ await t.ui.handle('commerce-open-ticket-create',{});
+ assert.equal(t.ui.ticketCreationPage(),null);
+ t.sandbox.window.BXH_TICKET_ROOM_PILOT_CODE=code;
+ t.setPartner(false);
+ await t.ui.handle('commerce-open-ticket-create',{});
+ assert.equal(t.ui.ticketCreationPage(),null);
+ t.setPartner(true);
+ await t.ui.handle('commerce-open-ticket-create',{});
+ const c=t.ui.context();
+ c.tickets=[
+  {id:'later',capacity:64,status:'available',expiresAt:now+20000},
+  {id:'first',capacity:64,status:'available',expiresAt:now+10000},
+  {id:'expired',capacity:96,status:'available',expiresAt:now-1},
+  {id:'used',capacity:128,status:'used',expiresAt:now+10000}
+ ];
+ const picker=t.ui.ticketCreationPage();
+ assert.match(picker,/新增賽事｜選券建房/);
+ assert.equal((picker.match(/data-action="commerce-ticket-bind"/g)||[]).length,5);
+ assert.equal((picker.match(/data-id="" disabled/g)||[]).length,4);
+ assert.match(picker,/data-id="first" [^>]*><strong>64 人/);
+ await t.ui.handle('commerce-ticket-bind',{dataset:{id:'expired'}});
+ assert.equal(c.ticketDraft,null);
+ await t.ui.handle('commerce-ticket-bind',{dataset:{id:'first'}});
+ assert.match(t.ui.ticketCreationPage(),/正取上限 64 人/);
+ t.sandbox.FormData=function(form){return Object.entries(form.values);};
+ t.sandbox.window.engagementService.ticketRoomOperation=async p=>{operations.push(p);return {ok:true,code};};
+ const form={dataset:{commerceForm:'ticket-room'},values:{name:'測試賽事',location:'台南',stations:'2',
+  registrationOpenAt:'2026-11-21T09:00',registrationCloseAt:'2026-11-21T10:00',startAt:'2026-11-21T11:00'}};
+ await t.listeners.submit({target:{closest:()=>form},preventDefault(){}});
+ assert.equal(operations.length,1);
+ assert.equal(operations[0].code,code);
+ assert.equal(operations[0].ticketId,'first');
+ assert.match(t.ui.ticketCreationPage(),/已建房並綁定啟動券/);
+ await t.ui.handle('commerce-ticket-back',{});
+ await t.ui.handle('commerce-close-ticket-create',{});
+ assert.equal(t.ui.ticketCreationPage(),null);
+});
+
 test('scoped ticket room form uses Taiwan time and replays the exact V2 start request',async()=>{
  const t=setup({partner:true});const c=t.ui.context(),code='BXH-TICKETTEST',roomId='ticket-fixture-generation';
  const room={ok:true,code,roomId,name:'測試賽事',phase:'waiting',eligibleCount:2,rosterRevision:5,drawId:null,startAt:Date.now()+60000};
