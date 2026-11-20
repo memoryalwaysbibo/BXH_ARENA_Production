@@ -5,7 +5,7 @@ const {test,after}=require('node:test');
 const {randomBytes}=require('node:crypto');
 const {db,service,handlers}=require('./harness.cjs');
 const {createApi}=require('../backend/api.cjs');
-const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketRemoveHandler}=require('../backend/ticket-room-create.cjs');
+const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketRemoveHandler}=require('../backend/ticket-room-create.cjs');
 const {createStartHandler,createDrawHandler,createTicketForfeitHandler}=require('../backend/lifecycle.cjs');
 
 after(()=>db.terminate());
@@ -87,7 +87,22 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  await assert.rejects(status({...statusRequest,auth:{uid:other}}),/permission-denied/);
  const waiting=await status(statusRequest);
  if(ptn)assert.equal(waiting.ticketStatus,'reserved');
- assert.deepEqual(waiting,{ok:true,code,roomId,name:'Fixture',phase:'waiting',startAt:now+600000,drawId:null,rosterRevision:0,eligibleCount:0,drawReady:false,participants:[],...(ptn?{ticketStatus:'reserved'}:{})});
+ assert.deepEqual(waiting,{ok:true,code,roomId,name:'Fixture',phase:'waiting',startAt:now+600000,
+  registrationOpenAt:now-2000,registrationCloseAt:now+300000,registrationEnabled:true,updatedAt:now,
+  drawId:null,rosterRevision:0,eligibleCount:0,drawReady:false,participants:[],...(ptn?{ticketStatus:'reserved'}:{})});
+ const schedule=createTicketScheduleHandler({db,clock:()=>now+1000});
+ const edit={auth:creation.auth,app:creation.app,data:{action:'ticket-room-schedule',code,
+  operationId:'edit-ticket-schedule',expectedUpdatedAt:now,registrationOpenAt:now-2000,
+  registrationCloseAt:now+400000,startAt:now+600000}};
+ await assert.rejects(schedule({...edit,auth:{uid:other}}),/permission-denied/);
+ assert.equal((await schedule(edit)).ok,true);
+ assert.equal((await schedule(edit)).replayed,true);
+ await assert.rejects(schedule({...edit,data:{...edit.data,operationId:'another-edit'}}),/version-conflict/);
+ await assert.rejects(schedule({...edit,data:{...edit.data,startAt:now+86400000}}),/operation-conflict/);
+ assert.equal((await room.get()).data().registrationCloseAt,now+400000);
+ assert.equal((await pub.get()).data().registrationCloseAt,now+400000);
+ assert.equal(JSON.parse((await room.get()).data().data).meta.registrationCloseAt,now+400000);
+ assert.equal(JSON.parse((await pub.get()).data().bracketView).meta.registrationCloseAt,now+400000);
  await assert.rejects(create({...creation,data:{...creation.data,name:'Changed'}}),/operation-conflict/);
  if(!ptn){
   const otherCode=code+'B';

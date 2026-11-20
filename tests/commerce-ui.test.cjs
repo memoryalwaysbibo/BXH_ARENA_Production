@@ -346,12 +346,15 @@ test('PTN takeover replaces stale legacy header only after server owner verifica
  t.sandbox.activeTab='management';
  t.sandbox.window.BXHTournamentEntryUtils={buildTournamentEntryUrl:code=>`https://arena.bxh.com.tw/?code=${code}&entry=register`};
  t.sandbox.window.engagementService.ticketRoomOperation=async request=>request.action==='ticket-ptn-status'
-  ?{ok:true,code}:{ok:true,code,name:'測試',phase:'waiting',eligibleCount:0,drawId:null,ticketStatus:'reserved'};
+  ?{ok:true,code}:{ok:true,code,name:'測試',phase:'waiting',eligibleCount:0,drawId:null,ticketStatus:'reserved',
+   registrationOpenAt:Date.now()-60000,registrationCloseAt:Date.now()-1000,startAt:Date.now()+3600000,updatedAt:123};
  await t.ui.handle('commerce-refresh-owned-ptn');
  assert.equal(t.ui.ticketManagementContext(),null);
  await t.ui.handle('commerce-open-owned-ptn',{});
  assert.equal(t.ui.ticketManagementContext().code,code);
- assert.match(t.ui.ticketCreationPage(),/查看玩家報名頁/);
+ assert.match(t.ui.ticketCreationPage(),/調整報名與開賽時間/);
+ assert.match(t.ui.ticketCreationPage(),/報名時間已過/);
+ assert.doesNotMatch(t.ui.ticketCreationPage(),/查看玩家報名頁|entry=register/);
  assert.match(t.ui.ticketCreationPage(),/disabled>抽籤/);
  const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
  assert.match(core,/ticketManagementContext\?\.\(\)/);

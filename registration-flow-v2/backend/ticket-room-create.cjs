@@ -165,10 +165,62 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
      a:{id:match.a.playerId,name:names.get(match.a.playerId)||'選手 A'},
      b:{id:match.b.playerId,name:names.get(match.b.playerId)||'選手 B'},updatedAt:match.updatedAt||0})):[];
    return {ok:true,code,roomId:state.id,name:room.name,phase:room.tournamentPhase,startAt:room.startAt,
+    registrationOpenAt:room.registrationOpenAt,registrationCloseAt:room.registrationCloseAt,
+    registrationEnabled:room.registrationEnabled,updatedAt:room.updatedAt,
     drawId:state.bracketDraw?.id??null,drawReady:state.bracketDraw?.rosterRevision===rosterRevision,rosterRevision,eligibleCount,
     ...(ticketStatus?{ticketStatus}:{}),...(room.tournamentPhase==='live'?{matches}:{}),
     participants:room.tournamentPhase==='waiting'?state.players.filter(player=>player.source==='online'&&player.registrationId)
      .map(player=>({registrationId:player.registrationId,name:player.name})):[]};
+  });
+ };
+}
+function createTicketScheduleHandler({db,clock=Date.now}){
+ return async request=>{
+  const uid=request.auth?.uid,data=request.data;
+  if(!uid)throw Error('auth-required');
+  if(!request.app)throw Error('permission-denied');
+  if(!data||Object.keys(data).some(key=>!['action','code','operationId','expectedUpdatedAt','registrationOpenAt','registrationCloseAt','startAt'].includes(key))||
+     data.action!=='ticket-room-schedule'||!validRegistrationRoomCode(data.code)||
+     typeof data.operationId!=='string'||!roomIdPattern.test(data.operationId)||
+     !Number.isSafeInteger(data.expectedUpdatedAt)||
+     ![data.registrationOpenAt,data.registrationCloseAt,data.startAt].every(at=>Number.isSafeInteger(at)&&at>0)||
+     !(data.registrationOpenAt<data.registrationCloseAt&&data.registrationCloseAt<=data.startAt))throw Error('invalid-operation');
+  const {code,operationId,expectedUpdatedAt,registrationOpenAt,registrationCloseAt,startAt}=data;
+  const roomRef=db.doc('tournaments/'+code),publicRef=db.doc('publicTournaments/'+code);
+  const receipt=roomRef.collection('operationLog').doc('ticket-room-schedule-'+digest([uid,operationId]));
+  const requestHash=digest(data);
+  return db.runTransaction(async tx=>{
+   const now=clock();
+   const [actorSnap,gateSnap,roomSnap,publicSnap,receiptSnap]=await tx.getAll(
+    db.doc('users/'+uid),db.doc(ticketLifecyclePath(code)),roomRef,publicRef,receipt);
+   if(receiptSnap.exists){
+    if(receiptSnap.data().requestHash!==requestHash)throw Error('operation-conflict');
+    return {ok:true,replayed:true};
+   }
+   const grant=ticketHostGrant(actorSnap.data(),now),gate=gateSnap.data(),room=roomSnap.data(),pub=publicSnap.data();
+   if(!grant||gate?.ownerUid!==uid||gate.roomCode!==code||gate.bindingEnabled!==true||gate.enabled!==true||
+      room?.eventAuthority!=='ticket'||room.ownerUid!==uid||room.createdBy!==uid||
+      room.partnerOrganizationCode!==grant.organizationId||
+      (room.partnerContractOrderCode||null)!==grant.order||room.ticketAccessV1?.roomId!==gate.roomId||
+      pub?.ticketRoomVersion!==1)throw Error('permission-denied');
+   if(room.tournamentPhase!=='waiting')throw Error('tournament-started');
+   if(room.updatedAt!==expectedUpdatedAt)throw Error('version-conflict');
+   if(registrationCloseAt<=now||startAt<=now||startAt>=grant.expiresAt)throw Error('invalid-operation');
+   const ticketSnap=await tx.get(db.doc('commerceTickets/'+room.ticketAccessV1.ticketId));
+   const ticket=ticketSnap.data();
+   if(ticket?.ownerUid!==uid||ticket.status!=='reserved'||ticket.boundRoomCode!==code||
+      ticket.boundRoomId!==gate.roomId||startAt>=ticket.expiresAt)throw Error('ticket-binding-invalid');
+   const state=JSON.parse(room.data),publicState=JSON.parse(pub.bracketView);
+   if(state.id!==gate.roomId||publicState.id!==gate.roomId)throw Error('ticket-binding-invalid');
+   const revision=Math.max(now,room.updatedAt+1);
+   const schedule={registrationOpenAt,registrationCloseAt,startAt,cancellationDeadline:registrationCloseAt,
+    registrationStatus:registrationOpenAt<=now?'open':'upcoming',updatedAt:revision};
+   Object.assign(state.meta,schedule);
+   Object.assign(publicState.meta,schedule);
+   tx.update(room,{...schedule,data:JSON.stringify({...state,updatedAt:revision})});
+   tx.update(publicRef,{...schedule,bracketView:JSON.stringify({...publicState,updatedAt:revision})});
+   tx.create(receipt,{requestHash,updatedAt:revision});
+   return {ok:true};
   });
  };
 }
@@ -185,4 +237,4 @@ function createTicketRemoveHandler({db,queue,enabled,clock=Date.now}){
    action:'cancel',intent:'ticket-host'}},(tx,user,operation,room)=>authorizeTicketRemoval(tx,db,user,operation,room,clock()));
  };
 }
-module.exports={createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketRemoveHandler};
+module.exports={createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketRemoveHandler};
