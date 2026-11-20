@@ -94,6 +94,8 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  const edit={auth:creation.auth,app:creation.app,data:{action:'ticket-room-schedule',code,
   operationId:'edit-ticket-schedule',expectedUpdatedAt:now,registrationOpenAt:now-2000,
   registrationCloseAt:now+400000,startAt:now+600000}};
+ if(!ptn)await assert.rejects(schedule(edit),/invalid-operation/);
+ if(ptn){
  await assert.rejects(schedule({...edit,auth:{uid:other}}),/permission-denied/);
  assert.equal((await schedule(edit)).ok,true);
  assert.equal((await schedule(edit)).replayed,true);
@@ -103,6 +105,7 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  assert.equal((await pub.get()).data().registrationCloseAt,now+400000);
  assert.equal(JSON.parse((await room.get()).data().data).meta.registrationCloseAt,now+400000);
  assert.equal(JSON.parse((await pub.get()).data().bracketView).meta.registrationCloseAt,now+400000);
+ }
  await assert.rejects(create({...creation,data:{...creation.data,name:'Changed'}}),/operation-conflict/);
  if(!ptn){
   const otherCode=code+'B';

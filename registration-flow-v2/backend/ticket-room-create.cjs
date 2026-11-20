@@ -180,7 +180,7 @@ function createTicketScheduleHandler({db,clock=Date.now}){
   if(!uid)throw Error('auth-required');
   if(!request.app)throw Error('permission-denied');
   if(!data||Object.keys(data).some(key=>!['action','code','operationId','expectedUpdatedAt','registrationOpenAt','registrationCloseAt','startAt'].includes(key))||
-     data.action!=='ticket-room-schedule'||!validRegistrationRoomCode(data.code)||
+     data.action!=='ticket-room-schedule'||!isPartnerRoomCode(data.code)||
      typeof data.operationId!=='string'||!roomIdPattern.test(data.operationId)||
      !Number.isSafeInteger(data.expectedUpdatedAt)||
      ![data.registrationOpenAt,data.registrationCloseAt,data.startAt].every(at=>Number.isSafeInteger(at)&&at>0)||
