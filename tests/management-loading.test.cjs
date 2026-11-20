@@ -183,7 +183,7 @@ function rig(){
  const calls={toasts:[],queries:[],pins:0,frames:[],timers:[],renders:0,scrolls:0};
  const s={state:{id:'room',cloudCode:'BXH-ABC123',meta:{}},appPhase:'app',activeTab:'settings',activeMode:'admin',actor:'u1',
   tournamentSettingsSavedNotice:null,adminTournamentListOpen:true,viewingRecordId:'old',viewingRecordData:{},mainTabNavCenterRequested:false,
-  currentAuthUid:()=>s.actor,hasAdminAccess:()=>true,saveRegistrationSettingsAndReport:async()=>true,
+  currentAuthUid:()=>s.actor,hasAdminAccess:()=>true,isPartnerOrganizerMode:()=>s.activeMode==='partner_organizer',saveRegistrationSettingsAndReport:async()=>true,
   rememberManagedRoomView(){calls.pins++;},changeAdminTournamentListQuery(q){calls.queries.push(q);return Promise.resolve();},
   render(){calls.renders++;},renderPreservingScroll(){calls.renders++;},showToast:m=>calls.toasts.push(m),
   requestAnimationFrame:f=>calls.frames.push(f),setTimeout:f=>calls.timers.push(f),document:{querySelectorAll:()=>[]},window:{scrollTo:()=>calls.scrolls++}};
@@ -202,6 +202,10 @@ test('save stays on settings until acceptance; failure does not navigate or refr
 });
 test('new local draft remains on settings with a publication prompt',async()=>{
  const {s,calls,save}=rig();s.state.cloudCode=null;await save();assert.equal(s.activeTab,'settings');assert.match(calls.toasts.at(-1),/草稿已儲存.*發布/);assert.equal(calls.queries.length,0);
+});
+test('partner local draft says no room code was created',async()=>{
+ const {s,calls,save}=rig();s.activeMode='partner_organizer';s.state.cloudCode=null;await save();
+ assert.equal(s.activeTab,'settings');assert.match(calls.toasts.at(-1),/僅儲存在此裝置.*尚未建立賽事房號/);assert.equal(calls.queries.length,0);
 });
 test('completion never pulls user back after room, identity, mode or tab changes',async()=>{
  for(const change of [s=>s.state={id:'other',cloudCode:'BXH-OTHER1'},s=>s.actor='u2',s=>s.activeMode='staff',s=>s.activeTab='people',s=>s.appPhase='player-center']){
