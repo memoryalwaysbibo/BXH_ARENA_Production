@@ -344,7 +344,7 @@ test('partner can recover their PTN room from management without a pilot URL',as
  assert.equal(t.ui.ownedTicketRoomCard(),'');
  t.setPartner(true);
  t.setUid('different-user');
- assert.equal(t.ui.ownedTicketRoomCard(),'');
+ assert.doesNotMatch(t.ui.ownedTicketRoomCard(),/房號 PTN-TST001/);
 });
 test('PTN takeover replaces stale legacy header only after server owner verification',async()=>{
  const t=setup({partner:true}),code='PTN-TST001';
@@ -378,4 +378,26 @@ test('PTN takeover replaces stale legacy header only after server owner verifica
  assert.match(core,/ticketManagedTab\?\.\('settings'\)/);
  t.setUid('another-owner');
  assert.equal(t.ui.ticketManagementContext(),null);
+});
+test('PTN owner alone can assign one delegate and a super admin can enter by room code',async()=>{
+ const t=setup(),code='PTN-AGENT1';
+ t.setAdmin(true);t.sandbox.activeTab='management';
+ assert.match(t.ui.ownedTicketRoomCard(),/代理或最高管理員接管 PTN 房號/);
+ const c=t.ui.context();c.view='ticket-manage';c.ownedPtn={code};c.ticketRoomOpen=true;c.roomManageOpen=true;
+ c.ticketRoom={ok:true,code,name:'房間',phase:'waiting',capacity:32,eligibleCount:0,confirmedCount:0,
+  registrationOpenAt:Date.now()-1000,registrationCloseAt:Date.now()+3600000,startAt:Date.now()+7200000,
+  delegateUid:'delegated-user',canAssignDelegate:true};
+ t.sandbox.activeTab='settings';
+ assert.match(t.ui.ticketManagedTab('settings'),/房間代理人（最多一名）/);
+ assert.match(t.ui.ticketManagedTab('settings'),/撤銷代理權/);
+ c.ticketRoom.canAssignDelegate=false;
+ assert.doesNotMatch(t.ui.ticketManagedTab('settings'),/撤銷代理權/);
+ c.ticketRoom.canAssignDelegate=true;
+ const calls=[];
+ t.sandbox.window.engagementService.ticketRoomOperation=async payload=>{calls.push(payload);return {ok:true};};
+ await t.ui.handle('commerce-ticket-revoke-delegate');
+ assert.equal(calls.length,1);
+ assert.equal(calls[0].action,'ticket-room-delegate');
+ assert.equal(calls[0].delegateUid,null);
+ assert.equal(calls[0].code,code);
 });

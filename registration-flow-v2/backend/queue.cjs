@@ -1,7 +1,7 @@
 'use strict';
 const {createHash, randomUUID}=require('node:crypto');
 const {registrationQueueOwnsRoom}=require('./legacy-writer.cjs');
-const {ticketHostGrant,checkTicketContract,validRegistrationRoomCode,ticketLifecyclePath}=require('./ticket-host.cjs');
+const {checkTicketContract,validRegistrationRoomCode,ticketLifecyclePath,authorizeTicketManager}=require('./ticket-host.cjs');
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const canonical=value=>JSON.stringify(value===null||typeof value!=='object'?value:Array.isArray(value)?value.map(x=>JSON.parse(canonical(x))):Object.fromEntries(Object.keys(value).sort().map(k=>[k,JSON.parse(canonical(value[k]))])));
 const active=u=>u?.active===true&&!u.deleted&&!['deleted','disabled','frozen'].includes(u.accountStatus);
@@ -37,14 +37,15 @@ function validate(uid,input){
 // Cloud Tasks deployment. onCreate + a scheduled sweep must both be wired before
 // rollout. Queue acceptance is NOT a reservation or proof of registration.
 async function authorizeTicketRemoval(tx,db,user,operation,room,now){
- const uid=operation.uid,grant=ticketHostGrant(user,now);
- if(!grant||room?.eventAuthority!=='ticket'||room.createdBy!==uid||room.ownerUid!==uid||
-    room.partnerOrganizationCode!==grant.organizationId||(room.partnerContractOrderCode||null)!==grant.order||
-    room.ticketAccessV1?.version!==1||room.ticketAccessV1?.ownerUid!==uid)throw fail('permission-denied');
+ const uid=operation.uid;
  const gate=(await tx.get(db.doc(ticketLifecyclePath(operation.code)))).data();
- if(gate?.roomCode!==operation.code||gate.ownerUid!==uid||gate.roomId!==room.ticketAccessV1.roomId||
+ let authority;
+ try{authority=await authorizeTicketManager(tx,db,{uid,user,room,gate,code:operation.code,now});}
+ catch{throw fail('permission-denied');}
+ const grant=authority.grant;
+ if(room.ticketAccessV1?.version!==1||gate.roomId!==room.ticketAccessV1.roomId||
     (gate.bindingEnabled!==true&&gate.enabled!==true))throw fail('permission-denied');
- if(grant.order)checkTicketContract((await tx.get(db.doc('partnerContracts/'+grant.order))).data(),grant,uid);
+ if(grant.order)checkTicketContract((await tx.get(db.doc('partnerContracts/'+grant.order))).data(),grant,authority.ownerUid);
 }
 
 function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAttempts=5,requireRoomOwnership=false,authorizeIntake,workerId=randomUUID(),beforeExecute=async()=>{},onTiming=()=>{}}={}){
