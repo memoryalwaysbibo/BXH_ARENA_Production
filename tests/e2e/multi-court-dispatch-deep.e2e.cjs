@@ -140,6 +140,8 @@ test('two courts preserve independent work and automatically return PASS after i
   await expect(page.locator('[data-action="modal-confirm"]')).toBeVisible({timeout:15000});
   await page.locator('[data-action="modal-confirm"]').click();
 
+  // Stay on the roster screen until the asynchronous start commit completes.
+  await page.waitForFunction(() => Boolean(state.startedAt), null, { timeout: 30000 });
   await page.locator('[data-action="community-switch-room-tab"][data-tab="referee"]').click();
   await expect(page.locator('#court-card-1')).toBeVisible({timeout:30000});
   await expect(page.locator('#court-card-2')).toBeVisible({timeout:30000});

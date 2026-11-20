@@ -96,6 +96,25 @@ test('four-player community event reaches first confirmed referee result', async
 
   await expect(page.getByRole('region', { name: '房間總覽' })).toBeVisible();
   await page.getByRole('navigation', { name: '房間管理' }).getByRole('button', { name: '人員管理', exact: true }).click();
+  await page.evaluate(async () => {
+    const roomId=state.id, code=state.cloudCode, generation=adminRosterGeneration;
+    let timer;
+    try {
+      await Promise.race([
+        (async () => {
+          let pending;
+          do {
+            pending=adminRosterSyncChain;
+            await pending;
+            if(state.id!==roomId || state.cloudCode!==code || adminRosterGeneration!==generation ||
+              appPhase!=='community-room' || communityRoomActiveTab!=='people') throw Error('Roster context changed during fixture setup');
+            if(adminRegistrationsError) throw Error('Initial roster synchronization failed: '+adminRegistrationsError);
+          } while(pending!==adminRosterSyncChain);
+        })(),
+        new Promise((_,reject) => { timer=setTimeout(() => reject(Error('Initial roster synchronization timed out')),30000); })
+      ]);
+    } finally { clearTimeout(timer); }
+  });
   await page.locator('[data-action="people-section"][data-section="tools"]').click();
   await expect(page.getByText('現場新增選手', { exact: true })).toBeVisible();
   await page.locator('#quick-add-textarea').fill('BOT Alpha\nBOT Beta\nBOT Gamma');
@@ -124,6 +143,7 @@ test('four-player community event reaches first confirmed referee result', async
   const modalConfirm = page.locator('[data-action="modal-confirm"]');
   await expect(modalConfirm).toBeVisible({ timeout: 20000 });
   await modalConfirm.click();
+  await page.waitForFunction(() => Boolean(state.startedAt), null, { timeout: 30000 });
 
   await page.evaluate(async () => {
     if (typeof flushCloudStateWrites === 'function') await flushCloudStateWrites();
