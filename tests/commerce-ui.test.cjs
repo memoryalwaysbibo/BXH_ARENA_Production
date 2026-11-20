@@ -314,3 +314,27 @@ test('ticket organizer can record a single match forfeit only after start',async
   playerId:'b',opponentId:'a',matchUpdatedAt:123,operationId:'same-operation'});
  assert.match(t.ui.shop(),/已登記棄權，對手晉級/);
 });
+
+test('partner can recover their PTN room from management without a pilot URL',async()=>{
+ const t=setup({partner:true}),code='PTN-TST001',calls=[];
+ t.sandbox.activeTab='management';
+ t.sandbox.window.engagementService.ticketRoomOperation=async request=>{
+  calls.push({...request});
+  if(request.action==='ticket-ptn-status')return {ok:true,code};
+  return {ok:true,code,name:'合作主辦測試賽事',phase:'waiting',eligibleCount:2,ticketStatus:'reserved'};
+ };
+ assert.equal(t.ui.ticketPilot(),false);
+ await t.ui.handle('commerce-refresh-owned-ptn');
+ assert.match(t.ui.ownedTicketRoomCard(),/PTN-TST001/);
+ await t.ui.handle('commerce-open-owned-ptn',{dataset:{id:'PTN-OTHER1'}});
+ assert.deepEqual(calls,[{action:'ticket-ptn-status'},{action:'ticket-room-state',code}]);
+ assert.match(t.ui.ticketCreationPage(),/已綁定啟動券/);
+ await t.ui.handle('commerce-ticket-back');
+ assert.equal(t.ui.ticketCreationPage(),null);
+ assert.match(t.ui.ownedTicketRoomCard(),/PTN-TST001/);
+ t.setPartner(false);
+ assert.equal(t.ui.ownedTicketRoomCard(),'');
+ t.setPartner(true);
+ t.setUid('different-user');
+ assert.equal(t.ui.ownedTicketRoomCard(),'');
+});

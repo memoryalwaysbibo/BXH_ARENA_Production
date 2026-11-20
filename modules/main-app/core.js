@@ -20741,6 +20741,7 @@ function renderTournamentManagementTab(){
     ${adminTournamentListBusy && adminTournamentListItems.length?'<div class="hint" role="status">正在讀取 5 場賽事摘要，已顯示的清單仍可使用。</div>':""}
     ${adminTournamentListError && adminTournamentListItems.length?`<div class="auth-error" role="status">${esc(adminTournamentListError)}；保留已載入的清單，可重試本次讀取。</div>`:""}
   </div>
+  ${window.BXHCommerce?.ownedTicketRoomCard?.()||''}
   ${body}
   ${adminTournamentListPaginationHtml()}
   ${canCreateOfficialTournament()?`<div class="panel" style="margin-top:12px;border-style:dashed;text-align:center;"><div style="font-family:var(--font-d);font-weight:700;font-size:16px;margin-bottom:8px;">建立下一場賽事</div><button class="btn btn-primary" data-action="cloud-admin-new-tournament">＋ 新增賽事</button></div>`:""}`;

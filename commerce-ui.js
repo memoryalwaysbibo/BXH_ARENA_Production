@@ -56,9 +56,12 @@ const ticketActions=new Set(['create-ticket-room','ticket-ptn-status','ticket-ro
 const ticketPilot=()=>canSeeTickets()&&typeof pilotCode()==='string'&&/^BXH-[A-Z0-9]{4,16}$/.test(pilotCode());
 const ticketCreationView=c=>c.view==='ticket-create'&&typeof activeTab!=='undefined'&&activeTab==='management';
 const ptnCreation=c=>ticketCreationView(c)&&window.BXH_TICKET_ROOM_PTN_PILOT===true;
-const ticketRoomCode=c=>ptnCreation(c)?c.ptnStatus?.code:pilotCode();
+const inManagement=()=>typeof activeTab!=='undefined'&&activeTab==='management';
+const ticketManagementView=c=>inManagement()&&canSeeTickets()&&c.view==='ticket-manage'&&isPtnCode(c.ownedPtn?.code);
+const ticketRoomCode=c=>ticketManagementView(c)?c.ownedPtn.code:ptnCreation(c)?c.ptnStatus?.code:pilotCode();
 const isPtnCode=code=>typeof code==='string'&&/^PTN-[A-Z0-9]{6}$/.test(code);
 const ticketViewOpen=c=>ticketCreationView(c)||c.view==='shop'&&c.ticketsOpen;
+const canOperateTicketRoom=c=>ticketManagementView(c)||(ticketPilot()&&ticketViewOpen(c));
 const ticketAvailable=ticket=>ticket.status==='available'&&ticket.expiresAt>Date.now();
 async function call(payload){
  const service=window.engagementService;
@@ -72,7 +75,7 @@ async function load(kind,more=false){
  const c=context();if(c.loading||c.busy||!currentAuthUid())return;
  if(kind.startsWith('admin-')&&!isSuperAdmin())return;
  if(kind==='my-tickets'&&!canSeeTickets())return;
- if(kind==='ticket-room-state'&&(!ticketPilot()||!ticketRoomCode(c)))return;
+ if(kind==='ticket-room-state'&&(!canOperateTicketRoom(c)||!ticketRoomCode(c)))return;
  if(kind==='ticket-ptn-status'&&(!ticketPilot()||!ptnCreation(c)))return;
  const generation=++c.generation;c.loading=true;c.error='';render();
  try{
@@ -103,7 +106,8 @@ async function mutate(payload){
   if(r.config){c.config=r.config;c.configDraft=null;}
   if(ticketActions.has(action)){
    c.tickets=null;c.ticketDraft=null;c.ticketRoom=null;
-   if(view===c.view&&ticketViewOpen(c)){
+   if(action==='create-ticket-room'&&isPtnCode(r.code))c.ownedPtn={code:r.code};
+   if(view===c.view&&canOperateTicketRoom(c)){
     if(action==='create-ticket-room'&&ptnCreation(c)&&isPtnCode(r.code))c.ptnStatus={ok:true,code:r.code};
     c.ticketRoomOpen=true;
    }
@@ -136,7 +140,7 @@ function ticketForfeitPanel(room,pending){
    <button type="button" class="btn btn-ghost" data-action="commerce-ticket-forfeit" data-id="${esc(match.id)}" data-side="b" ${pending?'disabled':''}>${esc(match.b.name)} 棄權</button></li>`).join('')}</ul></details>`;
 }
 function ticketRoomPanel(c){
- const back=`<button class="btn btn-ghost" data-action="commerce-ticket-back">${ticketCreationView(c)?'返回選券':'返回我的啟動券'}</button>`;
+ const back=`<button class="btn btn-ghost" data-action="commerce-ticket-back">${ticketManagementView(c)?'返回賽事管理':ticketCreationView(c)?'返回選券':'返回我的啟動券'}</button>`;
  const pending=c.loading||c.busy||!!c.pending;
  if(c.ticketDraft){
   const {ticket,...v}=c.ticketDraft;
@@ -147,8 +151,40 @@ function ticketRoomPanel(c){
  return `<section class="panel commerce">${back}<h2>${room?esc(room.name):'票券賽事'}</h2>${notices(c)}${c.loading?'<p role="status">正在讀取賽事……</p>':''}${room?`<p>${esc(room.code)}｜${room.phase==='waiting'?'等待開賽':room.phase==='live'?'已開賽':'賽事已離開候賽階段'}</p>${room.ticketStatus==='consumed'?'<p role="status">已扣用 1 張啟動券</p>':room.ticketStatus==='reserved'?'<p>已綁定啟動券，開賽時扣用。</p>':''}<p>可出賽 ${Number(room.eligibleCount)} 人｜${room.drawId?(room.drawReady===false?'名單已變更，請重新抽籤':'已抽籤'):'尚未抽籤'}</p>${room.phase==='waiting'?`<div class="btn-row"><button class="btn btn-ghost" data-action="commerce-ticket-draw" ${pending||room.eligibleCount<2?'disabled':''}>${room.drawId?'重新抽籤':'抽籤'}</button><button class="btn btn-primary" data-action="commerce-ticket-start" ${pending||!room.drawId||room.drawReady===false||room.eligibleCount<2?'disabled':''}>正式開賽並扣券</button></div>${room.participants?.length?`<details><summary>管理參賽名單（${room.participants.length} 人）</summary><ul>${room.participants.map(player=>`<li>${esc(player.name)} <button type="button" class="btn btn-ghost" data-action="commerce-ticket-remove" data-id="${esc(player.registrationId)}" ${pending?'disabled':''}>移除</button></li>`).join('')}</ul></details>`:''}`:''}`:''}${room?ticketForfeitPanel(room,pending):''}<button class="btn btn-ghost" data-action="commerce-ticket-refresh" ${c.loading?'disabled':''}>重新整理賽事</button></section>`;
 }
 
+async function discoverOwnedPtn(){
+ const c=context();
+ if(!currentAuthUid()||!canSeeTickets()||!inManagement()||c.ownedPtn?.loading)return;
+ const loading={loading:true};
+ c.ownedPtn=loading;
+ try{
+  const result=await call({action:'ticket-ptn-status'});
+  if(c===context()&&c.ownedPtn===loading)c.ownedPtn={code:isPtnCode(result.code)?result.code:null};
+ }catch(error){
+  if(c===context()&&c.ownedPtn===loading){
+   const message=String(error?.message||'');
+   c.ownedPtn={failed:!message.includes('permission-denied')||message.includes('app-check-unavailable')};
+  }
+ }finally{
+  if(c===context()&&canSeeTickets()&&inManagement())render();
+ }
+}
+function ownedTicketRoomCard(){
+ if(!canSeeTickets()||!inManagement()||!currentAuthUid())return '';
+ const c=context();
+ if(!c.ownedPtn){
+  setTimeout(()=>{if(c===context()&&!c.ownedPtn)void discoverOwnedPtn();},0);
+  return '';
+ }
+ if(c.ownedPtn.failed)return '<section class="panel"><p>暫時無法查詢票券賽事。</p><button class="btn btn-ghost" data-action="commerce-refresh-owned-ptn">重新查詢票券賽事</button></section>';
+ if(!isPtnCode(c.ownedPtn.code))return '';
+ return `<section class="panel tournament-management-card"><h3>我的票券賽事</h3><p>房號 ${esc(c.ownedPtn.code)}</p><button class="btn btn-primary btn-sm" data-action="commerce-open-owned-ptn">進入管理</button></section>`;
+}
 function ticketCreationPage(){
  const c=context();
+ if(ticketManagementView(c)){
+  schedule('ticket-room-state',c.ticketRoom===null);
+  return ticketRoomPanel(c);
+ }
  if(!ticketPilot()||!ticketCreationView(c))return null;
  if(c.ticketRoomOpen){
   schedule('ticket-room-state',!c.ticketDraft&&c.ticketRoom===null);
@@ -215,6 +251,13 @@ async function handle(action,target){
  const c=context(),adminMode=typeof activeTab!=='undefined'&&activeTab==='commerce-admin'&&isSuperAdmin();
  if(c.busy||c.loading)return;
  const id=target?.dataset?.id;
+ if(action==='commerce-refresh-owned-ptn')return discoverOwnedPtn();
+ if(action==='commerce-open-owned-ptn'){
+  if(!canSeeTickets()||!inManagement()||!isPtnCode(c.ownedPtn?.code))return;
+  enter('ticket-manage');
+  c.ticketRoomOpen=true;
+  return load('ticket-room-state');
+ }
  if(action==='commerce-open-ticket-create'){
   if(ticketPilot()&&typeof activeTab!=='undefined'&&activeTab==='management'){enter('ticket-create');render();}
   return;
@@ -246,15 +289,16 @@ async function handle(action,target){
   if(!ticketRoomCode(c))return;
   c.ticketRoomOpen=true;c.ticketRoom=null;c.error='';c.success='';return load('ticket-room-state');
  }
+ if(action==='commerce-ticket-back'&&ticketManagementView(c)){enter('management');render();return;}
  if(action==='commerce-ticket-back'){c.ticketRoomOpen=false;c.ticketDraft=null;c.error='';c.success='';render();return;}
- if(action==='commerce-ticket-refresh'&&ticketPilot()&&ticketViewOpen(c)&&c.ticketRoomOpen)return load('ticket-room-state');
- if(action==='commerce-ticket-remove'&&ticketPilot()&&ticketViewOpen(c)&&c.ticketRoomOpen&&!c.pending){
+ if(action==='commerce-ticket-refresh'&&canOperateTicketRoom(c)&&c.ticketRoomOpen)return load('ticket-room-state');
+ if(action==='commerce-ticket-remove'&&canOperateTicketRoom(c)&&c.ticketRoomOpen&&!c.pending){
   const room=c.ticketRoom;
   const player=room?.participants?.find(player=>player.registrationId===id);
   if(!player||room.code!==ticketRoomCode(c)||room.phase!=='waiting'||!confirm('確定移除「'+player.name+'」？'))return;
   return mutate({action:'ticket-room-remove',code:room.code,registrationId:id});
  }
- if(action==='commerce-ticket-forfeit'&&ticketPilot()&&ticketViewOpen(c)&&c.ticketRoomOpen&&!c.pending){
+ if(action==='commerce-ticket-forfeit'&&canOperateTicketRoom(c)&&c.ticketRoomOpen&&!c.pending){
   const room=c.ticketRoom,side=target?.dataset?.side;
   const match=room?.matches?.find(item=>item.id===id);
   if(!match||room.code!==ticketRoomCode(c)||room.phase!=='live'||!['a','b'].includes(side))return;
@@ -263,7 +307,7 @@ async function handle(action,target){
   return mutate({action:'ticket-room-forfeit',code:room.code,roomId:room.roomId,matchId:match.id,
    playerId:player.id,opponentId:opponent.id,matchUpdatedAt:match.updatedAt});
  }
- if(['commerce-ticket-draw','commerce-ticket-start'].includes(action)&&ticketPilot()&&ticketViewOpen(c)&&c.ticketRoomOpen&&!c.pending){
+ if(['commerce-ticket-draw','commerce-ticket-start'].includes(action)&&canOperateTicketRoom(c)&&c.ticketRoomOpen&&!c.pending){
   const room=c.ticketRoom,start=action==='commerce-ticket-start';
   if(!room||room.code!==ticketRoomCode(c)||room.phase!=='waiting'||room.eligibleCount<2||start&&(!room.drawId||room.drawReady===false))return;
   const confirmEarlyStart=start&&Number(room.startAt)>Date.now();
@@ -327,5 +371,5 @@ document.addEventListener('input',e=>{
  if(form.dataset.commerceForm==='config')c.configDraft={...v,enabled:v.enabled==='on'};
 });
 document.addEventListener('change',e=>{if(!e.target.matches?.('[data-commerce-status]'))return;const c=context();if(c.loading||c.busy)return;c.status=e.target.value;c.orders=null;void load('admin-orders');});
-window.BXHCommerce={shop,orders,adminPage,handle,context,load,ticketPilot,ticketCreationPage};
+window.BXHCommerce={shop,orders,adminPage,handle,context,load,ticketPilot,ticketCreationPage,ownedTicketRoomCard};
 })();
