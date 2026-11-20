@@ -60,8 +60,18 @@ const admit=createAdmission();
  patch("  if(quick){\n   const next=new Map(quickRows","  if(projectOnline){\n   const next=new Map(quickRows");
  patch("const fields={communityParticipantCount:result.communityParticipantCount,","const fields={...(!ticket?{communityParticipantCount:result.communityParticipantCount}:{}),");
  patch('module.exports={createFamilyRegistration};','createFamilyRegistration.v2CapacityAware=true;\nmodule.exports={createFamilyRegistration};');
+ patch("if(!/^BXH-[A-Z0-9]{4,16}$/.test(code))throw Error('invalid-code');",
+       "if(!/^(?:BXH-[A-Z0-9]{4,16}|PTN-[A-Z0-9]{6})$/.test(code))throw Error('invalid-code');");
  return source;
 }
 
-if(require.main===module)process.stdout.write(prepareFamilySource(readFileSync(process.argv[2],'utf8')));
-module.exports={prepareFamilySource};
+function prepareFamilyProofSource(source){
+ const digest=createHash('sha256').update(source).digest('hex');
+ if(digest!=='e33b8d08f8653a546a7656fd529478f4938b258046a88a4fae3e4b337017d5a9')throw Error('family-proof-baseline-mismatch');
+ return source.replace('/^BXH-[A-Z0-9]{4,16}$/','/^(?:BXH-[A-Z0-9]{4,16}|PTN-[A-Z0-9]{6})$/');
+}
+if(require.main===module){
+ const prepare=process.argv[3]==='--proof'?prepareFamilyProofSource:prepareFamilySource;
+ process.stdout.write(prepare(readFileSync(process.argv[2],'utf8')));
+}
+module.exports={prepareFamilySource,prepareFamilyProofSource};

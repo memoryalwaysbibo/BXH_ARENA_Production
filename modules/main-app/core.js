@@ -16358,7 +16358,7 @@ function lobbyPlayerRosterHtml(t){
 function lobbyCard(t, kind, loggedIn, expanded=false){
   const life=publicEventLifecycleStatus(t);
   const displayPhase=t.phase==="waiting" ? ((t.regStatus==="open"||t.regStatus==="full")&& (t.authority!=="community"||isCommunityQuickRegistration(t)) ? "registration" : "prestart") : life.phase;
-  const authorityLabel=t.authority==="community"?"COMMUNITY":"BXH OFFICIAL";
+  const authorityLabel=t.authority==="community"?"COMMUNITY":t.authority==="ticket"&&t.code?.startsWith("PTN-")?"合作賽事":"BXH OFFICIAL";
   const authorityClass=t.authority==="community"?"community":"official";
   const timeLabel=[t.date,t.startAt].filter(Boolean).join(" ") || "時間待公布";
   const details=[
@@ -16410,7 +16410,7 @@ function lobbyMatchesActiveFilters(t){
   const f=findEventsFilters||{keyword:"",date:"",region:"",format:"all"};
   const keyword=(f.keyword||"").trim().toLowerCase();
   const region=(f.region||"").trim().toLowerCase();
-  if(keyword && !String(t.name||"").toLowerCase().includes(keyword) && !String(t.hostName||"").toLowerCase().includes(keyword) && !String(t.location||"").toLowerCase().includes(keyword)) return false;
+  if(keyword && !String(t.name||"").toLowerCase().includes(keyword) && !String(t.hostName||"").toLowerCase().includes(keyword) && !String(t.location||"").toLowerCase().includes(keyword) && !String(t.code||"").toLowerCase().includes(keyword)) return false;
   if(f.date && t.date!==f.date) return false;
   if(region && !String(t.location||"").toLowerCase().includes(region)) return false;
   if(f.format && f.format!=="all" && t.formatType!==f.format) return false;
@@ -21009,7 +21009,7 @@ function readManagedRoomRecord(){
   try{
     if(!currentAuthUid())return null;
     const saved=JSON.parse(localStorage.getItem(managedRoomStorageKey())||"null");
-    return saved&&saved.uid===currentAuthUid()&&saved.mode===activeMode&&/^BXH-[A-Z0-9]{6}$/.test(saved.code||"")?saved:null;
+    return saved&&saved.uid===currentAuthUid()&&saved.mode===activeMode&&isValidRoomCode(saved.code)?saved:null;
   }catch{return null;}
 }
 function managedRoomPinRequest(){const saved=readManagedRoomRecord();return saved?{pinCode:saved.code}:{};}

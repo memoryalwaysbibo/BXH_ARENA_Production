@@ -275,7 +275,7 @@ test('the shipped cancellation action uses the V2 queue and avoids a legacy rese
  const cloud=fs.readFileSync(require.resolve('../modules/cloud/cloud-runtime.js'),'utf8');
  function source(marker,end){const start=cloud.indexOf(marker),stop=cloud.indexOf(end,start);assert(start>=0&&stop>start);return cloud.slice(start,stop+end.length);}
  const submit=source('  function submitRegistrationCancellation(','\n  }');
- const route=source('  async function registrationFlowV2Enabled(','\n  }');
+ const route=source('  const registrationV2RouteHints=new Map();','  const managementQueueOperations=').replace(/  const managementQueueOperations=$/,'');
  const cancel=source('    async cancelRoster(','\n    },');
  const playerCancel=source('    async cancelRegistrationAsPlayer(','\n    },');
  const context=vm.createContext({window:{BXH_REGISTRATION_FLOW_V2_ROOMS:[CODE],engagementService:{familyRegistration:async()=>({ok:true,rows:[{registrationId:cancelRequest.registrationId,status:'confirmed'}]})}},

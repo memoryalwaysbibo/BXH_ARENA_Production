@@ -42,19 +42,22 @@ function context(){
 }
 function errorMessage(e){
  const m=String(e?.message||e||'');
- const labels={'service-unavailable':'商城服務準備中，請稍後再試。','store-closed':'商城尚未開放購買。','delivery-not-ready':'此類商品的交付功能尚未完成驗證，暫時不能上架或購買。','product-unavailable':'商品目前無法購買，請重新整理商城。','product-changed':'商品內容已更新，請重新整理後確認。','version-conflict':'資料已被更新，請重新整理後再編輯。','contract-required':'此商品限已簽約且授權有效的活動主辦購買。','contract-expired':'主辦合約尚未生效或已到期。','partner-organizer-required':'此商品限授權有效的合作主辦購買。','ticket-holding-limit':'已達同時持有 2 張的上限，待付款訂單也計入預留名額。','ticket-monthly-limit':'本月已達五款合計 4 張的限購上限。','ticket-quota-needs-review':'票券資料需要核對，請聯絡 BXH。','ticket-lifecycle-disabled':'目前沒有開放這間票券房的試點操作。','ticket-unavailable':'這張券目前無法用來建房，請重新整理票券。','ticket-expired':'啟動券已到期，或會在預定開賽前到期。','ticket-binding-invalid':'票券與房間資料不一致，請重新整理。','forfeit-room-not-live':'只有進行中的賽事可以登記棄權。','forfeit-match-stale':'對戰資料已更新，請重新整理後再操作。','forfeit-round-waiting':'這場對戰目前尚未開放。','room-code-conflict':'試點房號已使用，請重新整理。','bracket-version-conflict':'抽籤資料已變更，請重新整理後再操作。','bracket-roster-changed':'可出賽名單已變更，請重新整理後再操作。','registration-roster-stale':'報名名單已更新，請重新整理後再操作。','registration-queue-pending':'報名資料正在更新，請稍後再試。','registration-queue-disabled':'這間賽事尚未開放 V2 操作。','early-start-confirmation-required':'尚未到預定開賽時間。','not-found':'目前找不到這間票券房。','unpaid-order-exists':'此商品已有未完成訂單，請到我的訂單查看。','already-owned':'你已持有此 Skin，無須重複購買。','bank-receipt-used':'這筆銀行交易已核銷，請確認是否重複使用。','amount-mismatch':'金額不符，請先釐清差額再確認。','payment-window-closed':'已超過付款期限或訂單狀態已變更，請聯絡 BXH。','invalid-remittance':'請填寫匯款末五碼與正確的轉帳時間。','refund-needs-review':'商品已有使用或後續異動，需要人工評估，暫不能自動收回。','transition-forbidden':'訂單狀態已變更，請重新讀取確認。','operation-conflict':'操作識別碼與原請求不一致，請保留訂單編號聯絡 BXH。','storage-unavailable':'瀏覽器無法保存待確認操作，請允許工作階段儲存後再試。','super-admin-required':'只有最高管理員可以執行此操作。','account-inactive':'帳號目前不可購買。','invalid-bank':'請確認三碼銀行代碼及收款帳號。','invalid-number':'請檢查金額、數量或期限。','invalid-text':'請完整填寫欄位。','invalid-image':'商品圖片請使用 HTTPS 網址。','invalid-vip-duration':'VIP 須設定有效天數，數量為 1。','invalid-quota-duration':'場次額度的期限沿用合約，商品天數請填 0。','cancel-unavailable':'這筆訂單已無法自行取消。','order-unavailable':'找不到可查看的訂單。','invalid-action':'無法執行這項操作。'};
+ const labels={'service-unavailable':'商城服務準備中，請稍後再試。','store-closed':'商城尚未開放購買。','delivery-not-ready':'此類商品的交付功能尚未完成驗證，暫時不能上架或購買。','product-unavailable':'商品目前無法購買，請重新整理商城。','product-changed':'商品內容已更新，請重新整理後確認。','version-conflict':'資料已被更新，請重新整理後再編輯。','contract-required':'此商品限已簽約且授權有效的活動主辦購買。','contract-expired':'主辦合約尚未生效或已到期。','partner-organizer-required':'此商品限授權有效的合作主辦購買。','ticket-holding-limit':'已達同時持有 2 張的上限，待付款訂單也計入預留名額。','ticket-monthly-limit':'本月已達五款合計 4 張的限購上限。','ticket-quota-needs-review':'票券資料需要核對，請聯絡 BXH。','ticket-lifecycle-disabled':'目前沒有開放這間票券房的試點操作。','ticket-unavailable':'這張券目前無法用來建房，請重新整理票券。','ticket-expired':'啟動券已到期，或會在預定開賽前到期。','ticket-binding-invalid':'票券與房間資料不一致，請重新整理。','forfeit-room-not-live':'只有進行中的賽事可以登記棄權。','forfeit-match-stale':'對戰資料已更新，請重新整理後再操作。','forfeit-round-waiting':'這場對戰目前尚未開放。','ticket-ptn-slot-occupied':'這個試點已有賽事，請返回選券頁管理。','room-code-conflict':'試點房號已使用，請重新整理。','bracket-version-conflict':'抽籤資料已變更，請重新整理後再操作。','bracket-roster-changed':'可出賽名單已變更，請重新整理後再操作。','registration-roster-stale':'報名名單已更新，請重新整理後再操作。','registration-queue-pending':'報名資料正在更新，請稍後再試。','registration-queue-disabled':'這間賽事尚未開放 V2 操作。','early-start-confirmation-required':'尚未到預定開賽時間。','not-found':'目前找不到這間票券房。','unpaid-order-exists':'此商品已有未完成訂單，請到我的訂單查看。','already-owned':'你已持有此 Skin，無須重複購買。','bank-receipt-used':'這筆銀行交易已核銷，請確認是否重複使用。','amount-mismatch':'金額不符，請先釐清差額再確認。','payment-window-closed':'已超過付款期限或訂單狀態已變更，請聯絡 BXH。','invalid-remittance':'請填寫匯款末五碼與正確的轉帳時間。','refund-needs-review':'商品已有使用或後續異動，需要人工評估，暫不能自動收回。','transition-forbidden':'訂單狀態已變更，請重新讀取確認。','operation-conflict':'操作識別碼與原請求不一致，請保留訂單編號聯絡 BXH。','storage-unavailable':'瀏覽器無法保存待確認操作，請允許工作階段儲存後再試。','super-admin-required':'只有最高管理員可以執行此操作。','account-inactive':'帳號目前不可購買。','invalid-bank':'請確認三碼銀行代碼及收款帳號。','invalid-number':'請檢查金額、數量或期限。','invalid-text':'請完整填寫欄位。','invalid-image':'商品圖片請使用 HTTPS 網址。','invalid-vip-duration':'VIP 須設定有效天數，數量為 1。','invalid-quota-duration':'場次額度的期限沿用合約，商品天數請填 0。','cancel-unavailable':'這筆訂單已無法自行取消。','order-unavailable':'找不到可查看的訂單。','invalid-action':'無法執行這項操作。'};
  for(const [k,v]of Object.entries(labels))if(m.includes(k))return v;
  return '連線尚未確認，請重試；系統會沿用原操作避免重複下單。';
 }
-const permanentErrors=/forfeit-(room-not-live|match-stale|round-waiting)|registration-(queue-pending|queue-disabled|roster-stale)|early-start-confirmation-required|bracket-started|ticket-lifecycle-disabled|ticket-unavailable|ticket-expired|ticket-binding-invalid|room-code-conflict|bracket-version-conflict|bracket-roster-changed|permission-denied|not-found|partner-organizer-required|ticket-holding-limit|ticket-monthly-limit|product-unavailable|store-closed|delivery-not-ready|product-changed|version-conflict|contract-required|contract-expired|unpaid-order-exists|already-owned|bank-receipt-used|amount-mismatch|payment-window-closed|invalid-|refund-needs-review|transition-forbidden|cancel-unavailable|account-inactive|super-admin-required|order-unavailable/;
+const permanentErrors=/forfeit-(room-not-live|match-stale|round-waiting)|registration-(queue-pending|queue-disabled|roster-stale)|early-start-confirmation-required|bracket-started|ticket-lifecycle-disabled|ticket-unavailable|ticket-expired|ticket-binding-invalid|room-code-conflict|ticket-ptn-slot-occupied|bracket-version-conflict|bracket-roster-changed|permission-denied|not-found|partner-organizer-required|ticket-holding-limit|ticket-monthly-limit|product-unavailable|store-closed|delivery-not-ready|product-changed|version-conflict|contract-required|contract-expired|unpaid-order-exists|already-owned|bank-receipt-used|amount-mismatch|payment-window-closed|invalid-|refund-needs-review|transition-forbidden|cancel-unavailable|account-inactive|super-admin-required|order-unavailable/;
 const money=n=>'NT$ '+Number(n||0).toLocaleString('zh-TW');
 const date=n=>n?new Date(n).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'—';
 function image(url){if(/^assets\/commerce\/tickets\/tournament-activation-(32-green|64-blue|96-purple|128-orange|160-red)\.png$/.test(url))return url;try{const u=new URL(url);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch{return '';}}
 function notices(c){return `${c.error?`<p class="commerce-error" role="alert">${esc(c.error)}</p>`:''}${c.success?`<p class="commerce-success" role="status">${esc(c.success)}</p>`:''}${c.pending?`<div class="banner"><span>有一筆操作尚待確認。</span><button class="btn btn-primary" data-action="commerce-retry" ${c.busy?'disabled':''}>確認原操作結果</button></div>`:''}`;}
 const pilotCode=()=>window.BXH_TICKET_ROOM_PILOT_CODE;
-const ticketActions=new Set(['create-ticket-room','ticket-room-state','ticket-room-draw','ticket-room-start','ticket-room-remove','ticket-room-forfeit']);
+const ticketActions=new Set(['create-ticket-room','ticket-ptn-status','ticket-room-state','ticket-room-draw','ticket-room-start','ticket-room-remove','ticket-room-forfeit']);
 const ticketPilot=()=>canSeeTickets()&&typeof pilotCode()==='string'&&/^BXH-[A-Z0-9]{4,16}$/.test(pilotCode());
 const ticketCreationView=c=>c.view==='ticket-create'&&typeof activeTab!=='undefined'&&activeTab==='management';
+const ptnCreation=c=>ticketCreationView(c)&&window.BXH_TICKET_ROOM_PTN_PILOT===true;
+const ticketRoomCode=c=>ptnCreation(c)?c.ptnStatus?.code:pilotCode();
+const isPtnCode=code=>typeof code==='string'&&/^PTN-[A-Z0-9]{6}$/.test(code);
 const ticketViewOpen=c=>ticketCreationView(c)||c.view==='shop'&&c.ticketsOpen;
 const ticketAvailable=ticket=>ticket.status==='available'&&ticket.expiresAt>Date.now();
 async function call(payload){
@@ -69,12 +72,14 @@ async function load(kind,more=false){
  const c=context();if(c.loading||c.busy||!currentAuthUid())return;
  if(kind.startsWith('admin-')&&!isSuperAdmin())return;
  if(kind==='my-tickets'&&!canSeeTickets())return;
- if(kind==='ticket-room-state'&&!ticketPilot())return;
+ if(kind==='ticket-room-state'&&(!ticketPilot()||!ticketRoomCode(c)))return;
+ if(kind==='ticket-ptn-status'&&(!ticketPilot()||!ptnCreation(c)))return;
  const generation=++c.generation;c.loading=true;c.error='';render();
  try{
   const cursor=more?(kind.includes('products')||kind==='catalog'?c.productsCursor:c.ordersCursor):null;
-  const r=await call(kind==='ticket-room-state'?{action:kind,code:pilotCode()}:{action:kind,cursor,...(kind==='admin-orders'?{status:c.status}:{})});if(c!==context()||generation!==c.generation)return;
+  const r=await call(kind==='ticket-room-state'?{action:kind,code:ticketRoomCode(c)}:kind==='ticket-ptn-status'?{action:kind}:{action:kind,cursor,...(kind==='admin-orders'?{status:c.status}:{})});if(c!==context()||generation!==c.generation)return;
   if(kind==='ticket-room-state')c.ticketRoom=r;
+  if(kind==='ticket-ptn-status')c.ptnStatus=r;
   if(typeof r.storeOpen==='boolean')c.storeOpen=r.storeOpen;
   if(r.products){c.products=more?[...(c.products||[]),...r.products]:r.products;c.productsCursor=r.nextCursor;}
   if(kind==='my-tickets'&&Array.isArray(r.tickets))c.tickets=r.tickets;
@@ -98,7 +103,10 @@ async function mutate(payload){
   if(r.config){c.config=r.config;c.configDraft=null;}
   if(ticketActions.has(action)){
    c.tickets=null;c.ticketDraft=null;c.ticketRoom=null;
-   if(view===c.view&&ticketViewOpen(c))c.ticketRoomOpen=true;
+   if(view===c.view&&ticketViewOpen(c)){
+    if(action==='create-ticket-room'&&ptnCreation(c)&&isPtnCode(r.code))c.ptnStatus={ok:true,code:r.code};
+    c.ticketRoomOpen=true;
+   }
   }
   c.success=({ 'create-ticket-room':'已建房並綁定啟動券。','ticket-room-draw':'抽籤完成。','ticket-room-start':'正式開賽，啟動券已扣用。','ticket-room-remove':'已移除選手。請重新抽籤。','ticket-room-forfeit':'已登記棄權，對手晉級。'})[action]||'操作已確認完成。';
  }catch(e){if(c===context()){
@@ -111,7 +119,7 @@ function productDetails(p,c){
  if(p.previewOnly)return `<section class="panel commerce-detail"><button class="btn btn-ghost" data-action="commerce-back-products">返回商品清單</button><img class="commerce-hero" src="${esc(image(p.imageUrl))}" alt="${esc(p.name)}"><h2>${esc(p.name)}</h2><p class="commerce-ticket-status" role="status">暫停購買</p><p class="commerce-price">價格待公告</p><p class="commerce-copy">單場積分賽適用，基本正取上限 ${p.capacity} 人。備取人數不計入基本上限；開房時選券並綁定房間，開賽後使用一張券。</p><dl class="commerce-facts"><dt>購買資格</dt><dd>授權有效的合作主辦</dd><dt>有效期限</dt><dd>待公告</dd></dl><p class="hint">目前僅供瀏覽，尚未開放付款、建立訂單或發券。價格與期限確認後另行公告。</p><button class="btn btn-primary" disabled aria-disabled="true">暫停購買</button></section>`;
  return `<section class="panel commerce-detail"><button class="btn btn-ghost" data-action="commerce-back-products">返回商品清單</button>${image(p.imageUrl)?`<img class="commerce-hero" src="${esc(image(p.imageUrl))}" alt="${esc(p.name)}">`:''}<h2>${esc(p.name)}</h2><p class="commerce-price">${money(p.priceTwd)}</p><p class="commerce-copy">${esc(p.description)}</p><dl class="commerce-facts"><dt>商品類型</dt><dd>${esc(kinds[p.delivery.kind])}</dd><dt>購買資格</dt><dd>${audienceLabel(p.audience)}</dd><dt>內容數量</dt><dd>${Number(p.delivery.quantity)}</dd><dt>持有／使用期限</dt><dd>${p.delivery.kind==='room_quota'?'依主辦合約與商品條款':p.delivery.durationDays?Number(p.delivery.durationDays)+' 天':'永久持有'}</dd>${p.delivery.kind==='ticket'?'<dt>購買上限</dt><dd>同時最多持有 2 張，每月五款合計限購 4 張。</dd>':''}</dl><h3>購買說明</h3><p class="commerce-copy">${esc(p.terms)}</p><p class="hint">銀行轉帳後，請至我的訂單回報匯款資訊。BXH 確認收款後交付；有期限的權益從成功開通起計算。</p>${!purchasable(p)?`<p role="status">${esc(errorMessage(p.unavailableReason))}</p>`:''}<label class="commerce-consent"><input type="checkbox" data-commerce-consent> 我已閱讀商品內容、資格、期限與購買說明</label><button class="btn btn-primary" data-action="commerce-buy" data-id="${esc(p.id)}" ${c.busy||c.loading||c.pending||!purchasable(p)?'disabled':''}>建立訂單｜${money(p.priceTwd)}</button></section>`;
 }
-function enter(view){const c=context();if(c.view!==view){c.view=view;c.generation++;c.loading=false;c.storeOpen=null;c.products=null;c.tickets=null;c.ticketsOpen=false;c.ticketRoomOpen=false;c.ticketRoom=null;c.ticketDraft=null;c.orders=null;c.order=null;c.error='';c.success='';}return c;}
+function enter(view){const c=context();if(c.view!==view){c.view=view;c.generation++;c.loading=false;c.storeOpen=null;c.products=null;c.tickets=null;c.ticketsOpen=false;c.ticketRoomOpen=false;c.ticketRoom=null;c.ticketDraft=null;c.ptnStatus=null;c.orders=null;c.order=null;c.error='';c.success='';}return c;}
 function ticketWallet(c){
  const locked=c.loading||c.busy||!!c.pending;
  const managePilot=ticketPilot()&&c.tickets&&!c.tickets.some(ticket=>ticket.boundRoomCode===pilotCode());
@@ -133,10 +141,10 @@ function ticketRoomPanel(c){
  if(c.ticketDraft){
   const {ticket,...v}=c.ticketDraft;
   const time=(key,label)=>input(key,label,v[key],'datetime-local','data-minute-precision="true" required');
-  return `<section class="panel commerce">${back}<h2>選券建房</h2>${notices(c)}<p>房號 ${esc(pilotCode())}｜正取上限 ${Number(ticket.capacity)} 人</p><form data-commerce-form="ticket-room">${input('name','賽事名稱',v.name,'text','maxlength="80" required')}${input('location','場地',v.location,'text','maxlength="160"')}${input('stations','裁判台數',v.stations||1,'number','min="1" max="12" step="1" required')}${time('registrationOpenAt','報名開放（台灣時間）')}${time('registrationCloseAt','報名截止（台灣時間）')}${time('startAt','預定開賽（台灣時間）')}<button class="btn btn-primary" ${pending?'disabled':''}>建立房間並綁券</button></form></section>`;
+  return `<section class="panel commerce">${back}<h2>選券建房</h2>${notices(c)}<p>${ptnCreation(c)?'建立時自動產生 PTN 房號':'房號 '+esc(pilotCode())}｜正取上限 ${Number(ticket.capacity)} 人</p><form data-commerce-form="ticket-room">${input('name','賽事名稱',v.name,'text','maxlength="80" required')}${input('location','場地',v.location,'text','maxlength="160"')}${input('stations','裁判台數',v.stations||1,'number','min="1" max="12" step="1" required')}${time('registrationOpenAt','報名開放（台灣時間）')}${time('registrationCloseAt','報名截止（台灣時間）')}${time('startAt','預定開賽（台灣時間）')}<button class="btn btn-primary" ${pending?'disabled':''}>建立房間並綁券</button></form></section>`;
  }
  const room=c.ticketRoom;
- return `<section class="panel commerce">${back}<h2>${room?esc(room.name):'票券賽事'}</h2>${notices(c)}${c.loading?'<p role="status">正在讀取賽事……</p>':''}${room?`<p>${esc(room.code)}｜${room.phase==='waiting'?'等待開賽':room.phase==='live'?'已開賽':'賽事已離開候賽階段'}</p><p>可出賽 ${Number(room.eligibleCount)} 人｜${room.drawId?(room.drawReady===false?'名單已變更，請重新抽籤':'已抽籤'):'尚未抽籤'}</p>${room.phase==='waiting'?`<div class="btn-row"><button class="btn btn-ghost" data-action="commerce-ticket-draw" ${pending||room.eligibleCount<2?'disabled':''}>${room.drawId?'重新抽籤':'抽籤'}</button><button class="btn btn-primary" data-action="commerce-ticket-start" ${pending||!room.drawId||room.drawReady===false||room.eligibleCount<2?'disabled':''}>正式開賽並扣券</button></div>${room.participants?.length?`<details><summary>管理參賽名單（${room.participants.length} 人）</summary><ul>${room.participants.map(player=>`<li>${esc(player.name)} <button type="button" class="btn btn-ghost" data-action="commerce-ticket-remove" data-id="${esc(player.registrationId)}" ${pending?'disabled':''}>移除</button></li>`).join('')}</ul></details>`:''}`:''}`:''}${room?ticketForfeitPanel(room,pending):''}<button class="btn btn-ghost" data-action="commerce-ticket-refresh" ${c.loading?'disabled':''}>重新整理賽事</button></section>`;
+ return `<section class="panel commerce">${back}<h2>${room?esc(room.name):'票券賽事'}</h2>${notices(c)}${c.loading?'<p role="status">正在讀取賽事……</p>':''}${room?`<p>${esc(room.code)}｜${room.phase==='waiting'?'等待開賽':room.phase==='live'?'已開賽':'賽事已離開候賽階段'}</p>${room.ticketStatus==='consumed'?'<p role="status">已扣用 1 張啟動券</p>':room.ticketStatus==='reserved'?'<p>已綁定啟動券，開賽時扣用。</p>':''}<p>可出賽 ${Number(room.eligibleCount)} 人｜${room.drawId?(room.drawReady===false?'名單已變更，請重新抽籤':'已抽籤'):'尚未抽籤'}</p>${room.phase==='waiting'?`<div class="btn-row"><button class="btn btn-ghost" data-action="commerce-ticket-draw" ${pending||room.eligibleCount<2?'disabled':''}>${room.drawId?'重新抽籤':'抽籤'}</button><button class="btn btn-primary" data-action="commerce-ticket-start" ${pending||!room.drawId||room.drawReady===false||room.eligibleCount<2?'disabled':''}>正式開賽並扣券</button></div>${room.participants?.length?`<details><summary>管理參賽名單（${room.participants.length} 人）</summary><ul>${room.participants.map(player=>`<li>${esc(player.name)} <button type="button" class="btn btn-ghost" data-action="commerce-ticket-remove" data-id="${esc(player.registrationId)}" ${pending?'disabled':''}>移除</button></li>`).join('')}</ul></details>`:''}`:''}`:''}${room?ticketForfeitPanel(room,pending):''}<button class="btn btn-ghost" data-action="commerce-ticket-refresh" ${c.loading?'disabled':''}>重新整理賽事</button></section>`;
 }
 
 function ticketCreationPage(){
@@ -146,17 +154,19 @@ function ticketCreationPage(){
   schedule('ticket-room-state',!c.ticketDraft&&c.ticketRoom===null);
   return ticketRoomPanel(c);
  }
- schedule('my-tickets',c.tickets===null);
- const bound=c.tickets?.some(ticket=>ticket.boundRoomCode===pilotCode());
+ const ptn=ptnCreation(c);
+ if(ptn&&!c.ptnStatus)schedule('ticket-ptn-status',true);
+ else schedule('my-tickets',c.tickets===null&&!(ptn&&c.ptnStatus.code));
+ const bound=ptn?isPtnCode(c.ptnStatus?.code):c.tickets?.some(ticket=>ticket.boundRoomCode===pilotCode());
  const locked=c.loading||c.busy||!!c.pending;
  const options=ticketPreviews.map(({capacity})=>{
   const available=(c.tickets||[]).filter(ticket=>ticket.capacity===capacity&&ticketAvailable(ticket));
   const first=available.sort((a,b)=>a.expiresAt-b.expiresAt)[0];
-  const enabled=first&&!bound&&!locked;
+  const enabled=first&&!bound&&!locked&&(!ptn||c.ptnStatus?.ok===true);
   const status=c.tickets===null?'尚未取得持有狀態':available.length?`可用 ${available.length} 張`:'無可用票券';
   return `<button class="panel commerce-category btn ${enabled?'btn-primary':'btn-ghost'}" data-action="commerce-ticket-bind" data-id="${esc(first?.id||'')}" ${enabled?'':'disabled'}><strong>${capacity} 人</strong><span>${status}</span></button>`;
  }).join('');
- return `<section class="commerce"><div class="panel-title"><h2>新增賽事｜選券建房</h2><button class="btn btn-ghost" data-action="commerce-close-ticket-create">返回賽事管理</button></div>${notices(c)}${c.loading?'<p role="status">正在讀取啟動券……</p>':''}<div class="commerce-grid">${options}</div>${bound?`<p>此試點房已綁券。</p><button class="btn btn-primary" data-action="commerce-ticket-room" ${locked?'disabled':''}>管理已建立的賽事</button>`:''}<button class="btn btn-ghost" data-action="commerce-refresh-tickets" ${locked?'disabled':''}>重新整理票券</button></section>`;
+ return `<section class="commerce"><div class="panel-title"><h2>新增賽事｜選券建房</h2><button class="btn btn-ghost" data-action="commerce-close-ticket-create">返回賽事管理</button></div>${notices(c)}${c.loading?'<p role="status">正在讀取啟動券……</p>':''}<div class="commerce-grid">${options}</div>${bound?`<p>此試點房已建立${ptn?'｜'+esc(ticketRoomCode(c)):''}。</p><button class="btn btn-primary" data-action="commerce-ticket-room" ${locked?'disabled':''}>管理已建立的賽事</button>`:''}<button class="btn btn-ghost" data-action="commerce-refresh-tickets" ${locked?'disabled':''}>重新整理票券</button></section>`;
 }
 
 function shop(){
@@ -226,12 +236,14 @@ async function handle(action,target){
   c.ticketsOpen=action==='commerce-open-tickets';c.tickets=null;c.ticketRoomOpen=false;c.ticketDraft=null;c.error='';render();return;
  }
  if(action==='commerce-ticket-bind'&&ticketPilot()&&ticketViewOpen(c)&&!c.pending){
-  if(ticketCreationView(c)&&c.tickets?.some(ticket=>ticket.boundRoomCode===pilotCode()))return;
+  if(ptnCreation(c)?(!c.ptnStatus?.ok||c.ptnStatus.code):
+     ticketCreationView(c)&&c.tickets?.some(ticket=>ticket.boundRoomCode===pilotCode()))return;
   const ticket=c.tickets?.find(ticket=>ticket.id===id&&ticketAvailable(ticket));
   if(ticket){c.ticketDraft={ticket};c.ticketRoomOpen=true;c.error='';c.success='';render();}
   return;
  }
  if(action==='commerce-ticket-room'&&ticketPilot()&&ticketViewOpen(c)){
+  if(!ticketRoomCode(c))return;
   c.ticketRoomOpen=true;c.ticketRoom=null;c.error='';c.success='';return load('ticket-room-state');
  }
  if(action==='commerce-ticket-back'){c.ticketRoomOpen=false;c.ticketDraft=null;c.error='';c.success='';render();return;}
@@ -239,13 +251,13 @@ async function handle(action,target){
  if(action==='commerce-ticket-remove'&&ticketPilot()&&ticketViewOpen(c)&&c.ticketRoomOpen&&!c.pending){
   const room=c.ticketRoom;
   const player=room?.participants?.find(player=>player.registrationId===id);
-  if(!player||room.code!==pilotCode()||room.phase!=='waiting'||!confirm('確定移除「'+player.name+'」？'))return;
+  if(!player||room.code!==ticketRoomCode(c)||room.phase!=='waiting'||!confirm('確定移除「'+player.name+'」？'))return;
   return mutate({action:'ticket-room-remove',code:room.code,registrationId:id});
  }
  if(action==='commerce-ticket-forfeit'&&ticketPilot()&&ticketViewOpen(c)&&c.ticketRoomOpen&&!c.pending){
   const room=c.ticketRoom,side=target?.dataset?.side;
   const match=room?.matches?.find(item=>item.id===id);
-  if(!match||room.code!==pilotCode()||room.phase!=='live'||!['a','b'].includes(side))return;
+  if(!match||room.code!==ticketRoomCode(c)||room.phase!=='live'||!['a','b'].includes(side))return;
   const player=match[side],opponent=match[side==='a'?'b':'a'];
   if(!confirm('確定登記「'+player.name+'」本場棄權，由「'+opponent.name+'」晉級？'))return;
   return mutate({action:'ticket-room-forfeit',code:room.code,roomId:room.roomId,matchId:match.id,
@@ -253,7 +265,7 @@ async function handle(action,target){
  }
  if(['commerce-ticket-draw','commerce-ticket-start'].includes(action)&&ticketPilot()&&ticketViewOpen(c)&&c.ticketRoomOpen&&!c.pending){
   const room=c.ticketRoom,start=action==='commerce-ticket-start';
-  if(!room||room.code!==pilotCode()||room.phase!=='waiting'||room.eligibleCount<2||start&&(!room.drawId||room.drawReady===false))return;
+  if(!room||room.code!==ticketRoomCode(c)||room.phase!=='waiting'||room.eligibleCount<2||start&&(!room.drawId||room.drawReady===false))return;
   const confirmEarlyStart=start&&Number(room.startAt)>Date.now();
   if(start&&!confirm(confirmEarlyStart?'尚未到預定時間。確定提前開賽並扣用啟動券？':'確定正式開賽並扣用啟動券？'))return;
   if(!start&&room.drawId&&!confirm('確定重新抽籤？'))return;
@@ -261,7 +273,10 @@ async function handle(action,target){
   return mutate(start?{...data,action:'ticket-room-start',drawId:room.drawId,confirmEarlyStart}
    :{...data,action:'ticket-room-draw',baseDrawId:room.drawId});
  }
- if(action==='commerce-refresh-tickets'&&ticketViewOpen(c))return load('my-tickets');
+ if(action==='commerce-refresh-tickets'&&ticketViewOpen(c)){
+  if(ptnCreation(c)&&(!c.ptnStatus||c.ptnStatus.code))return load('ticket-ptn-status');
+  return load('my-tickets');
+ }
  if(action==='commerce-refresh-products')return load('catalog');
  if(action==='commerce-products-more')return load(adminMode?'admin-products':'catalog',true);
  if(action==='commerce-refresh-orders')return load('my-orders');
@@ -289,7 +304,7 @@ document.addEventListener('submit',async e=>{
  if(type==='ticket-room'){
   if(!ticketPilot()||!ticketViewOpen(c)||!c.ticketDraft)return;
   const time=key=>Date.parse(values[key]+':00+08:00');
-  payload={action:'create-ticket-room',code:pilotCode(),ticketId:c.ticketDraft.ticket.id,name:values.name,
+  payload={action:'create-ticket-room',...(ptnCreation(c)?{}:{code:pilotCode()}),ticketId:c.ticketDraft.ticket.id,name:values.name,
    location:values.location,stations:Number(values.stations),registrationOpenAt:time('registrationOpenAt'),
    registrationCloseAt:time('registrationCloseAt'),startAt:time('startAt')};
  }else if(type==='report')payload={action:'report-payment',orderId:c.order?.id,report:{lastFive:values.lastFive,transferredAt:Date.parse(values.transferredAt+':00+08:00'),note:values.note}};
