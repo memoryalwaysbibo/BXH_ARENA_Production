@@ -87,7 +87,8 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  await assert.rejects(status({...statusRequest,auth:{uid:other}}),/permission-denied/);
  const waiting=await status(statusRequest);
  if(ptn)assert.equal(waiting.ticketStatus,'reserved');
- assert.deepEqual(waiting,{ok:true,code,roomId,name:'Fixture',phase:'waiting',startAt:now+600000,
+ assert.deepEqual(waiting,{ok:true,code,roomId,name:'Fixture',location:'Tainan',capacity:32,confirmedCount:0,
+  phase:'waiting',startAt:now+600000,
   registrationOpenAt:now-2000,registrationCloseAt:now+300000,registrationEnabled:true,updatedAt:now,
   drawId:null,rosterRevision:0,eligibleCount:0,drawReady:false,participants:[],...(ptn?{ticketStatus:'reserved'}:{})});
  const schedule=createTicketScheduleHandler({db,clock:()=>now+1000});

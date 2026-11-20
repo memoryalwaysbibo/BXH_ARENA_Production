@@ -330,6 +330,7 @@ test('partner can recover their PTN room from management without a pilot URL',as
  assert.deepEqual(calls,[{action:'ticket-ptn-status'},{action:'ticket-room-state',code}]);
  assert.match(t.ui.ticketCreationPage(),/已綁定啟動券/);
  assert.deepEqual(JSON.parse(JSON.stringify(t.ui.ticketManagementContext())),{code,phase:'waiting',verified:true});
+ assert.match(t.ui.ticketCreationPage(),/data-action="commerce-ticket-open-manage"[^>]*>管理房間/);
  assert.match(t.ui.ticketCreationPage(),/正式開賽並扣券/);
  await t.ui.handle('commerce-ticket-back');
  assert.equal(t.ui.ticketCreationPage(),null);
@@ -352,9 +353,15 @@ test('PTN takeover replaces stale legacy header only after server owner verifica
  assert.equal(t.ui.ticketManagementContext(),null);
  await t.ui.handle('commerce-open-owned-ptn',{});
  assert.equal(t.ui.ticketManagementContext().code,code);
+ assert.match(t.ui.ticketCreationPage(),/管理房間/);
+ await t.ui.handle('commerce-ticket-open-manage');
+ assert.match(t.ui.ticketCreationPage(),/報名管理/);
+ assert.match(t.ui.ticketCreationPage(),/報名已截止/);
+ await t.ui.handle('commerce-ticket-manage-tab',{dataset:{id:'settings'}});
  assert.match(t.ui.ticketCreationPage(),/調整報名與開賽時間/);
- assert.match(t.ui.ticketCreationPage(),/報名時間已過/);
+ assert.match(t.ui.ticketCreationPage(),/儲存賽事時間/);
  assert.doesNotMatch(t.ui.ticketCreationPage(),/查看玩家報名頁|entry=register/);
+ await t.ui.handle('commerce-ticket-close-manage');
  assert.match(t.ui.ticketCreationPage(),/disabled>抽籤/);
  const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
  assert.match(core,/ticketManagementContext\?\.\(\)/);
