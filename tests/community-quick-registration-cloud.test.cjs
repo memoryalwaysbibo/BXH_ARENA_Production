@@ -87,7 +87,7 @@ function harness() {
   vm.runInContext(fs.readFileSync(path.join(root,'modules/main-app/participant-names.js'),'utf8'),ctx);
   ctx.window.BXHQrCheckinFence = require('../modules/main-app/qr-checkin-fence.js');
   Object.assign(ctx, ctx.window.BXHDomainUtils, ctx.window.BXHRegistrationUtils);
-  for (const name of ['advanceOnsiteWriteFence', 'courtLifecycleWritePatch', 'buildPublicMirrorFields', 'computeTournamentPhase', 'reconstructPublicStateFromDoc']) vm.runInContext(cloudFunction(name), ctx);
+  for (const name of ['advanceOnsiteWriteFence', 'courtLifecycleWritePatch', 'buildPublicMirrorFields', 'computeTournamentPhase', 'reconstructPublicStateFromDoc', 'publicTournamentLifecycleReconcileCandidates']) vm.runInContext(cloudFunction(name), ctx);
   const names = ['createCommunityRoom', 'createRoom', 'pushUpdate', 'syncCommunityRegistrationSummary', 'joinRoom', 'joinRoomPublic', 'getPublicTournamentFull', 'getPublicTournamentSummary', 'queryPublicTournaments', 'queryAdminTournaments', 'promoteLocalWaitlistRoster', 'mutateRegistrationRoster'];
   vm.runInContext('api={' + names.map(method).join(',\n') + '}', ctx);
   ctx.window.engagementService = { familyRegistration: async payload => {
