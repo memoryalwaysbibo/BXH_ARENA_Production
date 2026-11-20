@@ -1,5 +1,10 @@
 'use strict';
 
+const isPartnerRoomCode=code=>typeof code==='string'&&/^PTN-[A-Z0-9]{6}$/.test(code);
+const validRegistrationRoomCode=code=>typeof code==='string'&&(/^BXH-[A-Z0-9]{4,16}$/.test(code)||isPartnerRoomCode(code));
+const ticketLifecyclePath=code=>isPartnerRoomCode(code)
+ ?'systemSettings/commerceTicketPtnPilotV1':'systemSettings/commerceTicketLifecycleV1';
+
 function grantTime(value){
  if((typeof value!=='number'&&typeof value!=='string')||(typeof value==='string'&&!value.trim()))return NaN;
  const n=Number(value);
@@ -18,7 +23,8 @@ function ticketHostGrant(user,now){
  const order=g.orderCode||user.partnerContractOrderCode||null;
  if(g.scope==='contract'?typeof order!=='string'||!(/^[A-Za-z0-9_-]{1,128}$/).test(order)
    :!!order||(g.scope!=null&&g.scope!=='manual'))return null;
- return {organizationId:g.organizationId,order,startsAt,expiresAt};
+ const organizationName=typeof g.organizationName==='string'?g.organizationName.trim().slice(0,80):'';
+ return {organizationId:g.organizationId,organizationName,order,startsAt,expiresAt};
 }
 
 function checkTicketContract(contract,grant,uid){
@@ -28,4 +34,4 @@ function checkTicketContract(contract,grant,uid){
     grantTime(contract.startsAt)!==grant.startsAt||grantTime(contract.expiresAt)!==grant.expiresAt)throw Error('permission-denied');
 }
 
-module.exports={ticketHostGrant,checkTicketContract};
+module.exports={ticketHostGrant,checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath};

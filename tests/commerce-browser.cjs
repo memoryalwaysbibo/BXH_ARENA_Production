@@ -9,6 +9,7 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
  const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE}:{}),args:['--no-sandbox']});
  try{
  for(const width of [390,1280]){
+  const ptn=width===390,expectedCode=ptn?'PTN-TEST32':'BXH-TICKETTEST';
   const page=await browser.newPage({viewport:{width,height:900}}),errors=[];
   page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
   await page.route('https://commerce.test/**',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><body><main id="app"></main></body></html>'}));
@@ -49,15 +50,17 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
    window.testTicketRoom=null;
    window.engagementService.ticketRoomOperation=async p=>{
     testCalls.push(p);
+    if(p.action==='ticket-ptn-status')return {ok:true,code:testTicketRoom?.code??null};
     if(p.action==='create-ticket-room'){
-     testTicketRoom={ok:true,code:p.code,roomId:'fixture-room-generation',name:p.name,phase:'waiting',
+     testTicketRoom={ok:true,code:p.code??'PTN-TEST32',roomId:'fixture-room-generation',name:p.name,phase:'waiting',ticketStatus:'reserved',
       startAt:p.startAt,drawId:null,rosterRevision:7,eligibleCount:2};
-     return {ok:true,code:p.code,roomId:testTicketRoom.roomId};
+     return {ok:true,code:testTicketRoom.code,roomId:testTicketRoom.roomId};
     }
+    if(p.code!==testTicketRoom?.code)throw Error('invalid-operation');
     if(p.action==='ticket-room-state')return {...testTicketRoom};
     if(p.roomId!==testTicketRoom.roomId||p.rosterRevision!==7)throw Error('invalid-operation');
     if(p.action==='ticket-room-draw'){testTicketRoom.drawId='fixture-draw';return {ok:true,drawId:testTicketRoom.drawId};}
-    if(p.action==='ticket-room-start'&&p.drawId===testTicketRoom.drawId){testTicketRoom.phase='live';return {ok:true,startedAt:Date.now()};}
+    if(p.action==='ticket-room-start'&&p.drawId===testTicketRoom.drawId){testTicketRoom.phase='live';testTicketRoom.ticketStatus='consumed';return {ok:true,startedAt:Date.now()};}
     throw Error('unsupported-ticket-room-action');
    };
    document.addEventListener('click',e=>{const t=e.target.closest('[data-action^="commerce-"]');if(t){e.preventDefault();void BXHCommerce.handle(t.dataset.action,t);}});
@@ -112,7 +115,7 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
   await page.getByText('已綁定房間 BXH-TICKETTEST',{exact:true}).waitFor();
   await page.getByText('到期時間（台灣時間）',{exact:false}).waitFor();
   assert.equal(await page.locator('[data-action="commerce-ticket-bind"]').count(),0);
-  await page.evaluate(()=>{window.BXH_TICKET_ROOM_PILOT_CODE='BXH-TICKETTEST';activeTab='management';testView='management';render();});
+  await page.evaluate(ptn=>{window.BXH_TICKET_ROOM_PILOT_CODE='BXH-TICKETTEST';window.BXH_TICKET_ROOM_PTN_PILOT=ptn;activeTab='management';testView='management';render();},ptn);
   await page.getByRole('button',{name:'＋ 新增賽事'}).click();
   await page.getByRole('heading',{name:'新增賽事｜選券建房'}).waitFor();
   const ticketOptions=page.locator('[data-action="commerce-ticket-bind"]');
@@ -127,12 +130,16 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
   await page.locator('[name="startAt"]').fill('2026-12-19T14:00');
   await page.getByRole('button',{name:'建立房間並綁券'}).click();
   await page.getByRole('heading',{name:'票券試點賽事'}).waitFor();
+  await page.getByText('已綁定啟動券，開賽時扣用。',{exact:true}).waitFor();
   await page.locator('[data-action="commerce-ticket-draw"]').click();
   await page.getByText('可出賽 2 人｜已抽籤',{exact:true}).waitFor();
   await page.locator('[data-action="commerce-ticket-start"]').click();
-  await page.getByText('BXH-TICKETTEST｜已開賽',{exact:true}).waitFor();
+  await page.getByText(expectedCode+'｜已開賽',{exact:true}).waitFor();
+  await page.getByText('已扣用 1 張啟動券',{exact:true}).waitFor();
   const flow=await page.evaluate(()=>testCalls.filter(p=>['create-ticket-room','ticket-room-draw','ticket-room-start'].includes(p.action)));
   assert.deepEqual(flow.map(p=>p.action),['create-ticket-room','ticket-room-draw','ticket-room-start']);
+  assert.equal(flow[0].code,ptn?undefined:expectedCode);
+  assert.ok(flow.slice(1).every(p=>p.code===expectedCode));
   assert.equal(flow[0].startAt,Date.parse('2026-12-19T14:00:00+08:00'));
   assert.equal(flow[2].drawId,'fixture-draw');
   assert.ok(flow.every(p=>p.operationId));

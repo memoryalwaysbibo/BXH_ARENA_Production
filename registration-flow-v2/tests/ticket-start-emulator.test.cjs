@@ -5,24 +5,26 @@ const {test,after}=require('node:test');
 const {randomBytes}=require('node:crypto');
 const {db,service,handlers}=require('./harness.cjs');
 const {createApi}=require('../backend/api.cjs');
-const {createTicketRoomHandler,createTicketRoomStateHandler,createTicketRemoveHandler}=require('../backend/ticket-room-create.cjs');
+const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketRemoveHandler}=require('../backend/ticket-room-create.cjs');
 const {createStartHandler,createDrawHandler,createTicketForfeitHandler}=require('../backend/lifecycle.cjs');
 
 after(()=>db.terminate());
 
-test('ticket room creation reserves once and only a successful start consumes the ticket',async()=>{
- const code='BXH-T'+randomBytes(5).toString('hex').toUpperCase(),owner='holder-'+code,other='other-'+code;
- const roomId='ticket-room-preserved-generation';
+for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once and only a successful start consumes the ticket`,async()=>{
+ const code=ptn?'PTN-'+randomBytes(3).toString('hex').toUpperCase():'BXH-T'+randomBytes(5).toString('hex').toUpperCase();
+ const owner='holder-'+code,other='other-'+code;
+ let roomId='ticket-room-preserved-generation';
  const ticketId='BXH-SO-'+code.replace(/[^A-Z0-9]/g,'').padEnd(24,'0');
  const now=Date.now(),contract='contract-'+code;
  const room=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code);
  const ticket=db.doc('commerceTickets/'+ticketId),order=db.doc('commerceOrders/'+ticketId);
  const contractRef=db.doc('partnerContracts/'+contract);
- const release=db.doc('systemSettings/commerceTicketLifecycleV1');
+ const release=db.doc('systemSettings/'+(ptn?'commerceTicketPtnPilotV1':'commerceTicketLifecycleV1'));
  const startsAt=new Date(now-1000).toISOString(),expiresAt=new Date(now+86400000).toISOString();
+ await release.delete();
  const initial=db.batch();
  initial.set(db.doc('users/'+owner),{active:true,role:'player',partnerContractOrderCode:contract,
-  partnerOrganizer:{status:'active',scope:'contract',organizationId:'fixture-org',orderCode:contract,startsAt,expiresAt}});
+  partnerOrganizer:{status:'active',scope:'contract',organizationId:'fixture-org',organizationName:'測試主辦',orderCode:contract,startsAt,expiresAt}});
  initial.set(db.doc('users/'+other),{active:true,role:'player'});
  initial.set(contractRef,{orderCode:contract,status:'active',targetUid:owner,signedBy:owner,
   signatureHash:'fixture-signature',signedAt:startsAt,startsAt,expiresAt,usedEvents:1});
@@ -32,12 +34,22 @@ test('ticket room creation reserves once and only a successful start consumes th
   ticketOrganizationId:'fixture-org',contractCode:contract,productSnapshot:{delivery:{kind:'ticket',assetId:'32'}}});
  await initial.commit();
 
- const create=createTicketRoomHandler({db,clock:()=>now});
- const creation={auth:{uid:owner},app:{appId:'fixture-app'},data:{action:'create-ticket-room',code,ticketId,
+ let attempts=0;
+ const collisionCode=code==='PTN-000000'?'PTN-000001':'PTN-000000';
+ if(ptn)await db.doc('publicTournaments/'+collisionCode).set({sentinel:true});
+ const create=createTicketRoomHandler({db,clock:()=>now,newPartnerCode:()=>++attempts<=6?collisionCode:code});
+ const creation={auth:{uid:owner},app:{appId:'fixture-app'},data:{action:'create-ticket-room',...(ptn?{}:{code}),ticketId,
   operationId:'ticket-fixture-create',name:'Fixture',location:'Tainan',stations:1,
   registrationOpenAt:now-2000,registrationCloseAt:now+300000,startAt:now+600000}};
  await assert.rejects(create(creation),/ticket-lifecycle-disabled/);
- await release.set({bindingEnabled:true,enabled:false,roomCode:code,roomId,ownerUid:owner});
+ await release.set({bindingEnabled:true,enabled:ptn,...(ptn?{}:{roomCode:code,roomId}),ownerUid:owner});
+ const ptnStatus=createPtnStatusHandler({db,clock:()=>now});
+ const ptnStatusRequest={auth:creation.auth,app:creation.app,data:{action:'ticket-ptn-status'}};
+ if(ptn){
+  assert.equal((await ptnStatus(ptnStatusRequest)).code,null);
+  await assert.rejects(ptnStatus({...ptnStatusRequest,auth:{uid:other}}),/permission-denied/);
+  await assert.rejects(create({...creation,data:{...creation.data,code}}),/invalid-operation/);
+ }
  await assert.rejects(create({...creation,app:null}),/permission-denied/);
  await assert.rejects(create({...creation,auth:{uid:other}}),/permission-denied/);
  await assert.rejects(create({...creation,data:{...creation.data,capacity:160}}),/invalid-operation/);
@@ -48,7 +60,16 @@ test('ticket room creation reserves once and only a successful start consumes th
  assert.equal((await pub.get()).exists,false);
  await order.update({paymentStatus:'paid'});
 
+ if(ptn)attempts=5;
  const creations=await Promise.all([create(creation),create(creation)]);
+ if(ptn){
+  roomId=creations[0].roomId;
+  assert.match(roomId,/^[a-f0-9-]{36}$/);
+  assert.equal((await ptnStatus(ptnStatusRequest)).code,code);
+  assert.equal((await db.doc('publicTournaments/'+collisionCode).get()).data().sentinel,true);
+  await assert.rejects(create({...creation,data:{...creation.data,operationId:'another-ticket-create'}}),/ticket-ptn-slot-occupied/);
+ }
+ assert.ok(creations.every(result=>result.code===code));
  assert.equal(creations.filter(result=>result.replayed).length,1);
  assert.ok(creations.every(result=>result.roomId===roomId));
  assert.equal((await ticket.get()).data().status,'reserved');
@@ -59,17 +80,21 @@ test('ticket room creation reserves once and only a successful start consumes th
  assert.equal(createdPub.data().ownerUid,undefined);
  assert.equal(createdPub.data().ticketAccessV1,undefined);
  assert.equal(createdPub.data().capacity,32);
+ if(ptn)assert.equal(createdPub.data().hostName,'測試主辦');
  assert.doesNotMatch(JSON.stringify(createdPub.data()),new RegExp(ticketId));
  const status=createTicketRoomStateHandler({db,clock:()=>now});
  const statusRequest={auth:creation.auth,app:creation.app,data:{action:'ticket-room-state',code}};
  await assert.rejects(status({...statusRequest,auth:{uid:other}}),/permission-denied/);
  const waiting=await status(statusRequest);
- assert.deepEqual(waiting,{ok:true,code,roomId,name:'Fixture',phase:'waiting',startAt:now+600000,drawId:null,rosterRevision:0,eligibleCount:0,drawReady:false,participants:[]});
+ if(ptn)assert.equal(waiting.ticketStatus,'reserved');
+ assert.deepEqual(waiting,{ok:true,code,roomId,name:'Fixture',phase:'waiting',startAt:now+600000,drawId:null,rosterRevision:0,eligibleCount:0,drawReady:false,participants:[],...(ptn?{ticketStatus:'reserved'}:{})});
  await assert.rejects(create({...creation,data:{...creation.data,name:'Changed'}}),/operation-conflict/);
- const otherCode=code+'B';
- await release.update({roomCode:otherCode});
- await assert.rejects(create({...creation,data:{...creation.data,code:otherCode,operationId:'ticket-other-room'}}),/ticket-unavailable/);
- await release.update({roomCode:code});
+ if(!ptn){
+  const otherCode=code+'B';
+  await release.update({roomCode:otherCode});
+  await assert.rejects(create({...creation,data:{...creation.data,code:otherCode,operationId:'ticket-other-room'}}),/ticket-unavailable/);
+  await release.update({roomCode:code});
+ }
  assert.equal(createdPub.data().registrationQueueVersion,2);
  const playerIds=Array.from({length:33},(_,i)=>'ticket-'+code+'-'+i);
  const profiles=db.batch();
@@ -99,6 +124,7 @@ test('ticket room creation reserves once and only a successful start consumes th
  const options={db,clock:()=>now,enabled:async candidate=>candidate===code};
  const draw=createDrawHandler(options),start=createStartHandler(options);
  const request={auth:{uid:owner},data:{code,roomId,baseDrawId:null,rosterRevision:synced.rosterRevision,operationId:'ticket-fixture-draw'}};
+ if(ptn)await release.update({enabled:false});
  await assert.rejects(draw(request),/ticket-lifecycle-disabled/);
  await release.update({enabled:true});
  await assert.rejects(draw({...request,auth:{uid:other}}),/permission-denied/);
@@ -161,6 +187,7 @@ test('ticket room creation reserves once and only a successful start consumes th
  assert.equal(savedTicket.data().usedAt,now);
  assert.equal(savedPub.data().ticketAccessV1,undefined);
  const live=await status(statusRequest);
+ if(ptn)assert.equal(live.ticketStatus,'consumed');
  assert.equal(live.phase,'live');
  assert.equal(live.eligibleCount,29);
  assert.equal(live.drawId,result.drawId);

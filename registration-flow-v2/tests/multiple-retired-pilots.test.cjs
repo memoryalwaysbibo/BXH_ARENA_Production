@@ -9,9 +9,11 @@ function fixture(){
  const pilot='BXH-XXDNAH',olds=['BXH-BZ2JW6','BXH-XJ7WJ5'];
  const status=[],writes=[],drains=[];
  const ticket='BXH-TICKETPILOT';
- let ticketGate;
+ const ptn='PTN-P1L0T1';
+ let ticketGate,ptnGate;
  let gate={roomCode:pilot,workersEnabled:true,intakeEnabled:true,lifecycleEnabled:true};
- const db={doc:path=>({get:async()=>({data:()=>path.endsWith('/registrationFlowV2Pilot')?gate:ticketGate})})};
+ const db={doc:path=>({get:async()=>({data:()=>path.endsWith('/registrationFlowV2Pilot')?gate:
+  path.endsWith('/commerceTicketPtnPilotV1')?ptnGate:ticketGate})})};
  const queue={status:async(...args)=>{status.push(args);return {operation:{state:'completed'}};},
   enqueue:async(...args)=>{writes.push(args);return {operation:{state:'queued'}};},
   drainCreatedJob:async code=>drains.push(code),sweep:async code=>drains.push(code)};
@@ -23,7 +25,7 @@ function fixture(){
   'firebase-functions/v2/firestore':{onDocumentCreated:bind},
   'firebase-functions/v2/scheduler':{onSchedule:bind},
   './queue.cjs':{createQueue:()=>queue},
-  './ticket-room-create.cjs':{createTicketRoomHandler:()=>async()=>{},createTicketRoomStateHandler:()=>async()=>{},createTicketRemoveHandler:()=>async()=>{}},
+  './ticket-room-create.cjs':{createTicketRoomHandler:()=>async()=>({ok:true}),createPtnStatusHandler:()=>async()=>({ok:true}),createTicketRoomStateHandler:()=>async()=>{},createTicketRemoveHandler:()=>async()=>{}},
   './lifecycle.cjs':{createDrawHandler:()=>async()=>{},createStartHandler:()=>async()=>{},createTicketForfeitHandler:()=>async()=>{}}
  };
  const module={exports:{}};
@@ -33,7 +35,8 @@ function fixture(){
   rosterFactory:()=>{},promotionFactory:()=>{},authorizeManagement:()=>{},...options});
  const call=(endpoint,code,data,uid='synthetic-actor')=>endpoint.run({auth:{uid},data:{code,...data}});
  const configureTicket=(settings={})=>{ticketGate={enabled:true,bindingEnabled:true,roomCode:ticket,roomId:'ticket-pilot-generation',ownerUid:'pilot-owner',...settings};};
- return {pilot,ticket,configureTicket,olds,status,writes,drains,create,call,close:()=>{gate={...gate,workersEnabled:false,intakeEnabled:false};}};
+ const configurePtn=(settings={})=>{ptnGate={enabled:true,bindingEnabled:true,roomCode:ptn,roomId:'ptn-pilot-generation',ownerUid:'pilot-owner',...settings};};
+ return {pilot,ticket,ptn,configureTicket,configurePtn,olds,status,writes,drains,create,call,close:()=>{gate={...gate,workersEnabled:false,intakeEnabled:false};}};
 }
 
 test('both retired pilots can read actor-scoped receipts while only the current pilot accepts work',async()=>{
@@ -56,6 +59,23 @@ test('both retired pilots can read actor-scoped receipts while only the current 
  assert.equal(f.writes.length,1);
  await assert.rejects(f.call(endpoints.registrationQueueV2,'BXH-OTHER',{action:'status',operationId}),/registration-queue-disabled/);
  await assert.rejects(endpoints.registrationQueueV2.run({data:{code:f.olds[0],action:'status',operationId}}),{code:'unauthenticated'});
+});
+
+test('PTN intake and recovery use only their assigned room while the BXH gate stays independent',async()=>{
+ const f=fixture(),endpoints=f.create();
+ const submit=code=>f.call(endpoints.registrationQueueV2,code,{action:'submit',
+  operation:{code,route:'family',payload:{action:'join',code}}});
+ await assert.rejects(submit(f.ptn),/registration-queue-disabled/);
+ f.configureTicket();
+ f.configurePtn();
+ await submit(f.ticket);
+ await submit(f.ptn);
+ await assert.rejects(submit('PTN-AAAAAA'),/registration-queue-disabled/);
+ await endpoints.registrationQueueV2Worker.run({params:{code:f.ptn,job:'synthetic-job'}});
+ await endpoints.registrationQueueV2Sweep.run({});
+ assert.deepEqual(f.drains,[f.ptn,f.pilot,f.ticket,f.ptn]);
+ assert.equal((await f.call(endpoints.registrationRosterQueueV2,undefined,{action:'create-ticket-room'})).ok,true);
+ await assert.rejects(endpoints.registrationRosterQueueV2.run({data:{action:'create-ticket-room'}}),/registration-queue-disabled/);
 });
 
 test('closed intake keeps both old pilots queryable and background work stays scoped to the current pilot',async()=>{

@@ -2,6 +2,7 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
+const entryUtils=fs.readFileSync(path.join(__dirname,'../modules/main-app/tournament-entry-utils.js'),'utf8');
 function between(start,end){const a=core.indexOf(start),b=core.indexOf(end,a+start.length);assert.ok(a>=0&&b>a);return core.slice(a,b);}
 const source=between('let adminTournamentListOpen = false;','let refereeDirectoryUsers = null;')+'\n'
  +between('function renderTournamentManagementTab(){','\nfunction renderAdminNoTournamentScreen(){');
@@ -17,7 +18,8 @@ function setup(query=async()=>page()){
  registrationStatusLabel:status=>({open:'報名中',full:'額滿',scheduled:'即將開放',closed:'已關閉'})[status]||status,esc:value=>String(value??''),
  window:{cloudSync:{connect:async()=>true,queryAdminTournamentSummaries:request=>{calls.push(JSON.parse(JSON.stringify(request)));return query(request);},queryAdminTournaments:()=>{throw Error('full tournament downloads forbidden');},repairTournamentLifecycle:()=>{throw Error('list must not repair room state');},enrichAdminTournamentCreatorNames:()=>{throw Error('optional user-profile reads forbidden');}}},
  render(){s.reconcileAdminTournamentListContext();}};
- vm.createContext(s);vm.runInContext(source,s);const evaluate=code=>vm.runInContext(code,s);s.reconcileAdminTournamentListContext();
+ vm.createContext(s);vm.runInContext(entryUtils,s);s.isValidRoomCode=s.window.BXHTournamentEntryUtils.isValidRoomCode;
+ vm.runInContext(source,s);const evaluate=code=>vm.runInContext(code,s);s.reconcileAdminTournamentListContext();
  return{s,calls,timer,evaluate,state:()=>JSON.parse(JSON.stringify(evaluate('({items:adminTournamentListItems,busy:adminTournamentListBusy,loaded:adminTournamentListLoaded,error:adminTournamentListError,cursor:adminTournamentListCursor,more:adminTournamentListHasMore,counts:adminTournamentListCounts,filter:adminTournamentListFilter,search:adminTournamentListSearch})'))),view:()=>s.renderTournamentManagementTab(),load:options=>s.loadAdminTournamentList(options),query:fn=>{query=fn;}};
 }
 test('management cards refresh their counts while visible without downloading full rooms',async()=>{
@@ -137,6 +139,9 @@ test('only successful management entry replaces the scoped pointer; viewing anot
  t.s.state.cloudCode='BXH-BBBBBB';t.s.rememberManagedRoomView();assert.equal(t.saved().code,'BXH-AAAAAA');
  t.s.previewTournamentByCode=async()=>({ok:false,reason:'forbidden'});await t.entry('BXH-CCCCCC');assert.equal(t.saved().code,'BXH-AAAAAA');assert.match(t.view(),/返回上次管理/);
  t.s.firebaseUser={uid:'other'};assert.equal(t.saved(),null);
+});
+test('a managed PTN room keeps its resume pointer',async()=>{
+ const t=navigationSetup();await t.entry('PTN-ABC123');assert.equal(t.saved().code,'PTN-ABC123');
 });
 test('reload re-reads the saved room from cloud and restores its tab and current court match',async()=>{
  const t=navigationSetup();await t.entry('BXH-AAAAAA');t.s.activeTab='referee';t.s.refereeResumeFocus=()=>({station:3});t.s.rememberManagedRoomView();

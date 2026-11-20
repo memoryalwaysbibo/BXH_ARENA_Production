@@ -105,6 +105,11 @@ def collect(ref, get_file, read_inputs):
                 inputs["family-registration.js"] = subprocess.run(
                     ["node", str(transformer), str(source)], check=True, capture_output=True, timeout=15,
                 ).stdout
+                proof = work / "my-events-operation-proof.cjs"
+                proof.write_bytes(inputs[proof.name])
+                inputs[proof.name] = subprocess.run(
+                    ["node", str(transformer), str(proof), "--proof"], check=True, capture_output=True, timeout=15,
+                ).stdout
             for path in baseline["files"]:
                 files[f"writer-inputs/{name}/{path}"] = inputs[path]
     return files, {

@@ -168,18 +168,26 @@ test('my tickets shows an owned bound ticket, and resets on account switch',asyn
  assert.equal(t.ui.context().tickets,null);
 });
 
-test('event management offers five capacities and binds the first valid held ticket',async()=>{
- const t=setup({partner:true}),code='BXH-TICKETTEST',now=Date.now(),operations=[];
+for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} event management offers five capacities and binds the first valid held ticket`,async()=>{
+ const t=setup({partner:true}),code=ptn?'PTN-TST001':'BXH-TICKETTEST',now=Date.now(),operations=[];
  t.sandbox.activeTab='management';
  assert.equal(t.ui.ticketPilot(),false);
  await t.ui.handle('commerce-open-ticket-create',{});
  assert.equal(t.ui.ticketCreationPage(),null);
- t.sandbox.window.BXH_TICKET_ROOM_PILOT_CODE=code;
+ t.sandbox.window.BXH_TICKET_ROOM_PILOT_CODE='BXH-TICKETTEST';
+ t.sandbox.window.BXH_TICKET_ROOM_PTN_PILOT=ptn;
  t.setPartner(false);
  await t.ui.handle('commerce-open-ticket-create',{});
  assert.equal(t.ui.ticketCreationPage(),null);
  t.setPartner(true);
  await t.ui.handle('commerce-open-ticket-create',{});
+ t.sandbox.window.engagementService.ticketRoomOperation=async p=>{
+  operations.push(p);
+  if(p.action==='ticket-ptn-status')return {ok:true,code:null};
+  if(p.action==='ticket-room-state')return {ok:true,code,name:'試點賽事',phase:'live',ticketStatus:'consumed'};
+  return {ok:true,code};
+ };
+ if(ptn)await t.ui.load('ticket-ptn-status');
  const c=t.ui.context();
  c.tickets=[
   {id:'later',capacity:64,status:'available',expiresAt:now+20000},
@@ -197,14 +205,19 @@ test('event management offers five capacities and binds the first valid held tic
  await t.ui.handle('commerce-ticket-bind',{dataset:{id:'first'}});
  assert.match(t.ui.ticketCreationPage(),/正取上限 64 人/);
  t.sandbox.FormData=function(form){return Object.entries(form.values);};
- t.sandbox.window.engagementService.ticketRoomOperation=async p=>{operations.push(p);return {ok:true,code};};
  const form={dataset:{commerceForm:'ticket-room'},values:{name:'測試賽事',location:'台南',stations:'2',
   registrationOpenAt:'2026-11-21T09:00',registrationCloseAt:'2026-11-21T10:00',startAt:'2026-11-21T11:00'}};
  await t.listeners.submit({target:{closest:()=>form},preventDefault(){}});
- assert.equal(operations.length,1);
- assert.equal(operations[0].code,code);
- assert.equal(operations[0].ticketId,'first');
+ const sent=operations.find(operation=>operation.action==='create-ticket-room');
+ assert.equal(sent.code,ptn?undefined:code);
+ assert.equal(sent.ticketId,'first');
  assert.match(t.ui.ticketCreationPage(),/已建房並綁定啟動券/);
+ if(ptn){
+  await t.ui.load('ticket-room-state');
+  assert.equal(operations.at(-1).code,code);
+  assert.match(t.ui.ticketCreationPage(),/PTN-TST001｜已開賽/);
+  assert.match(t.ui.ticketCreationPage(),/已扣用 1 張啟動券/);
+ }
  await t.ui.handle('commerce-ticket-back',{});
  await t.ui.handle('commerce-close-ticket-create',{});
  assert.equal(t.ui.ticketCreationPage(),null);

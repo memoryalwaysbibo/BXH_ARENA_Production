@@ -6,7 +6,8 @@ const {createQueue}=require('./queue.cjs');
 const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
 const {createStartHandler,createDrawHandler,createTicketForfeitHandler}=require('./lifecycle.cjs');
-const {createTicketRoomHandler,createTicketRoomStateHandler,createTicketRemoveHandler}=require('./ticket-room-create.cjs');
+const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketRemoveHandler}=require('./ticket-room-create.cjs');
+const {isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath}=require('./ticket-host.cjs');
 function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled,pilotRoom=null,retiredRoom=null,retiredRooms=[],ticketPilot=async()=>null}){
  if(createFamilyRegistration?.v2CapacityAware!==true)throw Error('queue-family-capacity-source-required');
  const familyFactory=store=>createFamilyRegistration(store,Date.now,{myEventsProofEnabled:true});
@@ -28,10 +29,10 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   handlers:{family:familyFactory,roster:rosterFactory,promotion:promotionFactory}});
  const api=createApi({queue,family:familyFactory(db),enabled:code=>isRetired(code)||intakeEnabled(code)});
  const managementApi=createManagementApi({queue,enabled:intakeEnabled,authorize:authorizeManagement});
- const bind=(handler,{options,preconditions=[],allowRetired=()=>false}={})=>onCall({region:'asia-east1',cors:true,timeoutSeconds:30,maxInstances:5,...options},async req=>{
+ const bind=(handler,{options,preconditions=[],allowRetired=()=>false,allowUnassigned=()=>false}={})=>onCall({region:'asia-east1',cors:true,timeoutSeconds:30,maxInstances:5,...options},async req=>{
   const data=req.data;
   if(stagedOnly||(!primaryRoom(data?.code)&&!(isRetired(data?.code)&&allowRetired(data))&&
-      !(req.auth?.uid&&await ticketAllowed(data?.code)))){
+      !(req.auth?.uid&&(allowUnassigned(data)||await ticketAllowed(data?.code))))){
    throw new HttpsError('failed-precondition','registration-queue-disabled');
   }
   try{return await handler(req);}catch(error){
@@ -46,6 +47,7 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
  const registrationQueueV2=bind(api,{allowRetired:data=>data.action==='status'||data.action==='mine'});
  const ticketRoomActions={
   'create-ticket-room':createTicketRoomHandler({db}),
+  'ticket-ptn-status':createPtnStatusHandler({db}),
   'ticket-room-state':createTicketRoomStateHandler({db}),
   'ticket-room-forfeit':createTicketForfeitHandler({db,enabled:startEnabled}),
   'ticket-room-remove':createTicketRemoveHandler({db,queue,enabled:intakeEnabled}),
@@ -55,8 +57,9 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   return Object.hasOwn(ticketRoomActions,action)?ticketRoomActions[action](req):managementApi(req);
  },{
   allowRetired:data=>data.action==='status',
+  allowUnassigned:data=>data?.code===undefined&&['create-ticket-room','ticket-ptn-status'].includes(data?.action),
   preconditions:['ticket-lifecycle-disabled','ticket-binding-invalid','ticket-expired','ticket-unavailable',
-   'room-code-conflict','room-receipt-inconsistent','bracket-room-changed',
+   'room-code-conflict','room-receipt-inconsistent','ticket-ptn-slot-occupied','bracket-room-changed',
    'forfeit-room-not-live','forfeit-match-stale','forfeit-round-waiting'],
  });
  const lifecycleOptions={
@@ -80,6 +83,8 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   if(!stagedOnly&&pilotRoom!==null){
    const ticket=await ticketPilot();
    if(ticket)await queue.sweep(ticket.roomCode);
+   const partnerTicket=await ticketPilot(undefined,undefined,true);
+   if(partnerTicket)await queue.sweep(partnerTicket.roomCode);
   }
  });
  return {registrationQueueV2,registrationRosterQueueV2,registrationQueueV2Worker,registrationQueueV2Sweep,registrationStartV2,registrationDrawV2};
@@ -96,12 +101,12 @@ function createPilotBindings({pilotRoom,retiredRoom=null,retiredRooms=[],...depe
   const config=snapshot.data();
   return config?.roomCode===pilotRoom&&config.workersEnabled===true&&config[field]===true;
  };
- const ticketRef=dependencies.db.doc('systemSettings/commerceTicketLifecycleV1');
- const ticketPilot=async(code,tx)=>{
-  if(code!==undefined&&(!validRoom(code)||code===pilotRoom||retired.includes(code)))return null;
+ const ticketPilot=async(code,tx,ptn=isPartnerRoomCode(code))=>{
+  if(code!==undefined&&(!validRegistrationRoomCode(code)||code===pilotRoom||retired.includes(code)))return null;
+  const ticketRef=dependencies.db.doc(ticketLifecyclePath(ptn?'PTN-000000':code));
   const snapshot=tx?await tx.get(ticketRef):await ticketRef.get();
   const config=snapshot.data();
-  if(config?.enabled!==true||config.bindingEnabled!==true||!validRoom(config.roomCode)||
+  if(config?.enabled!==true||config.bindingEnabled!==true||!(ptn?isPartnerRoomCode(config.roomCode):validRoom(config.roomCode))||
      config.roomCode===pilotRoom||retired.includes(config.roomCode)||
      (code!==undefined&&code!==config.roomCode)||
      !/^[A-Za-z0-9_-]{1,128}$/.test(config.ownerUid||'')||

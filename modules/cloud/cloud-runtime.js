@@ -891,7 +891,7 @@
     if(!allowAnonymous&&(!authReady || !authHandle || !authHandle.currentUser)) throw new Error("auth-required");
     if(!functionsHandle || !fnx) throw new Error("service-unavailable");
     try{
-      if(['hunterClashCommand','groupStageCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','adminOverrideRoster','adminRecoverOnsiteWaitlist','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload','ladderTeamDisplay','registrationDrawV2','registrationStartV2'].includes(name)||(name==='registrationRosterQueueV2'&&['create-ticket-room','ticket-room-state','ticket-room-remove','ticket-room-forfeit'].includes(payload?.action))){
+      if(['hunterClashCommand','groupStageCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','adminOverrideRoster','adminRecoverOnsiteWaitlist','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload','ladderTeamDisplay','registrationDrawV2','registrationStartV2'].includes(name)||(name==='registrationRosterQueueV2'&&['create-ticket-room','ticket-ptn-status','ticket-room-state','ticket-room-remove','ticket-room-forfeit'].includes(payload?.action))){
         const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);
         if(!verified){const err=new Error('網站驗證未完成，請重新嘗試。');err.code='functions/permission-denied';err.details={reason:'app-check-unavailable'};throw err;}
         if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
@@ -909,8 +909,9 @@
   }
   const registrationV2RouteHints=new Map();
   const registrationV2PilotCodes=new Set(['BXH-BZ2JW6','BXH-XJ7WJ5','BXH-XXDNAH']);
+  const isPtnTicketRoom=code=>typeof code==='string'&&/^PTN-[A-Z0-9]{6}$/.test(code);
   function ticketRegistrationPilot(code){
-    return typeof code==='string'&&/^BXH-[A-Z0-9]{4,16}$/.test(code)&&code===window.BXH_TICKET_ROOM_PILOT_CODE;
+    return isPtnTicketRoom(code)||(typeof code==='string'&&/^BXH-[A-Z0-9]{4,16}$/.test(code)&&code===window.BXH_TICKET_ROOM_PILOT_CODE);
   }
   function rememberRegistrationV2Route(code,room){
     if((!registrationV2PilotCodes.has(code)&&!ticketRegistrationPilot(code))||room?.registrationQueueVersion!==2)return;
@@ -1001,7 +1002,7 @@
   let playerRegistrationFeedback=null;
   function submitRegistrationCancellation(payload){
     const {code,operationId}=payload;
-    const route=code&&code===window.BXH_TICKET_ROOM_PILOT_CODE?'family':'roster';
+    const route=ticketRegistrationPilot(code)?'family':'roster';
     return callEngagementFunction('registrationQueueV2',{action:'submit',code,operation:{code,route,operationId,payload}},20000);
   }
   function getPlayerRegistrationFeedback(){
@@ -1035,7 +1036,8 @@
     registrationFlowV2Enabled,
     registrationManagementOperation,
     async ticketRoomOperation({action,code,...payload}){
-      if(code!==window.BXH_TICKET_ROOM_PILOT_CODE||typeof code!=='string'||!/^BXH-[A-Z0-9]{4,16}$/.test(code))throw Error('ticket-lifecycle-disabled');
+      const unassigned=code===undefined&&['create-ticket-room','ticket-ptn-status'].includes(action);
+      if(!ticketRegistrationPilot(code)&&!(unassigned&&window.BXH_TICKET_ROOM_PTN_PILOT===true))throw Error('ticket-lifecycle-disabled');
       if(action==='ticket-room-remove'){
         const {operationId,registrationId}=payload;
         const poll=()=>callEngagementFunction('registrationRosterQueueV2',{action:'status',code,operationId},8000);
@@ -1051,7 +1053,7 @@
         }
         throw Error('registration-operation-unconfirmed');
       }
-      if(['create-ticket-room','ticket-room-state','ticket-room-forfeit'].includes(action))return callEngagementFunction('registrationRosterQueueV2',{...payload,action,code},30000);
+      if(['create-ticket-room','ticket-ptn-status','ticket-room-state','ticket-room-forfeit'].includes(action))return callEngagementFunction('registrationRosterQueueV2',{...payload,action,...(unassigned?{}:{code})},30000);
       if(['ticket-room-draw','ticket-room-start'].includes(action))return callEngagementFunction(action==='ticket-room-draw'?'registrationDrawV2':'registrationStartV2',{...payload,code},30000);
       throw Error('invalid-action');
     },

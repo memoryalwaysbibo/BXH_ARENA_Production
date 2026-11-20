@@ -6,7 +6,7 @@ const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
 const {advance:advanceQrCheckinFence}=require('../../qr-checkin/backend/qr-checkin-fence.cjs');
 const {startMs}=require('../../qr-checkin/backend/overlays/lifecycle/operations-core.js');
 const {registrationQueueOwnsRoom}=require('./legacy-writer.cjs');
-const {ticketHostGrant,checkTicketContract}=require('./ticket-host.cjs');
+const {ticketHostGrant,checkTicketContract,validRegistrationRoomCode,ticketLifecyclePath}=require('./ticket-host.cjs');
 
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const commonFields=['code','roomId','rosterRevision','operationId'];
@@ -38,10 +38,10 @@ async function readReservedTicket({db,tx,room,pub,state,roomId,code,uid,grant,no
     pub.ticketRoomVersion!==1||state.meta?.eventAuthority!=='ticket'||
     [room.ladderMode,pub.ladderMode,state.meta?.ladderMode].some(mode=>mode!=='ranked'))throw Error('ticket-binding-invalid');
  const ref=db.doc('commerceTickets/'+access.ticketId);
- const settings=db.doc('systemSettings/commerceTicketLifecycleV1');
+ const settings=db.doc(ticketLifecyclePath(code));
  const [ticketSnap,releaseSnap]=await tx.getAll(ref,settings);
  const release=releaseSnap.data(),ticket=ticketSnap.data();
- if(release?.enabled!==true||release.roomCode!==code||release.roomId!==roomId)throw Error('ticket-lifecycle-disabled');
+ if(release?.enabled!==true||release.roomCode!==code||release.roomId!==roomId||release.ownerUid!==uid)throw Error('ticket-lifecycle-disabled');
  if(ticket?.version!==1||ticket.id!==access.ticketId||ticket.orderId!==access.ticketId||ticket.status!=='reserved'||
     ticket.ownerUid!==uid||ticket.boundRoomCode!==code||ticket.boundRoomId!==roomId||ticket.usedAt||
     (ticket.contractCode||null)!==(room.partnerContractOrderCode||null))throw Error('ticket-binding-invalid');
@@ -65,7 +65,7 @@ function createLifecycleHandler(action,{db,enabled=async()=>false,clock=Date.now
   if(!uid)throw Error('auth-required');
   const {code,roomId,baseDrawId,drawId,rosterRevision,operationId,confirmEarlyStart=false}=input;
   const expectedDrawId=draw?baseDrawId:drawId;
-  if(Object.keys(input).some(key=>!allowedFields.has(key))||typeof code!=='string'||!/^BXH-[A-Z0-9]{4,16}$/.test(code)||
+  if(Object.keys(input).some(key=>!allowedFields.has(key))||!validRegistrationRoomCode(code)||
      !validId(roomId)||!(draw&&expectedDrawId===null||validId(expectedDrawId))||
      !Number.isSafeInteger(rosterRevision)||rosterRevision<0||typeof operationId!=='string'||!/^[A-Za-z0-9_-]{8,100}$/.test(operationId)||
      typeof confirmEarlyStart!=='boolean')throw Error('invalid-operation');
@@ -193,7 +193,7 @@ function createTicketForfeitHandler({db,enabled=async()=>false,clock=Date.now}){
   if(!request.app)throw Error('permission-denied');
   const {action,code,roomId,matchId,playerId,opponentId,matchUpdatedAt,operationId}=input;
   if(action!=='ticket-room-forfeit'||Object.keys(input).some(key=>!forfeitFields.has(key))||
-     typeof code!=='string'||!/^BXH-[A-Z0-9]{4,16}$/.test(code)||
+     !validRegistrationRoomCode(code)||
      ![roomId,matchId,playerId,opponentId].every(validId)||playerId===opponentId||
      !Number.isSafeInteger(matchUpdatedAt)||matchUpdatedAt<0||
      typeof operationId!=='string'||!/^[A-Za-z0-9_-]{8,100}$/.test(operationId))throw Error('invalid-operation');
@@ -203,7 +203,7 @@ function createTicketForfeitHandler({db,enabled=async()=>false,clock=Date.now}){
   const now=clock();
   return db.runTransaction(async tx=>{
    const [actor,roomSnap,publicSnap,gateSnap,prior]=await tx.getAll(db.doc('users/'+uid),roomRef,publicRef,
-    db.doc('systemSettings/commerceTicketLifecycleV1'),operation);
+    db.doc(ticketLifecyclePath(code)),operation);
    const user=actor.data(),room=roomSnap.data(),pub=publicSnap.data(),gate=gateSnap.data();
    const grant=ticketHostGrant(user,now);
    if(!ownsTicketRoom(room,grant,uid)||room.eventAuthority!=='ticket'||gate?.ownerUid!==uid||gate.roomCode!==code)throw Error('permission-denied');
