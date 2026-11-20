@@ -24,5 +24,6 @@ test('PTN authority belongs only to room owner, their one delegate and an active
  await assert.rejects(authorize(delegateUid,{...delegate,active:false}),/permission-denied/);
  await assert.rejects(authorize(delegateUid,delegate,{...room,ptnDelegateUid:null}),/permission-denied/);
  await assert.rejects(authorize('highest-admin',admin,{...room,ownerUid:'someone-else'}),/permission-denied/);
+ await assert.rejects(authorize('highest-admin',admin,{...room,createdByRole:'official'}),/permission-denied/);
  await assert.rejects(authorize('highest-admin',admin,room,{...gate,roomCode:'PTN-OTHER1'}),/permission-denied/);
 });

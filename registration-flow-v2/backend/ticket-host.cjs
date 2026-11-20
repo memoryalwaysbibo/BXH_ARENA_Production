@@ -35,7 +35,7 @@ function activeTicketManager(user){
 // A delegate's authority belongs to one private PTN room, never to the
 // organization or to other rooms owned by the same organizer.
 async function authorizeTicketManager(tx,db,{uid,user,room,gate,code,now}){
- if(!activeTicketManager(user)||room?.eventAuthority!=='ticket'||
+ if(!activeTicketManager(user)||room?.eventAuthority!=='ticket'||room.createdByRole!=='partner_organizer'||
     typeof room.ownerUid!=='string'||room.createdBy!==room.ownerUid||
     gate?.ownerUid!==room.ownerUid||gate.roomCode!==code||
     room.ticketAccessV1?.ownerUid!==room.ownerUid||
