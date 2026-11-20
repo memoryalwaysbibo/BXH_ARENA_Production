@@ -26,7 +26,7 @@ const searchBinding = between(core, 'function bindAdminTournamentSearchInput(){'
 const cloudMethods = between(cloud, '    async queryAdminTournaments(){', '\n    // v13.13.4：玩家');
 const cloudDeadline = between(cloud, '  function withTimeout(promise, ms, fallbackValue){', '\n  async function tryInitFirebase(){');
 const styles = ['core-competition', 'auth-player', 'player-center-hunter', 'lobby-community', 'call-admin-tail', 'referee-tail', 'tail-p7'];
-const scripts = ['/modules/management-v2/navigation.js', '/modules/management-v2/adapter.js', '/event-poster-ui.js', '/modules/main-app/mailbox.js'];
+const scripts = ['/modules/management-v2/navigation.js', '/modules/management-v2/adapter.js', '/event-poster-ui.js', '/modules/main-app/mailbox.js', '/modules/main-app/tournament-entry-utils.js'];
 function row(name = 'Fixture room', extra = {}) {
   return { code: 'BXH-MOCK01', name, createdBy: 'fixture-owner', createdByName: 'Fixture creator',
     eventAuthority: 'official', tournamentPhase: 'waiting', archiveStatus: 'ongoing', registrationStatus:'open',registrationEnabled:true, ...extra };
@@ -53,6 +53,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;
 const hasAdminAccess = () => currentRole === 'admin' || currentRole === 'tester';
 const currentAuthUid = () => firebaseUser?.uid || '';
 const { mailboxContext, loadMailbox, mailboxButtonHtml, renderMailboxPage, handleMailbox } = window.BXHMailbox;
+const { isValidRoomCode } = window.BXHTournamentEntryUtils;
 const mailboxDate = () => '';
 window.engagementService = {
   mailbox: async ({ action, messageId }) => {
