@@ -17,7 +17,7 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
   await page.goto('https://commerce.test/');
   await page.addStyleTag({content:(process.env.COMMERCE_TEST_FONT?'@font-face{font-family:CommerceTestCJK;src:url(https://commerce.test/font.otf)}':'')+'body{margin:0;padding:16px;background:#0c1017;color:#eee;font:16px CommerceTestCJK,Arial}.panel{padding:18px;border:1px solid #3a414b;border-radius:14px;background:#151a22;box-sizing:border-box}.panel-title,.btn-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.btn{padding:10px 14px;border:1px solid #6b6554;background:#252c36;color:#eee;border-radius:10px;cursor:pointer}.btn-primary{background:#d7ba70;color:#12151b}.hint{color:#acb3bf}.empty-state{padding:24px}.banner{padding:14px;border:1px solid #d7ba70}'+fs.readFileSync(path.join(root,'commerce.css'),'utf8')});
   await page.evaluate(()=>{
-   window.currentAuthUid=()=>window.testUid||'buyer';window.engagementSessionEpoch=1;window.isSuperAdmin=()=>!!window.testAdmin;window.activeTab='';
+   window.currentAuthUid=()=>window.testUid||'buyer';window.engagementSessionEpoch=1;window.isSuperAdmin=()=>!!window.testAdmin;window.isPartnerOrganizerMode=()=>window.testUid==='ticket_buyer';window.activeTab='';
    window.esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
    window.testView='shop';window.render=()=>document.querySelector('#app').innerHTML=window.testView==='admin'?BXHCommerce.adminPage():window.testView==='orders'?BXHCommerce.orders():BXHCommerce.shop();
    window.testProduct={id:'skin_test',version:1,name:'星空獵人 Skin（隔離測試）',description:'收藏外觀示範。這是隔離測試商品，沒有正式販售。',terms:'永久持有；測試商品說明。',priceTwd:100,imageUrl:'https://example.invalid/skin.svg',audience:'all',sort:0,status:'published',purchasable:true,delivery:{kind:'skin',assetId:'test_skin',quantity:1,durationDays:0}};
@@ -25,7 +25,7 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
    window.testOrders=[];window.testCalls=[];
    window.engagementService={commerce:async p=>{
     testCalls.push(p);
-    if(p.action==='catalog')return {ok:true,products:window.testUid==='ticket_buyer'?[ticketOffer]:[testProduct],nextCursor:null,storeOpen:true};
+    if(p.action==='catalog')return {ok:true,products:window.testUid==='ticket_buyer'?[ticketOffer]:[testProduct,ticketOffer],nextCursor:null,storeOpen:true};
     if(p.action==='admin-products')return {ok:true,products:[testProduct],nextCursor:null};
     if(['my-orders','admin-orders'].includes(p.action))return {ok:true,orders:testOrders,nextCursor:null};
     if(p.action==='my-tickets')return {ok:true,tickets:window.testUid==='ticket_buyer'?[{
@@ -66,6 +66,11 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
   await page.addScriptTag({content:fs.readFileSync(path.join(root,'modules/main-app/domain-utils.js'),'utf8')});
   await page.evaluate(()=>{window.snapToHalfHourValue=window.BXHDomainUtils.snapToHalfHourValue;});
   await page.addScriptTag({content:timeGuard});await page.evaluate(()=>render());
+  assert.equal(await page.locator('[data-action="commerce-category"][data-id="ticket"]').count(),0);
+  await page.locator('[data-action="commerce-category"][data-id="all"]').click();
+  await page.getByText('星空獵人 Skin（隔離測試）',{exact:true}).waitFor();
+  assert.equal(await page.getByText('賽事啟動券｜32 人',{exact:true}).count(),0);
+  await page.locator('[data-action="commerce-categories"]').click();
   await page.locator('[data-action="commerce-category"][data-id="skin"]').click();
   await page.locator('[data-action="commerce-product"]').click();
   await page.locator('[data-commerce-consent]').check();

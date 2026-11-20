@@ -1,11 +1,11 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../commerce-ui.js'),'utf8');
-function setup(){
+function setup({partner=false}={}){
  const storage=new Map(),calls=[],listeners={};let uid='buyer',epoch=1,admin=false,fail=false;
- const sandbox={window:{engagementService:{commerce:async p=>{calls.push(JSON.parse(JSON.stringify(p)));if(fail)throw Error('network-timeout');return {ok:true,order:{id:'ORDER_TEST'}};}}},currentAuthUid:()=>uid,get engagementSessionEpoch(){return epoch;},isSuperAdmin:()=>admin,render(){},setTimeout(){},URL,Date,crypto:{randomUUID:()=> 'same-operation'},confirm:()=>true,esc:v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),sessionStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},document:{addEventListener:(k,f)=>listeners[k]=f,querySelector:()=>({checked:true})}};
+ const sandbox={window:{engagementService:{commerce:async p=>{calls.push(JSON.parse(JSON.stringify(p)));if(fail)throw Error('network-timeout');return {ok:true,order:{id:'ORDER_TEST'}};}}},currentAuthUid:()=>uid,get engagementSessionEpoch(){return epoch;},isSuperAdmin:()=>admin,isPartnerOrganizerMode:()=>partner,render(){},setTimeout(){},URL,Date,crypto:{randomUUID:()=> 'same-operation'},confirm:()=>true,esc:v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),sessionStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},document:{addEventListener:(k,f)=>listeners[k]=f,querySelector:()=>({checked:true})}};
  vm.createContext(sandbox);vm.runInContext(source,sandbox);
- return {ui:sandbox.window.BXHCommerce,calls,storage,listeners,sandbox,setUid:v=>{uid=v;epoch++;},setAdmin:v=>admin=v,setFail:v=>fail=v};
+ return {ui:sandbox.window.BXHCommerce,calls,storage,listeners,sandbox,setUid:v=>{uid=v;epoch++;},setAdmin:v=>admin=v,setPartner:v=>partner=v,setFail:v=>fail=v};
 }
 test('pending order retries reuse original operation/payload even after a connection failure',async()=>{
  const t=setup();t.ui.shop();const c=t.ui.context();c.products=[{id:'skin',version:1,purchasable:true,delivery:{kind:'skin'}}];
@@ -60,7 +60,7 @@ test('a closed store is clearly labeled and does not create placeholder products
 });
 
 test('five ticket previews remain visible with a closed store and cannot create orders',async()=>{
- const t=setup();t.ui.shop();const c=t.ui.context();c.products=[];c.storeOpen=false;
+ const t=setup({partner:true});t.ui.shop();const c=t.ui.context();c.products=[];c.storeOpen=false;
  const categories=t.ui.shop();assert.match(categories,/data-id="ticket"/);
  await t.ui.handle('commerce-category',{dataset:{id:'ticket'}});
  const listing=t.ui.shop();
@@ -103,7 +103,7 @@ function ticketOffer(changes={}){
   delivery:{kind:'ticket',assetId:'32',quantity:1,durationDays:30},...changes};
 }
 test('an eligible ticket offer replaces its preview and uses its real checkout SKU',async()=>{
- const t=setup();t.ui.shop();
+ const t=setup({partner:true});t.ui.shop();
  const c=t.ui.context();c.storeOpen=true;c.products=[ticketOffer()];
  await t.ui.handle('commerce-category',{dataset:{id:'ticket'}});
  assert.equal((t.ui.shop().match(/暫停購買/g)||[]).length,4);
@@ -114,8 +114,34 @@ test('an eligible ticket offer replaces its preview and uses its real checkout S
  await t.ui.handle('commerce-buy',{dataset:{id:'tournament_activation_32'}});
  assert.deepEqual(t.calls,[{action:'create-order',productId:'activation-32-sku',expectedVersion:4,operationId:'same-operation'}]);
 });
-test('ordinary players, closed checkout and invalid offers cannot create a ticket order',async()=>{
+test('player mode hides ticket categories, catalog results, details and wallet',async()=>{
  const t=setup();t.ui.shop();const c=t.ui.context();const id='tournament_activation_32';
+ c.storeOpen=true;c.products=[ticketOffer(),{id:'skin',name:'一般外觀',delivery:{kind:'skin'}}];
+ assert.doesNotMatch(t.ui.shop(),/data-id="ticket"/);
+ await t.ui.handle('commerce-category',{dataset:{id:'all'}});
+ await t.ui.handle('commerce-category',{dataset:{id:'ticket'}});
+ assert.equal(c.category,'all');
+ let html=t.ui.shop();
+ assert.match(html,/一般外觀/);
+ assert.doesNotMatch(html,/賽事啟動券|我的啟動券/);
+ await t.ui.handle('commerce-product',{dataset:{id}});
+ await t.ui.handle('commerce-buy',{dataset:{id}});
+ await t.ui.handle('commerce-open-tickets',{});
+ await t.ui.load('my-tickets');
+ assert.ok(!c.productId);
+ assert.equal(t.calls.length,0);
+ t.setPartner(true);
+ await t.ui.handle('commerce-category',{dataset:{id:'ticket'}});
+ await t.ui.handle('commerce-open-tickets',{});
+ assert.match(t.ui.shop(),/我的啟動券/);
+ t.setPartner(false);
+ html=t.ui.shop();
+ assert.doesNotMatch(html,/賽事啟動券|我的啟動券/);
+ assert.equal(c.ticketsOpen,false);
+});
+
+test('ineligible offers and closed checkout cannot create a partner ticket order',async()=>{
+ const t=setup({partner:true});t.ui.shop();const c=t.ui.context();const id='tournament_activation_32';
  c.storeOpen=true;c.products=[ticketOffer({purchasable:false,unavailableReason:'partner-organizer-required'})];
  await t.ui.handle('commerce-product',{dataset:{id}});
  assert.match(t.ui.shop(),/此商品限授權有效的合作主辦購買/);
@@ -129,7 +155,7 @@ test('ordinary players, closed checkout and invalid offers cannot create a ticke
 });
 
 test('my tickets shows an owned bound ticket, and resets on account switch',async()=>{
- const t=setup();t.ui.shop();await t.ui.handle('commerce-category',{dataset:{id:'ticket'}});
+ const t=setup({partner:true});t.ui.shop();await t.ui.handle('commerce-category',{dataset:{id:'ticket'}});
  assert.match(t.ui.shop(),/我的啟動券/);
  await t.ui.handle('commerce-open-tickets',{});
  t.sandbox.window.engagementService.commerce=async p=>{
@@ -143,7 +169,7 @@ test('my tickets shows an owned bound ticket, and resets on account switch',asyn
 });
 
 test('scoped ticket room form uses Taiwan time and replays the exact V2 start request',async()=>{
- const t=setup();const c=t.ui.context(),code='BXH-TICKETTEST',roomId='ticket-fixture-generation';
+ const t=setup({partner:true});const c=t.ui.context(),code='BXH-TICKETTEST',roomId='ticket-fixture-generation';
  const room={ok:true,code,roomId,name:'測試賽事',phase:'waiting',eligibleCount:2,rosterRevision:5,drawId:null,startAt:Date.now()+60000};
  const operations=[];let failStart=true;
  t.sandbox.FormData=function(form){return Object.entries(form.values);};
@@ -183,7 +209,7 @@ test('scoped ticket room form uses Taiwan time and replays the exact V2 start re
 });
 
 test('ticket organizer can remove an entrant before start and must redraw',async()=>{
- const t=setup(),code='BXH-TICKETTEST',calls=[];
+ const t=setup({partner:true}),code='BXH-TICKETTEST',calls=[];
  const room={ok:true,code,roomId:'test-ticket-room',phase:'waiting',name:'Fixture',eligibleCount:3,
   rosterRevision:4,drawId:'old-draw',drawReady:true,participants:[{registrationId:'entry-1',name:'參賽者甲'}]};
  t.sandbox.window.BXH_TICKET_ROOM_PILOT_CODE=code;
@@ -210,7 +236,7 @@ test('ticket organizer can remove an entrant before start and must redraw',async
 });
 
 test('ticket organizer can record a single match forfeit only after start',async()=>{
- const t=setup(),code='BXH-TICKETTEST',calls=[];
+ const t=setup({partner:true}),code='BXH-TICKETTEST',calls=[];
  const match={id:'match-1',seq:0,round:0,a:{id:'a',name:'選手甲'},b:{id:'b',name:'選手乙'},updatedAt:123};
  const room={ok:true,code,roomId:'test-ticket-room',phase:'waiting',name:'Fixture',eligibleCount:2,
   rosterRevision:4,drawId:'draw',drawReady:true,matches:[match]};
