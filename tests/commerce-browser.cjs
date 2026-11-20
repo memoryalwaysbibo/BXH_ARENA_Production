@@ -19,7 +19,7 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
   await page.evaluate(()=>{
    window.currentAuthUid=()=>window.testUid||'buyer';window.engagementSessionEpoch=1;window.isSuperAdmin=()=>!!window.testAdmin;window.isPartnerOrganizerMode=()=>window.testUid==='ticket_buyer';window.activeTab='';
    window.esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-   window.testView='shop';window.render=()=>document.querySelector('#app').innerHTML=window.testView==='admin'?BXHCommerce.adminPage():window.testView==='orders'?BXHCommerce.orders():BXHCommerce.shop();
+   window.testView='shop';window.render=()=>document.querySelector('#app').innerHTML=window.testView==='admin'?BXHCommerce.adminPage():window.testView==='orders'?BXHCommerce.orders():window.testView==='management'?(BXHCommerce.ticketCreationPage()||'<button data-action="commerce-open-ticket-create">＋ 新增賽事</button>'):BXHCommerce.shop();
    window.testProduct={id:'skin_test',version:1,name:'星空獵人 Skin（隔離測試）',description:'收藏外觀示範。這是隔離測試商品，沒有正式販售。',terms:'永久持有；測試商品說明。',priceTwd:100,imageUrl:'https://example.invalid/skin.svg',audience:'all',sort:0,status:'published',purchasable:true,delivery:{kind:'skin',assetId:'test_skin',quantity:1,durationDays:0}};
    window.ticketOffer={...testProduct,id:'activation_ticket_32',version:4,name:'賽事啟動券｜32 人',priceTwd:300,audience:'partner_organizer',delivery:{kind:'ticket',assetId:'32',quantity:1,durationDays:30}};
    window.testOrders=[];window.testCalls=[];
@@ -29,7 +29,7 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
     if(p.action==='admin-products')return {ok:true,products:[testProduct],nextCursor:null};
     if(['my-orders','admin-orders'].includes(p.action))return {ok:true,orders:testOrders,nextCursor:null};
     if(p.action==='my-tickets')return {ok:true,tickets:window.testUid==='ticket_buyer'?[{
-     id:'fixture-ticket',capacity:32,status:window.BXH_TICKET_ROOM_PILOT_CODE&&!testTicketRoom?'available':'reserved',issuedAt:Date.now(),expiresAt:Date.now()+86400000,boundRoomCode:'BXH-TICKETTEST'
+     id:'fixture-ticket',capacity:32,status:window.BXH_TICKET_ROOM_PILOT_CODE&&!testTicketRoom?'available':'reserved',issuedAt:Date.now(),expiresAt:Date.now()+86400000,boundRoomCode:window.BXH_TICKET_ROOM_PILOT_CODE&&!testTicketRoom?null:'BXH-TICKETTEST'
     }]:[]};
     if(p.action==='admin-config')return {ok:true,config:null,capabilities:{}};
     if(p.action==='admin-config-save')return {ok:true,config:{...p,version:1}};
@@ -112,9 +112,14 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
   await page.getByText('已綁定房間 BXH-TICKETTEST',{exact:true}).waitFor();
   await page.getByText('到期時間（台灣時間）',{exact:false}).waitFor();
   assert.equal(await page.locator('[data-action="commerce-ticket-bind"]').count(),0);
-  await page.evaluate(()=>{window.BXH_TICKET_ROOM_PILOT_CODE='BXH-TICKETTEST';});
-  await page.locator('[data-action="commerce-refresh-tickets"]').click();
-  await page.locator('[data-action="commerce-ticket-bind"]').click();
+  await page.evaluate(()=>{window.BXH_TICKET_ROOM_PILOT_CODE='BXH-TICKETTEST';activeTab='management';testView='management';render();});
+  await page.getByRole('button',{name:'＋ 新增賽事'}).click();
+  await page.getByRole('heading',{name:'新增賽事｜選券建房'}).waitFor();
+  const ticketOptions=page.locator('[data-action="commerce-ticket-bind"]');
+  await ticketOptions.filter({hasText:'可用 1 張'}).waitFor();
+  assert.equal(await ticketOptions.count(),5);
+  assert.equal(await page.locator('[data-action="commerce-ticket-bind"][disabled]').count(),4);
+  await ticketOptions.filter({hasText:'可用 1 張'}).click();
   await page.locator('[name="name"]').fill('票券試點賽事');
   await page.locator('[name="location"]').fill('台南');
   await page.locator('[name="registrationOpenAt"]').fill('2026-12-19T12:00');
@@ -132,7 +137,10 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
   assert.equal(flow[2].drawId,'fixture-draw');
   assert.ok(flow.every(p=>p.operationId));
   await page.locator('[data-action="commerce-ticket-back"]').click();
-  await page.locator('[data-action="commerce-close-tickets"]').click();
+  await page.getByRole('button',{name:'管理已建立的賽事'}).waitFor();
+  await page.locator('[data-action="commerce-close-ticket-create"]').click();
+  await page.getByRole('button',{name:'＋ 新增賽事'}).waitFor();
+  await page.evaluate(()=>{activeTab='commerce-shop';testView='shop';render();});
   await page.locator('[data-action="commerce-product"][data-id="tournament_activation_32"]').click();
   await page.getByText('同時最多持有 2 張，每月五款合計限購 4 張。').waitFor();
   await page.locator('[data-commerce-consent]').check();
