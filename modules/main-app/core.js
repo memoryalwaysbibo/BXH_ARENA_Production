@@ -5394,6 +5394,15 @@ let publicTournamentsReconcilePromise = null;
 let publicTournamentsReconcileTimer = null;
 let publicTournamentsLastSignature = "";
 const PUBLIC_TOURNAMENTS_RECONCILE_MS = 90000;
+let publicTournamentsRealtimeCanSkipPoll = false;
+let publicTournamentsRealtimeEpoch = 0;
+let publicTournamentsRealtimeRetryPending = false;
+let publicTournamentsRealtimeHealthyReceipt = 0;
+function shouldSkipLobbyIdlePoll(){
+  return window.BXH_LOBBY_SKIP_HEALTHY_IDLE_POLL!==false &&
+    !!publicTournamentsRealtimeUnsub && publicTournamentsRealtimeCanSkipPoll &&
+    publicTournamentsFreshness==="server";
+}
 
 function isTournamentLobbyVisible(){
   return (appPhase==="player-center" && playerActiveTab==="home" && !!firebaseUser && !!userProfile && currentRole==="player" && !mailboxContext().open)
@@ -5485,6 +5494,8 @@ function publicTournamentSourceState(source){
   return source&&source.ok===true&&source.fromCache===false&&source.hasPendingWrites===false?"server":"unknown";
 }
 function markLobbySourceUnknown(){
+  publicTournamentsRealtimeCanSkipPoll=false;
+  schedulePublicTournamentsReconcile();
   if(publicTournamentsFreshness!=="unknown"){publicTournamentsFreshness="unknown";requestLobbyRender();}
 }
 function invalidateMyRegistrationsCache(result){
@@ -5626,22 +5637,40 @@ function applyPublicTournamentItems(items,{renderIfChanged=true,source=null}={})
   if(changed && renderIfChanged && isTournamentLobbyVisible())requestLobbyRender();
   return changed;
 }
-function stopPublicTournamentsRealtime(){
-  if(publicTournamentsRealtimeUnsub){
-    try{ publicTournamentsRealtimeUnsub(); }catch(e){}
-    publicTournamentsRealtimeUnsub=null;
-  }
+function detachPublicTournamentsRealtime(){
+  ++publicTournamentsRealtimeEpoch;
+  publicTournamentsRealtimeCanSkipPoll=false;
+  const dispose=publicTournamentsRealtimeUnsub;
+  publicTournamentsRealtimeUnsub=null;
   publicTournamentsRealtimeStarting=false;
+  if(dispose){try{dispose();}catch(e){}}
+}
+function stopPublicTournamentsRealtime(){
+  detachPublicTournamentsRealtime();
+  publicTournamentsRealtimeRetryPending=false;
   if(publicTournamentsReconcileTimer){
     clearTimeout(publicTournamentsReconcileTimer);
     publicTournamentsReconcileTimer=null;
   }
 }
 function schedulePublicTournamentsReconcile(delay=PUBLIC_TOURNAMENTS_RECONCILE_MS){
-  if(publicTournamentsReconcileTimer || !isTournamentLobbyVisible()) return;
+  if(!isTournamentLobbyVisible()) return;
+  if(shouldSkipLobbyIdlePoll()){
+    if(publicTournamentsReconcileTimer){
+      clearTimeout(publicTournamentsReconcileTimer);
+      publicTournamentsReconcileTimer=null;
+    }
+    return;
+  }
+  if(publicTournamentsReconcileTimer) return;
   publicTournamentsReconcileTimer=setTimeout(()=>{
     publicTournamentsReconcileTimer=null;
-    reconcilePublicTournamentsNow("timer");
+    if(!isTournamentLobbyVisible())return;
+    if(publicTournamentsRealtimeRetryPending&&cloudAvailable()&&typeof window.cloudSync?.subscribePublicTournaments==="function"){
+      publicTournamentsRealtimeRetryPending=false;
+      startPublicTournamentsRealtime();
+    }
+    if(!shouldSkipLobbyIdlePoll())reconcilePublicTournamentsNow("timer");
   },Math.max(1000,Number(delay)||PUBLIC_TOURNAMENTS_RECONCILE_MS));
 }
 async function reconcilePublicTournamentsNow(reason="manual"){
@@ -5649,12 +5678,14 @@ async function reconcilePublicTournamentsNow(reason="manual"){
   if(publicTournamentsReconcilePromise)return publicTournamentsReconcilePromise;
   if(!isTournamentLobbyVisible())return false;
   const revision=publicTournamentsDataRevision;
+  const healthyReceipt=publicTournamentsRealtimeHealthyReceipt;
+  const superseded=()=>reason==="timer"&&healthyReceipt!==publicTournamentsRealtimeHealthyReceipt&&shouldSkipLobbyIdlePoll();
   publicTournamentsReconcilePromise=(async()=>{
     try{
       if(window.cloudSync&&window.cloudSync.connect)await window.cloudSync.connect();
       if(!lobbyContextIsCurrent(context)||!cloudAvailable()||!window.cloudSync?.queryPublicTournaments)return false;
       const result=await window.cloudSync.queryPublicTournaments();
-      if(!lobbyContextIsCurrent(context)||revision!==publicTournamentsDataRevision)return false;
+      if(!lobbyContextIsCurrent(context)||revision!==publicTournamentsDataRevision||superseded())return false;
       if(result?.ok){applyPublicTournamentItems(result.items,{source:result});return true;}
       markLobbySourceUnknown();
       if(publicTournamentsCache===null){
@@ -5664,7 +5695,7 @@ async function reconcilePublicTournamentsNow(reason="manual"){
       }
       return false;
     }catch(e){
-      if(lobbyContextIsCurrent(context)&&revision===publicTournamentsDataRevision)markLobbySourceUnknown();
+      if(lobbyContextIsCurrent(context)&&revision===publicTournamentsDataRevision&&!superseded())markLobbySourceUnknown();
       console.warn("[lobby reconcile]",reason,e);return false;
     }finally{
       if(lobbyContextIsCurrent(context)){
@@ -5677,29 +5708,47 @@ async function reconcilePublicTournamentsNow(reason="manual"){
 }
 function startPublicTournamentsRealtime(){
   const context=captureLobbyContext();
-  if(publicTournamentsRealtimeUnsub || publicTournamentsRealtimeStarting || !isTournamentLobbyVisible()) return;
+  if(publicTournamentsRealtimeUnsub || publicTournamentsRealtimeStarting ||
+    publicTournamentsRealtimeRetryPending || !isTournamentLobbyVisible()) return;
   if(!cloudAvailable() || !window.cloudSync || !window.cloudSync.subscribePublicTournaments){
     schedulePublicTournamentsReconcile(5000);
     return;
   }
+  const epoch=++publicTournamentsRealtimeEpoch;
   publicTournamentsRealtimeStarting=true;
-  try{
-    publicTournamentsRealtimeUnsub=window.cloudSync.subscribePublicTournaments((result)=>{
-      if(!lobbyContextIsCurrent(context)||!isTournamentLobbyVisible()) return;
-      if(result&&result.ok){
-        applyPublicTournamentItems(result.items,{source:result});
-      }else if(publicTournamentsCache===null){
-        publicTournamentsCache=[];
-        publicTournamentsError=PUBLIC_TOURNAMENTS_ERROR_MESSAGES[result&&result.reason]||PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
-        requestLobbyRender();
-      }else{markLobbySourceUnknown();}
-    });
-  }catch(e){
+  const active=()=>epoch===publicTournamentsRealtimeEpoch&&lobbyContextIsCurrent(context)&&isTournamentLobbyVisible();
+  const terminal=()=>{
+    detachPublicTournamentsRealtime();
+    publicTournamentsRealtimeRetryPending=true; // The existing 90s fallback is the only retry slot.
     markLobbySourceUnknown();
+  };
+  try{
+    const dispose=window.cloudSync.subscribePublicTournaments((result)=>{
+      if(!active())return;
+      if(result&&result.ok){
+        publicTournamentsRealtimeCanSkipPoll=publicTournamentSourceState(result)==="server" &&
+          result.requiresLifecycleReconcile===false;
+        if(publicTournamentsRealtimeCanSkipPoll)++publicTournamentsRealtimeHealthyReceipt;
+        applyPublicTournamentItems(result.items,{source:result});
+      }else{
+        // Firestore onSnapshot error is terminal, unlike cache/pending metadata.
+        terminal();
+        if(publicTournamentsCache===null){
+          publicTournamentsCache=[];
+          publicTournamentsError=PUBLIC_TOURNAMENTS_ERROR_MESSAGES[result&&result.reason]||PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
+          requestLobbyRender();
+        }
+      }
+      schedulePublicTournamentsReconcile();
+    });
+    if(active()&&typeof dispose==="function")publicTournamentsRealtimeUnsub=dispose;
+    else if(typeof dispose==="function")try{dispose();}catch(e){}
+    else if(active())terminal();
+  }catch(e){
+    if(active())terminal();
     console.warn("[lobby realtime subscribe]",e);
-    publicTournamentsRealtimeUnsub=null;
   }finally{
-    publicTournamentsRealtimeStarting=false;
+    if(epoch===publicTournamentsRealtimeEpoch)publicTournamentsRealtimeStarting=false;
     schedulePublicTournamentsReconcile();
   }
 }

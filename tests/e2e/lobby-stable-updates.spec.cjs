@@ -810,3 +810,79 @@ test('first profile creation requires both fields while an existing account can 
   await expect(page.locator('#complete-nickname')).not.toHaveAttribute('required', '');
   await expect(page.locator('#complete-phone')).not.toHaveAttribute('required', '');
 });
+
+test('R1 terminal lobby stream keeps fallback until a new server snapshot', async ({ page }) => {
+  await page.addInitScript(() => {
+    const nativeSet = window.setTimeout.bind(window);
+    const nativeClear = window.clearTimeout.bind(window);
+    const callbacks = new Map();
+    window.setTimeout = (callback, delay, ...args) => {
+      if (delay !== 90000 || typeof callback !== 'function' ||
+          !String(callback).includes('reconcilePublicTournamentsNow("timer")')) {
+        return nativeSet(callback, delay, ...args);
+      }
+      const id = nativeSet(() => {
+        callbacks.delete(id);
+        callback(...args);
+      }, delay);
+      callbacks.set(id, () => {
+        callbacks.delete(id);
+        nativeClear(id);
+        callback(...args);
+      });
+      return id;
+    };
+    window.clearTimeout = id => { callbacks.delete(id); nativeClear(id); };
+    window.fireLobbyWatchdog = id => {
+      const fire = callbacks.get(id);
+      if (!fire) throw Error('Expected one actual lobby 90-second watchdog');
+      fire();
+    };
+  });
+  await openLobby(page);
+  const status = () => page.evaluate(() => ({
+    active: lobbyFixture.subscriptions.filter(s => !s.stopped).length,
+    total: lobbyFixture.subscriptions.length,
+    queries: lobbyFixture.publicQueries.length,
+    timer: Boolean(publicTournamentsReconcileTimer),
+    count: lobbyFixture.readState().cache[0].confirmedCount,
+  }));
+  await page.evaluate(() => lobbyFixture.publish(lobbyFixture.rows, { requiresLifecycleReconcile: false }));
+  const initial = await status();
+  expect(initial).toMatchObject({ active: 1, timer: false, count: 2 });
+
+  await page.evaluate(() => {
+    const f = lobbyFixture;
+    f.oldTerminalStream = f.subscriptions.find(s => !s.stopped);
+    f.oldTerminalStream.callback({ ok: false, reason: 'network' });
+    const late = structuredClone(f.rows);
+    late[0].confirmedCount = 31;
+    f.oldTerminalStream.callback({ ...f.fresh(late), requiresLifecycleReconcile: false });
+  });
+  expect(await status()).toMatchObject({ active: 0, total: initial.total, timer: true, count: 2 });
+
+  await page.evaluate(async () => {
+    fireLobbyWatchdog(publicTournamentsReconcileTimer);
+    await publicTournamentsReconcilePromise;
+  });
+  expect(await status()).toMatchObject({
+    active: 1, total: initial.total + 1, queries: initial.queries + 1, timer: true, count: 2,
+  });
+
+  await page.evaluate(() => lobbyFixture.publish(lobbyFixture.rows, {
+    fromCache: true, requiresLifecycleReconcile: false,
+  }));
+  expect(await status()).toMatchObject({ active: 1, total: initial.total + 1, timer: true });
+
+  await page.evaluate(() => {
+    const rows = structuredClone(lobbyFixture.rows);
+    rows[0].confirmedCount = 12;
+    lobbyFixture.publish(rows, { requiresLifecycleReconcile: false });
+  });
+  await expandCard(page);
+  await expect(card(page)).toContainText(/12\s*\/\s*32/);
+  expect(await status()).toMatchObject({
+    active: 1, total: initial.total + 1, queries: initial.queries + 1, timer: false, count: 12,
+  });
+  expect(await page.evaluate(() => lobbyFixture.writes)).toEqual([]);
+});
