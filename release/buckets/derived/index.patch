@@ -1,0 +1,70 @@
+--- deployed/index.js
++++ deployed/index.js
+@@ -1,6 +1,6 @@
+ "use strict";
+ const {countOfficialMatches}=require("./official-match-titles-core.cjs");
+-const {randomUUID} = require('node:crypto');
++const {randomUUID, createHash} = require('node:crypto');
+ 
+ const {onCall, HttpsError} = require("firebase-functions/v2/https");
+ const {onSchedule} = require("firebase-functions/v2/scheduler");
+@@ -445,17 +445,34 @@
+ });
+ 
+ function tournamentState(t){try{return typeof t?.data==="string"?JSON.parse(t.data):t?.data||{};}catch{return {};}}
++const stableBucketState = value => Array.isArray(value) ? value.map(stableBucketState) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map(key => [key, stableBucketState(value[key])])) : value;
++const bucketStateDigest = state => createHash("sha256").update(JSON.stringify(stableBucketState(state))).digest("hex");
++function validBucketTitleSource(snap, log, state) {
++  if (!snap.exists) return false;
++  const tour = snap.data(), receipt = tour.bucketSettlement, createdAt = snap.createTime;
++  const sourceCreatedAt = Number.isSafeInteger(createdAt?.seconds) && Number.isSafeInteger(createdAt?.nanoseconds) ? `${createdAt.seconds}:${createdAt.nanoseconds}` : null;
++  return !Object.prototype.hasOwnProperty.call(tour, "bucketMigration") && !Object.prototype.hasOwnProperty.call(tour, "deletionStatus") && Object.prototype.hasOwnProperty.call(tour, "scoreStorage") && tour.eventAuthority === "official" && tour.ladderMode === "ranked" && tour.testMode !== true && tour.eventCancelled !== true && tour.ladderPointsAwarded === true && receipt?.version === 1 && receipt.status === "completed" && receipt.epoch === log.bucketEpoch && !!sourceCreatedAt && receipt.sourceCreatedAt === sourceCreatedAt && log.sourceCreatedAt === sourceCreatedAt && Number.isSafeInteger(receipt.completedAt) && receipt.completedAt > 0 && receipt.completedAt === state.settlementCompletedAt && receipt.stateDigest === bucketStateDigest(state) && tour.archiveStatus === "completed" && state.archiveStatus === "completed" && state.settlementPhase === "completed";
++}
+ 
+ async function processOfficialEventLog(log, sourceLogId, sourceType = "official_tournament", dryRun = false) {
+   if (!log || log.isTestData === true || log.testMode === true || log.type !== "event" || !log.playerUid || !log.eventCode) return {status: "skipped", reason: "not-event"};
+-  const tourSnap = await db.doc(`tournaments/${String(log.eventCode).toUpperCase()}`).get();
++  const tourRef = db.doc(`tournaments/${String(log.eventCode).toUpperCase()}`);
++  const tourSnap = await tourRef.get();
+   if (!tourSnap.exists) return {status: "skipped", reason: "tournament-missing"};
+   const tour = tourSnap.data();
+   if (tour.eventAuthority !== "official" || tour.ladderMode !== "ranked" || tour.testMode === true || tour.eventCancelled === true || tour.ladderPointsAwarded !== true) return {status: "skipped", reason: "not-eligible-official-event"};
++  const state = tournamentState(tour);
++  const bucketMarked = ["scoreStorage", "scoreBucketProjection", "bucketMigration", "deletionStatus"].some(key => Object.prototype.hasOwnProperty.call(tour, key));
++  if (bucketMarked) {
++    if (!validBucketTitleSource(tourSnap, log, state)) {
++      return {status: "skipped", reason: "bucket-settlement-source-mismatch"};
++    }
++  }
+   const uid = String(log.playerUid);
+   if (!validDocumentId(uid)) return {status: "skipped", reason: "invalid-player-uid"};
+-  const registrationSnap=await db.doc(`tournaments/${String(log.eventCode).toUpperCase()}/registrations/${uid}`).get();
+-  const officialMatchCount=countOfficialMatches({uid,state,registration:registrationSnap.data()});
++  const registrationRef=db.doc(`tournaments/${String(log.eventCode).toUpperCase()}/registrations/${uid}`);
++  const registrationSnap=await registrationRef.get();
++  let officialMatchCount=countOfficialMatches({uid,state,registration:registrationSnap.data()});
+   const playerSnap = await db.doc(`users/${uid}`).get();
+   if (!playerSnap.exists) return {status: "skipped", reason: "player-missing"};
+   if (isTestProfile(playerSnap.data())) return {status: "skipped", reason: "tester-account"};
+@@ -467,7 +484,12 @@
+     return {status: "eligible", reason: exists.exists ? "titles-only-reevaluation" : null, alreadyProcessed: exists.exists, uid, eventCode};
+   }
+   const created = await db.runTransaction(async (tx) => {
+-    const [resultSnap, statsSnap, freshPlayer] = await Promise.all([tx.get(resultRef), tx.get(statsRef), tx.get(db.doc(`users/${uid}`))]);
++    const [resultSnap, statsSnap, freshPlayer, freshTour, freshRegistration] = await Promise.all([tx.get(resultRef), tx.get(statsRef), tx.get(db.doc(`users/${uid}`)), ...(bucketMarked ? [tx.get(tourRef), tx.get(registrationRef)] : [])]);
++    if (bucketMarked) {
++      const freshState = tournamentState(freshTour.data());
++      if (!validBucketTitleSource(freshTour, log, freshState) || bucketStateDigest(freshState) !== bucketStateDigest(state)) return 'stale-bucket-source';
++      officialMatchCount = countOfficialMatches({uid, state:freshState, registration:freshRegistration.data()});
++    }
+     if (!freshPlayer.exists || isTestProfile(freshPlayer.data())) return false;
+     if (resultSnap.exists) return false;
+     const old = statsSnap.exists ? statsSnap.data() : {};
+@@ -503,6 +525,7 @@
+     }, {merge: true});
+     return true;
+   });
++  if (created === 'stale-bucket-source') return {status: 'skipped', reason: 'bucket-settlement-source-mismatch'};
+   // 即使前一次觸發已完成統計、但稱號判定暫時失敗，重試時仍會再次執行
+   // 冪等的稱號判定；不可因 result 文件已存在就永遠跳過補發。
+   const awards = await evaluateTitles(uid, sourceType, eventCode);

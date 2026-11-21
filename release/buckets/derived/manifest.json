@@ -1,0 +1,9 @@
+{
+  "sourceArchiveSha256": "77c7522073f37fa4ef05f8c181dfc02b31334325f785c08b5fef1e518fce7723",
+  "deployedIndexSha256": "d3abde6f05b5b5d08a8eaab99b415f2564a4dc33b36ba0ac66ae3742c4145172",
+  "candidateIndexSha256": "ae07cb5a45ed0ce209a47b1484df56327999f106488534cb8f750d1e3e37f2f9",
+  "patchSha256": "b9f6c440133c0c7e8aea4967698c6cdf7f57734b584db7617f615448eb445599",
+  "officialMatchHelperSha256": "a976e860e323c500841dd89caec82bfadfaae9d3132be67763331ef979e0622c",
+  "deployed": false,
+  "productionWrites": 0
+}
