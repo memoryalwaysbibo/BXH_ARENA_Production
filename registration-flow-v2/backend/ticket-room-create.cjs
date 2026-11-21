@@ -165,7 +165,8 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
    return {ok:true,code,roomId:state.id,name:room.name,location:room.location,
     ...(isPartnerRoomCode(code)?{delegateUid:room.ptnDelegateUid||null,
      delegateName:delegate?String(delegate.realName||delegate.displayName||'未設定姓名').slice(0,80):null,
-     delegateGameId:delegate?String(delegate.gameId||'').slice(0,80):null,
+     delegateGameId:delegate?String(delegate.gameId||delegate.nickname||
+      (delegate.displayName!==delegate.realName?delegate.displayName:'')||'').slice(0,80):null,
      canAssignDelegate:authority.owner}:{}),
     capacity:room.capacity,confirmedCount:room.confirmedCount,phase:room.tournamentPhase,startAt:room.startAt,
     registrationOpenAt:room.registrationOpenAt,registrationCloseAt:room.registrationCloseAt,
@@ -239,13 +240,14 @@ function createTicketDelegateSearchHandler({db,clock=Date.now}){
    const authority=await authorizeTicketManager(tx,db,{uid,user:actorSnap.data(),room:roomSnap.data(),gate,code,now:clock()});
    if(!authority.owner||gate.enabled!==true||gate.bindingEnabled!==true)throw Error('permission-denied');
    const rows=new Map();
-   for(const field of ['realName','displayName','gameId']){
+   for(const field of ['realName','displayName','gameId','nickname']){
     const found=await tx.get(db.collection('users').where(field,'==',query).limit(6));
     for(const row of found.docs){
      const player=row.data();
      if(row.id!==uid&&activeTicketManager(player)&&player.role==='player')rows.set(row.id,{
       uid:row.id,name:String(player.realName||player.displayName||'未設定姓名').slice(0,80),
-      gameId:String(player.gameId||'').slice(0,80)});
+      gameId:String(player.gameId||player.nickname||
+       (player.displayName!==player.realName?player.displayName:'')||'').slice(0,80)});
     }
    }
    return {ok:true,players:[...rows.values()].slice(0,10)};

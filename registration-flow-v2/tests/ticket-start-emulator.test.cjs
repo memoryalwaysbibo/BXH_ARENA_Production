@@ -96,6 +96,8 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
   await db.doc('users/'+delegate).set({active:true,role:'player',realName:'同名測試',gameId:'delegate-one'});
   const duplicate='duplicate-'+code;
   await db.doc('users/'+duplicate).set({active:true,role:'player',realName:'同名測試',gameId:'delegate-two'});
+  const legacy='legacy-'+code;
+  await db.doc('users/'+legacy).set({active:true,role:'player',realName:'舊帳號本名',nickname:'郭鬼鬼'});
   await db.doc('users/'+admin).set({active:true,role:'super_admin'});
   await db.doc('users/'+unrelated).set({active:true,role:'player',partnerOrganizer:{status:'active',scope:'manual',organizationId:'fixture-org',startsAt:now-1000,expiresAt:now+86400000}});
   const assign=createTicketDelegateHandler({db,clock:()=>now});
@@ -106,6 +108,8 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
   await assert.rejects(search({...lookup,app:null}),/permission-denied/);
   assert.deepEqual((await search(lookup)).players.map(p=>p.gameId).sort(),['delegate-one','delegate-two']);
   assert.equal((await search({...lookup,data:{...lookup.data,query:'delegate-two'}})).players[0].uid,duplicate);
+  assert.deepEqual((await search({...lookup,data:{...lookup.data,query:'郭鬼鬼'}})).players,
+   [{uid:legacy,name:'舊帳號本名',gameId:'郭鬼鬼'}]);
   const permission={auth:{uid:delegate},app:creation.app,data:{action:'ticket-room-state',code}};
   await assert.rejects(status(permission),/permission-denied/);
   await assert.rejects(status({...permission,auth:{uid:unrelated}}),/permission-denied/);
