@@ -1288,6 +1288,12 @@
     catch(e){ return null; }
   }
 
+  function publicTournamentLifecycleReconcileCandidates(items){
+    const actorUid=currentUserUidForWrites();
+    const actorPrivileged=!!(userProfile&&userProfile.active!==false&&userProfile.isTestAccount!==true&&["super_admin","admin","staff"].includes(userProfile.role));
+    return items.filter(pub=>actorPrivileged || (!!actorUid && pub.eventAuthority==="community" && pub.ownerUid===actorUid));
+  }
+
   function currentUserDisplayNameForWrites(){
     try{
       return String((userProfile && (userProfile.displayName || userProfile.realName || userProfile.nickname)) || adminDisplayName || "").trim();
@@ -1395,9 +1401,7 @@
         // Performance: never block first lobby paint on privileged N+1 lifecycle checks.
         // Public results return immediately; authorized self-heal runs best-effort in
         // the background and the existing realtime public listener delivers repairs.
-        const actorUid=currentUserUidForWrites();
-        const actorPrivileged=!!(userProfile&&userProfile.active!==false&&userProfile.isTestAccount!==true&&["super_admin","admin","staff"].includes(userProfile.role));
-        const lifecycleCandidates=results.filter(pub=>actorPrivileged || (!!actorUid && pub.eventAuthority==="community" && pub.ownerUid===actorUid));
+        const lifecycleCandidates=publicTournamentLifecycleReconcileCandidates(results);
         if(lifecycleCandidates.length){
           const cloudApi=this;
           Promise.resolve().then(async()=>{
@@ -1437,7 +1441,7 @@
     },
 
     // Realtime lobby feed: Firestore pushes only actual public-tournament changes.
-    // The 90-second reconciliation path below remains as a low-frequency self-heal.
+    // The 90-second read is a fallback for uncertain streams and lifecycle repair.
     subscribePublicTournaments(callback){
       if(!cloudEnabled || typeof callback!=="function") return ()=>{};
       try{
@@ -1453,7 +1457,9 @@
               excluded.push({code:docSnap.id,reason:"parse-error"});
             }
           });
-          callback({ok:true,items:results,rawCount:snap.size,excluded,fromCache:snap.metadata?.fromCache!==false,hasPendingWrites:snap.metadata?.hasPendingWrites!==false});
+          callback({ok:true,items:results,rawCount:snap.size,excluded,
+            requiresLifecycleReconcile:excluded.length>0 || publicTournamentLifecycleReconcileCandidates(results).length>0,
+            fromCache:snap.metadata?.fromCache!==false,hasPendingWrites:snap.metadata?.hasPendingWrites!==false});
         },err=>{
           const code=(err&&err.code)||"unknown";
           const reason=code==="permission-denied"?"permission-denied":code==="failed-precondition"?"failed-precondition":"network";
