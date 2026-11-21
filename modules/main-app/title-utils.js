@@ -115,6 +115,21 @@ function formatTitleDisplay(realName,gameId,titleName,format,enabled=true){
   return `${real}${game!==real?`（${game}）`:""}・${titleName}`;
 }
 
-Object.assign(window.BXHTitleUtils||(window.BXHTitleUtils={}),{titleArtworkPath,titleDisplayName,onlineTimeArtworkPreviewHtml,TITLE_TIER_LABELS,TITLE_LIMITED_LABELS,titleRarityLabel,titleTierValue,titleTierClass,titleTierLabel,titleLimitedTypeValue,titleLimitedLabel,titlePermanentLabel,titleClassificationText,formatTitleDisplay,titleClassificationHtml});
+// Uses the catalog projection already included in engagementSnapshot; expanding is read-free.
+function titleHolderHtml(t){
+  if(!t||t.isHidden===true||t.isPublic===false)return '';
+  const eligible=t.limitedType==='unique'||Number(t.maxRecipients)===1||['creator','season_king','custom_09d92de7-47f8-4aec-bed3-3401c7f691f4'].includes(t.id);
+  if(!eligible)return '';
+  const label=t.id==='custom_09d92de7-47f8-4aec-bed3-3401c7f691f4'?'現任持有人':'擁有人';
+  const s=t.holderSummary;
+  let value='資料核對中';
+  if(s?.schemaVersion===1&&s.status==='unawarded')value='尚未授予';
+  if(s?.schemaVersion===1&&s.status==='owned'&&typeof s.holder?.name==='string'&&s.holder.name.trim()&&/^[A-Za-z0-9_-]{1,128}$/.test(s.holder.uid||'')){
+    value='<button type="button" class="btn btn-ghost btn-sm" data-action="card-open" data-uid="'+esc(s.holder.uid)+'">'+esc(s.holder.name)+'</button>';
+  }
+  return '<div class="hint title-holder-summary" style="margin-top:8px"><b>'+label+'：</b>'+value+'</div>';
+}
+
+Object.assign(window.BXHTitleUtils||(window.BXHTitleUtils={}),{titleArtworkPath,titleDisplayName,titleHolderHtml,onlineTimeArtworkPreviewHtml,TITLE_TIER_LABELS,TITLE_LIMITED_LABELS,titleRarityLabel,titleTierValue,titleTierClass,titleTierLabel,titleLimitedTypeValue,titleLimitedLabel,titlePermanentLabel,titleClassificationText,formatTitleDisplay,titleClassificationHtml});
 
 })();
