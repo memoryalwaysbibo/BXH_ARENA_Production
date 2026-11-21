@@ -1,0 +1,75 @@
+name: Bucket Cloud read-only provenance
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/bucket-cloud-readonly.yml'
+      - 'scripts/bucket-raffle-readonly.py'
+      - 'scripts/bucket-readonly-report.py'
+      - 'tests/four-court-buckets/raffle-readonly.py'
+      - 'tests/four-court-buckets/readonly-report.py'
+permissions:
+  contents: read
+jobs:
+  offline-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify bodyless reads, immutable source and filtered report boundary
+        run: |
+          python3 -B tests/four-court-buckets/raffle-readonly.py
+          python3 -B tests/four-court-buckets/readonly-report.py
+  cloud-readonly:
+    needs: offline-contracts
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository_id == '1377260014'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      CLOUDSDK_CONFIG: /tmp/bxh-bucket-readonly-gcloud
+      CLOUDSDK_CORE_PROJECT: bxh-arena
+      CAPTURE_HOME: /tmp/bxh-bucket-readonly-capture
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require configured read-only identity
+        env:
+          PROVIDER: ${{ vars.BXH_READONLY_WIF_PROVIDER }}
+          ACCOUNT: ${{ vars.BXH_READONLY_SERVICE_ACCOUNT }}
+        run: |
+          python3 - <<'PY'
+          import os,re
+          assert re.fullmatch(r'projects/[0-9]+/locations/global/workloadIdentityPools/[-a-z0-9]+/providers/[-a-z0-9]+', os.environ['PROVIDER']), 'Configure BXH_READONLY_WIF_PROVIDER'
+          assert re.fullmatch(r'[-a-z0-9]+@bxh-arena\.iam\.gserviceaccount\.com', os.environ['ACCOUNT']), 'Configure BXH_READONLY_SERVICE_ACCOUNT'
+          PY
+      - uses: google-github-actions/auth@v3
+        with:
+          project_id: bxh-arena
+          workload_identity_provider: ${{ vars.BXH_READONLY_WIF_PROVIDER }}
+          service_account: ${{ vars.BXH_READONLY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: bxh-arena
+      - name: Capture three fixed raffle source generations
+        run: |
+          mkdir -p "$CAPTURE_HOME"
+          HOME="$CAPTURE_HOME" python3 -B scripts/bucket-raffle-readonly.py
+      - name: Export only validated hash report
+        if: always()
+        run: python3 -B scripts/bucket-readonly-report.py "$CAPTURE_HOME" "$RUNNER_TEMP/bucket-readonly-report.json"
+      - name: Upload filtered report only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bucket-readonly-provenance-${{ github.run_id }}
+          path: ${{ runner.temp }}/bucket-readonly-report.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove temporary source capture
+        if: always()
+        run: rm -rf -- "$CAPTURE_HOME"
