@@ -71,6 +71,12 @@ test('historical import atomically replaces the old room roster and its public m
     assert.deepEqual(JSON.parse(publicRoom.data().bracketView).players,
       saved.players.map(({ id, name, checkedIn }) => ({ id, name, checkedIn })));
     assert.equal((await coordinator.readSettlement({ getAll: (...refs) => db.getAll(...refs) }, parentCode)).effectiveCount, 16);
+    await db.doc('tournaments/' + parentCode).update({ data: JSON.stringify({
+      ...saved, players: oldPlayers,
+    }) });
+    await assert.rejects(coordinator.readSettlement({ getAll: (...refs) => db.getAll(...refs) }, parentCode),
+      { code: 'group-parent-roster-changed' });
+    await db.doc('tournaments/' + parentCode).update({ data: JSON.stringify(saved) });
     assert.deepEqual(await coordinator.historicalImport(parentCode, actor, payload, preview.digest), status);
   } finally {
     await deleteApp(app);
