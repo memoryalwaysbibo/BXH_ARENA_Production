@@ -5,7 +5,7 @@ const {test,after}=require('node:test');
 const {randomBytes}=require('node:crypto');
 const {db,service,handlers}=require('./harness.cjs');
 const {createApi}=require('../backend/api.cjs');
-const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketRemoveHandler,createTicketDelegateHandler}=require('../backend/ticket-room-create.cjs');
+const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketRemoveHandler,createTicketDelegateHandler,createTicketDelegateSearchHandler}=require('../backend/ticket-room-create.cjs');
 const {createStartHandler,createDrawHandler,createTicketForfeitHandler}=require('../backend/lifecycle.cjs');
 
 after(()=>db.terminate());
@@ -90,13 +90,22 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  assert.deepEqual(waiting,{ok:true,code,roomId,name:'Fixture',location:'Tainan',capacity:32,confirmedCount:0,
   phase:'waiting',startAt:now+600000,
   registrationOpenAt:now-2000,registrationCloseAt:now+300000,registrationEnabled:true,updatedAt:now,
-  drawId:null,rosterRevision:0,eligibleCount:0,drawReady:false,participants:[],...(ptn?{ticketStatus:'reserved',delegateUid:null,canAssignDelegate:true}:{})});
+  drawId:null,rosterRevision:0,eligibleCount:0,drawReady:false,participants:[],...(ptn?{ticketStatus:'reserved',delegateUid:null,delegateName:null,delegateGameId:null,canAssignDelegate:true}:{})});
  if(ptn){
   const delegate='delegate-'+code,admin='super-'+code,unrelated='unrelated-'+code;
-  await db.doc('users/'+delegate).set({active:true,role:'player'});
+  await db.doc('users/'+delegate).set({active:true,role:'player',realName:'同名測試',gameId:'delegate-one'});
+  const duplicate='duplicate-'+code;
+  await db.doc('users/'+duplicate).set({active:true,role:'player',realName:'同名測試',gameId:'delegate-two'});
   await db.doc('users/'+admin).set({active:true,role:'super_admin'});
   await db.doc('users/'+unrelated).set({active:true,role:'player',partnerOrganizer:{status:'active',scope:'manual',organizationId:'fixture-org',startsAt:now-1000,expiresAt:now+86400000}});
   const assign=createTicketDelegateHandler({db,clock:()=>now});
+  const search=createTicketDelegateSearchHandler({db,clock:()=>now});
+  const lookup={auth:{uid:owner},app:creation.app,data:{action:'ticket-room-delegate-search',code,query:'同名測試'}};
+  await assert.rejects(search({...lookup,auth:{uid:admin}}),/permission-denied/);
+  await assert.rejects(search({...lookup,auth:{uid:unrelated}}),/permission-denied/);
+  await assert.rejects(search({...lookup,app:null}),/permission-denied/);
+  assert.deepEqual((await search(lookup)).players.map(p=>p.gameId).sort(),['delegate-one','delegate-two']);
+  assert.equal((await search({...lookup,data:{...lookup.data,query:'delegate-two'}})).players[0].uid,duplicate);
   const permission={auth:{uid:delegate},app:creation.app,data:{action:'ticket-room-state',code}};
   await assert.rejects(status(permission),/permission-denied/);
   await assert.rejects(status({...permission,auth:{uid:unrelated}}),/permission-denied/);
@@ -108,6 +117,8 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
   assert.equal((await assign(assignment)).delegateUid,delegate);
   assert.equal((await status(permission)).canAssignDelegate,false);
   assert.equal((await status(statusRequest)).delegateUid,delegate);
+  assert.equal((await status(statusRequest)).delegateName,'同名測試');
+  assert.equal((await status(statusRequest)).delegateGameId,'delegate-one');
   assert.equal((await status({...permission,auth:{uid:unrelated}}).catch(e=>e.message)),'permission-denied');
   await assign({...assignment,data:{...assignment.data,delegateUid:null}});
   await assert.rejects(status(permission),/permission-denied/);
