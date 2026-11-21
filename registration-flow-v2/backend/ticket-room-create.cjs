@@ -161,8 +161,12 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
     ?state.matches.filter(forfeitMatchAvailable).map(match=>({id:match.id,seq:match.seq,round:match.round,
      a:{id:match.a.playerId,name:names.get(match.a.playerId)||'選手 A'},
      b:{id:match.b.playerId,name:names.get(match.b.playerId)||'選手 B'},updatedAt:match.updatedAt||0})):[];
+   const delegate=room.ptnDelegateUid?(await tx.get(db.doc('users/'+room.ptnDelegateUid))).data():null;
    return {ok:true,code,roomId:state.id,name:room.name,location:room.location,
-    ...(isPartnerRoomCode(code)?{delegateUid:room.ptnDelegateUid||null,canAssignDelegate:authority.owner}:{}),
+    ...(isPartnerRoomCode(code)?{delegateUid:room.ptnDelegateUid||null,
+     delegateName:delegate?String(delegate.realName||delegate.displayName||'未設定姓名').slice(0,80):null,
+     delegateGameId:delegate?String(delegate.gameId||'').slice(0,80):null,
+     canAssignDelegate:authority.owner}:{}),
     capacity:room.capacity,confirmedCount:room.confirmedCount,phase:room.tournamentPhase,startAt:room.startAt,
     registrationOpenAt:room.registrationOpenAt,registrationCloseAt:room.registrationCloseAt,
     registrationEnabled:room.registrationEnabled,updatedAt:room.updatedAt,
@@ -221,6 +225,33 @@ function createTicketScheduleHandler({db,clock=Date.now}){
   });
  };
 }
+function createTicketDelegateSearchHandler({db,clock=Date.now}){
+ return async request=>{
+  const uid=request.auth?.uid,data=request.data;
+  if(!uid)throw Error('auth-required');
+  if(!request.app)throw Error('permission-denied');
+  if(data?.action!=='ticket-room-delegate-search'||Object.keys(data).some(k=>!['action','code','query'].includes(k))||
+     !isPartnerRoomCode(data.code)||typeof data.query!=='string'||data.query.trim().length<2||data.query.trim().length>80)throw Error('invalid-operation');
+  const code=data.code,query=data.query.trim();
+  return db.runTransaction(async tx=>{
+   const [actorSnap,roomSnap,gateSnap]=await tx.getAll(db.doc('users/'+uid),db.doc('tournaments/'+code),db.doc(ticketLifecyclePath(code)));
+   const gate=gateSnap.data();
+   const authority=await authorizeTicketManager(tx,db,{uid,user:actorSnap.data(),room:roomSnap.data(),gate,code,now:clock()});
+   if(!authority.owner||gate.enabled!==true||gate.bindingEnabled!==true)throw Error('permission-denied');
+   const rows=new Map();
+   for(const field of ['realName','displayName','gameId']){
+    const found=await tx.get(db.collection('users').where(field,'==',query).limit(6));
+    for(const row of found.docs){
+     const player=row.data();
+     if(row.id!==uid&&activeTicketManager(player)&&player.role==='player')rows.set(row.id,{
+      uid:row.id,name:String(player.realName||player.displayName||'未設定姓名').slice(0,80),
+      gameId:String(player.gameId||'').slice(0,80)});
+    }
+   }
+   return {ok:true,players:[...rows.values()].slice(0,10)};
+  });
+ };
+}
 function createTicketDelegateHandler({db,clock=Date.now}){
  return async request=>{
   const uid=request.auth?.uid,data=request.data;
@@ -260,4 +291,4 @@ function createTicketRemoveHandler({db,queue,enabled,clock=Date.now}){
    action:'cancel',intent:'ticket-host'}},(tx,user,operation,room)=>authorizeTicketRemoval(tx,db,user,operation,room,clock()));
  };
 }
-module.exports={createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketRemoveHandler,createTicketDelegateHandler};
+module.exports={createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketRemoveHandler,createTicketDelegateHandler,createTicketDelegateSearchHandler};
