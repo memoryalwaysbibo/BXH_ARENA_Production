@@ -1,0 +1,96 @@
+{
+  "patches": [
+    {
+      "function": "familyRegistration",
+      "sourceSet": 9,
+      "path": "family-registration.js",
+      "archiveSha256": "87362c9e7ffd86109338781d05f3e2dca95bcdfbee5f8646fd9a242843d299ec",
+      "baselineFileSha256": "d988ad76a0d02e82546d316a240449dc925e3c1dafd82a298345f1f5d3519145",
+      "patchedFileSha256": "c2c01133fef9f149926e5f652bb17198cc03e3fab71a8e047b1ab771b4340e05",
+      "edits": [
+        {
+          "before": "  const t=ts.data(),pub=ps.data(),u=us.data(),s=state(t),requestHash=hash(JSON.stringify(d)),profiles=fs.data()?.profiles||[];",
+          "after": "  const t=ts.data(),pub=ps.data(),u=us.data();\n  if([t,pub].some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');\n  const s=state(t),requestHash=hash(JSON.stringify(d)),profiles=fs.data()?.profiles||[];"
+        }
+      ]
+    },
+    {
+      "function": "teamRegistration",
+      "sourceSet": 24,
+      "path": "team-registration-service.js",
+      "archiveSha256": "035ac2e91fa7c3c165dbde09d5b1d5eaed45b063739df9bf4c935aaa82de9673",
+      "baselineFileSha256": "0f31293a02c2c2bc568e4d0c8da501a47708af9fb144e094d576cbc675482c25",
+      "patchedFileSha256": "fab303bc0966ce47494fca4648fd9b28907d0f5d6e766ef52b8092aa8ec6df0c",
+      "edits": [
+        {
+          "before": "    const t=ts.data(),pub=ps.data(),u=us.data(),s=runtimeState(t),cfg=teamConfig(t,pub,s);",
+          "after": "    const t=ts.data(),pub=ps.data(),u=us.data();\n    if([t,pub].some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');\n    const s=runtimeState(t),cfg=teamConfig(t,pub,s);"
+        }
+      ]
+    },
+    {
+      "function": "teamScoring",
+      "sourceSet": 25,
+      "path": "team-scoring-service.js",
+      "archiveSha256": "7c9c28954bda702a0bbe44ec0594cbd201cd62040b3672530e99c10e6e3294ab",
+      "baselineFileSha256": "00f3a19e81b710e3acaabe3f3034b9afad35d8cf3aa37a7565c0ee9985dd1cef",
+      "patchedFileSha256": "809ea0fd190230d9a2ec2031195bcc71825db13a3cb2fbb68e549b8f5a55772d",
+      "edits": [
+        {
+          "before": "    if(!t)throw Error('event-not-found');",
+          "after": "    if(!t)throw Error('event-not-found');\n    if([t,snaps[4].data()].some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');"
+        }
+      ]
+    },
+    {
+      "function": "courtCallService",
+      "sourceSet": 3,
+      "path": "court-call-service.js",
+      "archiveSha256": "e4e0dcbdef190aeee168b50dd3c9df64c6f1b625bb55f7849acb2fca295f9c61",
+      "baselineFileSha256": "24e3fa16067b9cbdbae96024c220bc2686914c139f350a539b6ad2b8755cc7f5",
+      "patchedFileSha256": "88d8a3f0c91c37752df3e356a45d7240de3a441037333a8a874983dbb509fbe1",
+      "edits": [
+        {
+          "before": "   const p=snaps[0].data(),t=snaps[1].data();if(!C.active(p))throw Error('account-inactive');if(!t)throw Error('event-not-found');",
+          "after": "   const p=snaps[0].data(),t=snaps[1].data();if(!C.active(p))throw Error('account-inactive');if(!t)throw Error('event-not-found');\n   if([t,snaps[2].data()].some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');"
+        }
+      ]
+    },
+    {
+      "function": "enchantmentService",
+      "sourceSet": 6,
+      "path": "enchantment-service.js",
+      "archiveSha256": "e404c76b4335fd1664169712f644cc56d02f8335df7a56f3b8d8aee50399be0f",
+      "baselineFileSha256": "cbab97115b94ceaf755ba0ccdbdedb202f619fd75f1c3b051c874ec61bff891f",
+      "patchedFileSha256": "67f20625c04ad02025215b930b38e51fb7c5a86873564e3a221e449ab4d11ec8",
+      "edits": [
+        {
+          "before": "   if(!t)throw Error('event-not-found');",
+          "after": "   if(!t)throw Error('event-not-found');\n   if([t,publicSnap.data()].some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');"
+        }
+      ]
+    },
+    {
+      "function": "teamLineup",
+      "sourceSet": 23,
+      "path": "team-lineup-service.js",
+      "archiveSha256": "b0a2da1a0249626da5e5a7c9063652d270ed942247c4a305f8af8d73e2e75d89",
+      "baselineFileSha256": "042d1431f189402e3c1ee7f10312c879c1e8dc64bc0ce74087cde6aeb2b28a36",
+      "patchedFileSha256": "d9df1e2e2e811a8e8ba52e53330aad41e41360cd8b514266b21ac09aedd56ea7",
+      "edits": [
+        {
+          "before": "const [userSnap, roomSnap, lineupSnap, scoreSnap] = await Promise.all([",
+          "after": "const [userSnap, roomSnap, lineupSnap, scoreSnap, publicSnap] = await Promise.all(["
+        },
+        {
+          "before": "tx.get(db.doc('users/' + uid)), tx.get(roomRef), tx.get(lineupRef), tx.get(scoreRef)",
+          "after": "tx.get(db.doc('users/' + uid)), tx.get(roomRef), tx.get(lineupRef), tx.get(scoreRef), tx.get(db.doc('publicTournaments/' + code))"
+        },
+        {
+          "before": "      if (!room) throw Error('event-not-found');",
+          "after": "      if (!room) throw Error('event-not-found');\n      if([room,publicSnap.data()].some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');"
+        }
+      ]
+    }
+  ]
+}
