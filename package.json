@@ -7,6 +7,6 @@
   },
   "scripts": {
     "test:ui-smoke": "playwright test --config=playwright.config.cjs",
-    "test:ui-e2e": "playwright test --config=playwright.e2e.config.cjs"
+    "test:ui-e2e": "playwright test --config=playwright.e2e.config.cjs && node --test tests/e2e/lobby-idle-wire.unit.cjs && playwright test --config=playwright.lobby-idle-300.config.cjs"
   }
 }
