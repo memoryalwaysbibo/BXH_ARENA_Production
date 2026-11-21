@@ -1,0 +1,239 @@
+{
+  "status": "candidate-not-deployed",
+  "runtimeEnabled": false,
+  "completionEnabled": false,
+  "productionWrites": 0,
+  "hostingPatches": [
+    {
+      "sourceSet": 15,
+      "function": "preserveCompletedRoomAndCountHost",
+      "file": "hosting.js",
+      "baselineSha256": "17b908d68524e8637108d1902ff71bae2995ba9287ca73cbdacaf289851e9b6e",
+      "candidateSha256": "fc95a285d1dac35ab9a3190ff8061146cc799d6ca97947cb7d4ddf186f03af8d",
+      "scope": "deploy only this independently captured entrypoint; not syncMyHostingProgress or siblings",
+      "capturedMetadata": {
+        "name": "preserveCompletedRoomAndCountHost",
+        "entryPoint": "preserveCompletedRoomAndCountHost",
+        "runtime": "nodejs22",
+        "updateTime": "2026-10-17T00:49:47.182301061Z",
+        "storageSource": {
+          "bucket": "gcf-v2-sources-87261141693-asia-east1",
+          "object": "preserveCompletedRoomAndCountHost/function-source.zip",
+          "generation": "1792198087085126"
+        },
+        "codebase": null,
+        "eventTrigger": {
+          "eventType": "google.cloud.firestore.document.v1.written",
+          "eventFilters": [
+            {
+              "attribute": "database",
+              "value": "(default)"
+            },
+            {
+              "attribute": "namespace",
+              "value": "(default)"
+            },
+            {
+              "attribute": "document",
+              "value": "tournaments/{code}",
+              "operator": "match-path-pattern"
+            }
+          ]
+        },
+        "sourceSet": 15,
+        "classification": "pending-source-review"
+      },
+      "edits": [
+        {
+          "before": "const {stateOf,completion}=require('./hosting-core');\nconst db=getFirestore();\nasync function keepAndCount(code){\n return db.runTransaction(async tx=>{\n  const ref=db.doc(`tournaments/${code}`),snap=await tx.get(ref);if(!snap.exists)return null;\n  const t=snap.data(),s=stateOf(t),uid=t.createdBy;\n  if(!uid||typeof uid!=='string'||uid.includes('/'))return null;\n  const ledger=db.doc(`hostCompletionLedger/${code}`),stats=db.doc(`hostStats/${uid}`);\n  const [profile,prior,publicRoom]=await Promise.all([tx.get(db.doc(`users/${uid}`)),tx.get(ledger),tx.get(db.doc(`publicTournaments/${code}`))]);\n  const summary=completion(t,profile.data());\n  if(t.eventAuthority==='community'&&s.archiveStatus==='completed'&&t.expiresAt!=null){\n",
+          "after": "const {stateOf,completion}=require('./hosting-core');\nconst db=getFirestore();\nconst Bucket=require('./bucket-completion/hosting-guard.cjs');\nasync function keepAndCount(code,expectedBirth=null){\n return db.runTransaction(async tx=>{\n  const ref=db.doc(`tournaments/${code}`),snap=await tx.get(ref);if(!snap.exists)return null;\n  const t=snap.data(),s=stateOf(t),uid=t.createdBy;\n  if(expectedBirth&&Bucket.identity(snap)!==expectedBirth)return null;\n  if(!uid||typeof uid!=='string'||uid.includes('/'))return null;\n  const ledger=db.doc(`hostCompletionLedger/${code}`),stats=db.doc(`hostStats/${uid}`);\n  const [profile,prior,publicRoom]=await Promise.all([tx.get(db.doc(`users/${uid}`)),tx.get(ledger),tx.get(db.doc(`publicTournaments/${code}`))]);\n  if(Bucket.marked(t,publicRoom.data())){\n   if(!Object.hasOwn(t,'bucketCompletion')&&!Object.hasOwn(t,'bucketSettlement')&&t.archiveStatus!=='completed'&&s.archiveStatus!=='completed')return null;\n   return Bucket.countCertified({db,tx,root:snap,pub:publicRoom,profile,prior,ledger,stats,FieldValue,completion});\n  }\n  const summary=completion(t,profile.data());\n  if(t.eventAuthority==='community'&&s.archiveStatus==='completed'&&t.expiresAt!=null){\n"
+        },
+        {
+          "before": "}\n// A persisted outbox decouples count commits from title evaluation retries.\nasync function run(code,{queue=true}={}){const uid=await keepAndCount(code);if(uid&&queue)await db.doc(`hostAwardQueue/${uid}`).set({updatedAt:FieldValue.serverTimestamp()},{merge:true});return uid;}\nexports.preserveCompletedRoomAndCountHost=onDocumentWritten({document:'tournaments/{code}',region:'asia-east1',retry:true},async e=>{if(e.data?.after.exists)await run(e.params.code);});\nexports.syncMyHostingProgress=onCall({region:'asia-east1',cors:true,timeoutSeconds:540},async req=>{\n const uid=req.auth?.uid;if(!uid)throw new HttpsError('unauthenticated','auth-required');\n const p=await db.doc(`users/${uid}`).get();if(!p.exists||p.data().active!==true)throw new HttpsError('permission-denied','inactive-account');\n let last=null,count=0;\n do{\n  let q=db.collection('tournaments').where('createdBy','==',uid).orderBy(FieldPath.documentId()).limit(100);if(last)q=q.startAfter(last);\n  const page=await q.get();\n  for(const d of page.docs)if(await run(d.id,{queue:false}))count++;\n  last=page.size===100?page.docs.at(-1):null;\n }while(last);\n await db.doc(`hostStats/${uid}`).set({completedHostedCount:count,titleHistoryStartDate:'2026-09-21',updatedAt:FieldValue.serverTimestamp()},{merge:true});\n await db.doc(`hostAwardQueue/${uid}`).set({updatedAt:FieldValue.serverTimestamp(),source:'self_sync'},{merge:true});\n return {ok:true,completedHostedCount:count};\n});\n// Rebuilds host progress exactly from all valid completed rooms on/after the title-history baseline.\nexports.preserveExistingCompletedRooms=onSchedule({schedule:'every 24 hours',timeZone:'Asia/Taipei',region:'asia-east1',timeoutSeconds:540,maxInstances:1},async()=>{\n if(process.env.GCLOUD_PROJECT!=='bxh-arena'&&process.env.GOOGLE_CLOUD_PROJECT!=='bxh-arena')return;\n const counts=new Map(),touched=new Set();let last=null,scanned=0,qualified=0;\n do{\n  let q=db.collection('tournaments').orderBy(FieldPath.documentId()).limit(100);if(last)q=q.startAfter(last);\n  const page=await q.get();\n  for(const d of page.docs){\n   scanned++;\n   if(stateOf(d.data()).archiveStatus!=='completed')continue;\n   const uid=await run(d.id,{queue:false});\n   if(uid){qualified++;counts.set(uid,Number(counts.get(uid)||0)+1);touched.add(uid);}\n  }\n  last=page.size===100?page.docs.at(-1):null;\n }while(last);\n\n let statsLast=null;\n do{\n  let q=db.collection('hostStats').orderBy(FieldPath.documentId()).limit(100);if(statsLast)q=q.startAfter(statsLast);\n  const page=await q.get();\n  for(const d of page.docs){\n   const exact=Number(counts.get(d.id)||0);\n   await d.ref.set({completedHostedCount:exact,titleHistoryStartDate:'2026-09-21',updatedAt:FieldValue.serverTimestamp()},{merge:true});\n   touched.add(d.id);\n  }\n  statsLast=page.size===100?page.docs.at(-1):null;\n }while(statsLast);\n\n for(const [uid,count] of counts){\n  await db.doc(`hostStats/${uid}`).set({completedHostedCount:Number(count),titleHistoryStartDate:'2026-09-21',updatedAt:FieldValue.serverTimestamp()},{merge:true});\n }\n for(const uid of touched)await db.doc(`hostAwardQueue/${uid}`).set({updatedAt:FieldValue.serverTimestamp(),source:'history_rebuild'},{merge:true});\n console.log('host-title-history-rebuild',{historyStart:'2026-09-21',scanned,qualified,hosts:counts.size});\n});\n",
+          "after": "}\n// A persisted outbox decouples count commits from title evaluation retries.\nasync function run(code,{queue=true,expectedBirth=null}={}){const uid=await keepAndCount(code,expectedBirth);if(uid&&queue)await db.doc(`hostAwardQueue/${uid}`).set({updatedAt:FieldValue.serverTimestamp()},{merge:true});return uid;}\nexports.preserveCompletedRoomAndCountHost=onDocumentWritten({document:'tournaments/{code}',region:'asia-east1',retry:true},async e=>{if(e.data?.after.exists)await run(e.params.code,{expectedBirth:Bucket.identity(e.data.after)});});\nexports.syncMyHostingProgress=onCall({region:'asia-east1',cors:true,timeoutSeconds:540},async req=>{\n const uid=req.auth?.uid;if(!uid)throw new HttpsError('unauthenticated','auth-required');\n const p=await db.doc(`users/${uid}`).get();if(!p.exists||p.data().active!==true)throw new HttpsError('permission-denied','inactive-account');\n try{\n  const count=await Bucket.rebuildHost({db,uid,FieldValue,completion,stateOf,requireActiveActor:true});\n  return {ok:true,completedHostedCount:count};\n }catch(error){\n  if(error.completionCode==='inactive-account')throw new HttpsError('permission-denied','inactive-account');\n  throw error;\n }\n});\n// Rebuilds host progress exactly from all valid completed rooms on/after the title-history baseline.\nexports.preserveExistingCompletedRooms=onSchedule({schedule:'every 24 hours',timeZone:'Asia/Taipei',region:'asia-east1',timeoutSeconds:540,maxInstances:1},async()=>{\n if(process.env.GCLOUD_PROJECT!=='bxh-arena'&&process.env.GOOGLE_CLOUD_PROJECT!=='bxh-arena')return;\n return Bucket.rebuildAll({db,FieldValue,FieldPath,completion,stateOf});\n});\n"
+        }
+      ]
+    },
+    {
+      "sourceSet": 16,
+      "function": "preserveExistingCompletedRooms",
+      "file": "hosting.js",
+      "baselineSha256": "17b908d68524e8637108d1902ff71bae2995ba9287ca73cbdacaf289851e9b6e",
+      "candidateSha256": "fc95a285d1dac35ab9a3190ff8061146cc799d6ca97947cb7d4ddf186f03af8d",
+      "scope": "deploy only this independently captured entrypoint; not syncMyHostingProgress or siblings",
+      "capturedMetadata": {
+        "name": "preserveExistingCompletedRooms",
+        "entryPoint": "preserveExistingCompletedRooms",
+        "runtime": "nodejs22",
+        "updateTime": "2026-10-17T00:51:35.756609729Z",
+        "storageSource": {
+          "bucket": "gcf-v2-sources-87261141693-asia-east1",
+          "object": "preserveExistingCompletedRooms/function-source.zip",
+          "generation": "1792198230460311"
+        },
+        "codebase": null,
+        "eventTrigger": {
+          "eventType": null,
+          "eventFilters": []
+        },
+        "sourceSet": 16,
+        "classification": "pending-source-review"
+      },
+      "edits": [
+        {
+          "before": "const {stateOf,completion}=require('./hosting-core');\nconst db=getFirestore();\nasync function keepAndCount(code){\n return db.runTransaction(async tx=>{\n  const ref=db.doc(`tournaments/${code}`),snap=await tx.get(ref);if(!snap.exists)return null;\n  const t=snap.data(),s=stateOf(t),uid=t.createdBy;\n  if(!uid||typeof uid!=='string'||uid.includes('/'))return null;\n  const ledger=db.doc(`hostCompletionLedger/${code}`),stats=db.doc(`hostStats/${uid}`);\n  const [profile,prior,publicRoom]=await Promise.all([tx.get(db.doc(`users/${uid}`)),tx.get(ledger),tx.get(db.doc(`publicTournaments/${code}`))]);\n  const summary=completion(t,profile.data());\n  if(t.eventAuthority==='community'&&s.archiveStatus==='completed'&&t.expiresAt!=null){\n",
+          "after": "const {stateOf,completion}=require('./hosting-core');\nconst db=getFirestore();\nconst Bucket=require('./bucket-completion/hosting-guard.cjs');\nasync function keepAndCount(code,expectedBirth=null){\n return db.runTransaction(async tx=>{\n  const ref=db.doc(`tournaments/${code}`),snap=await tx.get(ref);if(!snap.exists)return null;\n  const t=snap.data(),s=stateOf(t),uid=t.createdBy;\n  if(expectedBirth&&Bucket.identity(snap)!==expectedBirth)return null;\n  if(!uid||typeof uid!=='string'||uid.includes('/'))return null;\n  const ledger=db.doc(`hostCompletionLedger/${code}`),stats=db.doc(`hostStats/${uid}`);\n  const [profile,prior,publicRoom]=await Promise.all([tx.get(db.doc(`users/${uid}`)),tx.get(ledger),tx.get(db.doc(`publicTournaments/${code}`))]);\n  if(Bucket.marked(t,publicRoom.data())){\n   if(!Object.hasOwn(t,'bucketCompletion')&&!Object.hasOwn(t,'bucketSettlement')&&t.archiveStatus!=='completed'&&s.archiveStatus!=='completed')return null;\n   return Bucket.countCertified({db,tx,root:snap,pub:publicRoom,profile,prior,ledger,stats,FieldValue,completion});\n  }\n  const summary=completion(t,profile.data());\n  if(t.eventAuthority==='community'&&s.archiveStatus==='completed'&&t.expiresAt!=null){\n"
+        },
+        {
+          "before": "}\n// A persisted outbox decouples count commits from title evaluation retries.\nasync function run(code,{queue=true}={}){const uid=await keepAndCount(code);if(uid&&queue)await db.doc(`hostAwardQueue/${uid}`).set({updatedAt:FieldValue.serverTimestamp()},{merge:true});return uid;}\nexports.preserveCompletedRoomAndCountHost=onDocumentWritten({document:'tournaments/{code}',region:'asia-east1',retry:true},async e=>{if(e.data?.after.exists)await run(e.params.code);});\nexports.syncMyHostingProgress=onCall({region:'asia-east1',cors:true,timeoutSeconds:540},async req=>{\n const uid=req.auth?.uid;if(!uid)throw new HttpsError('unauthenticated','auth-required');\n const p=await db.doc(`users/${uid}`).get();if(!p.exists||p.data().active!==true)throw new HttpsError('permission-denied','inactive-account');\n let last=null,count=0;\n do{\n  let q=db.collection('tournaments').where('createdBy','==',uid).orderBy(FieldPath.documentId()).limit(100);if(last)q=q.startAfter(last);\n  const page=await q.get();\n  for(const d of page.docs)if(await run(d.id,{queue:false}))count++;\n  last=page.size===100?page.docs.at(-1):null;\n }while(last);\n await db.doc(`hostStats/${uid}`).set({completedHostedCount:count,titleHistoryStartDate:'2026-09-21',updatedAt:FieldValue.serverTimestamp()},{merge:true});\n await db.doc(`hostAwardQueue/${uid}`).set({updatedAt:FieldValue.serverTimestamp(),source:'self_sync'},{merge:true});\n return {ok:true,completedHostedCount:count};\n});\n// Rebuilds host progress exactly from all valid completed rooms on/after the title-history baseline.\nexports.preserveExistingCompletedRooms=onSchedule({schedule:'every 24 hours',timeZone:'Asia/Taipei',region:'asia-east1',timeoutSeconds:540,maxInstances:1},async()=>{\n if(process.env.GCLOUD_PROJECT!=='bxh-arena'&&process.env.GOOGLE_CLOUD_PROJECT!=='bxh-arena')return;\n const counts=new Map(),touched=new Set();let last=null,scanned=0,qualified=0;\n do{\n  let q=db.collection('tournaments').orderBy(FieldPath.documentId()).limit(100);if(last)q=q.startAfter(last);\n  const page=await q.get();\n  for(const d of page.docs){\n   scanned++;\n   if(stateOf(d.data()).archiveStatus!=='completed')continue;\n   const uid=await run(d.id,{queue:false});\n   if(uid){qualified++;counts.set(uid,Number(counts.get(uid)||0)+1);touched.add(uid);}\n  }\n  last=page.size===100?page.docs.at(-1):null;\n }while(last);\n\n let statsLast=null;\n do{\n  let q=db.collection('hostStats').orderBy(FieldPath.documentId()).limit(100);if(statsLast)q=q.startAfter(statsLast);\n  const page=await q.get();\n  for(const d of page.docs){\n   const exact=Number(counts.get(d.id)||0);\n   await d.ref.set({completedHostedCount:exact,titleHistoryStartDate:'2026-09-21',updatedAt:FieldValue.serverTimestamp()},{merge:true});\n   touched.add(d.id);\n  }\n  statsLast=page.size===100?page.docs.at(-1):null;\n }while(statsLast);\n\n for(const [uid,count] of counts){\n  await db.doc(`hostStats/${uid}`).set({completedHostedCount:Number(count),titleHistoryStartDate:'2026-09-21',updatedAt:FieldValue.serverTimestamp()},{merge:true});\n }\n for(const uid of touched)await db.doc(`hostAwardQueue/${uid}`).set({updatedAt:FieldValue.serverTimestamp(),source:'history_rebuild'},{merge:true});\n console.log('host-title-history-rebuild',{historyStart:'2026-09-21',scanned,qualified,hosts:counts.size});\n});\n",
+          "after": "}\n// A persisted outbox decouples count commits from title evaluation retries.\nasync function run(code,{queue=true,expectedBirth=null}={}){const uid=await keepAndCount(code,expectedBirth);if(uid&&queue)await db.doc(`hostAwardQueue/${uid}`).set({updatedAt:FieldValue.serverTimestamp()},{merge:true});return uid;}\nexports.preserveCompletedRoomAndCountHost=onDocumentWritten({document:'tournaments/{code}',region:'asia-east1',retry:true},async e=>{if(e.data?.after.exists)await run(e.params.code,{expectedBirth:Bucket.identity(e.data.after)});});\nexports.syncMyHostingProgress=onCall({region:'asia-east1',cors:true,timeoutSeconds:540},async req=>{\n const uid=req.auth?.uid;if(!uid)throw new HttpsError('unauthenticated','auth-required');\n const p=await db.doc(`users/${uid}`).get();if(!p.exists||p.data().active!==true)throw new HttpsError('permission-denied','inactive-account');\n try{\n  const count=await Bucket.rebuildHost({db,uid,FieldValue,completion,stateOf,requireActiveActor:true});\n  return {ok:true,completedHostedCount:count};\n }catch(error){\n  if(error.completionCode==='inactive-account')throw new HttpsError('permission-denied','inactive-account');\n  throw error;\n }\n});\n// Rebuilds host progress exactly from all valid completed rooms on/after the title-history baseline.\nexports.preserveExistingCompletedRooms=onSchedule({schedule:'every 24 hours',timeZone:'Asia/Taipei',region:'asia-east1',timeoutSeconds:540,maxInstances:1},async()=>{\n if(process.env.GCLOUD_PROJECT!=='bxh-arena'&&process.env.GOOGLE_CLOUD_PROJECT!=='bxh-arena')return;\n return Bucket.rebuildAll({db,FieldValue,FieldPath,completion,stateOf});\n});\n"
+        }
+      ]
+    },
+    {
+      "sourceSet": "host-sync",
+      "captureSourceSet": 0,
+      "captureObservedAt": "20261103T063553Z",
+      "function": "syncMyHostingProgress",
+      "file": "hosting.js",
+      "capturedMetadata": {
+        "name": "syncMyHostingProgress",
+        "entryPoint": "syncMyHostingProgress",
+        "runtime": "nodejs22",
+        "updateTime": "2026-10-17T00:51:33.160518911Z",
+        "storageSource": {
+          "bucket": "gcf-v2-sources-87261141693-asia-east1",
+          "object": "syncMyHostingProgress/function-source.zip",
+          "generation": "1792198207366151"
+        },
+        "codebase": null,
+        "eventTrigger": {
+          "eventType": null,
+          "eventFilters": []
+        },
+        "sourceSet": 0,
+        "classification": "pending-source-review"
+      },
+      "archiveSha256": "4c2a9f7b2dc4f36088e87757dcead0d152f0ef7e6749815beb7c818a869d3398",
+      "scope": "independently captured callable only; no sibling deployment",
+      "candidateSha256": "fc95a285d1dac35ab9a3190ff8061146cc799d6ca97947cb7d4ddf186f03af8d",
+      "edits": [
+        {
+          "before": "const {stateOf,completion}=require('./hosting-core');\nconst db=getFirestore();\nasync function keepAndCount(code){\n return db.runTransaction(async tx=>{\n  const ref=db.doc(`tournaments/${code}`),snap=await tx.get(ref);if(!snap.exists)return null;\n  const t=snap.data(),s=stateOf(t),uid=t.createdBy;\n  if(!uid||typeof uid!=='string'||uid.includes('/'))return null;\n  const ledger=db.doc(`hostCompletionLedger/${code}`),stats=db.doc(`hostStats/${uid}`);\n  const [profile,prior,publicRoom]=await Promise.all([tx.get(db.doc(`users/${uid}`)),tx.get(ledger),tx.get(db.doc(`publicTournaments/${code}`))]);\n  const summary=completion(t,profile.data());\n  if(t.eventAuthority==='community'&&s.archiveStatus==='completed'&&t.expiresAt!=null){\n",
+          "after": "const {stateOf,completion}=require('./hosting-core');\nconst db=getFirestore();\nconst Bucket=require('./bucket-completion/hosting-guard.cjs');\nasync function keepAndCount(code,expectedBirth=null){\n return db.runTransaction(async tx=>{\n  const ref=db.doc(`tournaments/${code}`),snap=await tx.get(ref);if(!snap.exists)return null;\n  const t=snap.data(),s=stateOf(t),uid=t.createdBy;\n  if(expectedBirth&&Bucket.identity(snap)!==expectedBirth)return null;\n  if(!uid||typeof uid!=='string'||uid.includes('/'))return null;\n  const ledger=db.doc(`hostCompletionLedger/${code}`),stats=db.doc(`hostStats/${uid}`);\n  const [profile,prior,publicRoom]=await Promise.all([tx.get(db.doc(`users/${uid}`)),tx.get(ledger),tx.get(db.doc(`publicTournaments/${code}`))]);\n  if(Bucket.marked(t,publicRoom.data())){\n   if(!Object.hasOwn(t,'bucketCompletion')&&!Object.hasOwn(t,'bucketSettlement')&&t.archiveStatus!=='completed'&&s.archiveStatus!=='completed')return null;\n   return Bucket.countCertified({db,tx,root:snap,pub:publicRoom,profile,prior,ledger,stats,FieldValue,completion});\n  }\n  const summary=completion(t,profile.data());\n  if(t.eventAuthority==='community'&&s.archiveStatus==='completed'&&t.expiresAt!=null){\n"
+        },
+        {
+          "before": "}\n// A persisted outbox decouples count commits from title evaluation retries.\nasync function run(code,{queue=true}={}){const uid=await keepAndCount(code);if(uid&&queue)await db.doc(`hostAwardQueue/${uid}`).set({updatedAt:FieldValue.serverTimestamp()},{merge:true});return uid;}\nexports.preserveCompletedRoomAndCountHost=onDocumentWritten({document:'tournaments/{code}',region:'asia-east1',retry:true},async e=>{if(e.data?.after.exists)await run(e.params.code);});\nexports.syncMyHostingProgress=onCall({region:'asia-east1',cors:true,timeoutSeconds:540},async req=>{\n const uid=req.auth?.uid;if(!uid)throw new HttpsError('unauthenticated','auth-required');\n const p=await db.doc(`users/${uid}`).get();if(!p.exists||p.data().active!==true)throw new HttpsError('permission-denied','inactive-account');\n let last=null,count=0;\n do{\n  let q=db.collection('tournaments').where('createdBy','==',uid).orderBy(FieldPath.documentId()).limit(100);if(last)q=q.startAfter(last);\n  const page=await q.get();\n  for(const d of page.docs)if(await run(d.id,{queue:false}))count++;\n  last=page.size===100?page.docs.at(-1):null;\n }while(last);\n await db.doc(`hostStats/${uid}`).set({completedHostedCount:count,titleHistoryStartDate:'2026-09-21',updatedAt:FieldValue.serverTimestamp()},{merge:true});\n await db.doc(`hostAwardQueue/${uid}`).set({updatedAt:FieldValue.serverTimestamp(),source:'self_sync'},{merge:true});\n return {ok:true,completedHostedCount:count};\n});\n// Rebuilds host progress exactly from all valid completed rooms on/after the title-history baseline.\nexports.preserveExistingCompletedRooms=onSchedule({schedule:'every 24 hours',timeZone:'Asia/Taipei',region:'asia-east1',timeoutSeconds:540,maxInstances:1},async()=>{\n if(process.env.GCLOUD_PROJECT!=='bxh-arena'&&process.env.GOOGLE_CLOUD_PROJECT!=='bxh-arena')return;\n const counts=new Map(),touched=new Set();let last=null,scanned=0,qualified=0;\n do{\n  let q=db.collection('tournaments').orderBy(FieldPath.documentId()).limit(100);if(last)q=q.startAfter(last);\n  const page=await q.get();\n  for(const d of page.docs){\n   scanned++;\n   if(stateOf(d.data()).archiveStatus!=='completed')continue;\n   const uid=await run(d.id,{queue:false});\n   if(uid){qualified++;counts.set(uid,Number(counts.get(uid)||0)+1);touched.add(uid);}\n  }\n  last=page.size===100?page.docs.at(-1):null;\n }while(last);\n\n let statsLast=null;\n do{\n  let q=db.collection('hostStats').orderBy(FieldPath.documentId()).limit(100);if(statsLast)q=q.startAfter(statsLast);\n  const page=await q.get();\n  for(const d of page.docs){\n   const exact=Number(counts.get(d.id)||0);\n   await d.ref.set({completedHostedCount:exact,titleHistoryStartDate:'2026-09-21',updatedAt:FieldValue.serverTimestamp()},{merge:true});\n   touched.add(d.id);\n  }\n  statsLast=page.size===100?page.docs.at(-1):null;\n }while(statsLast);\n\n for(const [uid,count] of counts){\n  await db.doc(`hostStats/${uid}`).set({completedHostedCount:Number(count),titleHistoryStartDate:'2026-09-21',updatedAt:FieldValue.serverTimestamp()},{merge:true});\n }\n for(const uid of touched)await db.doc(`hostAwardQueue/${uid}`).set({updatedAt:FieldValue.serverTimestamp(),source:'history_rebuild'},{merge:true});\n console.log('host-title-history-rebuild',{historyStart:'2026-09-21',scanned,qualified,hosts:counts.size});\n});\n",
+          "after": "}\n// A persisted outbox decouples count commits from title evaluation retries.\nasync function run(code,{queue=true,expectedBirth=null}={}){const uid=await keepAndCount(code,expectedBirth);if(uid&&queue)await db.doc(`hostAwardQueue/${uid}`).set({updatedAt:FieldValue.serverTimestamp()},{merge:true});return uid;}\nexports.preserveCompletedRoomAndCountHost=onDocumentWritten({document:'tournaments/{code}',region:'asia-east1',retry:true},async e=>{if(e.data?.after.exists)await run(e.params.code,{expectedBirth:Bucket.identity(e.data.after)});});\nexports.syncMyHostingProgress=onCall({region:'asia-east1',cors:true,timeoutSeconds:540},async req=>{\n const uid=req.auth?.uid;if(!uid)throw new HttpsError('unauthenticated','auth-required');\n const p=await db.doc(`users/${uid}`).get();if(!p.exists||p.data().active!==true)throw new HttpsError('permission-denied','inactive-account');\n try{\n  const count=await Bucket.rebuildHost({db,uid,FieldValue,completion,stateOf,requireActiveActor:true});\n  return {ok:true,completedHostedCount:count};\n }catch(error){\n  if(error.completionCode==='inactive-account')throw new HttpsError('permission-denied','inactive-account');\n  throw error;\n }\n});\n// Rebuilds host progress exactly from all valid completed rooms on/after the title-history baseline.\nexports.preserveExistingCompletedRooms=onSchedule({schedule:'every 24 hours',timeZone:'Asia/Taipei',region:'asia-east1',timeoutSeconds:540,maxInstances:1},async()=>{\n if(process.env.GCLOUD_PROJECT!=='bxh-arena'&&process.env.GOOGLE_CLOUD_PROJECT!=='bxh-arena')return;\n return Bucket.rebuildAll({db,FieldValue,FieldPath,completion,stateOf});\n});\n"
+        }
+      ],
+      "baselineSha256": "17b908d68524e8637108d1902ff71bae2995ba9287ca73cbdacaf289851e9b6e"
+    }
+  ],
+  "missingExactSource": [],
+  "supportedCompletion": "official individual standard single elimination general only",
+  "shared": {
+    "protocol/core.cjs": "a83eb0af577420f256802e4d0a8ece7b45c1efbc6433047cf4931d034be23713",
+    "protocol/event-staff-core.cjs": "1efe3593f349908f6dfd5173c03f0030f6ade653636c9b5efa21b027e25c7358",
+    "protocol/public-view.cjs": "0bda68eb58adf93c53f29bfb2d726d7d10cf6486b711de840a6526a177359499",
+    "protocol/qr-checkin-fence.cjs": "556270ff967f083182c39b6ed6a331d06909ac66891fa9e3f7cd03356a257aab",
+    "protocol/results.cjs": "9c5d1053683645ddf247e4463463616616f607d9f50a26ef08188c2f63b4769d",
+    "protocol/runtime.cjs": "b84daf88c3b5a4c93bc40d9a85c0eb6079d2f6cd46308e587dc4f9291d6e0df0",
+    "protocol/state.cjs": "e9fa3ae6cd379a94fda711070e4dc36bc311b62ff67e12e810f0db1caa407c3a"
+  },
+  "helperFiles": {
+    "README.md": "3fad7471ede0577ffd9762ec57e8bdd4b1680144cbea291fb8f39ebc86241f99",
+    "certificate.cjs": "8303d0ebe31752c7edb21bfecec08d1a9d3870bb509bab0dbfff7cd6a2bd5152",
+    "general-completion.cjs": "2eea28a22f6815cc63787b960aa4701a52d6157536773b1e4fa4b5bf11c2faed",
+    "hosting/15/hosting-core.js": "10be2ab437fa20d0115405eca13fe47f56736a9808a8d6e6812b56b2d4562680",
+    "hosting/15/hosting.js": "fc95a285d1dac35ab9a3190ff8061146cc799d6ca97947cb7d4ddf186f03af8d",
+    "hosting/16/hosting-core.js": "10be2ab437fa20d0115405eca13fe47f56736a9808a8d6e6812b56b2d4562680",
+    "hosting/16/hosting.js": "fc95a285d1dac35ab9a3190ff8061146cc799d6ca97947cb7d4ddf186f03af8d",
+    "hosting/host-sync/hosting-core.js": "10be2ab437fa20d0115405eca13fe47f56736a9808a8d6e6812b56b2d4562680",
+    "hosting/host-sync/hosting.js": "fc95a285d1dac35ab9a3190ff8061146cc799d6ca97947cb7d4ddf186f03af8d",
+    "hosting-guard.cjs": "14f6ffe9fef25050f5b9e212211dd15318a57c808ed496892460051e75a301be",
+    "index.js": "cabc41a95fff794252a1df078c3cf862272b26acc71e4351eb06b8c34e949a6c",
+    "package.json": "4b3a67b85f1e1a41f37e6133347009266c33e0d39168bdd4dc4648c181091806",
+    "protocol/core.cjs": "a83eb0af577420f256802e4d0a8ece7b45c1efbc6433047cf4931d034be23713",
+    "protocol/event-staff-core.cjs": "1efe3593f349908f6dfd5173c03f0030f6ade653636c9b5efa21b027e25c7358",
+    "protocol/public-view.cjs": "0bda68eb58adf93c53f29bfb2d726d7d10cf6486b711de840a6526a177359499",
+    "protocol/qr-checkin-fence.cjs": "556270ff967f083182c39b6ed6a331d06909ac66891fa9e3f7cd03356a257aab",
+    "protocol/results.cjs": "9c5d1053683645ddf247e4463463616616f607d9f50a26ef08188c2f63b4769d",
+    "protocol/runtime.cjs": "b84daf88c3b5a4c93bc40d9a85c0eb6079d2f6cd46308e587dc4f9291d6e0df0",
+    "protocol/state.cjs": "e9fa3ae6cd379a94fda711070e4dc36bc311b62ff67e12e810f0db1caa407c3a"
+  },
+  "fixtureFiles": {
+    "fixtures/15/hosting.js": "17b908d68524e8637108d1902ff71bae2995ba9287ca73cbdacaf289851e9b6e",
+    "fixtures/16/hosting.js": "17b908d68524e8637108d1902ff71bae2995ba9287ca73cbdacaf289851e9b6e",
+    "fixtures/host-sync/_qr_checkin/admin-firestore.cjs": "3c8c2abf2cb2f4142e0e8ec727e232e703d60f0a9a2449867c25464e1d8f850e",
+    "fixtures/host-sync/_qr_checkin/guard-firestore.cjs": "b0d0027f0b79b845eb118c585bb8104d3590c1c18729737300f6fdf32d97d43b",
+    "fixtures/host-sync/_qr_checkin/qr-checkin-fence.cjs": "556270ff967f083182c39b6ed6a331d06909ac66891fa9e3f7cd03356a257aab",
+    "fixtures/host-sync/hosting.js": "17b908d68524e8637108d1902ff71bae2995ba9287ca73cbdacaf289851e9b6e",
+    "fixtures/host-sync/package.json": "c91d10364c4fc66b6241cd2848de9c2cb736ef8195a3f50b0de0c23599c71509",
+    "fixtures/hosting-core.js": "10be2ab437fa20d0115405eca13fe47f56736a9808a8d6e6812b56b2d4562680"
+  },
+  "protocolSource": {
+    "referenceCommit": "b82e8d393ab14c6146575ebf28ccedb0c02b3ed9",
+    "referenceRankedCandidate": "2b885a849e4685df68975c9c16b283a2c8c07992",
+    "stateGitBlob": "da457b44c6694293470efa3ce71699ada100b8b1",
+    "scope": "state/runtime/public projection copied byte-for-byte from reviewed PR713 protocol; general validation retains result topology and deliberately does not resolve/credit account UIDs"
+  },
+  "hostSyncCapture": {
+    "stage": "HOST_SYNC_SOURCE_CAPTURE",
+    "observedAt": "20261103T063553Z",
+    "project": "bxh-arena",
+    "function": {
+      "name": "syncMyHostingProgress",
+      "entryPoint": "syncMyHostingProgress",
+      "runtime": "nodejs22",
+      "updateTime": "2026-10-17T00:51:33.160518911Z",
+      "storageSource": {
+        "bucket": "gcf-v2-sources-87261141693-asia-east1",
+        "object": "syncMyHostingProgress/function-source.zip",
+        "generation": "1792198207366151"
+      },
+      "codebase": null,
+      "eventTrigger": {
+        "eventType": null,
+        "eventFilters": []
+      },
+      "sourceSet": 0,
+      "classification": "pending-source-review"
+    },
+    "archiveSha256": "4c2a9f7b2dc4f36088e87757dcead0d152f0ef7e6749815beb7c818a869d3398",
+    "verifiedFiles": 92,
+    "closureFiles": [
+      {
+        "path": "_qr_checkin/admin-firestore.cjs",
+        "sha256": "3c8c2abf2cb2f4142e0e8ec727e232e703d60f0a9a2449867c25464e1d8f850e",
+        "size": 215
+      },
+      {
+        "path": "_qr_checkin/guard-firestore.cjs",
+        "sha256": "b0d0027f0b79b845eb118c585bb8104d3590c1c18729737300f6fdf32d97d43b",
+        "size": 4704
+      },
+      {
+        "path": "_qr_checkin/qr-checkin-fence.cjs",
+        "sha256": "556270ff967f083182c39b6ed6a331d06909ac66891fa9e3f7cd03356a257aab",
+        "size": 1381
+      },
+      {
+        "path": "hosting-core.js",
+        "sha256": "10be2ab437fa20d0115405eca13fe47f56736a9808a8d6e6812b56b2d4562680",
+        "size": 1952
+      },
+      {
+        "path": "hosting.js",
+        "sha256": "17b908d68524e8637108d1902ff71bae2995ba9287ca73cbdacaf289851e9b6e",
+        "size": 4743
+      }
+    ],
+    "dependencyManifest": {
+      "path": "fixtures/host-sync/package.json",
+      "node": "22",
+      "firebase-admin": "14.4.0",
+      "firebase-functions": "7.3.2"
+    }
+  }
+}
