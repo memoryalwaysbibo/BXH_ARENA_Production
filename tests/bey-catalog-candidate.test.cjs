@@ -47,3 +47,13 @@ test('manual handoff module has no file chooser, upload, remote write, auth or s
  const text=require('node:fs').readFileSync(require('node:path').join(__dirname,'../modules/bey-catalog/catalog-candidate-presentation.js'),'utf8');
  assert.doesNotMatch(text,/fetch\s*\(|XMLHttpRequest|firebase|localStorage|sessionStorage|FormData|type\s*=\s*['"]file|innerHTML|insertAdjacentHTML/);
 });
+
+test('BX54 user-provided PNG preserves original bytes, unverified provenance and existing222 entries',async()=>{
+ const fs=require('node:fs'),path=require('node:path'),root=path.resolve(__dirname,'..');
+ const p=require('../modules/bey-catalog/catalog-candidate-policy.js');const data=JSON.parse(fs.readFileSync(path.join(root,p.dataURL)));const valid=model.validate(data,p);const bx=valid.entries.find(r=>r.recordId==='supplied_20261014_0085');
+ assert.equal(valid.entries.length,223);assert.equal(bx.pairingConfidence,'user_assigned');assert.equal(bx.provenance,'user_supplied_retail_source');assert.equal(bx.rightsStatus,'unverified');assert.equal(bx.status,'candidate');assert.equal(bx.sourceURL,'https://www.yodobashi.com/product/100000001010262959/');
+ const bytes=fs.readFileSync(path.join(root,bx.imageURL));assert.equal(bytes.length,464143);assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),'948062cf8f37cdaecad243aaca25874c8dc1104536bb06d86489b3fef4ebf82c');assert.equal(bytes.readUInt32BE(16),600);assert.equal(bytes.readUInt32BE(20),600);
+ const old=JSON.parse(fs.readFileSync(path.join(root,'data/bey-catalog-pending/candidate-images.36061318cf77a96c7e68d7c8c26b5429e26eec64136d1244ca2f0e9407599118.json')));const remaining=valid.entries.filter(r=>r.recordId!==bx.recordId);assert.deepEqual(remaining,old.entries);
+ for(const key of ['provenance','rightsStatus']){const bad=structuredClone(data);bad.entries.find(r=>r.recordId===bx.recordId)[key]='authorized';assert.throws(()=>model.validate(bad,p),/INVALID_CANDIDATE_MANIFEST/);}
+ const bad=structuredClone(data);delete bad.entries.find(r=>r.recordId===bx.recordId).rightsStatus;assert.throws(()=>model.validate(bad,p),/INVALID_CANDIDATE_MANIFEST/);
+});

@@ -53,7 +53,7 @@ async function inspectRuntime(root = ROOT) {
   if (new Set(candidateData.entries.map(row=>row.imageURL)).size !== candidatePolicy.imageURLs.length || candidateData.entries.some(row=>!candidatePolicy.imageURLs.includes(row.imageURL))) throw Error('CANDIDATE_ASSET_LIST_MISMATCH');
   for(const row of candidateData.entries) {
     const asset=bytes.get(row.imageURL);
-    if(!asset || asset.length>2097152 || sha256(asset)!==row.imageSha256 || asset.toString('ascii',0,4)!=='RIFF' || asset.toString('ascii',8,12)!=='WEBP') throw Error('CANDIDATE_IMAGE_MISMATCH');
+    if(!asset || asset.length>2097152 || sha256(asset)!==row.imageSha256 || !(row.imageURL.endsWith('.png') ? asset.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])) : asset.toString('ascii',0,4)==='RIFF' && asset.toString('ascii',8,12)==='WEBP')) throw Error('CANDIDATE_IMAGE_MISMATCH');
   }
   const html = bytes.get('bey-catalog.html').toString('utf8');
   const expectedAssets = new Set([...RUNTIME_FILES.slice(1, 4), 'modules/bey-catalog/catalog-pending-model.js', 'modules/bey-catalog/catalog-pending-ui.js', ...CANDIDATE_SCRIPTS]);

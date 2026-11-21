@@ -15,10 +15,11 @@
     const figure=node('figure','','candidate-image');
     const image=document.createElement('img');
     image.loading='lazy';image.decoding='async';image.alt='候選圖片，尚未核實';image.src='./'+candidate.imageURL;
-    const caption=node('figcaption',candidate.pairingConfidence==='exact_variant' ? '候選配圖 · 圖片與款式待核實' : '同商品參考圖，尚未確認本款配置');
+    const caption=node('figcaption',candidate.pairingConfidence==='user_assigned' ? '使用者提供候選圖 · 款式與圖片待核實' : candidate.pairingConfidence==='exact_variant' ? '候選配圖 · 圖片與款式待核實' : '同商品參考圖，尚未確認本款配置');
     image.addEventListener('error',()=>{image.hidden=true;caption.textContent='候選圖片載入失敗 · 請保留待核狀態';},{once:true});
     const source=node('a','圖片來源');source.href=candidate.sourceURL;source.target='_blank';source.rel='noopener noreferrer';
     figure.append(image,caption,source);
+    if(candidate.provenance==='user_supplied_retail_source')figure.append(node('p','使用者提供圖片與零售來源連結；圖片權利待核，不代表原廠授權。原圖日文註記保留。','candidate-rights-note'));
     if(additionalNotices[candidate.sourceURL])figure.append(node('p',additionalNotices[candidate.sourceURL],'candidate-rights-note'));
     return figure;
   }

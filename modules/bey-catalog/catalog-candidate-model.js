@@ -17,7 +17,8 @@
     if (!exact(data,['schemaVersion','inventorySha256','entries']) || data.schemaVersion !== 1 || data.inventorySha256 !== policy.inventorySha256 || !Array.isArray(data.entries) || data.entries.length > 285) fail();
     const ids = new Set(policy.recordIds), urls = new Set(policy.sourceURLs), seen = new Set();
     const entries = data.entries.map(row => {
-      if (!exact(row,KEYS) || typeof row.recordId !== 'string' || !/^supplied_20261014_\d{4}$/.test(row.recordId) || !ids.has(row.recordId) || seen.has(row.recordId) || !validHash(row.imageSha256) || !validHash(row.sourceImageSha256) || row.imageURL !== 'assets/bey-catalog/candidates/' + row.imageSha256 + '.webp' || !['exact_variant','product_reference'].includes(row.pairingConfidence) || row.status !== 'candidate') fail();
+      const userSupplied = row?.pairingConfidence === 'user_assigned';
+      if (!exact(row,userSupplied ? [...KEYS,'provenance','rightsStatus'] : KEYS) || (userSupplied && (row.provenance !== 'user_supplied_retail_source' || row.rightsStatus !== 'unverified')) || typeof row.recordId !== 'string' || !/^supplied_20261014_\d{4}$/.test(row.recordId) || !ids.has(row.recordId) || seen.has(row.recordId) || !validHash(row.imageSha256) || !validHash(row.sourceImageSha256) || !['.webp','.png'].some(ext => row.imageURL === 'assets/bey-catalog/candidates/' + row.imageSha256 + ext) || !['exact_variant','product_reference','user_assigned'].includes(row.pairingConfidence) || row.status !== 'candidate') fail();
       publicURL(row.sourceURL,urls); publicURL(row.sourceImageURL,urls); seen.add(row.recordId);
       return Object.freeze({...row});
     });
