@@ -277,7 +277,9 @@ test('historical import validates before writing, preserves five stages, and set
   const parent = 'tournaments/' + parentCode;
   db.rows.delete('groupStagePlans/' + parentCode);
   db.rows.delete('groupStageRoutes/' + parentCode);
-  db.rows.set('publicTournaments/' + parentCode, { bracketView: '{}' });
+  db.rows.set('publicTournaments/' + parentCode, { bracketView: JSON.stringify({
+    players: item.players.map(({ id, name }) => ({ id, name })), matches: [],
+  }) });
   db.rows.set('ladderSystem/current', { status: 'active', currentSeason: 'S1' });
   const type = 'bxh-historical-top-eight-v1';
   const keys = ['A', 'B', 'C', 'D'];
@@ -328,9 +330,9 @@ test('historical import validates before writing, preserves five stages, and set
   const imported = await up('historical-import', payload, preview.digest);
   assert.equal(imported.readyForSettlement, true);
   assert.equal(imported.next, null);
-  assert.equal(db.writes.length, 2);
+  assert.equal(db.writes.length, 4);
   assert.deepEqual(await up('historical-import', payload, preview.digest), imported);
-  assert.equal(db.writes.length, 2);
+  assert.equal(db.writes.length, 4);
   const history = await up('history', null, null, 'user-0');
   assert.deepEqual(history.stages.map(stage => stage.key), ['A', 'B', 'C', 'D', 'final-eight']);
   assert.equal(history.ownPlayerIds.length, 2);
@@ -338,7 +340,7 @@ test('historical import validates before writing, preserves five stages, and set
   assert(!JSON.stringify(history).includes('user-0'));
   const settlementPreview = await up('settlement-preview');
   assert.equal(settlementPreview.eligibleCount, 14);
-  assert.equal(db.writes.length, 2);
+  assert.equal(db.writes.length, 4);
   const result = await up('settle');
   assert.equal(result.creditedCount, 14);
   assert.equal(db.rows.get(parent).archiveStatus, 'completed');
