@@ -8,6 +8,75 @@ const { createGroupSettlement } = require('./settlement.cjs');
 const { roster, finish } = require('./test-fixtures.cjs');
 const buckets = require('../referee-seats/functions/bucket-state.cjs');
 
+test('historical import atomically replaces the old room roster and its public mirror', async () => {
+  const app = initializeApp({ projectId: project });
+  const db = getFirestore(app);
+  const parentCode = 'BXH-HIS001', actor = 'history-admin';
+  try {
+    const keys = ['A', 'B', 'C', 'D'];
+    const groups = Object.fromEntries(keys.map(key => [key,
+      Array.from({ length: 4 }, (_, i) => ({ id: key + (i + 1), name: key + ' player ' + i, hold: true }))]));
+    const groupMatches = Object.fromEntries(keys.map(key => [key, [
+      { number: 1, round: 0, a: key + '1', b: key + '2', winner: key + '1' },
+      { number: 2, round: 0, a: key + '3', b: key + '4', winner: key + '3' },
+    ]]));
+    const finalMatches = [
+      { number: 1, round: 0, a: 'A1', b: 'A3', winner: 'A1' },
+      { number: 2, round: 0, a: 'B1', b: 'B3', winner: 'B1' },
+      { number: 3, round: 0, a: 'C1', b: 'C3', winner: 'C1' },
+      { number: 4, round: 0, a: 'D1', b: 'D3', winner: 'D1' },
+      { number: 5, round: 1, a: 'A1', b: 'B1', winner: 'A1', fromA: 1, fromB: 2 },
+      { number: 6, round: 1, a: 'C1', b: 'D1', winner: 'C1', fromA: 3, fromB: 4 },
+      { number: 7, round: 2, a: 'A1', b: 'C1', winner: 'A1', fromA: 5, fromB: 6 },
+    ];
+    const payload = { type: 'bxh-historical-top-eight-v1', parentCode, groups, groupMatches,
+      finalMatches, finalPlaces: ['A1', 'C1', 'B1', 'D1', 'A3', 'B3', 'C3', 'D3'] };
+    const oldPlayers = Array.from({ length: 20 }, (_, i) => ({ id: 'old-' + i, name: 'Old ' + i }));
+    const original = { id: 'historical-parent', cloudCode: parentCode, players: oldPlayers,
+      matches: [], startedAt: null, meta: { name: 'History', formatType: 'single',
+        battleMode: 'individual', playMode: 'standard', registrationEnabled: true } };
+    await Promise.all([
+      db.doc('users/' + actor).set({ active: true, role: 'super_admin' }),
+      db.doc('systemConfig/groupStages').set({ enabled: true, parentCodes: [parentCode] }),
+      db.doc('tournaments/' + parentCode).set({ eventAuthority: 'official', ladderMode: 'ranked',
+        data: JSON.stringify(original), registrationEnabled: true }),
+      db.doc('publicTournaments/' + parentCode).set({ bracketView: JSON.stringify({
+        players: oldPlayers.map(p => ({ id: p.id, name: p.name, checkedIn: false })), matches: [] }),
+        registrationEnabled: true }),
+    ]);
+    const coordinator = createCoordinator(db, { clock: () => 1234 });
+    const preview = await coordinator.historicalImport(parentCode, actor, payload);
+    assert.equal(preview.previewOnly, true);
+    assert.equal(preview.entrantCount, 16);
+    assert.equal(preview.matchCount, 15);
+    assert.equal(JSON.parse((await db.doc('tournaments/' + parentCode).get()).data().data).players.length, 20);
+    await assert.rejects(coordinator.historicalImport(parentCode, actor, payload, 'wrong-digest'),
+      { code: 'history-import-preview-changed' });
+    await db.doc('publicTournaments/' + parentCode).update({ bracketView: '{invalid' });
+    await assert.rejects(coordinator.historicalImport(parentCode, actor, payload, preview.digest),
+      { code: 'history-import-room-unavailable' });
+    assert.equal((await db.doc('groupStagePlans/' + parentCode).get()).exists, false);
+    await db.doc('publicTournaments/' + parentCode).update({ bracketView: JSON.stringify({
+      players: oldPlayers.map(p => ({ id: p.id, name: p.name, checkedIn: false })), matches: [] }) });
+    const status = await coordinator.historicalImport(parentCode, actor, payload, preview.digest);
+    assert.equal(status.historical, true);
+    const [privateRoom, publicRoom] = await db.getAll(db.doc('tournaments/' + parentCode),
+      db.doc('publicTournaments/' + parentCode));
+    const saved = JSON.parse(privateRoom.data().data);
+    assert.deepEqual(saved.players.map(p => p.id), keys.flatMap(key => groups[key].map(p => p.id)));
+    assert(saved.players.every(p => p.checkedIn === true && p.ladderEligible === false));
+    assert.equal(saved.meta.registrationEnabled, false);
+    assert.equal(privateRoom.data().registrationEnabled, false);
+    assert.equal(publicRoom.data().registrationEnabled, false);
+    assert.deepEqual(JSON.parse(publicRoom.data().bracketView).players,
+      saved.players.map(({ id, name, checkedIn }) => ({ id, name, checkedIn })));
+    assert.equal((await coordinator.readSettlement({ getAll: (...refs) => db.getAll(...refs) }, parentCode)).effectiveCount, 16);
+    assert.deepEqual(await coordinator.historicalImport(parentCode, actor, payload, preview.digest), status);
+  } finally {
+    await deleteApp(app);
+  }
+});
+
 const project = 'demo-bxh-group-stages';
 assert.equal(process.env.GCLOUD_PROJECT, project);
 assert.equal(process.env.FIRESTORE_EMULATOR_HOST, '127.0.0.1:8199');
