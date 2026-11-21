@@ -512,6 +512,14 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         const state = roomState(room.data());
         startingRoster(room.data());
         check(state.id === current.parentRoomId && state.cloudCode === parentCode, 'group-parent-room-changed');
+        const imported = GROUPS.flatMap(key => current.event.groups[key]);
+        check(state.historicalImportDigest === current.importDigest &&
+          state.meta.registrationEnabled === false && state.players.length === imported.length &&
+          state.players.every((player, index) => player.id === imported[index].id &&
+            player.name === imported[index].name &&
+            (player.accountUid || null) === (imported[index].accountUid || null) &&
+            (player.guardianUid || null) === (imported[index].guardianUid || null)),
+        'group-parent-roster-changed');
         return { ...scoreCompletedEvent(current.event, ['final-eight']), historical: true };
       }
       checkRoster(current, room.data());
