@@ -96,7 +96,7 @@ test('285-player historical import previews, archives, and settles through Fires
     };
     const dataBatch = db.batch(), profiles = db.batch();
     dataBatch.set(parent, parentData);
-    dataBatch.set(db.doc('publicTournaments/' + parentCode), { bracketView: '{}' });
+    dataBatch.set(db.doc('publicTournaments/' + parentCode), { bracketView: JSON.stringify({ players: [], matches: [] }) });
     dataBatch.set(db.doc('ladderSystem/current'), { status: 'active', currentSeason: 'S1' });
     dataBatch.set(db.doc('systemConfig/groupStages'), { enabled: true, parentCodes: [parentCode] });
     profiles.set(db.doc('users/' + actor), { active: true, role: 'super_admin' });
@@ -118,7 +118,12 @@ test('285-player historical import previews, archives, and settles through Fires
     const imports = await Promise.all([1, 2].map(() =>
       coordinator.historicalImport(parentCode, actor, payload, preview.digest)));
     assert.deepEqual(imports[0], imports[1]);
-    assert.deepEqual((await parent.get()).data(), parentData);
+    const importedParent = (await parent.get()).data();
+    const importedRoster = JSON.parse(importedParent.data).players;
+    assert.equal(importedRoster.length, 285);
+    assert.equal(importedParent.registrationEnabled, false);
+    assert.equal((await db.doc('publicTournaments/' + parentCode).get()).data().registrationEnabled, false);
+    assert.equal(JSON.parse((await db.doc('publicTournaments/' + parentCode).get()).data().bracketView).players.length, 285);
     const history = await createHistoryReader(db)(parentCode, 'historical-A1');
     assert.deepEqual(history.stages.map(stage => [stage.key, stage.matches.length]),
       [['A', 70], ['B', 73], ['C', 67], ['D', 67], ['final-eight', 7]]);
