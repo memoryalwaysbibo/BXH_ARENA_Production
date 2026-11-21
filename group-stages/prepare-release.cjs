@@ -11,6 +11,8 @@ const sourceFiles = [
   'group-stages/settlement.cjs',
   'group-stages/core.cjs',
   'group-stages/draw.cjs',
+  'group-stages/historical-top-eight.cjs',
+  'group-stages/historical-import.cjs',
   'referee-seats/functions/bucket-state.cjs',
   'ladder-v1.js',
 ];

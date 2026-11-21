@@ -26,7 +26,7 @@ exports.groupStageCommand = onCall({
     if (code === 'group-auth-required') throw new HttpsError('unauthenticated', code);
     if (forbidden.has(code)) throw new HttpsError('permission-denied', code);
     if (invalid.has(code)) throw new HttpsError('invalid-argument', code);
-    if (typeof code === 'string' && code.startsWith('group-')) {
+    if (typeof code === 'string' && (code.startsWith('group-') || code.startsWith('history-'))) {
       throw new HttpsError('failed-precondition', code);
     }
     throw error;

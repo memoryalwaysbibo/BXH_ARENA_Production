@@ -177,7 +177,7 @@ test('the rehearsal release packages only the group callable codebase', () => {
     const deployedFiles = fs.readdirSync(path.join(output, 'functions'), { recursive: true, withFileTypes: true })
       .filter(item => item.isFile()).map(item => item.name).sort();
     assert.deepEqual(deployedFiles, ['bucket-state.cjs','command.cjs','coordinator.cjs','core.cjs','draw.cjs',
-      'firebase-entry.cjs','ladder-v1.js','package.json','read.cjs','settlement.cjs']);
+      'firebase-entry.cjs','historical-import.cjs','historical-top-eight.cjs','ladder-v1.js','package.json','read.cjs','settlement.cjs']);
     assert.throws(() => prepareRelease(root, output), { code: 'EEXIST' });
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
@@ -205,4 +205,43 @@ test('one server draw creates four complete, disjoint 80-player group brackets',
     assert.equal(Object.keys(drawn.courtAssignments).length, 12);
   }
   assert.equal(entrants.size, 320);
+});
+
+test('historical four-group import ends groups at two qualifiers and uses mixed finals placements', () => {
+  const { buildHistoricalTopEight } = require('./historical-top-eight.cjs');
+  const players = roster(16);
+  const groups = Object.fromEntries(GROUPS.map((key, i) => [key, players.slice(i * 4, i * 4 + 4)]));
+  const groupMatches = Object.fromEntries(GROUPS.map(key => [key,
+    [0, 1].map(i => {
+      const a = groups[key][i * 2].id, b = groups[key][i * 2 + 1].id;
+      return { number: i + 1, round: 0, a, b, winner: a };
+    })
+  ]));
+  const [a, aa, b, bb, c, cc, d, dd] = GROUPS.flatMap(key => groupMatches[key].map(row => row.winner));
+  const finalMatches = [
+    { number: 1, round: 0, a, b: aa, winner: aa },
+    { number: 2, round: 0, a: b, b: c, winner: b },
+    { number: 3, round: 0, a: bb, b: d, winner: d },
+    { number: 4, round: 0, a: cc, b: dd, winner: cc },
+    { number: 5, round: 1, a: aa, b, winner: b, fromA: 1, fromB: 2 },
+    { number: 6, round: 1, a: d, b: cc, winner: cc, fromA: 3, fromB: 4 },
+    { number: 7, round: 2, a: b, b: cc, winner: cc, fromA: 5, fromB: 6 },
+  ];
+  const finalPlaces = [cc, b, aa, d, c, a, bb, dd];
+  const source = { groups, groupMatches, finalMatches, finalPlaces };
+  const result = buildHistoricalTopEight(source);
+  assert.deepEqual(result.settlement.topEight, finalPlaces);
+  assert.equal(result.settlement.effectiveCount, 16);
+  assert.equal(result.settlement.matches.length, 15);
+  assert.equal(result.settlement.participants.filter(player => player.placement === 9).length, 8);
+
+  const wrongPlacements = [cc, b, a, d, c, aa, bb, dd];
+  assert.throws(() => buildHistoricalTopEight({ ...source, finalPlaces: wrongPlacements }),
+    { code: 'history-placement-mismatch' });
+  const badRounds = finalMatches.map(row => row.number === 5 ? { ...row, fromA: 3 } : row);
+  assert.throws(() => buildHistoricalTopEight({ ...source, finalMatches: badRounds }),
+    { code: 'history-advancement-source' });
+  const duplicateGroups = { ...groups, B: groups.A };
+  assert.throws(() => buildHistoricalTopEight({ ...source, groups: duplicateGroups }),
+    { code: 'history-roster' });
 });

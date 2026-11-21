@@ -1,7 +1,8 @@
 (function (root) {
   'use strict';
   const keys = ['A', 'B', 'C', 'D', 'runners-up', 'champions'];
-  const labels = { A: 'A 組', B: 'B 組', C: 'C 組', D: 'D 組', 'runners-up': '第 5～8 名', champions: '第 1～4 名' };
+  const finalKey = 'final-eight';
+  const labels = { [finalKey]: '總八強', A: 'A 組', B: 'B 組', C: 'C 組', D: 'D 組', 'runners-up': '第 5～8 名', champions: '第 1～4 名' };
   const statuses = { unpublished: '尚未公布', 'not-applicable': '本場不適用', scheduled: '已抽籤 · 待開賽', ready: '已公布', 'in-progress': '進行中', completed: '已完成', 'needs-review': '資料待核對' };
   const published = stage => stage && ['scheduled', 'ready', 'in-progress', 'completed', 'needs-review'].includes(stage.status);
   const verifiedStage = stage => published(stage) && stage.needsReview !== true && stage.status !== 'needs-review';
@@ -16,7 +17,7 @@
       (mode === 'own' ? 'own' : 'preview') + '" data-code="' + esc(code || '') + '" data-auto="' + (auto ? 'true' : 'false') +
       '" aria-label="' + (mode === 'own' ? '我的分組賽紀錄' : '分組賽對戰表') + '"></section>';
   }
-  function matchCard(match, players, ownIds, stageStatus) {
+  function matchCard(match, players, ownIds, stageStatus, from) {
     const names = new Map(list(players).map(player => [player.id, player.name]));
     const side = (entry, score) => {
       const id = entry?.playerId;
@@ -28,7 +29,8 @@
     };
     const result = match.isBye ? '輪空' : match.completed ? (match.forfeit ? '棄權判定' : '已完成') : '尚未完成';
     return '<article class="group-history-match' + (match.completed ? ' is-complete' : '') + '" data-index="' +
-      esc(match.indexInRound ?? 0) + '" data-bye="' + !!match.isBye + '"><div class="group-history-match-meta">' +
+      esc(match.indexInRound ?? 0) + '" data-bye="' + !!match.isBye + '"' +
+      (from ? ' data-from="' + from.join(',') + '"' : '') + '><div class="group-history-match-meta">' +
       result + '</div>' + side(match.a, match.scoreA) + side(match.b, match.scoreB) + '</article>';
   }
   function tree(data, key) {
@@ -52,14 +54,21 @@
       [...rounds.values()].sort((a, b) => (a.bracket === b.bracket ? 0 : a.bracket === 'main' ? -1 : 1) || a.round - b.round).map(round =>
         '<section class="group-history-round" data-round="' + round.round + '" data-bracket="' + round.bracket + '"><h4>' + (round.bracket === 'bronze' ? '季軍賽' : round.matches.length === 1 ? '冠亞' : '第 ' + (round.round + 1) + ' 輪') +
         '</h4><div class="group-history-round-matches">' + round.matches.sort((a, b) => (a.indexInRound || 0) - (b.indexInRound || 0))
-          .filter(match => !match.isBye).map(match => matchCard(match, stage.players, ownIds, stage.status)).join('') + '</div></section>').join('') + '</div>';
+          .filter(match => !match.isBye).map(match => {
+          const from = stage.historical ? list(rounds.get('main:' + (round.round - 1))?.matches)
+            .filter(source => [match.a?.playerId, match.b?.playerId].includes(source.winnerId))
+            .map(source => source.indexInRound) : null;
+          return matchCard(match, stage.players, ownIds, stage.status, from);
+        }).join('') + '</div></section>').join('') + '</div>';
   }
+  function stageKeys(data) { return stageFor(data, finalKey) ? [...keys.slice(0, 4), finalKey] : keys; }
   function previews(data, selected = 'A') {
-    if (!keys.includes(selected)) selected = 'A';
+    const tabs = stageKeys(data);
+    if (!tabs.includes(selected)) selected = 'A';
     const assigned = list(data?.assignedGroups).filter(key => ['A', 'B', 'C', 'D'].includes(key));
     const assignment = assigned.length ? '<div class="group-history-assignment" role="status"><span>你的抽籤組別</span><strong>' +
       assigned.map(key => esc(stageLabel(data, key))).join('、') + '</strong><small>可先查看對位；開賽及裁判台依主辦安排。</small></div>' : '';
-    return assignment + '<div class="group-history-tabs" role="tablist" aria-label="選擇分組對戰表">' + keys.map(key => {
+    return assignment + '<div class="group-history-tabs" role="tablist" aria-label="選擇分組對戰表">' + tabs.map(key => {
       const stage = stageFor(data, key);
       return '<button type="button" class="btn ' + (selected === key ? 'btn-primary' : 'btn-ghost') + '" role="tab"' +
         ' id="group-history-tab-' + key + '" aria-selected="' + (selected === key) + '" aria-controls="group-history-tree-panel"' +
@@ -76,7 +85,7 @@
       const names = list(data.stages).filter(verifiedStage).flatMap(stage => list(stage.players));
       const name = names.find(player => player.id === id)?.name || '本人';
       const placement = !data.needsReview && !list(data.stages).some(stage => stage.needsReview || stage.status === 'needs-review') && list(data.placements).find(row => row.playerId === id && Number.isSafeInteger(row.placement) && row.placement > 0);
-      const matches = list(data.ownMatches).filter(match => keys.includes(match.stageKey) && verifiedStage(stageFor(data, match.stageKey)) &&
+      const matches = list(data.ownMatches).filter(match => (keys.includes(match.stageKey) || match.stageKey === finalKey) && verifiedStage(stageFor(data, match.stageKey)) &&
         (match.a?.playerId === id || match.b?.playerId === id || match.isBye && match.winnerId === id));
       return '<article class="group-history-own"><h3>' + esc(name) + '</h3><p><strong>' +
         (placement ? '第 ' + placement.placement + ' 名' : '名次待核對') + '</strong></p>' +
@@ -115,7 +124,7 @@
     return header + form + discovery + notice + loading + title +
       (model.data ? (own ? ownHistory(model.data) : previews(model.data, model.selected)) : !own && model.started ? previews(null, model.selected) : '') + refresh;
   }
-  const api = { keys, slot, codeValid, content, previews, ownHistory, esc };
+  const api = { keys, stageKeys, slot, codeValid, content, previews, ownHistory, esc };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.BXHGroupHistoryView = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -7,12 +7,16 @@ const clone = value => value === undefined ? undefined : structuredClone(value);
 
 function memoryDb() {
   const rows = new Map(), reads = [], writes = [], transactions = [];
-  const ref = path => ({ path, collection: name => ({ doc: id => ref(path + '/' + name + '/' + id) }) });
+  const collection = prefix => ({
+    doc: id => ref(prefix + '/' + id),
+    where: (field, op, value) => ({ limit: limit => ({ prefix, field, op, value, limit }) }),
+  });
+  const ref = path => ({ path, collection: name => collection(path + '/' + name) });
   const snapshot = target => {
     reads.push(target.path);
-    return { exists: rows.has(target.path), data: () => clone(rows.get(target.path)) };
+    return { id: target.path.split('/').at(-1), exists: rows.has(target.path), data: () => clone(rows.get(target.path)) };
   };
-  return { rows, reads, writes, transactions, doc: ref,
+  return { rows, reads, writes, transactions, doc: ref, collection,
     async runTransaction(callback, options) {
       transactions.push(options);
       const pending = [];
@@ -22,8 +26,17 @@ function memoryDb() {
         pending.push([target.path, clone(value)]);
       };
       const result = await callback({
-        get: async target => snapshot(target), getAll: async (...targets) => targets.map(snapshot),
-        create: (target, value) => write(target, value, true), set: write, update: write,
+        get: async target => {
+          if (!target.prefix) return snapshot(target);
+          const root = target.prefix + '/';
+          return { docs: [...rows].filter(([key, data]) => key.startsWith(root) && !key.slice(root.length).includes('/') &&
+            (target.op === 'in' ? target.value.includes(data[target.field]) : data[target.field] === target.value))
+            .slice(0, target.limit).map(([key]) => snapshot(ref(key))) };
+        },
+        getAll: async (...targets) => targets.map(snapshot),
+        create: (target, value) => write(target, value, true),
+        set: (target, value, options) => write(target, options?.merge ? { ...rows.get(target.path), ...value } : value),
+        update: write,
         delete: target => write(target, undefined),
       });
       pending.forEach(([path, value]) => { writes.push(path); rows.set(path, value); });
