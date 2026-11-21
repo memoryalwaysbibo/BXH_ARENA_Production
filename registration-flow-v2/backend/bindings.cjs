@@ -6,7 +6,7 @@ const {createQueue}=require('./queue.cjs');
 const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
 const {createStartHandler,createDrawHandler,createTicketForfeitHandler}=require('./lifecycle.cjs');
-const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketRemoveHandler}=require('./ticket-room-create.cjs');
+const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketRemoveHandler,createTicketDelegateHandler}=require('./ticket-room-create.cjs');
 const {isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath}=require('./ticket-host.cjs');
 function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled,pilotRoom=null,retiredRoom=null,retiredRooms=[],ticketPilot=async()=>null}){
  if(createFamilyRegistration?.v2CapacityAware!==true)throw Error('queue-family-capacity-source-required');
@@ -49,6 +49,8 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   'create-ticket-room':createTicketRoomHandler({db}),
   'ticket-ptn-status':createPtnStatusHandler({db}),
   'ticket-room-state':createTicketRoomStateHandler({db}),
+  'ticket-room-schedule':createTicketScheduleHandler({db}),
+  'ticket-room-delegate':createTicketDelegateHandler({db}),
   'ticket-room-forfeit':createTicketForfeitHandler({db,enabled:startEnabled}),
   'ticket-room-remove':createTicketRemoveHandler({db,queue,enabled:intakeEnabled}),
  };
@@ -58,7 +60,7 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
  },{
   allowRetired:data=>data.action==='status',
   allowUnassigned:data=>data?.code===undefined&&['create-ticket-room','ticket-ptn-status'].includes(data?.action),
-  preconditions:['ticket-lifecycle-disabled','ticket-binding-invalid','ticket-expired','ticket-unavailable',
+  preconditions:['ticket-lifecycle-disabled','ticket-binding-invalid','ticket-expired','ticket-unavailable','version-conflict',
    'room-code-conflict','room-receipt-inconsistent','ticket-ptn-slot-occupied','bracket-room-changed',
    'forfeit-room-not-live','forfeit-match-stale','forfeit-round-waiting'],
  });

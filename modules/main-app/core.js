@@ -20551,7 +20551,7 @@ function adminManagementContextHtml(){
   if(!hasAdminAccess()){
     return publicManagementContextHtml();
   }
-  const ticket=activeTab==='management'?window.BXHCommerce?.ticketManagementContext?.():null;
+  const ticket=window.BXHCommerce?.ticketManagementContext?.();
   if(ticket){
     const phase=ticket.verified?({waiting:'等待開賽',live:'進行中',done:'已結束',cancelled:'已取消'})[ticket.phase]||'票券房管理':'正在驗證管理權限';
     return `<div class="admin-context-hud"><span class="badge ${ticket.phase==='live'?'badge-neon':'badge-metal'}">${esc(phase)}</span><span class="admin-context-code"><span>票券賽事 ${esc(ticket.code)}</span></span></div>`;
@@ -21248,6 +21248,14 @@ function ensureAdminMailboxRefresh(){
   },120000);
 }
 
+// The same management navigation serves official and partner rooms; the
+// selected room decides which server-backed content each tab renders.
+window.BXHTicketManagementNavigate=tab=>{
+  if(tab!=='registrations'||!hasAdminAccess()||!window.BXHCommerce?.ticketManagementContext?.()?.verified)return;
+  activeTab=tab;
+  mainTabNavCenterRequested=true;
+  render();
+};
 function renderApp(){
   const app = document.getElementById("app");
   const allTabs = [["management","賽事管理"],["ladder","排行榜"],["live","即時戰況"],["bracket","對戰表"],["referee","裁判台"],["duty","我的執勤"],["registrations","報名管理"],["settings","賽事設定"],["people","人員管理"],["operations","抽獎與維護"],["history","賽事紀錄"],["version","版本更新"]];
@@ -21281,16 +21289,16 @@ function renderApp(){
   else if(activeTab==="referee-admin") content = renderRefereeLicensePage('admin');
   else if(activeTab==="team-preview") content = window.BXHTeamAdminPreview.page();
   else if(activeTab==="ladder") content = wrapBracketWatermark(renderLadderLeaderboardPage(hasAdminAccess()));
-  else if(activeTab==="live") content = wrapBracketWatermark(renderLive());
-  else if(activeTab==="bracket") content = renderBracket();
-  else if(activeTab==="referee") content = wrapBracketWatermark(renderReferee());
+  else if(activeTab==="live") content = window.BXHCommerce?.ticketManagedTab?.('live') ?? wrapBracketWatermark(renderLive());
+  else if(activeTab==="bracket") content = window.BXHCommerce?.ticketManagedTab?.('bracket') ?? renderBracket();
+  else if(activeTab==="referee") content = window.BXHCommerce?.ticketManagedTab?.('referee') ?? wrapBracketWatermark(renderReferee());
   else if(activeTab==="duty") content = window.BXH_REFEREE_CERTIFICATES_V1===true?renderRefereeLicensePage('duty'):wrapBracketWatermark(renderDutyLog());
-  else if(activeTab==="registrations") content = wrapBracketWatermark(renderAdminRegistrationsTab());
-  else if(activeTab==="people") content = wrapBracketWatermark(renderPeopleManagement());
-  else if(activeTab==="operations") content = renderTournamentOperationsPage();
+  else if(activeTab==="registrations") content = window.BXHCommerce?.ticketManagedTab?.('registrations') ?? wrapBracketWatermark(renderAdminRegistrationsTab());
+  else if(activeTab==="people") content = window.BXHCommerce?.ticketManagedTab?.('people') ?? wrapBracketWatermark(renderPeopleManagement());
+  else if(activeTab==="operations") content = window.BXHCommerce?.ticketManagedTab?.('operations') ?? renderTournamentOperationsPage();
   else if(activeTab==="history") content = wrapBracketWatermark(renderHistory());
   else if(activeTab==="version") content = wrapBracketWatermark(renderVersionPage());
-  else content = wrapBracketWatermark(renderSettings());
+  else content = window.BXHCommerce?.ticketManagedTab?.('settings') ?? wrapBracketWatermark(renderSettings());
 
   const appHtml = `
     <div class="stickytop mode-shell">

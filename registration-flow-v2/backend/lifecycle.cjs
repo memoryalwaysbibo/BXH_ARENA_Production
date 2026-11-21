@@ -6,7 +6,7 @@ const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
 const {advance:advanceQrCheckinFence}=require('../../qr-checkin/backend/qr-checkin-fence.cjs');
 const {startMs}=require('../../qr-checkin/backend/overlays/lifecycle/operations-core.js');
 const {registrationQueueOwnsRoom}=require('./legacy-writer.cjs');
-const {ticketHostGrant,checkTicketContract,validRegistrationRoomCode,ticketLifecyclePath}=require('./ticket-host.cjs');
+const {checkTicketContract,validRegistrationRoomCode,ticketLifecyclePath,authorizeTicketManager}=require('./ticket-host.cjs');
 
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const commonFields=['code','roomId','rosterRevision','operationId'];
@@ -24,11 +24,6 @@ function currentEligiblePlayers(state,registrations,confirmedCount){
  if(eligible.length<2||eligible.length>320||new Set(eligible).size!==eligible.length||
     eligible.some(id=>typeof id!=='string'||!id))throw Error('bracket-roster-changed');
  return eligible;
-}
-
-function ownsTicketRoom(room,grant,uid){
- return grant&&room?.createdByRole==='partner_organizer'&&room.createdBy===uid&&room.ownerUid===uid
-  &&room.partnerOrganizationCode===grant.organizationId&&(room.partnerContractOrderCode||null)===grant.order;
 }
 
 async function readReservedTicket({db,tx,room,pub,state,roomId,code,uid,grant,now}){
@@ -75,13 +70,14 @@ function createLifecycleHandler(action,{db,enabled=async()=>false,clock=Date.now
   const requestHash=digest(JSON.stringify([roomId,expectedDrawId,rosterRevision,confirmEarlyStart]));
   const now=clock(),drawSeed=draw?randomBytes(32).toString('hex'):null;
   return db.runTransaction(async tx=>{
-   const [userSnap,roomSnap,publicSnap,prior]=await tx.getAll(db.doc('users/'+uid),roomRef,publicRef,operation);
+   const [userSnap,roomSnap,publicSnap,prior,gateSnap]=await tx.getAll(db.doc('users/'+uid),roomRef,publicRef,operation,db.doc(ticketLifecyclePath(code)));
    const user=userSnap.data();
    const room=roomSnap.data(),pub=publicSnap.data();
    const ticketRoom=room?.eventAuthority==='ticket'||pub?.eventAuthority==='ticket'||!!room?.ticketAccessV1||!!pub?.ticketRoomVersion;
-   const grant=ticketRoom?ticketHostGrant(user,now):null;
+   const authority=ticketRoom?await authorizeTicketManager(tx,db,{uid,user,room,gate:gateSnap.data(),code,now}):null;
+   const grant=authority?.grant;
    if(user?.active!==true||user.deleted||user.isTestAccount||['deleted','disabled','frozen'].includes(user.accountStatus)||
-      (ticketRoom?!ownsTicketRoom(room,grant,uid):!['admin','super_admin'].includes(user.role)))throw Error('permission-denied');
+      (!ticketRoom&&!['admin','super_admin'].includes(user.role)))throw Error('permission-denied');
    if(!room||!pub)throw Error('not-found');
    const state=JSON.parse(room.data),mirror=JSON.parse(pub.bracketView);
    if(state.id!==roomId)throw Error('bracket-room-changed');
@@ -120,7 +116,7 @@ function createLifecycleHandler(action,{db,enabled=async()=>false,clock=Date.now
    if(!pending.empty)throw Error('registration-queue-pending');
    if(registrations.size>320||room.confirmedCount!==pub.confirmedCount)throw Error('registration-roster-stale');
    const eligible=currentEligiblePlayers(state,registrations,room.confirmedCount);
-   const ticketRef=ticketRoom?await readReservedTicket({db,tx,room,pub,state,roomId,code,uid,grant,now}):null;
+   const ticketRef=ticketRoom?await readReservedTicket({db,tx,room,pub,state,roomId,code,uid:authority.ownerUid,grant,now}):null;
    const phaseFields=draw?{}:{tournamentPhase:'live',registrationStatus:'started'};
    const result=draw
     ? commitDraw({state,mirror,uid,now,id:'v2-'+digest(JSON.stringify([code,roomId,operationKey])),drawSeed})
@@ -205,9 +201,8 @@ function createTicketForfeitHandler({db,enabled=async()=>false,clock=Date.now}){
    const [actor,roomSnap,publicSnap,gateSnap,prior]=await tx.getAll(db.doc('users/'+uid),roomRef,publicRef,
     db.doc(ticketLifecyclePath(code)),operation);
    const user=actor.data(),room=roomSnap.data(),pub=publicSnap.data(),gate=gateSnap.data();
-   const grant=ticketHostGrant(user,now);
-   if(!ownsTicketRoom(room,grant,uid)||room.eventAuthority!=='ticket'||gate?.ownerUid!==uid||gate.roomCode!==code)throw Error('permission-denied');
-   if(gate.roomId!==roomId||room.ticketAccessV1?.roomId!==roomId||room.ticketAccessV1?.ownerUid!==uid||
+   await authorizeTicketManager(tx,db,{uid,user,room,gate,code,now});
+   if(gate.roomId!==roomId||room.ticketAccessV1?.roomId!==roomId||
       pub?.ticketRoomVersion!==1||pub.eventAuthority!=='ticket')throw Error('ticket-binding-invalid');
    const state=JSON.parse(room.data),mirror=JSON.parse(pub.bracketView);
    if(state.id!==roomId)throw Error('bracket-room-changed');

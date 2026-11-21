@@ -330,7 +330,12 @@ test('partner can recover their PTN room from management without a pilot URL',as
  assert.deepEqual(calls,[{action:'ticket-ptn-status'},{action:'ticket-room-state',code}]);
  assert.match(t.ui.ticketCreationPage(),/已綁定啟動券/);
  assert.deepEqual(JSON.parse(JSON.stringify(t.ui.ticketManagementContext())),{code,phase:'waiting',verified:true});
- assert.match(t.ui.ticketCreationPage(),/正式開賽並扣券/);
+ assert.match(t.ui.ticketCreationPage(),/data-action="commerce-ticket-open-manage"[^>]*>管理房間/);
+ await t.ui.handle('commerce-ticket-open-manage');
+ t.sandbox.activeTab='registrations';
+ assert.match(t.ui.ticketManagedTab('registrations'),/正式開賽並扣券/);
+ assert.doesNotMatch(t.ui.ticketManagedTab('registrations'),/票券房管理/);
+ t.sandbox.activeTab='management';
  await t.ui.handle('commerce-ticket-back');
  assert.equal(t.ui.ticketCreationPage(),null);
  assert.equal(t.ui.ticketManagementContext(),null);
@@ -339,23 +344,60 @@ test('partner can recover their PTN room from management without a pilot URL',as
  assert.equal(t.ui.ownedTicketRoomCard(),'');
  t.setPartner(true);
  t.setUid('different-user');
- assert.equal(t.ui.ownedTicketRoomCard(),'');
+ assert.doesNotMatch(t.ui.ownedTicketRoomCard(),/房號 PTN-TST001/);
 });
 test('PTN takeover replaces stale legacy header only after server owner verification',async()=>{
  const t=setup({partner:true}),code='PTN-TST001';
  t.sandbox.activeTab='management';
  t.sandbox.window.BXHTournamentEntryUtils={buildTournamentEntryUrl:code=>`https://arena.bxh.com.tw/?code=${code}&entry=register`};
  t.sandbox.window.engagementService.ticketRoomOperation=async request=>request.action==='ticket-ptn-status'
-  ?{ok:true,code}:{ok:true,code,name:'測試',phase:'waiting',eligibleCount:0,drawId:null,ticketStatus:'reserved'};
+  ?{ok:true,code}:{ok:true,code,name:'測試',phase:'waiting',eligibleCount:0,drawId:null,ticketStatus:'reserved',
+   registrationOpenAt:Date.now()-60000,registrationCloseAt:Date.now()-1000,startAt:Date.now()+3600000,updatedAt:123};
  await t.ui.handle('commerce-refresh-owned-ptn');
  assert.equal(t.ui.ticketManagementContext(),null);
  await t.ui.handle('commerce-open-owned-ptn',{});
  assert.equal(t.ui.ticketManagementContext().code,code);
- assert.match(t.ui.ticketCreationPage(),/查看玩家報名頁/);
- assert.match(t.ui.ticketCreationPage(),/disabled>抽籤/);
+ assert.match(t.ui.ticketCreationPage(),/管理房間/);
+ await t.ui.handle('commerce-ticket-open-manage');
+ t.sandbox.activeTab='registrations';
+ assert.equal(t.ui.ticketManagementContext().code,code);
+ assert.match(t.ui.ticketManagedTab('registrations'),/報名資訊/);
+ assert.match(t.ui.ticketManagedTab('registrations'),/報名已截止/);
+ assert.match(t.ui.ticketManagedTab('registrations'),/disabled>抽籤/);
+ t.sandbox.activeTab='settings';
+ assert.match(t.ui.ticketManagedTab('settings'),/合作主辦設定/);
+ assert.match(t.ui.ticketManagedTab('settings'),/調整報名與開賽時間/);
+ assert.match(t.ui.ticketManagedTab('settings'),/儲存賽事時間/);
+ assert.doesNotMatch(t.ui.ticketManagedTab('settings'),/查看玩家報名頁|entry=register/);
+ t.sandbox.activeTab='referee';
+ assert.match(t.ui.ticketManagedTab('referee'),/尚未接入合作賽事/);
  const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
  assert.match(core,/ticketManagementContext\?\.\(\)/);
  assert.match(core,/票券賽事 \$\{esc\(ticket\.code\)\}/);
+ assert.match(core,/ticketManagedTab\?\.\('registrations'\)/);
+ assert.match(core,/ticketManagedTab\?\.\('settings'\)/);
  t.setUid('another-owner');
  assert.equal(t.ui.ticketManagementContext(),null);
+});
+test('PTN owner alone can assign one delegate and a super admin can enter by room code',async()=>{
+ const t=setup(),code='PTN-AGENT1';
+ t.setAdmin(true);t.sandbox.activeTab='management';
+ assert.match(t.ui.ownedTicketRoomCard(),/代理或最高管理員接管 PTN 房號/);
+ const c=t.ui.context();c.view='ticket-manage';c.ownedPtn={code};c.ticketRoomOpen=true;c.roomManageOpen=true;
+ c.ticketRoom={ok:true,code,name:'房間',phase:'waiting',capacity:32,eligibleCount:0,confirmedCount:0,
+  registrationOpenAt:Date.now()-1000,registrationCloseAt:Date.now()+3600000,startAt:Date.now()+7200000,
+  delegateUid:'delegated-user',canAssignDelegate:true};
+ t.sandbox.activeTab='settings';
+ assert.match(t.ui.ticketManagedTab('settings'),/房間代理人（最多一名）/);
+ assert.match(t.ui.ticketManagedTab('settings'),/撤銷代理權/);
+ c.ticketRoom.canAssignDelegate=false;
+ assert.doesNotMatch(t.ui.ticketManagedTab('settings'),/撤銷代理權/);
+ c.ticketRoom.canAssignDelegate=true;
+ const calls=[];
+ t.sandbox.window.engagementService.ticketRoomOperation=async payload=>{calls.push(payload);return {ok:true};};
+ await t.ui.handle('commerce-ticket-revoke-delegate');
+ assert.equal(calls.length,1);
+ assert.equal(calls[0].action,'ticket-room-delegate');
+ assert.equal(calls[0].delegateUid,null);
+ assert.equal(calls[0].code,code);
 });
