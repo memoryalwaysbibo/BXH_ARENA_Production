@@ -144,7 +144,7 @@
         "諸神典藏者":"assets/title-limited-gods-collector.webp",
         "諸神收藏家":"assets/title-limited-gods-collector.webp",
         "S2總冠軍":"assets/title-limited-s2-champion.webp",
-        "S3總冠軍":"assets/title-limited-s3-champion.webp",
+        "S3總冠軍":"assets/title-limited-s3-champion.webp",'一戰成名':'assets/title-limited-one-battle-fame-20261121.webp',
         "新銳獵人":"assets/title-common-rookie-hunter-v1.webp",
         "戰場熟面孔":"assets/title-rare-familiar-face-v1.webp",
         "初來乍到":"assets/title-common-first-checkin-v1.webp",

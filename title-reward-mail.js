@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-function titleArt(reward){return String(reward?.artwork||({'s2_champion':'assets/title-limited-s2-champion.webp','s3_champion':'assets/title-limited-s3-champion.webp'})[reward?.titleId]||'');}
+function titleArt(reward){return String(reward?.artwork||({'s2_champion':'assets/title-limited-s2-champion.webp','s3_champion':'assets/title-limited-s3-champion.webp','custom_a950db41-d655-4d7b-9586-1cf1cc81ee85':'assets/title-limited-one-battle-fame-20261121.webp'})[reward?.titleId]||'');}
 function labelTier(v){return ({eternal:'永恆',legendary:'傳說',epic:'史詩',rare:'稀有',common:'一般'})[v]||String(v||'稱號');}
 function labelLimited(v){return ({unique:'唯一限定',event:'活動限定',season:'賽季限定',identity:'身分限定',launch:'開服限定',beta:'封測限定'})[v]||'';}
 window.BXHTitleRewardUI={
