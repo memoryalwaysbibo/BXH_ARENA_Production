@@ -70,7 +70,6 @@ async function confirmSameContentLobbyWatch(page, request, run) {
     });
     await homeTab.click();
     const card = page.locator('[data-lobby-code="' + code + '"]');
-    await expect(card).toBeAttached();
     const snapshot = (mode, after = -1, n = 1) => page.waitForFunction(({code, mode, after, n}) => {
       const hit = window.__r1WatchWebE2E.capture.findIndex((x, index) =>
         index > after && x.ok === true && x.hasPendingWrites === false &&
@@ -80,7 +79,9 @@ async function confirmSameContentLobbyWatch(page, request, run) {
       return hit >= 0 ? hit + 1 : false;
     }, { code, mode, after, n }, { timeout: 15000 });
     const index = async (mode, after, n) => Number(await (await snapshot(mode, after, n)).jsonValue()) - 1;
+    // Confirm emulator transport independently of whether the UI renders the row.
     const server0 = await index('server', -1, 1);
+    await expect(card).toBeAttached();
     await page.evaluate(() => window.__r1WatchWebE2E.offline());
     const cache = await index('cache', server0, 1);
     await page.evaluate(() => window.__r1WatchWebE2E.online());
@@ -92,6 +93,8 @@ async function confirmSameContentLobbyWatch(page, request, run) {
     await write({ confirmedCount: integer(2) }, { 'updateMask.fieldPaths': 'confirmedCount' });
     await index('server', server1, 2);
     const capacity = card.locator('.lobby-detail-grid').getByText('名額｜2 / 16', { exact: true });
+    const sectionToggle = page.locator('[data-lobby-section="registration"] > .lobby-collapse-toggle');
+    if (await sectionToggle.getAttribute('aria-expanded') === 'false') await sectionToggle.click();
     if (!await card.evaluate(el => el.open)) await card.locator(':scope > summary').click();
     await expect(capacity).toBeVisible();
   } finally {
@@ -130,6 +133,12 @@ test('player can create account and open a community room on isolated emulators'
       ['4173', '8080', '9099', '5001'].includes(url.port);
     const pinnedSdk = url.protocol === 'https:' && host === 'www.gstatic.com' &&
       url.pathname.startsWith('/firebasejs/10.13.0/');
+    // This isolated loopback test uses real Auth/Firestore emulators, not App Check.
+    // Do not load App Check: its Enterprise provider waits on a script that the
+    // route blocks, which can leave real Firestore streams waiting on a token.
+    if (pinnedSdk && url.pathname === '/firebasejs/10.13.0/firebase-app-check.js') {
+      return route.abort('blockedbyclient');
+    }
     if (!(emulatorOrApp || pinnedSdk)) return route.abort('blockedbyclient');
     await route.continue();
   });
