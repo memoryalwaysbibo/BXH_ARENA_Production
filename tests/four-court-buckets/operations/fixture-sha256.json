@@ -1,0 +1,10 @@
+{
+  "fixtures/7/event-staff.js": "b71a1c54f280f68e85d1df4e5dd458362703ac4b25efd7e73caee9884916351b",
+  "fixtures/7/event-staff-core.js": "1287fb6e3dbc43c03e56cc133888ee5d874846939addff79df3b6b7f215218c6",
+  "fixtures/5/operations.js": "0b948bdc0a14e2a526e13066a3fc284e348a2e2171def51ae6a79a498bca6500",
+  "fixtures/5/operations-core.js": "c8ba02a5e3ff7edde5f6d0586346400be8bb5e0c9b857432babd49a27cadffc7",
+  "fixtures/5/release-controls.js": "f7b2ea90058bf4c817afdb8690d7e0d26c07f35359a059df0f80d910f360d6c2",
+  "fixtures/7/_qr_checkin/admin-firestore.cjs": "3c8c2abf2cb2f4142e0e8ec727e232e703d60f0a9a2449867c25464e1d8f850e",
+  "fixtures/7/_qr_checkin/guard-firestore.cjs": "b0d0027f0b79b845eb118c585bb8104d3590c1c18729737300f6fdf32d97d43b",
+  "fixtures/7/_qr_checkin/qr-checkin-fence.cjs": "556270ff967f083182c39b6ed6a331d06909ac66891fa9e3f7cd03356a257aab"
+}

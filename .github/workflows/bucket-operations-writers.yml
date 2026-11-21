@@ -1,0 +1,36 @@
+name: Bucket staff raffle and activity fences
+on:
+  pull_request:
+    paths:
+      - 'release/buckets/operations/**'
+      - 'tests/four-court-buckets/operations/**'
+      - '.github/workflows/bucket-operations-writers.yml'
+permissions:
+  contents: read
+jobs:
+  isolated-source-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify exact captured sources and patch closure
+        run: python3 -B tests/four-court-buckets/operations/verify-package.py
+      - name: Legacy behavior, ownership and delayed-event isolation
+        run: node tests/four-court-buckets/operations/probe.cjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install isolated native validation dependencies
+        run: npm install --prefix /tmp/bucket-operations --no-save --ignore-scripts firebase-tools@14 firebase-admin@13.10.0 firebase-functions@6.6.0
+      - name: Native SDK transactions and delayed snapshots in loopback demo project
+        env:
+          NODE_PATH: /tmp/bucket-operations/node_modules
+          GCLOUD_PROJECT: demo-bxh-bucket-operations
+          CI: true
+        run: /tmp/bucket-operations/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-bucket-operations --config tests/four-court-buckets/operations/native.firebase.json 'node tests/four-court-buckets/operations/native-emulator.cjs'
