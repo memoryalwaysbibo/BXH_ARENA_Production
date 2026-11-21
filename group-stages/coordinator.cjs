@@ -235,7 +235,31 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
         const { event, digest, summary } = await resolveHistoricalImport(tx, db, parent.room, state.id, payload);
         if (!expectedDigest) return { ...summary, digest, previewOnly: true };
         check(digest === expectedDigest, 'history-import-preview-changed');
-        const next = { historical: true, importDigest: digest, importedBy: actorUid, importedAt: clock(),
+        // The historical bracket is the actual tournament roster. Keep old registration
+        // documents for audit, but stop live registration sync from restoring the
+        // original sign-up list after the historical roster has been committed.
+        const players = GROUPS.flatMap(key => event.groups[key].map(player => ({
+          id: player.id, name: player.name, gameId: player.gameId,
+          source: 'historical', checkedIn: true, ladderEligible: player.ladderEligible,
+          ...(player.accountUid ? { accountUid: player.accountUid } : {}),
+          ...(player.guardianUid ? { guardianUid: player.guardianUid,
+            familyPlayerId: player.familyPlayerId } : {}),
+        })));
+        let mirror;
+        try { mirror = JSON.parse(publicRoom.data().bracketView); }
+        catch { check(false, 'history-import-room-unavailable'); }
+        check(mirror && typeof mirror === 'object' && !Array.isArray(mirror) &&
+          Array.isArray(mirror.players) && mirror.matches?.length === 0, 'history-import-room-unavailable');
+        const now = clock();
+        const updatedState = { ...state, players, updatedAt: now,
+          meta: { ...state.meta, registrationEnabled: false, registrationStatus: 'closed' },
+          historicalImportDigest: digest };
+        tx.set(parent.room, { data: JSON.stringify(updatedState), registrationEnabled: false,
+          registrationStatus: 'closed', updatedAt: now }, { merge: true });
+        tx.set(parent.publicRoom, { bracketView: JSON.stringify({ ...mirror,
+          players: players.map(({ id, name, checkedIn }) => ({ id, name, checkedIn })) }),
+          registrationEnabled: false, registrationStatus: 'closed', updatedAt: now }, { merge: true });
+        const next = { historical: true, importDigest: digest, importedBy: actorUid, importedAt: now,
           parentRoomId: state.id, event, active: null, roomCodes: {}, rehearsal: false };
         tx.create(parent.plan, next);
         tx.create(parent.routing, { ...publicStatus(next), eligibleUids: [] });
