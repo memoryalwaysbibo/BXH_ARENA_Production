@@ -266,3 +266,84 @@ test('uncollected completed outcomes must refer to their actual opponents even w
   assert.equal(result.stages[0].status, 'needs-review'); assert.equal(result.needsReview, true);
   assert.deepEqual(result.placements, []);
 });
+
+test('historical import validates before writing, preserves five stages, and settles once', async () => {
+  const item = await fixture();
+  const { db, parentCode, coordinator } = item;
+  const { createGroupSettlement } = require('../group-stages/settlement.cjs');
+  const run = createGroupStageCommand(coordinator, createHistoryReader(db), createGroupSettlement(db, coordinator, { clock: () => 1 }));
+  const up = (action, payload, digest, actor = 'operator') => run({ auth: { uid: actor },
+    data: { action, parentCode, payload, digest } });
+  const parent = 'tournaments/' + parentCode;
+  db.rows.delete('groupStagePlans/' + parentCode);
+  db.rows.delete('groupStageRoutes/' + parentCode);
+  db.rows.set('publicTournaments/' + parentCode, { bracketView: '{}' });
+  db.rows.set('ladderSystem/current', { status: 'active', currentSeason: 'S1' });
+  const type = 'bxh-historical-top-eight-v1';
+  const keys = ['A', 'B', 'C', 'D'];
+  const groups = Object.fromEntries(keys.map((key, index) => [key, item.players.slice(index * 4, index * 4 + 4)
+    .map((player, j) => {
+      const gameId = 'G-' + player.id;
+      const registration = db.rows.get(parent + '/registrations/' + player.registrationId);
+      Object.assign(registration, { realName: player.name, gameId, status: j === 1 ? 'waitlist' : 'confirmed' });
+      return { id: key + (j + 1), name: player.name, gameId };
+    })]));
+  groups.A[2].guardianOf = 'A1';
+  groups.A[3].hold = true;
+  groups.B[2].accountUid = 'user-6';
+  groups.B[3].directory = { name: 'Confirmed Alias', gameId: 'ExactId' };
+  Object.assign(db.rows.get('users/user-7'), { realName: 'Confirmed Alias', gameId: 'ExactId' });
+  groups.C[2].registrationName = groups.C[2].name;
+  groups.C[2].name = 'Displayed competition name';
+  const groupMatches = Object.fromEntries(keys.map(key => [key, [
+    { number: 1, round: 0, a: key + '1', b: key + '3', winner: key + '1' },
+    { number: 2, round: 0, a: key + '2', b: key + '4', winner: key + '2' },
+  ]]));
+  const finalMatches = [
+    { number: 1, round: 0, a: 'A1', b: 'C2', winner: 'A1' },
+    { number: 2, round: 0, a: 'D1', b: 'B2', winner: 'D1' },
+    { number: 3, round: 0, a: 'C1', b: 'A2', winner: 'C1' },
+    { number: 4, round: 0, a: 'B1', b: 'D2', winner: 'B1' },
+    { number: 5, round: 1, a: 'A1', b: 'D1', winner: 'D1', fromA: 1, fromB: 2 },
+    { number: 6, round: 1, a: 'C1', b: 'B1', winner: 'C1', fromA: 3, fromB: 4 },
+    { number: 7, round: 2, a: 'D1', b: 'C1', winner: 'D1', fromA: 5, fromB: 6 },
+  ];
+  const finalPlaces = ['D1', 'C1', 'B1', 'A1', 'A2', 'B2', 'C2', 'D2'];
+  const payload = { type, parentCode, groups, groupMatches, finalMatches, finalPlaces };
+  await assert.rejects(up('historical-preview', { ...payload, parentCode: 'BXH-OTHER1' }),
+    { code: 'history-import-room-mismatch' });
+  await assert.rejects(up('historical-preview', payload), { code: 'group-permission-denied' });
+  db.rows.get('users/operator').role = 'super_admin';
+  const preview = await up('historical-preview', payload);
+  assert.equal(preview.eligibleCount, 14);
+  assert.equal(preview.familyCount, 1);
+  assert.deepEqual(preview.unlinked.map(row => row.id), ['A4']);
+  assert.equal(preview.matchCount, 15);
+  assert.equal(db.writes.length, 0);
+  await assert.rejects(up('historical-import', payload), { code: 'history-import-preview-required' });
+  db.rows.get('users/user-1').active = false;
+  await assert.rejects(up('historical-import', payload, preview.digest), { code: 'history-import-preview-changed' });
+  assert.equal(db.writes.length, 0);
+  db.rows.get('users/user-1').active = true;
+  const imported = await up('historical-import', payload, preview.digest);
+  assert.equal(imported.readyForSettlement, true);
+  assert.equal(imported.next, null);
+  assert.equal(db.writes.length, 2);
+  assert.deepEqual(await up('historical-import', payload, preview.digest), imported);
+  assert.equal(db.writes.length, 2);
+  const history = await up('history', null, null, 'user-0');
+  assert.deepEqual(history.stages.map(stage => stage.key), ['A', 'B', 'C', 'D', 'final-eight']);
+  assert.equal(history.ownPlayerIds.length, 2);
+  assert(history.stages.flatMap(stage => stage.matches).every(match => match.scoreA === null && match.scoreB === null));
+  assert(!JSON.stringify(history).includes('user-0'));
+  const settlementPreview = await up('settlement-preview');
+  assert.equal(settlementPreview.eligibleCount, 14);
+  assert.equal(db.writes.length, 2);
+  const result = await up('settle');
+  assert.equal(result.creditedCount, 14);
+  assert.equal(db.rows.get(parent).archiveStatus, 'completed');
+  assert.equal(db.rows.get('ladderTransactions/' + parentCode + '_user-0').placement, 4);
+  const writes = db.writes.length;
+  assert.equal((await up('settle')).alreadyAwarded, true);
+  assert.equal(db.writes.length, writes);
+});

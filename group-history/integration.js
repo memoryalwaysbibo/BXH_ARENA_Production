@@ -34,6 +34,8 @@
     if (!columns.length) return;
     const cards = columns.map(col => new Map([...col.querySelectorAll('.group-history-match')]
       .map(card => [Number(card.dataset.index), card])));
+    const sourceIndices = (index, card) => card.dataset.from === undefined
+      ? [index * 2, index * 2 + 1] : card.dataset.from.split(',').filter(Boolean).map(Number);
     const anchor = cards.reduce((best, map, index) => map.size > cards[best].size ? index : best, 0);
     const positions = cards.map(() => new Map());
     const rowHeight = Math.max(65, ...cards.flatMap(map => [...map.values()].map(card => card.offsetHeight))) + 10;
@@ -41,15 +43,18 @@
     for (const [index, card] of cards[anchor]) { positions[anchor].set(index, cursor + card.offsetHeight / 2); cursor += rowHeight; }
     for (let round = anchor + 1; round < cards.length; round++) {
       for (const [index, card] of cards[round]) {
-        const a = positions[round - 1].get(index * 2), b = positions[round - 1].get(index * 2 + 1);
+        const [a, b] = sourceIndices(index, card).map(source => positions[round - 1].get(source));
         positions[round].set(index, a != null && b != null ? (a + b) / 2 : (a ?? b ?? card.offsetHeight / 2));
       }
     }
     for (let round = anchor - 1; round >= 0; round--) {
       for (const [index, card] of cards[round]) {
-        const sibling = cards[round].has(index ^ 1);
-        const target = positions[round + 1].get(Math.floor(index / 2));
-        positions[round].set(index, (target ?? card.offsetHeight / 2) + (sibling ? (index % 2 ? rowHeight / 2 : -rowHeight / 2) : 0));
+        const entry = [...cards[round + 1]].find(([nextIndex, next]) => sourceIndices(nextIndex, next).includes(index));
+        const sources = entry ? sourceIndices(...entry) : [];
+        const target = entry ? positions[round + 1].get(entry[0]) : null;
+        const sibling = sources.filter(source => cards[round].has(source)).length > 1;
+        positions[round].set(index, (target ?? card.offsetHeight / 2) +
+          (sibling ? (sources.indexOf(index) ? rowHeight / 2 : -rowHeight / 2) : 0));
       }
     }
     let height = 0;
@@ -76,7 +81,7 @@
     const y = card => card.getBoundingClientRect().top - origin.top + card.offsetHeight / 2;
     for (let round = 1; round < cards.length; round++) {
       for (const [index, target] of cards[round]) {
-        const sources = [cards[round - 1].get(index * 2), cards[round - 1].get(index * 2 + 1)].filter(Boolean);
+        const sources = sourceIndices(index, target).map(source => cards[round - 1].get(source)).filter(Boolean);
         for (const source of sources) {
           const start = x(source), end = target.getBoundingClientRect().left - origin.left + tree.scrollLeft;
           const mid = (start + end) / 2;
@@ -175,7 +180,7 @@
       const target = event.target.closest('button');
       if (!target || !node.contains(target) || target.disabled) return;
       const stage = target.dataset.groupHistoryStage;
-      if (view().keys.includes(stage)) { model.selected = stage; paint(model); node.querySelector('[data-group-history-stage="' + stage + '"]')?.focus(); return; }
+      if (view().stageKeys(model.data).includes(stage)) { model.selected = stage; paint(model); node.querySelector('[data-group-history-stage="' + stage + '"]')?.focus(); return; }
       if (target.dataset.groupHistoryCode) void load(model, target.dataset.groupHistoryCode);
       if (target.dataset.groupHistoryAction === 'refresh') void load(model, model.code);
       if (target.dataset.groupHistoryAction === 'discover') void discover(model);
@@ -186,7 +191,7 @@
       const target = event.target.closest('[data-group-history-stage]');
       if (!current(model) || !target || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
       event.preventDefault();
-      const keys = view().keys, index = keys.indexOf(model.selected);
+      const keys = view().stageKeys(model.data), index = keys.indexOf(model.selected);
       model.selected = event.key === 'Home' ? keys[0] : event.key === 'End' ? keys[keys.length - 1] : keys[(index + (event.key === 'ArrowLeft' ? -1 : 1) + keys.length) % keys.length];
       paint(model); node.querySelector('[data-group-history-stage="' + model.selected + '"]')?.focus();
     };
