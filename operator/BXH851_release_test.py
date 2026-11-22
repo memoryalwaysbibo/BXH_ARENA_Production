@@ -26,7 +26,7 @@ class ReleaseStageTest(unittest.TestCase):
             archive = root / "live.zip"
             with zipfile.ZipFile(archive, "w") as zipped:
                 zipped.writestr(path, old)
-                zipped.writestr("index.cjs", "exports.registrationRosterQueueV2 = () => {};\n")
+                zipped.writestr("index.cjs", "const {createBindings}=require('./registration-flow-v2/backend/bindings.cjs');\nmodule.exports=createBindings({});\n")
                 zipped.writestr("package.json", json.dumps({"main": "index.cjs", "engines": {"node": "22"}}))
                 zipped.writestr("keep.cjs", "module.exports = 'live only';\n")
             with patch.object(release, "FILES", {path: release.digest(old)}):
