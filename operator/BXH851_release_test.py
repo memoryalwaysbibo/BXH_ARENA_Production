@@ -14,6 +14,10 @@ spec.loader.exec_module(release)
 
 
 class ReleaseStageTest(unittest.TestCase):
+    def test_deploy_target_scopes_to_one_function_in_codebase(self):
+        self.assertEqual(release.DEPLOY_TARGET,
+                         "functions:bxh-registration-v2-closed:registrationRosterQueueV2")
+
     def test_stage_changes_only_reviewed_files(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
