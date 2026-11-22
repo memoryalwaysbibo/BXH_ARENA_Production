@@ -26,7 +26,7 @@ function fixture(){
   'firebase-functions/v2/scheduler':{onSchedule:bind},
   './queue.cjs':{createQueue:()=>queue},
   './ticket-room-create.cjs':{createTicketRoomHandler:()=>async()=>({ok:true}),createPtnStatusHandler:()=>async()=>({ok:true}),createTicketRoomStateHandler:()=>async()=>{},createTicketScheduleHandler:()=>async()=>{},createTicketDelegateHandler:()=>async()=>{},createTicketDelegateSearchHandler:()=>async()=>{},createTicketRemoveHandler:()=>async()=>{}},
-  './lifecycle.cjs':{createDrawHandler:()=>async()=>{},createStartHandler:()=>async()=>{},createTicketForfeitHandler:()=>async()=>{}}
+  './lifecycle.cjs':{createDrawHandler:()=>async()=>{},createStartHandler:()=>async()=>{},createTicketForfeitHandler:()=>async()=>{},createTicketScoreHandler:()=>async()=>{}}
  };
  const module={exports:{}};
  runInNewContext(readFileSync(file,'utf8'),{module,require:id=>stubs[id]??localRequire(id)});

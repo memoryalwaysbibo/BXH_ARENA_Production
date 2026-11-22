@@ -6,7 +6,7 @@ const {randomBytes}=require('node:crypto');
 const {db,service,handlers}=require('./harness.cjs');
 const {createApi}=require('../backend/api.cjs');
 const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketRemoveHandler,createTicketDelegateHandler,createTicketDelegateSearchHandler}=require('../backend/ticket-room-create.cjs');
-const {createStartHandler,createDrawHandler,createTicketForfeitHandler}=require('../backend/lifecycle.cjs');
+const {createStartHandler,createDrawHandler,createTicketForfeitHandler,createTicketScoreHandler}=require('../backend/lifecycle.cjs');
 
 after(()=>db.terminate());
 
@@ -243,10 +243,44 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  assert.equal(live.phase,'live');
  assert.equal(live.eligibleCount,29);
  assert.equal(live.drawId,result.drawId);
+ assert.ok(live.bracket.length>live.matches.length);
+ const score=createTicketScoreHandler(options);
+ const scoredMatch=live.bracket.find(item=>item.round===0&&item.canScore);
+ let scoreUpdatedAt=scoredMatch.updatedAt;
+ const scoreRequest=(command,suffix,extra={})=>({auth:creation.auth,app:creation.app,
+  data:{action:'ticket-room-score',code,roomId,matchId:scoredMatch.id,matchUpdatedAt:scoreUpdatedAt,
+   operationId:'score-'+suffix,command,...extra}});
+ await assert.rejects(score({...scoreRequest('score','no-app',{side:'A',finish:'spin'}),app:null}),/permission-denied/);
+ await assert.rejects(score({...scoreRequest('score','other',{side:'A',finish:'spin'}),auth:{uid:other}}),/permission-denied/);
+ for(let i=0;i<4;i++){
+  const request=scoreRequest('score','point-'+i,{side:'A',finish:'spin'});
+  const saved=await score(request);
+  assert.equal(saved.scoreA,i+1);
+  assert.equal((await score(request)).replayed,true);
+  scoreUpdatedAt=(await status(statusRequest)).bracket.find(item=>item.id===scoredMatch.id).updatedAt;
+  await assert.rejects(score({...request,data:{...request.data,operationId:'stale-'+i}}),/score-match-stale/);
+ }
+ await assert.rejects(score(scoreRequest('score','too-many',{side:'B',finish:'spin'})),/score-match-stale/);
+ assert.equal((await score(scoreRequest('undo','undo'))).scoreA,3);
+ scoreUpdatedAt=(await status(statusRequest)).bracket.find(item=>item.id===scoredMatch.id).updatedAt;
+ await assert.rejects(score(scoreRequest('confirm','too-early')),/score-result-not-ready/);
+ await score(scoreRequest('score','last',{side:'A',finish:'spin'}));
+ scoreUpdatedAt=(await status(statusRequest)).bracket.find(item=>item.id===scoredMatch.id).updatedAt;
+ const confirmation=scoreRequest('confirm','confirm');
+ const scoredDecision=await score(confirmation);
+ assert.equal(scoredDecision.completed,true);
+ assert.equal((await score(confirmation)).replayed,true);
+ const projected=(await status(statusRequest)).bracket.find(item=>item.id===scoredMatch.id);
+ assert.equal(projected.winnerId,scoredMatch.a.id);
+ assert.equal(projected.scoreA,4);
+ const [privateAfterScore,publicAfterScore]=await db.getAll(room,pub);
+ assert.equal(JSON.parse(privateAfterScore.data().data).matches.find(item=>item.id===scoredMatch.id).winnerId,scoredMatch.a.id);
+ assert.equal(JSON.parse(publicAfterScore.data().bracketView).matches.find(item=>item.id===scoredMatch.id).scoreA,4);
+ assert.equal((await ticket.get()).data().status,'consumed');
  await assert.rejects(remove({...removal,data:{...removal.data,operationId:'late-host-cancel'}}),/tournament-started/);
  await assert.rejects(submit(other,'cancel','late-player-cancel'),/tournament-started/);
  const forfeit=createTicketForfeitHandler(options);
- const match=live.matches.find(item=>item.round===0);
+ const match=live.matches.find(item=>item.round===0&&item.id!==scoredMatch.id);
  assert.ok(match);
  const forfeitData={action:'ticket-room-forfeit',code,roomId,matchId:match.id,
   playerId:match.a.id,opponentId:match.b.id,matchUpdatedAt:match.updatedAt,operationId:'ticket-forfeit-once'};

@@ -370,13 +370,37 @@ test('PTN takeover replaces stale legacy header only after server owner verifica
  assert.match(t.ui.ticketManagedTab('settings'),/儲存賽事時間/);
  assert.doesNotMatch(t.ui.ticketManagedTab('settings'),/查看玩家報名頁|entry=register/);
  t.sandbox.activeTab='referee';
- assert.match(t.ui.ticketManagedTab('referee'),/尚未接入合作賽事/);
+ assert.match(t.ui.ticketManagedTab('referee'),/賽事尚未開賽/);
  const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
  assert.match(core,/ticketManagementContext\?\.\(\)/);
  assert.match(core,/票券賽事 \$\{esc\(ticket\.code\)\}/);
  assert.match(core,/ticketManagedTab\?\.\('registrations'\)/);
  assert.match(core,/ticketManagedTab\?\.\('settings'\)/);
  t.setUid('another-owner');
+ assert.equal(t.ui.ticketManagementContext(),null);
+});
+test('PTN live takeover shows bracket and scores only its verified room',async()=>{
+ const t=setup({partner:true}),code='PTN-TST001',calls=[];
+ t.sandbox.activeTab='management';
+ const match={id:'round-one',seq:0,round:0,station:1,scoreA:3,scoreB:0,updatedAt:123,
+  canScore:true,a:{id:'a',name:'甲'},b:{id:'b',name:'乙'}};
+ t.sandbox.window.engagementService.ticketRoomOperation=async payload=>{
+  calls.push(JSON.parse(JSON.stringify(payload)));
+  return payload.action==='ticket-ptn-status'?{ok:true,code}:payload.action==='ticket-room-state'
+   ?{ok:true,code,roomId:'ticket-room-generation',name:'測試',phase:'live',bracket:[match],matches:[]}
+   :{ok:true,scoreA:4,scoreB:0,completed:false};
+ };
+ await t.ui.handle('commerce-refresh-owned-ptn');
+ await t.ui.handle('commerce-open-owned-ptn',{});
+ await t.ui.handle('commerce-ticket-open-manage');
+ t.sandbox.activeTab='bracket';
+ assert.match(t.ui.ticketManagedTab('bracket'),/甲 3 : 0 乙/);
+ t.sandbox.activeTab='referee';
+ assert.match(t.ui.ticketManagedTab('referee'),/旋轉 \+1/);
+ await t.ui.handle('commerce-ticket-score',{dataset:{id:match.id,command:'score',side:'A',finish:'spin'}});
+ assert.deepEqual(calls.at(-1),{action:'ticket-room-score',code,roomId:'ticket-room-generation',
+  matchId:match.id,matchUpdatedAt:123,command:'score',side:'A',finish:'spin',operationId:'same-operation'});
+ t.setUid('another-user');
  assert.equal(t.ui.ticketManagementContext(),null);
 });
 test('PTN owner alone can assign one delegate and a super admin can enter by room code',async()=>{

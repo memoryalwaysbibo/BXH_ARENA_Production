@@ -5,7 +5,7 @@
 const {createQueue}=require('./queue.cjs');
 const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
-const {createStartHandler,createDrawHandler,createTicketForfeitHandler}=require('./lifecycle.cjs');
+const {createStartHandler,createDrawHandler,createTicketForfeitHandler,createTicketScoreHandler}=require('./lifecycle.cjs');
 const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketRemoveHandler,createTicketDelegateHandler,createTicketDelegateSearchHandler}=require('./ticket-room-create.cjs');
 const {isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath}=require('./ticket-host.cjs');
 function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled,pilotRoom=null,retiredRoom=null,retiredRooms=[],ticketPilot=async()=>null}){
@@ -53,6 +53,7 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   'ticket-room-delegate':createTicketDelegateHandler({db}),
   'ticket-room-delegate-search':createTicketDelegateSearchHandler({db}),
   'ticket-room-forfeit':createTicketForfeitHandler({db,enabled:startEnabled}),
+  'ticket-room-score':createTicketScoreHandler({db,enabled:startEnabled}),
   'ticket-room-remove':createTicketRemoveHandler({db,queue,enabled:intakeEnabled}),
  };
  const registrationRosterQueueV2=bind(req=>{
@@ -63,7 +64,8 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   allowUnassigned:data=>data?.code===undefined&&['create-ticket-room','ticket-ptn-status'].includes(data?.action),
   preconditions:['ticket-lifecycle-disabled','ticket-binding-invalid','ticket-expired','ticket-unavailable','version-conflict',
    'room-code-conflict','room-receipt-inconsistent','ticket-ptn-slot-occupied','bracket-room-changed',
-   'forfeit-room-not-live','forfeit-match-stale','forfeit-round-waiting'],
+   'forfeit-room-not-live','forfeit-match-stale','forfeit-round-waiting',
+   'score-room-not-live','score-match-stale','score-round-waiting','score-result-not-ready'],
  });
  const lifecycleOptions={
   options:{enforceAppCheck:true},

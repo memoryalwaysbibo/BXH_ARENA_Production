@@ -161,6 +161,16 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
     ?state.matches.filter(forfeitMatchAvailable).map(match=>({id:match.id,seq:match.seq,round:match.round,
      a:{id:match.a.playerId,name:names.get(match.a.playerId)||'選手 A'},
      b:{id:match.b.playerId,name:names.get(match.b.playerId)||'選手 B'},updatedAt:match.updatedAt||0})):[];
+   const bracket=room.tournamentPhase==='live'&&Array.isArray(state.matches)?state.matches.map(match=>({
+    id:match.id,seq:match.seq,round:match.round,bracket:match.bracket||null,station:match.station||null,
+    status:match.status||'pending',isBye:!!match.isBye,completed:!!match.completed,
+    a:match.a?.playerId?{id:match.a.playerId,name:names.get(match.a.playerId)||'選手 A'}:null,
+    b:match.b?.playerId?{id:match.b.playerId,name:names.get(match.b.playerId)||'選手 B'}:null,
+    scoreA:Number(match.scoreA||0),scoreB:Number(match.scoreB||0),winnerId:match.winnerId||null,
+    updatedAt:match.updatedAt||0,
+    canScore:gate.enabled===true&&!state.championId&&forfeitMatchAvailable(match)&&
+     !['quick'].includes(match.scoringMode)
+   })):null;
    const delegate=room.ptnDelegateUid?(await tx.get(db.doc('users/'+room.ptnDelegateUid))).data():null;
    return {ok:true,code,roomId:state.id,name:room.name,location:room.location,
     ...(isPartnerRoomCode(code)?{delegateUid:room.ptnDelegateUid||null,
@@ -171,7 +181,8 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
     registrationOpenAt:room.registrationOpenAt,registrationCloseAt:room.registrationCloseAt,
     registrationEnabled:room.registrationEnabled,updatedAt:room.updatedAt,
     drawId:state.bracketDraw?.id??null,drawReady:state.bracketDraw?.rosterRevision===rosterRevision,rosterRevision,eligibleCount,
-    ...(ticketStatus?{ticketStatus}:{}),...(room.tournamentPhase==='live'?{matches}:{}),
+    ...(ticketStatus?{ticketStatus}:{}),...(room.tournamentPhase==='live'?{matches,bracket,
+     championName:names.get(state.championId)||null}:{}),
     participants:room.tournamentPhase==='waiting'?state.players.filter(player=>player.source==='online'&&player.registrationId)
      .map(player=>({registrationId:player.registrationId,name:player.name})):[]};
   });
