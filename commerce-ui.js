@@ -53,7 +53,7 @@ const date=n=>n?new Date(n).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour1
 function image(url){if(/^assets\/commerce\/tickets\/tournament-activation-(32-green|64-blue|96-purple|128-orange|160-red)\.png$/.test(url))return url;try{const u=new URL(url);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch{return '';}}
 function notices(c){return `${c.error?`<p class="commerce-error" role="alert">${esc(c.error)}</p>`:''}${c.success?`<p class="commerce-success" role="status">${esc(c.success)}</p>`:''}${c.pending?`<div class="banner"><span>有一筆操作尚待確認。</span><button class="btn btn-primary" data-action="commerce-retry" ${c.busy?'disabled':''}>確認原操作結果</button></div>`:''}`;}
 const pilotCode=()=>window.BXH_TICKET_ROOM_PILOT_CODE;
-const ticketActions=new Set(['create-ticket-room','ticket-ptn-status','ticket-room-state','ticket-room-schedule','ticket-room-delegate','ticket-room-delegate-search','ticket-room-draw','ticket-room-start','ticket-room-remove','ticket-room-forfeit']);
+const ticketActions=new Set(['create-ticket-room','ticket-ptn-status','ticket-room-state','ticket-room-schedule','ticket-room-delegate','ticket-room-delegate-search','ticket-room-draw','ticket-room-start','ticket-room-remove','ticket-room-forfeit','ticket-room-score']);
 const ticketPilot=()=>canSeeTickets()&&typeof pilotCode()==='string'&&/^BXH-[A-Z0-9]{4,16}$/.test(pilotCode());
 const ticketCreationView=c=>c.view==='ticket-create'&&typeof activeTab!=='undefined'&&activeTab==='management';
 const ptnCreation=c=>ticketCreationView(c)&&window.BXH_TICKET_ROOM_PTN_PILOT===true;
@@ -114,7 +114,7 @@ async function mutate(payload){
     c.ticketRoomOpen=true;
    }
   }
-  c.success=({ 'create-ticket-room':'已建房並綁定啟動券。','ticket-room-schedule':'報名與開賽時間已更新。','ticket-room-delegate':'代理權已更新。','ticket-room-draw':'抽籤完成。','ticket-room-start':'正式開賽，啟動券已扣用。','ticket-room-remove':'已移除選手。請重新抽籤。','ticket-room-forfeit':'已登記棄權，對手晉級。'})[action]||'操作已確認完成。';
+  c.success=({ 'create-ticket-room':'已建房並綁定啟動券。','ticket-room-schedule':'報名與開賽時間已更新。','ticket-room-delegate':'代理權已更新。','ticket-room-draw':'抽籤完成。','ticket-room-start':'正式開賽，啟動券已扣用。','ticket-room-remove':'已移除選手。請重新抽籤。','ticket-room-forfeit':'已登記棄權，對手晉級。','ticket-room-score':r.completed?'賽果已確認，選手已晉級。':'分數已儲存。'})[action]||'操作已確認完成。';
  }catch(e){if(c===context()){
   c.error=errorMessage(e);
   if(permanentErrors.test(String(e?.message||e))){c.pending=null;try{sessionStorage.removeItem(storageKey());}catch{}}
@@ -141,13 +141,23 @@ function ticketForfeitPanel(room,pending){
    <button type="button" class="btn btn-ghost" data-action="commerce-ticket-forfeit" data-id="${esc(match.id)}" data-side="a" ${pending?'disabled':''}>${esc(match.a.name)} 棄權</button>
    <button type="button" class="btn btn-ghost" data-action="commerce-ticket-forfeit" data-id="${esc(match.id)}" data-side="b" ${pending?'disabled':''}>${esc(match.b.name)} 棄權</button></li>`).join('')}</ul></details>`;
 }
+function ticketBracketPanel(room){
+ if(room.phase!=='live')return '<p>賽事尚未開賽。</p>';
+ const matches=room.bracket||[];
+ return `<h3>對戰表</h3>${room.championName?`<p role="status">冠軍：${esc(room.championName)}</p>`:''}${matches.length?`<ol>${matches.map(match=>`<li>第 ${Number(match.round)+1} 輪・第 ${Number(match.seq)+1} 場${match.station?'・'+Number(match.station)+' 號台':''}｜${esc(match.a?.name||'待定')} ${Number(match.scoreA)} : ${Number(match.scoreB)} ${esc(match.b?.name||'待定')}｜${match.isBye?'輪空':match.completed?'已完成':match.a&&match.b?'待進行':'等待晉級'}</li>`).join('')}</ol>`:'<p>尚無對戰資料，請重新整理房間。</p>'}`;
+}
+function ticketRefereePanel(room,pending){
+ if(room.phase!=='live')return '<p>賽事尚未開賽。</p>';
+ const matches=(room.bracket||[]).filter(match=>match.canScore&&match.a&&match.b);
+ return `<h3>合作賽事裁判台</h3><p>房主、房間代理人或最高管理員可記分；每場確認賽果後自動晉級。</p>${room.championName?`<p role="status">賽事已決出冠軍：${esc(room.championName)}</p>`:''}${matches.length?matches.map(match=>`<article class="panel"><h4>第 ${Number(match.round)+1} 輪・第 ${Number(match.seq)+1} 場${match.station?'｜'+Number(match.station)+' 號台':''}</h4>${['A','B'].map(side=>`<div><strong>${esc(match[side.toLowerCase()].name)}：${Number(match['score'+side])}</strong><div class="btn-row">${[['spin','旋轉 +1'],['knockout','擊飛 +2'],['burst','爆裂 +2'],['extreme','極限 +3']].map(([finish,label])=>`<button type="button" class="btn btn-ghost" data-action="commerce-ticket-score" data-id="${esc(match.id)}" data-command="score" data-side="${side}" data-finish="${finish}" ${pending||Math.max(Number(match.scoreA),Number(match.scoreB))>=4?'disabled':''}>${label}</button>`).join('')}</div></div>`).join('')}<div class="btn-row"><button type="button" class="btn btn-ghost" data-action="commerce-ticket-score" data-id="${esc(match.id)}" data-command="undo" ${pending||Number(match.scoreA)+Number(match.scoreB)===0?'disabled':''}>撤回上一分</button><button type="button" class="btn btn-primary" data-action="commerce-ticket-score" data-id="${esc(match.id)}" data-command="confirm" ${pending||Math.max(Number(match.scoreA),Number(match.scoreB))<4?'disabled':''}>確認賽果並晉級</button></div></article>`).join(''):'<p>目前沒有可記分的對戰；可至對戰表查看進度。</p>'}`;
+}
 function ticketHostManagementPanel(c,room,pending,scheduleForm,tab){
  const now=Date.now(),status=room.registrationEnabled===false?'已關閉':room.registrationOpenAt>now?'尚未開放':room.registrationCloseAt<=now?'報名已截止':'報名中';
  const roster=room.participants||[];
  const draw=`<h3>抽籤與開賽</h3><p>可出賽 ${Number(room.eligibleCount)} 人｜${room.drawId?(room.drawReady===false?'名單已變更，請重新抽籤':'已抽籤'):'尚未抽籤'}</p>${room.ticketStatus==='consumed'?'<p>啟動券已扣用。</p>':room.ticketStatus==='reserved'?'<p>啟動券已綁定，正式開賽時扣用。</p>':''}${room.phase==='waiting'?`<div class="btn-row"><button class="btn btn-ghost" data-action="commerce-ticket-draw" ${pending||room.eligibleCount<2?'disabled':''}>${room.drawId?'重新抽籤':'抽籤'}</button><button class="btn btn-primary" data-action="commerce-ticket-start" ${pending||!room.drawId||room.drawReady===false||room.eligibleCount<2?'disabled':''}>正式開賽並扣券</button></div>`:'<p>此賽事已離開候賽階段。</p>'}${ticketForfeitPanel(room,pending)}`;
  const registrations=`<h3>報名資訊</h3><p>狀態：${status}｜正取 ${Number(room.confirmedCount??room.eligibleCount)} / ${Number(room.capacity||0)} 人</p><p>報名開放：${date(room.registrationOpenAt)}<br>報名截止：${date(room.registrationCloseAt)}（台灣時間）</p>${status==='報名已截止'&&room.phase==='waiting'?'<p class="commerce-error">報名已截止；請至「合作主辦設定」調整時間後再請玩家報名。</p>':''}${room.phase==='waiting'?`<h4>已報名名單</h4>${roster.length?`<ul>${roster.map(player=>`<li>${esc(player.name)} <button type="button" class="btn btn-ghost" data-action="commerce-ticket-remove" data-id="${esc(player.registrationId)}" ${pending?'disabled':''}>移除</button></li>`).join('')}</ul>`:'<p>目前沒有已報名的選手。</p>'}`:'<p>賽事已開賽，報名名單不可再變更。</p>'}`;
  const delegate=room.canAssignDelegate?`<h3>房間代理人（最多一名）</h3><p>目前代理人：${room.delegateUid?`${esc(room.delegateName||'未設定姓名')}（${esc(room.delegateGameId||'未設定遊戲 ID')}）`:'尚未指定'}</p><form data-commerce-form="ticket-delegate-search">${input('query','搜尋本名或遊戲 ID','','text','minlength="2" maxlength="80" required')}<button class="btn btn-primary" ${pending?'disabled':''}>搜尋帳號</button></form>${c.delegateSearch?.code===room.code?`<p>搜尋「${esc(c.delegateSearch.query)}」：${c.delegateSearch.players.length} 筆結果</p><ul>${c.delegateSearch.players.map((player,i)=>`<li>${esc(player.name)}（${esc(player.gameId||'未設定遊戲 ID')}） <button type="button" class="btn btn-ghost" data-action="commerce-ticket-select-delegate" data-id="${i}" ${pending?'disabled':''}>選為代理人</button></li>`).join('')}</ul>`:''}${room.delegateUid?`<button class="btn btn-ghost" data-action="commerce-ticket-revoke-delegate" ${pending?'disabled':''}>撤銷代理權</button>`:''}`:room.delegateUid?`<p>此房間已指定代理人：${esc(room.delegateName||'未設定姓名')}（${esc(room.delegateGameId||'未設定遊戲 ID')}）。</p>`:'';
- return `<section class="panel commerce"><h2>${tab==='settings'?'賽事設定':tab==='people'?'人員管理':tab==='registrations'?'報名管理':'賽事管理'}｜${esc(room.name)}</h2><p>房號 ${esc(room.code)}｜正取 ${Number(room.confirmedCount??room.eligibleCount)} / ${Number(room.capacity||0)} 人</p>${notices(c)}${c.loading?'<p role="status">正在讀取房間資料……</p>':''}${tab==='settings'?`<h3>合作主辦設定</h3><p>賽事名稱：${esc(room.name)}｜場地：${esc(room.location||'未設定')}</p>${scheduleForm||'<p>開賽後不能調整報名時間。</p>'}${delegate}`:tab==='people'?registrations:tab==='registrations'?`${registrations}${draw}`:'<p>這項官方賽事功能尚未接入合作賽事。</p>'}<button class="btn btn-ghost" data-action="commerce-ticket-refresh" ${c.loading?'disabled':''}>重新整理房間</button></section>`;
+ return `<section class="panel commerce"><h2>${tab==='settings'?'賽事設定':tab==='people'?'人員管理':tab==='registrations'?'報名管理':'賽事管理'}｜${esc(room.name)}</h2><p>房號 ${esc(room.code)}｜正取 ${Number(room.confirmedCount??room.eligibleCount)} / ${Number(room.capacity||0)} 人</p>${notices(c)}${c.loading?'<p role="status">正在讀取房間資料……</p>':''}${tab==='settings'?`<h3>合作主辦設定</h3><p>賽事名稱：${esc(room.name)}｜場地：${esc(room.location||'未設定')}</p>${scheduleForm||'<p>開賽後不能調整報名時間。</p>'}${delegate}`:tab==='people'?registrations:tab==='registrations'?`${registrations}${draw}`:tab==='bracket'||tab==='live'?ticketBracketPanel(room):tab==='referee'?ticketRefereePanel(room,pending):'<p>這項官方賽事功能尚未接入合作賽事。</p>'}<button class="btn btn-ghost" data-action="commerce-ticket-refresh" ${c.loading?'disabled':''}>重新整理房間</button></section>`;
 }
 function ticketManagedTab(tab){
  const c=context();
@@ -348,6 +358,15 @@ async function handle(action,target){
   if(!confirm('確定登記「'+player.name+'」本場棄權，由「'+opponent.name+'」晉級？'))return;
   return mutate({action:'ticket-room-forfeit',code:room.code,roomId:room.roomId,matchId:match.id,
    playerId:player.id,opponentId:opponent.id,matchUpdatedAt:match.updatedAt});
+ }
+ if(action==='commerce-ticket-score'&&ticketManagementView(c)&&c.ticketRoomOpen&&!c.pending){
+  const room=c.ticketRoom,match=room?.bracket?.find(item=>item.id===id),command=target?.dataset?.command;
+  if(!match?.canScore||room.code!==ticketRoomCode(c)||room.phase!=='live'||!['score','undo','confirm'].includes(command))return;
+  const side=target?.dataset?.side,finish=target?.dataset?.finish;
+  if(command==='score'&&(!['A','B'].includes(side)||!['spin','knockout','burst','extreme'].includes(finish)))return;
+  if(command==='confirm'&&!confirm(`確認 ${match.a.name} ${match.scoreA}：${match.scoreB} ${match.b.name} 的賽果並讓勝者晉級？`))return;
+  return mutate({action:'ticket-room-score',code:room.code,roomId:room.roomId,matchId:match.id,
+   matchUpdatedAt:match.updatedAt,command,...(command==='score'?{side,finish}:{})});
  }
  if(['commerce-ticket-draw','commerce-ticket-start'].includes(action)&&canOperateTicketRoom(c)&&c.ticketRoomOpen&&!c.pending){
   const room=c.ticketRoom,start=action==='commerce-ticket-start';

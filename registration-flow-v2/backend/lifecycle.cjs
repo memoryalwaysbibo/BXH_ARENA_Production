@@ -6,7 +6,7 @@ const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
 const {advance:advanceQrCheckinFence}=require('../../qr-checkin/backend/qr-checkin-fence.cjs');
 const {startMs}=require('../../qr-checkin/backend/overlays/lifecycle/operations-core.js');
 const {registrationQueueOwnsRoom}=require('./legacy-writer.cjs');
-const {checkTicketContract,validRegistrationRoomCode,ticketLifecyclePath,authorizeTicketManager}=require('./ticket-host.cjs');
+const {checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,authorizeTicketManager}=require('./ticket-host.cjs');
 
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const commonFields=['code','roomId','rosterRevision','operationId'];
@@ -256,4 +256,101 @@ function createTicketForfeitHandler({db,enabled=async()=>false,clock=Date.now}){
  };
 }
 
-module.exports={createStartHandler,createDrawHandler,createTicketForfeitHandler,forfeitMatchAvailable};
+const ticketScoreFields=new Set(['action','code','roomId','matchId','matchUpdatedAt','operationId','command','side','finish']);
+const ticketPoints=Object.freeze({spin:1,knockout:2,burst:2,extreme:3});
+function createTicketScoreHandler({db,enabled=async()=>false,clock=Date.now}){
+ return async request=>{
+  const uid=request.auth?.uid,input=request.data||{};
+  if(!uid)throw Error('auth-required');
+  if(!request.app)throw Error('permission-denied');
+  const {action,code,roomId,matchId,matchUpdatedAt,operationId,command,side,finish}=input;
+  if(action!=='ticket-room-score'||Object.keys(input).some(key=>!ticketScoreFields.has(key))||
+     !isPartnerRoomCode(code)||![roomId,matchId].every(validId)||
+     !Number.isSafeInteger(matchUpdatedAt)||matchUpdatedAt<0||
+     typeof operationId!=='string'||!/^[A-Za-z0-9_-]{8,100}$/.test(operationId)||
+     !['score','undo','confirm'].includes(command)||
+     (command==='score'?(!['A','B'].includes(side)||!Object.hasOwn(ticketPoints,finish)):(side!==undefined||finish!==undefined)))throw Error('invalid-operation');
+  const roomRef=db.doc('tournaments/'+code),publicRef=db.doc('publicTournaments/'+code);
+  const operation=roomRef.collection('operationLog').doc('ticket-room-score-'+digest(JSON.stringify([uid,operationId])));
+  const requestHash=digest(JSON.stringify([roomId,matchId,matchUpdatedAt,command,side,finish]));
+  const now=clock();
+  return db.runTransaction(async tx=>{
+   const [actor,roomSnap,publicSnap,gateSnap,prior]=await tx.getAll(db.doc('users/'+uid),roomRef,publicRef,
+    db.doc(ticketLifecyclePath(code)),operation);
+   const user=actor.data(),room=roomSnap.data(),pub=publicSnap.data(),gate=gateSnap.data();
+   const authority=await authorizeTicketManager(tx,db,{uid,user,room,gate,code,now});
+   if(gate.roomId!==roomId||room.ticketAccessV1?.roomId!==roomId||
+      pub?.ticketRoomVersion!==1||pub.eventAuthority!=='ticket')throw Error('ticket-binding-invalid');
+   const state=JSON.parse(room.data),mirror=JSON.parse(pub.bracketView);
+   if(state.id!==roomId||mirror.id!==roomId)throw Error('bracket-room-changed');
+   if(prior.exists){
+    if(prior.data().requestHash!==requestHash)throw Error('operation-conflict');
+    return {...prior.data().result,replayed:true};
+   }
+   if(gate.enabled!==true||!registrationQueueOwnsRoom(room)||!await enabled(code,tx))throw Error('ticket-lifecycle-disabled');
+   const ticket=(await tx.get(db.doc('commerceTickets/'+room.ticketAccessV1.ticketId))).data();
+   if(ticket?.status!=='consumed'||ticket.ownerUid!==authority.ownerUid||
+      ticket.boundRoomCode!==code||ticket.boundRoomId!==roomId)throw Error('ticket-binding-invalid');
+   if(room.tournamentPhase!=='live'||pub.tournamentPhase!=='live'||!state.startedAt||!state.rosterLocked||
+      state.championId||[room,pub,state].some(doc=>doc.systemClosed||doc.eventCancelled||doc.deletionStatus||
+       ['completed','archived'].includes(doc.archiveStatus)||'scoreStorage' in doc||'scoreBucketProjection' in doc)||
+      state.meta?.eventCancelled||state.meta?.eventAuthority!=='ticket'||state.meta?.formatType!=='single'||
+      state.meta?.battleMode!=='individual'||!Array.isArray(state.matches)||!Array.isArray(mirror.matches))throw Error('score-room-not-live');
+   const match=state.matches.find(item=>item.id===matchId);
+   const publicMatch=mirror.matches.find(item=>item.id===matchId);
+   if(!forfeitMatchAvailable(match)||(match.updatedAt||0)!==matchUpdatedAt||
+      publicMatch?.completed||publicMatch?.a?.playerId!==match.a.playerId||
+      publicMatch?.b?.playerId!==match.b.playerId||
+      Number(publicMatch.scoreA||0)!==Number(match.scoreA||0)||
+      Number(publicMatch.scoreB||0)!==Number(match.scoreB||0)||
+      !['standard',undefined,null].includes(match.scoringMode)||
+      !['standard',undefined,null].includes(state.meta.scoringMode))throw Error('score-match-stale');
+   const actorName=String(user.realName||user.gameId||user.displayName||'合作主辦').slice(0,80);
+   const engine=createEngine(state,{uid,name:actorName},now,operationId);
+   if(engine.singleElimRoundDispatchBlocked(match,state.matches,state.meta)||
+      engine.singleElimBronzeBeforeFinalBlocked(match,state.matches,state.meta))throw Error('score-round-waiting');
+   match.scoringMode='standard';
+   if(command==='score'){
+    if(engine.checkWinnerSide(match))throw Error('score-match-stale');
+    const key=side==='A'?'scoreA':'scoreB',points=ticketPoints[finish],current=Number(match[key]||0);
+    if(!Number.isInteger(current)||current<0||current+points>6)throw Error('score-match-stale');
+    const event=engine.createHunterRoundEvent(match,side,finish,points,now);
+    match[key]=current+points;(match.log||(match.log=[])).push(event);
+    match.status='in_progress';match.startedAt=match.startedAt||now;
+   }else if(command==='undo'){
+    const last=match.log?.at(-1);
+    if(!last||!['A','B'].includes(last.side)||!Number.isInteger(last.points)||last.points<1||last.points>3||
+       Number(match[last.side==='A'?'scoreA':'scoreB']||0)<last.points)throw Error('score-match-stale');
+    match.log.pop();match[last.side==='A'?'scoreA':'scoreB']-=last.points;
+   }else{
+    const decision=engine.evaluateMatchCompletion(match);
+    if(!decision.ok)throw Error('score-result-not-ready');
+    engine.applyMatchCompletionFields(match,decision,actorName);
+   }
+   match.updatedAt=Math.max(now,Number(match.updatedAt||0)+1);
+   match.updatedBy=actorName;
+   match.refereeSeatScoreRevision=Number(match.refereeSeatScoreRevision||0)+1;
+   if(command==='confirm')engine.rebuildPropagationForState(state);
+   const updatedAt=Math.max(now,Number(room.updatedAt||0)+1,Number(state.updatedAt||0)+1);
+   state.updatedAt=updatedAt;
+   const priorMatches=new Map(mirror.matches.map(item=>[item.id,item]));
+   mirror.matches=state.matches.map(item=>({...priorMatches.get(item.id),
+    a:item.a?.playerId?{playerId:item.a.playerId}:null,b:item.b?.playerId?{playerId:item.b.playerId}:null,
+    station:item.station??null,status:item.status,isBye:!!item.isBye,completed:!!item.completed,
+    scoreA:item.scoreA??null,scoreB:item.scoreB??null,log:item.log||[],
+    winnerId:item.winnerId||null,loserId:item.loserId||null,completedAt:item.completedAt||null,
+    confirmedAt:item.confirmedAt||null,resultMethod:item.resultMethod||null,forfeit:item.forfeit===true}));
+   Object.assign(mirror,{updatedAt,courtAssignments:publicCourts(state),callRevision:Number(state.callRevision||0)});
+   for(const key of ['championId','runnerUpId','thirdId','fourthId'])mirror[key]=state[key]??null;
+   const fence=room.qrCheckinManaged===true?advanceQrCheckinFence(room,state):{};
+   tx.update(roomRef,{...fence,updatedAt,data:JSON.stringify(state)});
+   tx.update(publicRef,{...fence,updatedAt,bracketView:JSON.stringify(mirror)});
+   const result={ok:true,matchId,scoreA:Number(match.scoreA||0),scoreB:Number(match.scoreB||0),
+    completed:!!match.completed,winnerId:match.winnerId||null};
+   tx.create(operation,{requestHash,result,actorUid:uid,at:now});
+   return result;
+  });
+ };
+}
+
+module.exports={createStartHandler,createDrawHandler,createTicketForfeitHandler,createTicketScoreHandler,forfeitMatchAvailable};
