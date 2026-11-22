@@ -7,8 +7,30 @@ const {db,service,handlers}=require('./harness.cjs');
 const {createApi}=require('../backend/api.cjs');
 const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketRemoveHandler,createTicketDelegateHandler,createTicketDelegateSearchHandler}=require('../backend/ticket-room-create.cjs');
 const {createStartHandler,createDrawHandler,createTicketForfeitHandler,createTicketScoreHandler}=require('../backend/lifecycle.cjs');
+const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
 
 after(()=>db.terminate());
+
+test('two-player PTN match produces a champion with the shared bracket engine',()=>{
+ const now=Date.now(),state={cloudCode:'PTN-TEST01',startedAt:now,archiveStatus:'ongoing',
+  bracketSize:2,meta:{eventAuthority:'ticket',formatType:'single',battleMode:'individual',stations:1},
+  players:[{id:'a',name:'甲'},{id:'b',name:'乙'}],courtAssignments:{},
+  matches:[{id:'final',bracket:'SE',round:0,indexInRound:0,seq:0,station:1,
+   a:{type:'player',playerId:'a'},b:{type:'player',playerId:'b'},status:'ready',
+   scoreA:0,scoreB:0,log:[],completed:false}]};
+ const match=state.matches[0],engine=createEngine(state,{uid:'owner',name:'主辦'},now,'two-player-final');
+ for(let i=0;i<4;i++){
+  match.log.push(engine.createHunterRoundEvent(match,'A','spin',1,now+i));
+  match.scoreA++;
+ }
+ const decision=engine.evaluateMatchCompletion(match);
+ assert.equal(decision.ok,true);
+ engine.applyMatchCompletionFields(match,decision,'主辦');
+ engine.rebuildPropagationForState(state);
+ assert.equal(match.winnerId,'a');
+ assert.equal(state.championId,'a');
+ assert.equal(state.runnerUpId,'b');
+});
 
 for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once and only a successful start consumes the ticket`,async()=>{
  const code=ptn?'PTN-'+randomBytes(3).toString('hex').toUpperCase():'BXH-T'+randomBytes(5).toString('hex').toUpperCase();
