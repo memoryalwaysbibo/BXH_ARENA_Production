@@ -1034,6 +1034,11 @@
   }
   window.engagementService={
     registrationFlowV2Enabled,
+    // Pure presentation hint for existing ordinary routes; never used for dispatch.
+    knownRegistrationV2DisplayRoute(code){
+      return registrationV2PilotCodes.has(code)||ticketRegistrationPilot(code)||
+        (Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code));
+    },
     registrationManagementOperation,
     async ticketRoomOperation({action,code,...payload}){
       const unassigned=code===undefined&&['create-ticket-room','ticket-ptn-status'].includes(action);
