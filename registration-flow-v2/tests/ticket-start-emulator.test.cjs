@@ -282,7 +282,7 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
   assert.equal(saved.scoreA,i+1);
   assert.equal((await score(request)).replayed,true);
   scoreUpdatedAt=(await status(statusRequest)).bracket.find(item=>item.id===scoredMatch.id).updatedAt;
-  await assert.rejects(score({...request,data:{...request.data,operationId:'stale-'+i}}),/score-match-stale/);
+  await assert.rejects(score({...request,data:{...request.data,operationId:'stale-score-'+i}}),/score-match-stale/);
  }
  await assert.rejects(score(scoreRequest('score','too-many',{side:'B',finish:'spin'})),/score-match-stale/);
  assert.equal((await score(scoreRequest('undo','undo'))).scoreA,3);
