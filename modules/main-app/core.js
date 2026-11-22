@@ -16279,6 +16279,19 @@ function lobbyMyRegistration(code){
   return myRegistrationsCache.find(r=>r.tournamentCode===code && (r.status==="confirmed"||r.status==="waitlist"||r.status==="pending_draw")) || null;
 }
 function lobbySummary(raw){
+  // Display only: do not call registration route lookups or classify unmarked rooms.
+  function lobbyRegistrationVersionLabel(raw){
+    if(publicTournamentsFreshness!=="server"||!raw||raw.eventAuthority!=="official"||
+       raw.ticketRoomVersion||raw.registrationSelection||
+       raw.battleMode==="team"||raw.parsedData?.meta?.battleMode==="team"||
+       !/^BXH-[A-Z0-9]{4,16}$/.test(raw.code||""))return "";
+    const version=raw.registrationQueueVersion;
+    const route=window.engagementService?.knownRegistrationV2DisplayRoute?.(raw.code);
+    if(version===2)return route===true?"V2 排隊報名":"";
+    if(route!==false)return "";
+    if(version===1||(version==null&&raw.code==="BXH-6SW48P"))return "V1 標準報名";
+    return "";
+  }
   const pd = raw.parsedData || {};
   const m = pd.meta || {};
   const regStatus = lobbyRegistrationStateKnown(raw)?getEffectiveRegistrationStatus(raw):"unknown";
@@ -16287,7 +16300,7 @@ function lobbySummary(raw){
   return {
     raw, communityQuickRegistration:isCommunityQuickRegistration(raw), registrationEnabled:raw.registrationEnabled, registrationStatus:raw.registrationStatus, code:raw.code, name:m.name||raw.name||"未命名賽事", date:m.date||raw.eventDate||"", startAt:m.startTime||raw.startAt||"",
     location:m.location||raw.location||"", phase:canonicalPublicTournamentPhase(raw), regStatus,
-    authority, hostName, systemClosure:raw.systemClosure||pd.systemClosure||null,
+    authority, hostName, registrationVersionLabel:lobbyRegistrationVersionLabel(raw), systemClosure:raw.systemClosure||pd.systemClosure||null,
     ladderMode:(raw.ladderMode??m.ladderMode)==="ranked"?"ranked":"general",
     registrationSelection:raw.registrationSelection||null,registeredCount:Number(raw.registeredCount||0),capacity:raw.capacity??null, confirmedCount:communityRegistrationParticipantCount(raw), waitlistEnabled:!!raw.waitlistEnabled,
     waitlistCapacity:raw.waitlistCapacity||0, waitlistCount:raw.waitlistCount||0,
@@ -16432,6 +16445,7 @@ function lobbyCard(t, kind, loggedIn, expanded=false){
         </div>
         <div class="lobby-card-right">
           <span class="lobby-room-code">房號 ${esc(t.code)}</span>
+          ${t.registrationVersionLabel?`<span class="badge badge-metal" style="white-space:nowrap;flex-shrink:0" title="${esc(t.registrationVersionLabel)}" aria-label="${esc(t.registrationVersionLabel)}">${esc(t.registrationVersionLabel.slice(0,2))}</span>`:""}
           <span class="badge ${t.ladderMode==="ranked"?"badge-neon":"badge-metal"}" style="white-space:nowrap;flex-shrink:0">${t.ladderMode==="ranked"?"積分賽事":"一般賽事"}</span>
           <span class="lobby-authority ${authorityClass}">${authorityLabel}</span>
           ${t.roomAccessMode==="password"?'<span class="badge badge-metal">🔒 密碼房</span>':""}
@@ -19426,10 +19440,23 @@ function courtForceExitConfirmation(change,m){
       return executeCourtForceAction(change);
     }};
 }
+function renderNewTournamentRegistrationVersion(){
+  return `<fieldset style="min-width:0;margin:12px 0;padding:8px;border:1px solid var(--border,#454955);border-radius:9px">
+    <legend style="padding:0 4px;font-weight:700">報名流程版本</legend>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px" aria-label="報名流程版本">
+      <button type="button" class="btn btn-primary" aria-pressed="true" style="min-width:0;min-height:44px;padding:5px 2px;white-space:normal;display:block;line-height:1.22"><strong>V1</strong><br>標準報名</button>
+      <button type="button" class="btn btn-ghost" disabled aria-pressed="false" style="min-width:0;min-height:44px;padding:5px 2px;white-space:normal;display:block;line-height:1.22"><strong>V2</strong><br>排隊報名</button>
+      <button type="button" class="btn btn-ghost" disabled aria-pressed="false" style="min-width:0;min-height:44px;padding:5px 2px;white-space:normal;display:block;line-height:1.22"><strong>V3</strong><br>先保留名額</button>
+    </div>
+    <p class="hint" style="margin:6px 0 0">目前僅開放 V1。V2 和 V3 不可選擇。</p>
+  </fieldset>`;
+}
+
 function renderModal(){
   if(!pendingModal) return "";
   const mm = pendingModal;
   let body = mm.messageIsHtml ? `<div class="modal-rich-content">${mm.message||""}</div>` : `<p>${esc(mm.message).replace(/\n/g,"<br>")}</p>`;
+  if(mm.showNewTournamentRegistrationVersion===true)body+=renderNewTournamentRegistrationVersion();
   mm.confirmDisabled = false;
   if(mm.type==='court-force-exit'){
     mm.confirmDisabled=mm.acknowledged!==true;
@@ -24727,7 +24754,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     render();
     const hasData = state.players.length>0 || state.matches.length>0 || (state.meta && (state.meta.name || state.meta.date || state.meta.location));
     if(hasData){
-      openModal({ type:"generic", title:isTester()?"建立測試賽事":"建立新賽事", message:`目前賽事會保留，不會被刪除。確定建立一場新的空白${isTester()?"測試":""}賽事？`, confirmLabel:isTester()?"新增測試賽事":"新增賽事", onConfirm:()=>doNewTournament(false) });
+      openModal({ type:"generic", title:isTester()?"建立測試賽事":"建立新賽事", message:`目前賽事會保留，不會被刪除。確定建立一場新的空白${isTester()?"測試":""}賽事？`, confirmLabel:isTester()?"新增測試賽事":"新增賽事", showNewTournamentRegistrationVersion:!isTester(), onConfirm:()=>doNewTournament(false) });
     } else { doNewTournament(false); }
     return;
   }
