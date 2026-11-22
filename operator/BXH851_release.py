@@ -21,6 +21,7 @@ PROJECT = "bxh-arena"
 REGION = "asia-east1"
 FUNCTION = "registrationRosterQueueV2"
 CODEBASE = "bxh-registration-v2-closed"
+DEPLOY_TARGET = f"functions:{CODEBASE}:{FUNCTION}"
 FILES = {
     "registration-flow-v2/backend/bindings.cjs": "4ecf3bcbf50245eaf71243a4146f60c533bdd3e3ae4ce2ac9b8b18b19cc0f103",
     "registration-flow-v2/backend/lifecycle.cjs": "1a157fa9e70c43c150bd8ab0118789043a0fba2517cadd03cb64e2b095a6f89f",
@@ -119,7 +120,7 @@ def main():
             env = dict(os.environ, GOOGLE_CLOUD_QUOTA_PROJECT=PROJECT)
             subprocess.run(["firebase", "deploy", "--project", PROJECT,
                             "--config", str(release / "firebase.json"), "--only",
-                            "functions:" + FUNCTION, "--non-interactive"],
+                            DEPLOY_TARGET, "--non-interactive"],
                            check=True, cwd=release, env=env)
             after = describe()
             if after == before:
