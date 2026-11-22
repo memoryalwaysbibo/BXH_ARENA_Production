@@ -6615,6 +6615,7 @@ function summarizeRecord(st){
     battleMode: st.meta.battleMode==="team"?"team":"individual", teamSize:Math.max(3,Number(st.meta.teamSize)||3), playMode:st.meta.playMode==="enchantment"?"enchantment":"standard",
     formatType: st.meta.formatType, format: st.meta.format,
     playerCount: st.players.length, championName: champ || null,
+    historicalGroupStage: !!st.historicalImportDigest,
     systemClosure: st.systemClosure||null,
     archiveStatus: st.archiveStatus, cloudCode: st.cloudCode || "", ladderMode: (st.meta && st.meta.ladderMode)==="ranked" ? "ranked" : "general", ladderPointsAwarded: st.ladderPointsAwarded===true, ladderSeasonId: st.ladderSeasonId||null,
     updatedAt: st.updatedAt, createdAt: st.createdAt, completedAt: st.completedAt, archivedAt: st.archivedAt
@@ -19688,6 +19689,7 @@ function renderHistoryDetail(rec){
   } finally { state = saved; }
 
   const groupHistoryBracket=bracketHtml.includes('id="bxh-group-history"');
+  const historicalGroupStage=!!rec.historicalImportDigest;
   const fmt = rec.meta.formatType || "single";
   const realMatches = (rec.matches||[]).filter(m=>!m.isBye);
   const completedMatches=realMatches.filter(m=>m.completed);
@@ -19719,12 +19721,12 @@ function renderHistoryDetail(rec){
     ${rec.testLadderSettlementNote?`<p role="status">${esc(rec.testLadderSettlementNote)}</p>`:""}
     <div class="hint">已完成賽事的結果、對戰表、逐場判決與參賽資料集中於此查閱。</div>
     <div class="grid grid-4" style="margin-top:14px;"><div class="stat-box"><div class="label">日期</div><div class="value small">${esc(rec.meta.date||"—")}</div></div><div class="stat-box"><div class="label">地點</div><div class="value small">${esc(rec.meta.location||"—")}</div></div><div class="stat-box"><div class="label">賽制</div><div class="value small">${esc(FORMAT_LABELS[fmt]||"")}</div></div><div class="stat-box"><div class="label">狀態</div><div class="value small">${esc(ARCHIVE_LABELS[rec.archiveStatus]||rec.archiveStatus)}</div></div></div>
-    <div class="grid grid-4" style="margin-top:12px;"><div class="stat-box"><div class="label">參賽人數</div><div class="value">${officialParticipantCount}</div></div><div class="stat-box"><div class="label">完成場次</div><div class="value">${doneCount} / ${realMatches.length}</div></div><div class="stat-box"><div class="label">賽事耗時</div><div class="value small">${durationMin==null?"—":durationMin+" 分鐘"}</div></div><div class="stat-box"><div class="label">平均每場</div><div class="value small">${fmtDuration(avgMatchSec)}</div></div></div>
+    <div class="grid grid-4" style="margin-top:12px;"><div class="stat-box"><div class="label">參賽人數</div><div class="value">${officialParticipantCount}</div></div>${historicalGroupStage?'<div class="stat-box"><div class="label">賽果</div><div class="value small">詳見分組賽對戰表</div></div>':`<div class="stat-box"><div class="label">完成場次</div><div class="value">${doneCount} / ${realMatches.length}</div></div><div class="stat-box"><div class="label">賽事耗時</div><div class="value small">${durationMin==null?"—":durationMin+" 分鐘"}</div></div><div class="stat-box"><div class="label">平均每場</div><div class="value small">${fmtDuration(avgMatchSec)}</div></div>`}</div>
     ${rec.archiveStatus==="completed" && !(rec.systemClosure&&!rec.systemClosure.restoredAt)?`<div class="banner" style="margin-top:14px;"><span>唯讀歷史紀錄｜${isSuperAdmin()?"最高管理員可解除封存進行更正。":"如需更正，請由最高管理員處理。"}</span>${isSuperAdmin()?`<button class="btn btn-ghost btn-sm" data-action="unarchive-record" data-id="${rec.id}">解除封存並編輯</button>`:""}</div>`:""}
   </div>
-  ${championHtml}
-  <div class="panel"><div class="panel-title">逐場判決紀錄</div>${matchRows?`<div class="rank-scroll"><table class="rank-table postmatch-match-table"><thead><tr><th>#</th><th>戰鬥台</th><th>比分</th><th>勝方</th><th>判決裁判</th><th>確認時間</th></tr></thead><tbody>${matchRows}</tbody></table></div>`:`<div class="empty-state">尚無可追溯的完成場次</div>`}<div class="hint" style="margin-top:10px;">v13.22.0 起的正式判定會保存實際確認裁判；更舊紀錄可能顯示「舊版未記錄」。</div></div>
-  <div class="panel"><div class="panel-title">最終排名</div>${renderStandingsTableGeneric(stats, fmt)}</div>
+  ${historicalGroupStage?'':championHtml}
+  ${historicalGroupStage?'':`<div class="panel"><div class="panel-title">逐場判決紀錄</div>${matchRows?`<div class="rank-scroll"><table class="rank-table postmatch-match-table"><thead><tr><th>#</th><th>戰鬥台</th><th>比分</th><th>勝方</th><th>判決裁判</th><th>確認時間</th></tr></thead><tbody>${matchRows}</tbody></table></div>`:`<div class="empty-state">尚無可追溯的完成場次</div>`}<div class="hint" style="margin-top:10px;">v13.22.0 起的正式判定會保存實際確認裁判；更舊紀錄可能顯示「舊版未記錄」。</div></div>
+  <div class="panel"><div class="panel-title">最終排名</div>${renderStandingsTableGeneric(stats, fmt)}</div>`}
   <div class="panel"><div class="panel-title">參賽名單與報到狀態</div><div class="rank-scroll"><table class="rank-table"><thead><tr><th>選手</th><th>報到狀態</th></tr></thead><tbody>${playerRows}</tbody></table></div></div>
   <div class="panel"><div class="panel-title">${groupHistoryBracket?"分組賽對戰表":"完整最終對戰表"}</div><div class="hint" style="margin-bottom:12px;">${groupHistoryBracket?"以下由分組賽紀錄服務核對後顯示；資料不一致時保留待核對狀態。":"以下為賽事完成後保存的唯讀對戰結果。"}</div>${bracketHtml}</div>
   </div>`;
@@ -19762,7 +19764,7 @@ function renderHistory(){
         </div>
         <span class="badge ${r.archiveStatus==='completed'?'badge-neon':r.archiveStatus==='paused'?'badge-metal':'badge-danger'}">${r.systemClosure&&!r.systemClosure.restoredAt?'比賽結束（系統關閉）':esc(ARCHIVE_LABELS[r.archiveStatus]||r.archiveStatus)}</span>
       </div>
-      <div class="hint" style="margin-top:6px;">冠軍：${r.championName?esc(r.championName):"—"}</div>
+      <div class="hint" style="margin-top:6px;">${r.historicalGroupStage?'分組賽事｜名次請查看分組賽紀錄':`冠軍：${r.championName?esc(r.championName):"—"}`}</div>
       <div class="btn-row" style="margin-top:10px;">
         <button class="btn btn-ghost btn-sm" data-action="view-record" data-id="${r.id}">${r.archiveStatus==='completed'?'查看賽後紀錄':'查看完整紀錄'}</button>
         ${r.archiveStatus!=='completed' && !isCurrent ? `<button class="btn btn-ghost btn-sm" data-action="resume-record" data-id="${r.id}">繼續此賽事</button>`:''}
