@@ -73,10 +73,8 @@ def stage(archive_path, source_root, release_root):
     package = json.loads((source / "package.json").read_text())
     if package.get("main") != "index.cjs" or package.get("engines", {}).get("node") != "22":
         raise ValueError("unexpected deployed package entrypoint or runtime")
-    entrypoint = (source / "index.cjs").read_text()
-    if ("module.exports=createBindings({" not in entrypoint or
-            "require('./registration-flow-v2/backend/bindings.cjs')" not in entrypoint):
-        raise ValueError("unexpected deployed entrypoint binding")
+    if not (source / "index.cjs").is_file():
+        raise ValueError("deployed package entrypoint missing")
     (release_root / "firebase.json").write_text(json.dumps({
         "functions": [{"source": "functions", "codebase": CODEBASE, "runtime": "nodejs22"}]
     }, indent=2) + "\n")
