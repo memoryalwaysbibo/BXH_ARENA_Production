@@ -6,7 +6,7 @@ const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
 const {advance:advanceQrCheckinFence}=require('../../qr-checkin/backend/qr-checkin-fence.cjs');
 const {startMs}=require('../../qr-checkin/backend/overlays/lifecycle/operations-core.js');
 const {registrationQueueOwnsRoom}=require('./legacy-writer.cjs');
-const {checkTicketContract,validRegistrationRoomCode,ticketLifecyclePath,authorizeTicketManager}=require('./ticket-host.cjs');
+const {checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,authorizeTicketManager}=require('./ticket-host.cjs');
 
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const commonFields=['code','roomId','rosterRevision','operationId'];
@@ -265,7 +265,7 @@ function createTicketScoreHandler({db,enabled=async()=>false,clock=Date.now}){
   if(!request.app)throw Error('permission-denied');
   const {action,code,roomId,matchId,matchUpdatedAt,operationId,command,side,finish}=input;
   if(action!=='ticket-room-score'||Object.keys(input).some(key=>!ticketScoreFields.has(key))||
-     !validRegistrationRoomCode(code)||![roomId,matchId].every(validId)||
+     !isPartnerRoomCode(code)||![roomId,matchId].every(validId)||
      !Number.isSafeInteger(matchUpdatedAt)||matchUpdatedAt<0||
      typeof operationId!=='string'||!/^[A-Za-z0-9_-]{8,100}$/.test(operationId)||
      !['score','undo','confirm'].includes(command)||
@@ -303,7 +303,8 @@ function createTicketScoreHandler({db,enabled=async()=>false,clock=Date.now}){
       publicMatch?.b?.playerId!==match.b.playerId||
       Number(publicMatch.scoreA||0)!==Number(match.scoreA||0)||
       Number(publicMatch.scoreB||0)!==Number(match.scoreB||0)||
-      !['standard',undefined,null].includes(match.scoringMode))throw Error('score-match-stale');
+      !['standard',undefined,null].includes(match.scoringMode)||
+      !['standard',undefined,null].includes(state.meta.scoringMode))throw Error('score-match-stale');
    const actorName=String(user.realName||user.gameId||user.displayName||'合作主辦').slice(0,80);
    const engine=createEngine(state,{uid,name:actorName},now,operationId);
    if(engine.singleElimRoundDispatchBlocked(match,state.matches,state.meta)||

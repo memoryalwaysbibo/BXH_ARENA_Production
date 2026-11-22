@@ -244,8 +244,10 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  assert.equal(live.eligibleCount,29);
  assert.equal(live.drawId,result.drawId);
  assert.ok(live.bracket.length>live.matches.length);
+ let scoredMatch={id:'not-scored'};
+ if(ptn){
  const score=createTicketScoreHandler(options);
- const scoredMatch=live.bracket.find(item=>item.round===0&&item.canScore);
+ scoredMatch=live.bracket.find(item=>item.round===0&&item.canScore);
  let scoreUpdatedAt=scoredMatch.updatedAt;
  const scoreRequest=(command,suffix,extra={})=>({auth:creation.auth,app:creation.app,
   data:{action:'ticket-room-score',code,roomId,matchId:scoredMatch.id,matchUpdatedAt:scoreUpdatedAt,
@@ -277,6 +279,7 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  assert.equal(JSON.parse(privateAfterScore.data().data).matches.find(item=>item.id===scoredMatch.id).winnerId,scoredMatch.a.id);
  assert.equal(JSON.parse(publicAfterScore.data().bracketView).matches.find(item=>item.id===scoredMatch.id).scoreA,4);
  assert.equal((await ticket.get()).data().status,'consumed');
+ }
  await assert.rejects(remove({...removal,data:{...removal.data,operationId:'late-host-cancel'}}),/tournament-started/);
  await assert.rejects(submit(other,'cancel','late-player-cancel'),/tournament-started/);
  const forfeit=createTicketForfeitHandler(options);

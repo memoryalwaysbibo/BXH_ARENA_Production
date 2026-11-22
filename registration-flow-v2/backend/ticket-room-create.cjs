@@ -1,5 +1,6 @@
 'use strict';
 const {forfeitMatchAvailable}=require('./lifecycle.cjs');
+const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
 
 const {createHash,randomBytes,randomUUID}=require('node:crypto');
 const {ticketHostGrant,checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,authorizeTicketManager,activeTicketManager}=require('./ticket-host.cjs');
@@ -161,6 +162,7 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
     ?state.matches.filter(forfeitMatchAvailable).map(match=>({id:match.id,seq:match.seq,round:match.round,
      a:{id:match.a.playerId,name:names.get(match.a.playerId)||'選手 A'},
      b:{id:match.b.playerId,name:names.get(match.b.playerId)||'選手 B'},updatedAt:match.updatedAt||0})):[];
+   const scoreEngine=room.tournamentPhase==='live'?createEngine(state,{uid,name:'合作主辦'},clock(),'ticket-room-state'):null;
    const bracket=room.tournamentPhase==='live'&&Array.isArray(state.matches)?state.matches.map(match=>({
     id:match.id,seq:match.seq,round:match.round,bracket:match.bracket||null,station:match.station||null,
     status:match.status||'pending',isBye:!!match.isBye,completed:!!match.completed,
@@ -169,7 +171,9 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
     scoreA:Number(match.scoreA||0),scoreB:Number(match.scoreB||0),winnerId:match.winnerId||null,
     updatedAt:match.updatedAt||0,
     canScore:gate.enabled===true&&!state.championId&&forfeitMatchAvailable(match)&&
-     !['quick'].includes(match.scoringMode)
+     !['quick'].includes(match.scoringMode)&&!['quick'].includes(state.meta.scoringMode)&&
+     !scoreEngine.singleElimRoundDispatchBlocked(match,state.matches,state.meta)&&
+     !scoreEngine.singleElimBronzeBeforeFinalBlocked(match,state.matches,state.meta)
    })):null;
    const delegate=room.ptnDelegateUid?(await tx.get(db.doc('users/'+room.ptnDelegateUid))).data():null;
    return {ok:true,code,roomId:state.id,name:room.name,location:room.location,
