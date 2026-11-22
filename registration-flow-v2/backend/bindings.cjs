@@ -24,7 +24,6 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   ?(pilotRoom!==null||await workersReady())&&await enabled(code,tx)===true
   :await ticketAllowed(code,tx));
  const queue=createQueue(db,{FieldValue,requireRoomOwnership:true,
-  onTiming:fields=>console.info(JSON.stringify({event:'registration-v2-worker-phase',...fields})),
   authorizeIntake:pilotRoom===null?undefined:intakeEnabled,
   handlers:{family:familyFactory,roster:rosterFactory,promotion:promotionFactory}});
  const api=createApi({queue,family:familyFactory(db),enabled:code=>isRetired(code)||intakeEnabled(code)});
