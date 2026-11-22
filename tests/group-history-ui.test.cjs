@@ -64,6 +64,24 @@ test('archived no-draw parent retains history entry even without current fronten
   assert.ok(html.includes('id="bxh-group-history"')); assert.ok(html.includes('data-auto="false"')); assert.ok(!html.includes('此賽事尚未產生對戰表'));
   assert.ok(html.includes('由分組賽紀錄服務核對後顯示')); assert.equal(c.state, original);
 });
+test('historical group archive does not show empty single-room scores or invented rankings', () => {
+  const core = fs.readFileSync('modules/main-app/core.js', 'utf8');
+  const start = core.indexOf('function renderHistoryDetail('), end = core.indexOf('\n}', start) + 2;
+  const c = vm.createContext({ window: { BXHGroupHistoryView: view, BXHGroupStageUi: { enabled: () => true } },
+    firebaseUser: { uid: 'owner' }, state: {}, computeStats: () => [], tournamentEligiblePlayers: players => players,
+    esc: view.esc, renderSystemClosureNotice: () => '', isSuperAdmin: () => false,
+    FORMAT_LABELS: { single: '單淘汰' }, ARCHIVE_LABELS: { completed: '已封存' },
+    renderStandingsTableGeneric: () => '<table>錯誤的單房排名</table>' });
+  vm.runInContext(core.slice(start, end), c);
+  const html = c.renderHistoryDetail({ id: 'historical', cloudCode: 'BXH-ABC123', historicalImportDigest: 'digest',
+    meta: { formatType: 'single' }, players: [{ id: 'p1', name: '甲', checkedIn: true }],
+    matches: [], bracketSize: 0, archiveStatus: 'completed' });
+  assert.ok(html.includes('分組賽對戰表'));
+  assert.ok(html.includes('詳見分組賽對戰表'));
+  assert.ok(!html.includes('完成場次'));
+  assert.ok(!html.includes('錯誤的單房排名'));
+  assert.ok(!html.includes('尚無可追溯的完成場次'));
+});
 test('unknown scores remain dashes, zero is displayed only when actually provided', () => {
   const data = fixture(); data.stages[0].matches[0].scoreA = null; data.stages[0].matches[0].scoreB = 0;
   const html = view.previews(data); assert.ok(html.includes('<b>—</b>')); assert.ok(html.includes('<b>0</b>'));
