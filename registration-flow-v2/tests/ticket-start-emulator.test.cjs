@@ -305,7 +305,7 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  await assert.rejects(remove({...removal,data:{...removal.data,operationId:'late-host-cancel'}}),/tournament-started/);
  await assert.rejects(submit(other,'cancel','late-player-cancel'),/tournament-started/);
  const forfeit=createTicketForfeitHandler(options);
- const match=live.matches.find(item=>item.round===0&&item.id!==scoredMatch.id);
+ const match=(await status(statusRequest)).matches.find(item=>item.round===0&&item.id!==scoredMatch.id);
  assert.ok(match);
  const forfeitData={action:'ticket-room-forfeit',code,roomId,matchId:match.id,
   playerId:match.a.id,opponentId:match.b.id,matchUpdatedAt:match.updatedAt,operationId:'ticket-forfeit-once'};
