@@ -1,0 +1,89 @@
+name: Validate ARENA R2 full guest lab (no release)
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/arena-r2-full-home-lab.yml'
+      - 'tests/e2e/r2-full-home/**'
+permissions:
+  contents: read
+concurrency:
+  group: arena-r2-full-home-lab-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  synthetic-only:
+    if: >-
+      ${{ github.event.pull_request.head.repo.full_name == github.repository &&
+          github.event.pull_request.head.ref == 'lab/r2-full-home-websdk-20261123' &&
+          github.event.pull_request.draft == true }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Reject any non-lab change before installing
+        shell: bash
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$PR_HEAD"
+          git diff --name-only "$PR_BASE...$PR_HEAD" | python3 -c '
+          import sys
+          workflow=".github/workflows/arena-r2-full-home-lab.yml"
+          prefix="tests/e2e/r2-full-home/"
+          names=["build-overlay.py","r2-anchors.json","home-summary-lab.js","firebase.json","firestore.rules","playwright.config.cjs","r2-full-home.e2e.cjs","README.md"]
+          required={workflow}|{prefix+n for n in names if n!="README.md"}
+          allowed={workflow}|{prefix+n for n in names}
+          actual=set(sys.stdin.read().splitlines())
+          if not required<=actual<=allowed: raise SystemExit("Unexpected R2 laboratory file inventory")
+          '
+      - name: Checkout exact public-application fixture base
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: cbfeb2904d3628e49bfb7527fd1f7f7ab63e1be2
+          path: .r2-pinned
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Build and verify exact three-file fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          lab="$GITHUB_WORKSPACE/tests/e2e/r2-full-home"
+          out="$RUNNER_TEMP/r2-home-overlay"
+          python3 "$lab/build-overlay.py" "$GITHUB_WORKSPACE/.r2-pinned" "$out"
+          node --check "$lab/r2-full-home.e2e.cjs"
+          printf 'R2_FIXTURE_REPO=%s\nR2_FIXTURE_OVERLAY=%s\n' "$GITHUB_WORKSPACE/.r2-pinned" "$out" >> "$GITHUB_ENV"
+      - name: Install exact isolated test tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/r2-tools" --save-exact --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0 firebase-tools@14.27.0
+      - name: Run exactly two full guest emulator browser tests
+        shell: bash
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+        run: |
+          set -euo pipefail
+          lab="$GITHUB_WORKSPACE/tests/e2e/r2-full-home"
+          export NODE_PATH="$RUNNER_TEMP/r2-tools/node_modules"
+          export PATH="$RUNNER_TEMP/r2-tools/node_modules/.bin:$PATH"
+          unset GCLOUD_PROJECT GOOGLE_CLOUD_PROJECT FIREBASE_CONFIG FIRESTORE_EMULATOR_HOST FIREBASE_AUTH_EMULATOR_HOST FIREBASE_EMULATOR_HUB GOOGLE_APPLICATION_CREDENTIALS
+          tmp="$(mktemp -d "$RUNNER_TEMP/r2-home-firebase.XXXXXXXX")"
+          export XDG_CONFIG_HOME="$tmp"
+          cd "$tmp"
+          firebase emulators:exec --only firestore --project demo-bxh-arena-r2-websdk --config "$lab/firebase.json" \
+            "playwright test --config=$lab/playwright.config.cjs"
