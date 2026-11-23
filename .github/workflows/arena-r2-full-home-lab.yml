@@ -19,8 +19,6 @@ jobs:
           github.event.pull_request.draft == true }}
     runs-on: ubuntu-24.04
     timeout-minutes: 12
-    container:
-      image: mcr.microsoft.com/playwright:v1.55.0-noble
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -72,10 +70,11 @@ jobs:
         run: |
           set -euo pipefail
           npm install --prefix "$RUNNER_TEMP/r2-tools" --save-exact --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0 firebase-tools@14.27.0
+          export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/r2-browsers"
+          node "$RUNNER_TEMP/r2-tools/node_modules/@playwright/test/cli.js" install --with-deps chromium
+          printf 'PLAYWRIGHT_BROWSERS_PATH=%s\n' "$PLAYWRIGHT_BROWSERS_PATH" >> "$GITHUB_ENV"
       - name: Run exactly two full guest emulator browser tests
         shell: bash
-        env:
-          PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
         run: |
           set -euo pipefail
           lab="$GITHUB_WORKSPACE/tests/e2e/r2-full-home"
