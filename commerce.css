@@ -3,3 +3,12 @@
 .commerce-ticket-status{display:inline-block;width:max-content;margin:0;padding:5px 10px;border:1px solid rgba(255,192,82,.55);border-radius:999px;color:#ffd58a;font-weight:700;background:rgba(255,192,82,.1)}
 
 .commerce-ticket-card img{aspect-ratio:2/1;background:transparent;border-radius:0}.commerce-detail .commerce-hero[src^="assets/commerce/tickets/"]{aspect-ratio:2/1;background:transparent;border-radius:0}
+
+/* PTN uses the official two-player scoring layout, with its supported actions. */
+.commerce-ptn-courts{margin-top:14px}
+.commerce-ptn-court{min-width:0;overflow:hidden}
+.commerce-ptn-court-header{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 16px 8px;color:#f3f4f6}
+.commerce-ptn-court-header span{color:#e3c264;font-size:12px;font-weight:800}
+.commerce-ptn-court .ref-vs-mark{color:#e3c264;font-weight:900;font-size:15px}
+.commerce-ptn-court .ref-confirm-result{grid-column:1/-1}
+@media(max-width:520px){.commerce-ptn-court-header{align-items:flex-start;flex-direction:column}.commerce-ptn-court .side-name{overflow-wrap:anywhere}}

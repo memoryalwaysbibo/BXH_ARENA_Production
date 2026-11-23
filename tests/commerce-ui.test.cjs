@@ -427,12 +427,34 @@ test('PTN live takeover shows bracket and scores only its verified room',async()
  t.sandbox.activeTab='bracket';
  assert.match(t.ui.ticketManagedTab('bracket'),/甲 3 : 0 乙/);
  t.sandbox.activeTab='referee';
- assert.match(t.ui.ticketManagedTab('referee'),/旋轉 \+1/);
+ const panel=t.ui.ticketManagedTab('referee');
+ assert.match(panel,/court-grid court-grid-1 commerce-ptn-courts/);
+ assert.match(panel,/ref-vs-arena standard/);
+ assert.match(panel,/旋轉勝利＋1分/);
+ assert.match(panel,/擊飛勝利＋2分/);
+ assert.match(panel,/爆裂勝利＋2分/);
+ assert.match(panel,/極限勝利＋3分/);
+ assert.match(panel,/撤回上一筆得分/);
+ assert.match(panel,/data-command="confirm" disabled/);
+ assert.equal((panel.match(/data-command="score"/g)||[]).length,8);
  await t.ui.handle('commerce-ticket-score',{dataset:{id:match.id,command:'score',side:'A',finish:'spin'}});
  assert.deepEqual(calls.at(-1),{action:'ticket-room-score',code,roomId:'ticket-room-generation',
   matchId:match.id,matchUpdatedAt:123,command:'score',side:'A',finish:'spin',operationId:'same-operation'});
  t.setUid('another-user');
  assert.equal(t.ui.ticketManagementContext(),null);
+});
+test('PTN official-style score panel locks scoring at four and recommends the winning side',()=>{
+ const t=setup({partner:true}),code='PTN-TST001';
+ t.sandbox.activeTab='referee';
+ const c=t.ui.context();c.view='ticket-manage';c.ownedPtn={code};c.ticketRoomOpen=true;c.roomManageOpen=true;
+ c.ticketRoom={ok:true,code,name:'測試',phase:'live',bracket:[{id:'m1',round:0,seq:0,station:1,
+  canScore:true,scoreA:1,scoreB:4,a:{name:'甲'},b:{name:'乙'}}]};
+ const panel=t.ui.ticketManagedTab('referee');
+ assert.match(panel,/待確認賽果/);
+ assert.match(panel,/建議：乙 勝/);
+ assert.match(panel,/data-command="confirm" >確認比賽結果/);
+ assert.equal((panel.match(/data-command="score"[^>]*disabled/g)||[]).length,8);
+ assert.doesNotMatch(panel,/data-action="score"|data-command="fault"|本局重賽/);
 });
 test('PTN owner alone can assign one delegate and a super admin can enter by room code',async()=>{
  const t=setup(),code='PTN-AGENT1';
