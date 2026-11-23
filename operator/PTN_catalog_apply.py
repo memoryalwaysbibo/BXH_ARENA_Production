@@ -4,11 +4,13 @@ import argparse
 import json
 import subprocess
 import time
+import urllib.error
 import urllib.request
 
 from PTN_catalog_stage import CATALOG, ROOT, field, read, scalar, stage
 
 COMMIT = ROOT + ':commit'
+RESOURCE = ROOT.removeprefix('https://firestore.googleapis.com/v1/')
 SALE = 'systemSettings/commerceTicketPtnSaleV1'
 STORE = 'systemSettings/commerceV1'
 
@@ -28,7 +30,7 @@ def prepare(token, now):
             fields['createdAt'] = field(now)
         fields['updatedAt'] = field(now)
         fields['updatedBy'] = field('operator:PTN_catalog_apply')
-        writes.append({'update': {'name': ROOT + '/commerceProducts/' + proposal['id'],
+        writes.append({'update': {'name': RESOURCE + '/commerceProducts/' + proposal['id'],
                                   'fields': fields},
                        'currentDocument': proposal['precondition']})
     return specs, writes
@@ -39,8 +41,12 @@ def apply(token, writes):
         COMMIT, data=json.dumps({'writes': writes}).encode(), method='POST',
         headers={'Authorization': 'Bearer ' + token,
                  'Content-Type': 'application/json'})
-    with urllib.request.urlopen(request, timeout=60) as response:
-        result = json.load(response)
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            result = json.load(response)
+    except urllib.error.HTTPError as error:
+        raise ValueError('Firestore commit rejected: ' +
+                         error.read().decode('utf-8', errors='replace')[:1200]) from error
     if len(result.get('writeResults', [])) != len(writes):
         raise ValueError('unexpected write count; inspect products before retry')
 

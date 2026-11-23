@@ -29,6 +29,8 @@ class DraftApplyTest(unittest.TestCase):
             _, writes = candidate.prepare('token', 456)
         self.assertEqual(len(writes), 5)
         self.assertEqual(writes[0]['currentDocument'], {'updateTime': current['updateTime']})
+        self.assertEqual(writes[0]['update']['name'],
+                         'projects/bxh-arena/databases/(default)/documents/commerceProducts/' + first['id'])
         self.assertEqual(writes[0]['update']['fields']['createdAt'], field(123))
         self.assertTrue(all(w['currentDocument'] == {'exists': False} for w in writes[1:]))
         self.assertTrue(all(w['update']['fields']['status'] == field('draft') for w in writes))
