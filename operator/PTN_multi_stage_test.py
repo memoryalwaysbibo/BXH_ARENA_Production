@@ -10,6 +10,32 @@ import PTN_multi_stage as release
 
 
 class StageTest(unittest.TestCase):
+    def test_main_selects_three_candidate_directories(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'stage'
+            root.mkdir()
+            seen = {}
+            targets = {'registrationQueueV2': ('11', ()),
+                       'commerceService': ('22', ()),
+                       'ladderAutoSettlement': ('33', ())}
+            def fake_checkout(path, repo, ref):
+                path.mkdir()
+            def fake_describe(name):
+                return ('bucket', 'source.zip', targets[name][0], 'codebase')
+            def fake_stage(root, name, binding, candidate, category):
+                seen[name] = (candidate, category)
+                return {'function': name, 'generation': binding[2], 'codebase': binding[3]}
+            with (patch.dict(release.TARGETS, targets, clear=True),
+                  patch.object(release.tempfile, 'mkdtemp', return_value=str(root)),
+                  patch.object(release, 'checkout', side_effect=fake_checkout),
+                  patch.object(release, 'describe', side_effect=fake_describe),
+                  patch.object(release, 'stage_one', side_effect=fake_stage)):
+                release.main()
+            self.assertEqual(seen, {
+                'registrationQueueV2': (root / 'candidates/front', 'room'),
+                'commerceService': (root / 'candidates/commerce/release/commerce/functions', 'commerce'),
+                'ladderAutoSettlement': (root / 'candidates/settlement/release/bucket-settlement-package/auto', 'settlement')})
+
     def test_preserves_unreviewed_files_and_rejects_source_drift(self):
         live = {'domain.cjs': b'module.exports=1;', 'service.cjs': b'module.exports=2;',
                 'ticket-purchase.cjs': b'module.exports=3;',

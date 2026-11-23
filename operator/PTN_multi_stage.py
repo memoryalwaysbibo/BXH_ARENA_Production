@@ -142,6 +142,15 @@ def stage_one(root, name, binding, candidate, category):
             'sourceSha256': digest(live_zip.read_bytes()), 'replaced': list(paths),
             'added': [PROOF[0]] if category == 'settlement' else []}
 
+def candidate_path(checkouts, category):
+    if category == 'room':
+        return checkouts / 'front'
+    if category == 'commerce':
+        return checkouts / 'commerce' / 'release/commerce/functions'
+    if category == 'settlement':
+        return checkouts / 'settlement' / 'release/bucket-settlement-package/auto'
+    raise ValueError('unexpected candidate category')
+
 def main():
     out = Path(tempfile.mkdtemp(prefix='bxh-ptn-stage-'))
     checkouts = out / 'candidates'
@@ -154,11 +163,9 @@ def main():
         binding = describe(name)
         if binding[2] != generation or not binding[3]:
             raise ValueError(name + ': live generation or codebase changed')
-        category = 'room' if name.startswith('registration') else 'commerce' if name == 'commerceService' else 'settlement'
-        report.append(stage_one(out, name, binding, checkouts[
-            'front' if category == 'room' else category] / (
-                'release/commerce/functions' if category == 'commerce' else
-                'release/bucket-settlement-package/auto' if category == 'settlement' else '.'), category))
+        category = ('room' if name.startswith('registration') else
+                    'commerce' if name in ('commerceService', 'commerceDelivery') else 'settlement')
+        report.append(stage_one(out, name, binding, candidate_path(checkouts, category), category))
         if describe(name) != binding:
             raise ValueError(name + ': source changed during staging')
     (out / 'report.json').write_text(json.dumps({'status': 'STAGED_ONLY',
