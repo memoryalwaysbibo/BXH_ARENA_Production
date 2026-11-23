@@ -73,7 +73,7 @@ def stage(catalog, current, existing, sale, store):
         fields['sort'] = field(cap)
         fields['delivery'] = {'mapValue': {'fields': {
             key: field(str(cap) if key == 'assetId' else value)
-            for key, value in catalog['delivery'].items()}}}
+            for key, value in {**catalog['delivery'], 'assetId': str(cap)}.items()}}}
         proposals.append({'id': spec['id'], 'fields': fields,
                           'precondition': {'updateTime': current['updateTime']}
                           if cap == 32 else {'exists': False}})
