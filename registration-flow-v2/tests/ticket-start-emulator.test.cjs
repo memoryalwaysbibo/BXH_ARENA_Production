@@ -89,7 +89,7 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
   assert.match(roomId,/^[a-f0-9-]{36}$/);
   assert.equal((await ptnStatus(ptnStatusRequest)).code,code);
   assert.equal((await db.doc('publicTournaments/'+collisionCode).get()).data().sentinel,true);
-  await assert.rejects(create({...creation,data:{...creation.data,operationId:'another-ticket-create'}}),/ticket-ptn-slot-occupied/);
+  await assert.rejects(create({...creation,data:{...creation.data,operationId:'another-ticket-create'}}),/room-code-conflict/);
  }
  assert.ok(creations.every(result=>result.code===code));
  assert.equal(creations.filter(result=>result.replayed).length,1);
