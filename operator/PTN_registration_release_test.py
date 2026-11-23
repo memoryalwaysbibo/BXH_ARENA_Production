@@ -8,6 +8,20 @@ import PTN_registration_release as release
 
 
 class RegistrationReleaseTest(unittest.TestCase):
+    def test_fingerprint_ignores_metadata_only_changes_but_detects_source_drift(self):
+        name = 'registrationQueueV2Worker'
+        info = {'buildConfig': {'entryPoint': name, 'runtime': 'nodejs22',
+                                'source': {'storageSource': {'bucket': 'source',
+                                                             'object': 'code.zip',
+                                                             'generation': release.GENERATION[name]}}},
+                'labels': {'firebase-functions-codebase': release.CODEBASE},
+                'updateTime': 'earlier'}
+        refreshed = json.loads(json.dumps(info))
+        refreshed['updateTime'] = 'later'
+        self.assertEqual(release.fingerprint(info), release.fingerprint(refreshed))
+        refreshed['buildConfig']['source']['storageSource']['generation'] = 'changed'
+        self.assertNotEqual(release.fingerprint(info), release.fingerprint(refreshed))
+
     def test_staged_source_and_generation_must_match_selected_function(self):
         name = 'registrationRosterQueueV2'
         info = {'buildConfig': {'entryPoint': name, 'runtime': 'nodejs22',

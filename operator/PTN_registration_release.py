@@ -43,6 +43,16 @@ def identity(info):
             service.get('environmentVariables'))
 
 
+def fingerprint(info):
+    source = info.get('buildConfig', {}).get('source', {}).get('storageSource', {})
+    service = info.get('serviceConfig', {})
+    return (source.get('bucket'), source.get('object'), str(source.get('generation')),
+            identity(info), info.get('buildConfig', {}).get('environmentVariables'),
+            service.get('availableCpu'), service.get('maxInstanceCount'),
+            service.get('maxInstanceRequestConcurrency'), service.get('ingressSettings'),
+            info.get('eventTrigger', {}).get('retryPolicy'))
+
+
 def preflight(root, name, before):
     source = before.get('buildConfig', {}).get('source', {}).get('storageSource', {})
     if (str(source.get('generation')) != GENERATION[name] or
@@ -75,7 +85,7 @@ def main():
     name = args.name
     before = describe(name)
     code = preflight(args.stage_root, name, before)
-    if describe(name) != before:
+    if fingerprint(describe(name)) != fingerprint(before):
         raise ValueError(name + ': live function changed during preflight')
     print('PTN_REGISTRATION_PREFLIGHT_OK', name, GENERATION[name], flush=True)
     if not args.apply:
@@ -88,7 +98,7 @@ def main():
     try:
         subprocess.run(['npm', '--prefix', str(code), 'install', '--omit=dev',
                         '--ignore-scripts', '--no-audit', '--no-fund'], check=True)
-        if describe(name) != before:
+        if fingerprint(describe(name)) != fingerprint(before):
             raise ValueError(name + ': live function changed before deploy')
         env = dict(os.environ, GOOGLE_CLOUD_QUOTA_PROJECT=PROJECT)
         subprocess.run(['firebase', 'deploy', '--config', str(release / 'firebase.json'),
