@@ -47,6 +47,14 @@ function errorMessage(e){
  for(const [k,v]of Object.entries(labels))if(m.includes(k))return v;
  return '連線尚未確認，請重試；系統會沿用原操作避免重複下單。';
 }
+function ticketRoomReadError(e){
+ const message=String(e?.message||e||'');
+ if(message.includes('app-check-unavailable')||message.includes('網站驗證未完成'))return '網站驗證未完成，請重新載入頁面後重試。';
+ if(message.includes('permission-denied')||message.includes('unauthenticated')||message.includes('auth-required'))return '管理權限驗證失敗，請確認目前登入的帳號與此房主辦或代理人相同。';
+ if(message.includes('deadline-exceeded')||message.includes('initialization-timeout'))return '賽事資料讀取逾時，請重新整理賽事。';
+ if(message.includes('unavailable')||message.includes('network-request-failed'))return '目前無法連接賽事服務，請確認網路後重新整理賽事。';
+ return errorMessage(e);
+}
 const permanentErrors=/forfeit-(room-not-live|match-stale|round-waiting)|registration-(queue-pending|queue-disabled|roster-stale)|early-start-confirmation-required|bracket-started|ticket-lifecycle-disabled|ticket-unavailable|ticket-expired|ticket-binding-invalid|room-code-conflict|ticket-ptn-slot-occupied|bracket-version-conflict|bracket-roster-changed|permission-denied|not-found|partner-organizer-required|ticket-holding-limit|ticket-monthly-limit|product-unavailable|store-closed|delivery-not-ready|product-changed|version-conflict|contract-required|contract-expired|unpaid-order-exists|already-owned|bank-receipt-used|amount-mismatch|payment-window-closed|invalid-|refund-needs-review|transition-forbidden|cancel-unavailable|account-inactive|super-admin-required|order-unavailable/;
 const money=n=>'NT$ '+Number(n||0).toLocaleString('zh-TW');
 const date=n=>n?new Date(n).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'—';
@@ -90,7 +98,7 @@ async function load(kind,more=false){
   if(kind==='my-tickets'&&Array.isArray(r.tickets))c.tickets=r.tickets;
   if(r.orders){c.orders=more?[...(c.orders||[]),...r.orders]:r.orders;c.ordersCursor=r.nextCursor;}
   if(kind==='admin-config'){c.config=r.config;c.capabilities=r.capabilities;c.configDraft={enabled:r.config?.enabled===true,paymentHours:r.config?.paymentHours||48,bankCode:r.config?.bank?.bankCode||'',bankName:r.config?.bank?.bankName||'',branch:r.config?.bank?.branch||'',accountName:r.config?.bank?.accountName||'',accountNumber:r.config?.bank?.accountNumber||''};}
- }catch(e){if(c===context()&&generation===c.generation)c.error=errorMessage(e);}finally{if(c===context()&&generation===c.generation){c.loading=false;render();}}
+ }catch(e){if(c===context()&&generation===c.generation)c.error=kind==='ticket-room-state'?ticketRoomReadError(e):errorMessage(e);}finally{if(c===context()&&generation===c.generation){c.loading=false;render();}}
 }
 async function mutate(payload){
  const c=context();if(c.busy||c.loading)return;
