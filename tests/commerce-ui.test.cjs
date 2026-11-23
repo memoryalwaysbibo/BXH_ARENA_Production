@@ -47,6 +47,16 @@ test('partner organizer can open the storefront and orders in both management in
  assert.match(nav.renderRails('commerce-orders',['management','commerce-shop','commerce-orders']),/data-management-v2-tab="commerce-orders"/);
  assert.ok(!nav.renderRails('management',['management','live']).includes('data-management-v2-group="commerce"'));
 });
+test('partner ticket room entry is available without an old pilot URL flag',()=>{
+ const index=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+ assert.match(index,/window\.BXH_PTN_TICKET_SALE = true;/);
+ assert.doesNotMatch(index,/get\("ptnSale"\)/);
+ const t=setup({partner:true});
+ t.sandbox.window.BXH_PTN_TICKET_SALE=true;
+ assert.equal(t.ui.ticketPilot(),true);
+ t.setPartner(false);
+ assert.equal(t.ui.ticketPilot(),false);
+});
 test('an old admin catalog response cannot populate the player shop after navigation',async()=>{
  const t=setup();t.setAdmin(true);t.ui.adminPage();
  let resolve;t.sandbox.window.engagementService.commerce=()=>new Promise(r=>resolve=r);
