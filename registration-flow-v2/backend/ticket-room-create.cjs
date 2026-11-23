@@ -2,7 +2,7 @@
 const {forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked}=require('./lifecycle.cjs');
 
 const {createHash,randomBytes,randomUUID}=require('node:crypto');
-const {ticketHostGrant,checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,authorizeTicketManager,activeTicketManager}=require('./ticket-host.cjs');
+const {ticketHostGrant,checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,resolveTicketGate,authorizeTicketManager,activeTicketManager}=require('./ticket-host.cjs');
 const {authorizeTicketRemoval}=require('./queue.cjs');
 
 const fields=new Set(['action','code','ticketId','operationId','name','location','stations',
@@ -10,6 +10,8 @@ const fields=new Set(['action','code','ticketId','operationId','name','location'
 const roomIdPattern=/^[A-Za-z0-9_-]{8,100}$/;
 const digest=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const ptnReleasePath='systemSettings/commerceTicketPtnPilotV1';
+const ptnSalePath='systemSettings/commerceTicketPtnSaleV1';
+const ptnPrices=Object.freeze({'32':300,'64':600,'96':1000,'128':1500,'160':2000});
 
 function requestData(input){
  if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(key=>!fields.has(key))||
@@ -50,7 +52,73 @@ function roomDocuments({input,capacity,owner,grant,roomId,now}){
  };
 }
 
+function createSaleTicketRoomHandler({db,clock,newPartnerCode}){
+ return async request=>{
+  const uid=request.auth?.uid;
+  if(typeof uid!=='string'||!/^[-A-Za-z0-9_]{1,128}$/.test(uid))throw Error('auth-required');
+  if(!request.app)throw Error('permission-denied');
+  const input=requestData(request.data);
+  if(input.code!==undefined)throw Error('invalid-operation');
+  const {ticketId,operationId}=input,requestHash=digest(input);
+  const ticketRef=db.doc('commerceTickets/'+ticketId),orderRef=db.doc('commerceOrders/'+ticketId);
+  const saleRef=db.doc(ptnSalePath),indexRef=db.doc('commerceTicketHostIndex/'+uid);
+  const operationRef=db.doc('commerceTicketRoomCreateOps/'+digest([uid,operationId]));
+  const attempt=candidate=>db.runTransaction(async tx=>{
+   const now=clock();
+   const [actor,ticketSnap,orderSnap,saleSnap,operationSnap,indexSnap]=await tx.getAll(
+    db.doc('users/'+uid),ticketRef,orderRef,saleRef,operationRef,indexRef);
+   const grant=ticketHostGrant(actor.data(),now),ticket=ticketSnap.data(),order=orderSnap.data(),sale=saleSnap.data();
+   if(!grant)throw Error('permission-denied');
+   if(sale?.enabled!==true)throw Error('ticket-lifecycle-disabled');
+   const code=operationSnap.exists?operationSnap.data().code:candidate;
+   if(!isPartnerRoomCode(code))throw Error('room-code-conflict');
+   const room=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code),gateRef=db.doc('commerceTicketRoomGates/'+code);
+   const receipt=room.collection('operationLog').doc('ticket-room-create-'+digest([uid,operationId]));
+   const [roomSnap,pubSnap,gateSnap,receiptSnap]=await tx.getAll(room,pub,gateRef,receipt);
+   if(operationSnap.exists){
+    const prior=operationSnap.data(),existing=roomSnap.data();
+    if(prior.ownerUid!==uid||prior.ticketId!==ticketId||prior.requestHash!==requestHash||
+       !receiptSnap.exists||receiptSnap.data().requestHash!==requestHash||
+       receiptSnap.data().roomId!==prior.roomId||existing?.ownerUid!==uid||
+       existing.ticketAccessV1?.ticketId!==ticketId||gateSnap.data()?.roomId!==prior.roomId||
+       ticket?.boundRoomCode!==code||ticket?.boundRoomId!==prior.roomId)throw Error('operation-conflict');
+    return {ok:true,code,roomId:prior.roomId,replayed:true};
+   }
+   if(roomSnap.exists||pubSnap.exists||gateSnap.exists)throw Error('room-code-conflict');
+   const spec=order?.productSnapshot?.delivery,capacity=Number(spec?.assetId);
+   if(order?.id!==ticketId||order.ownerUid!==uid||order.ticketPurchaseVersion!==3||
+      order.paymentStatus!=='paid'||order.deliveryStatus!=='delivered'||
+      order.ticketOrganizationId!==grant.organizationId||(order.contractCode||null)!==grant.order||
+      spec?.kind!=='ticket'||spec?.quantity!==1||spec?.durationDays!==0||
+      sale.productIds?.[spec.assetId]!==order.productSnapshot.id||
+      ptnPrices[spec.assetId]!==order.amountTwd||
+      ticket?.version!==2||ticket.id!==ticketId||ticket.orderId!==ticketId||
+      ticket.ownerUid!==uid||ticket.status!=='available'||ticket.usedAt||
+      ticket.boundRoomCode!==null||ticket.boundRoomId!=null||ticket.expiresAt!==null||
+      ticket.capacity!==capacity||ticket.addedCapacity!==0||
+      (ticket.contractCode||null)!==grant.order)throw Error('ticket-binding-invalid');
+   if(input.registrationCloseAt<=now||input.startAt<=now||input.startAt>=grant.expiresAt)throw Error('invalid-operation');
+   if(grant.order)checkTicketContract((await tx.get(db.doc('partnerContracts/'+grant.order))).data(),grant,uid);
+   const roomId=randomUUID();
+   const {privateRoom,publicRoom}=roomDocuments({input:{...input,code},capacity,owner:uid,grant,roomId,now});
+   tx.create(room,{...privateRoom,ptnSettlementVersion:1});
+   tx.create(pub,{...publicRoom,ptnSettlementVersion:1});
+   tx.create(gateRef,{enabled:true,bindingEnabled:true,ownerUid:uid,roomCode:code,roomId,ticketId,createdAt:now});
+   tx.update(ticketRef,{status:'reserved',boundRoomCode:code,boundRoomId:roomId,updatedAt:now});
+   tx.set(indexRef,{ownerUid:uid,latestRoomCode:code,updatedAt:now},{merge:true});
+   tx.create(operationRef,{ownerUid:uid,ticketId,requestHash,code,roomId,at:now});
+   tx.create(receipt,{requestHash,roomId});
+   return {ok:true,code,roomId};
+  });
+  for(let i=0;i<5;i++){
+   try{return await attempt(newPartnerCode());}
+   catch(error){if(error.message!=='room-code-conflict'||i===4)throw error;}
+  }
+ };
+}
+
 function createTicketRoomHandler({db,clock=Date.now,newPartnerCode=()=>`PTN-${randomBytes(3).toString('hex').toUpperCase()}`}){
+ const saleCreate=createSaleTicketRoomHandler({db,clock,newPartnerCode});
  return async request=>{
   const uid=request.auth?.uid;
   if(typeof uid!=='string'||!/^[-A-Za-z0-9_]{1,128}$/.test(uid))throw Error('auth-required');
@@ -58,23 +126,29 @@ function createTicketRoomHandler({db,clock=Date.now,newPartnerCode=()=>`PTN-${ra
   const input=requestData(request.data),{ticketId,operationId}=input;
   const auto=input.code===undefined;
   const ticket=db.doc('commerceTickets/'+ticketId),order=db.doc('commerceOrders/'+ticketId);
+  if(auto&&(await order.get()).data()?.ticketPurchaseVersion===3)return saleCreate(request);
   const release=db.doc(auto?ptnReleasePath:ticketLifecyclePath(input.code));
   const requestHash=digest(input);
+  const createOperation=auto?db.doc('commerceTicketRoomCreateOps/'+digest([uid,operationId])):null;
   const attempt=candidate=>db.runTransaction(async tx=>{
    const now=clock();
-   const [profileSnap,ticketSnap,orderSnap,gateSnap]=await tx.getAll(db.doc('users/'+uid),ticket,order,release);
+   const [profileSnap,ticketSnap,orderSnap,gateSnap,createSnap]=await tx.getAll(db.doc('users/'+uid),ticket,order,release,...(auto?[createOperation]:[]));
    const grant=ticketHostGrant(profileSnap.data(),now);
    if(!grant)throw Error('permission-denied');
    const held=ticketSnap.data(),paid=orderSnap.data(),gate=gateSnap.data();
    if(auto&&(!gate||gate.ownerUid!==uid))throw Error('ticket-lifecycle-disabled');
-   const code=auto?(gate.roomCode??candidate):input.code;
+   const legacyReceipt=auto&&gate?.roomCode
+    ?await tx.get(db.doc('tournaments/'+gate.roomCode).collection('operationLog').doc('ticket-room-create-'+digest([uid,operationId])))
+    :null;
+   const code=auto?(createSnap?.data()?.code|| (legacyReceipt?.exists?gate.roomCode:candidate)):input.code;
    if(auto&&!isPartnerRoomCode(code))throw Error('ticket-lifecycle-disabled');
    const room=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code);
    const receipt=room.collection('operationLog').doc('ticket-room-create-'+digest([uid,operationId]));
    const [roomSnap,publicSnap,receiptSnap]=await tx.getAll(room,pub,receipt);
-   if(receiptSnap.exists){
+   if(receiptSnap.exists||createSnap?.exists){
     const prior=receiptSnap.data(),existing=roomSnap.data();
-    if(prior.requestHash!==requestHash)throw Error('operation-conflict');
+    if(prior?.requestHash!==requestHash||createSnap?.exists&&
+       (createSnap.data().requestHash!==requestHash||createSnap.data().code!==code||createSnap.data().roomId!==prior?.roomId))throw Error('operation-conflict');
     if(!existing||publicSnap.data()?.ticketRoomVersion!==1||existing.ownerUid!==uid||
        existing.ticketAccessV1?.ticketId!==ticketId||existing.ticketAccessV1?.roomId!==prior.roomId||
        held?.boundRoomCode!==code||held?.boundRoomId!==prior.roomId)throw Error('room-receipt-inconsistent');
@@ -83,7 +157,7 @@ function createTicketRoomHandler({db,clock=Date.now,newPartnerCode=()=>`PTN-${ra
    if(gate?.bindingEnabled!==true||gate.ownerUid!==uid)throw Error('ticket-lifecycle-disabled');
    if(auto){
     if(gate.enabled!==true)throw Error('ticket-lifecycle-disabled');
-    if(gate.roomCode!=null||gate.roomId!=null)throw Error('ticket-ptn-slot-occupied');
+    if(Object.keys(gate.rooms||{}).length>=8)throw Error('ticket-ptn-slot-occupied');
    }else if(gate.roomCode!==code||!roomIdPattern.test(gate.roomId||''))throw Error('ticket-lifecycle-disabled');
    if(roomSnap.exists||publicSnap.exists)throw Error('room-code-conflict');
    if(held?.version!==1||held.id!==ticketId||held.orderId!==ticketId||held.ownerUid!==uid||
@@ -102,7 +176,11 @@ function createTicketRoomHandler({db,clock=Date.now,newPartnerCode=()=>`PTN-${ra
    tx.create(room,privateRoom);
    tx.create(pub,publicRoom);
    tx.update(ticket,{status:'reserved',boundRoomCode:code,boundRoomId:roomId,updatedAt:now});
-   if(auto)tx.update(release,{roomCode:code,roomId});
+   if(auto){
+    const rooms={...(gate.rooms||{}),[code]:{roomId,ownerUid:uid}};
+    tx.update(release,{rooms,latestRoomCode:code,...(gate.roomCode?{}:{roomCode:code,roomId})});
+    tx.create(createOperation,{requestHash,code,roomId,ticketId,ownerUid:uid,at:now});
+   }
    tx.create(receipt,{requestHash,roomId});
    return {ok:true,code,roomId};
   });
@@ -119,12 +197,20 @@ function createPtnStatusHandler({db,clock=Date.now}){
   if(!uid)throw Error('auth-required');
   if(!request.app)throw Error('permission-denied');
   if(data?.action!=='ticket-ptn-status'||Object.keys(data).length!==1)throw Error('invalid-operation');
-  const [actor,config]=await db.getAll(db.doc('users/'+uid),db.doc(ptnReleasePath));
+  const [actor,config,index,sale]=await db.getAll(db.doc('users/'+uid),db.doc(ptnReleasePath),
+   db.doc('commerceTicketHostIndex/'+uid),db.doc(ptnSalePath));
   const gate=config.data();
-  if(!ticketHostGrant(actor.data(),clock())||gate?.ownerUid!==uid||
-     gate.bindingEnabled!==true||gate.enabled!==true)throw Error('permission-denied');
+  if(!ticketHostGrant(actor.data(),clock()))throw Error('permission-denied');
+  if(sale.data()?.enabled===true){
+   const latest=index.data()?.ownerUid===uid?index.data().latestRoomCode:null;
+   if(latest!=null&&!isPartnerRoomCode(latest))throw Error('ticket-lifecycle-disabled');
+   return {ok:true,code:latest,canCreate:true};
+  }
+  if(gate?.ownerUid!==uid||gate.bindingEnabled!==true||gate.enabled!==true)throw Error('permission-denied');
   if(gate.roomCode!=null&&!isPartnerRoomCode(gate.roomCode))throw Error('ticket-lifecycle-disabled');
-  return {ok:true,code:gate.roomCode??null};
+  const latest=gate.latestRoomCode??gate.roomCode??null;
+  if(latest&&!isPartnerRoomCode(latest))throw Error('ticket-lifecycle-disabled');
+  return {ok:true,code:latest,canCreate:Object.keys(gate.rooms||{}).length<8};
  };
 }
 function createTicketRoomStateHandler({db,clock=Date.now}){
@@ -138,7 +224,7 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
   return db.runTransaction(async tx=>{
    const [actor,gateSnap,roomSnap]=await tx.getAll(db.doc('users/'+uid),
     db.doc(ticketLifecyclePath(code)),db.doc('tournaments/'+code));
-   const gate=gateSnap.data(),room=roomSnap.data();
+   const gate=await resolveTicketGate(db,code,tx,gateSnap.data()),room=roomSnap.data();
    if(gate?.bindingEnabled!==true&&gate?.enabled!==true)throw Error('ticket-lifecycle-disabled');
    if(!room)throw Error('not-found');
    const authority=await authorizeTicketManager(tx,db,{uid,user:actor.data(),room,gate,code,now:clock()});
@@ -209,7 +295,7 @@ function createTicketScheduleHandler({db,clock=Date.now}){
    const now=clock();
    const [actorSnap,gateSnap,roomSnap,publicSnap,receiptSnap]=await tx.getAll(
     db.doc('users/'+uid),db.doc(ticketLifecyclePath(code)),roomRef,publicRef,receipt);
-   const gate=gateSnap.data(),room=roomSnap.data(),pub=publicSnap.data();
+   const gate=await resolveTicketGate(db,code,tx,gateSnap.data()),room=roomSnap.data(),pub=publicSnap.data();
    const authority=await authorizeTicketManager(tx,db,{uid,user:actorSnap.data(),room,gate,code,now});
    const grant=authority.grant;
    if(gate.bindingEnabled!==true||gate.enabled!==true||pub?.ticketRoomVersion!==1)throw Error('permission-denied');
@@ -223,7 +309,8 @@ function createTicketScheduleHandler({db,clock=Date.now}){
    const ticketSnap=await tx.get(db.doc('commerceTickets/'+room.ticketAccessV1.ticketId));
    const ticket=ticketSnap.data();
    if(ticket?.ownerUid!==authority.ownerUid||ticket.status!=='reserved'||ticket.boundRoomCode!==code||
-      ticket.boundRoomId!==gate.roomId||startAt>=ticket.expiresAt)throw Error('ticket-binding-invalid');
+      ticket.boundRoomId!==gate.roomId||ticket.version===1&&startAt>=ticket.expiresAt||
+      ticket.version===2&&ticket.expiresAt!==null)throw Error('ticket-binding-invalid');
    const state=JSON.parse(room.data),publicState=JSON.parse(pub.bracketView);
    if(state.id!==gate.roomId||publicState.id!==gate.roomId)throw Error('ticket-binding-invalid');
    const revision=Math.max(now,room.updatedAt+1);
@@ -248,7 +335,7 @@ function createTicketDelegateSearchHandler({db,clock=Date.now}){
   const code=data.code,query=data.query.trim();
   return db.runTransaction(async tx=>{
    const [actorSnap,roomSnap,gateSnap]=await tx.getAll(db.doc('users/'+uid),db.doc('tournaments/'+code),db.doc(ticketLifecyclePath(code)));
-   const gate=gateSnap.data();
+   const gate=await resolveTicketGate(db,code,tx,gateSnap.data());
    const authority=await authorizeTicketManager(tx,db,{uid,user:actorSnap.data(),room:roomSnap.data(),gate,code,now:clock()});
    if(!authority.owner||gate.enabled!==true||gate.bindingEnabled!==true)throw Error('permission-denied');
    const rows=new Map();
@@ -278,7 +365,7 @@ function createTicketDelegateHandler({db,clock=Date.now}){
   return db.runTransaction(async tx=>{
    const roomRef=db.doc('tournaments/'+code);
    const [actorSnap,roomSnap,gateSnap]=await tx.getAll(db.doc('users/'+uid),roomRef,db.doc(ticketLifecyclePath(code)));
-   const room=roomSnap.data(),gate=gateSnap.data();
+   const room=roomSnap.data(),gate=await resolveTicketGate(db,code,tx,gateSnap.data());
    const authority=await authorizeTicketManager(tx,db,{uid,user:actorSnap.data(),room,gate,code,now:clock()});
    if(!authority.owner||gate.enabled!==true||gate.bindingEnabled!==true)throw Error('permission-denied');
    if(delegateUid){

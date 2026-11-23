@@ -69,10 +69,10 @@ test('five ticket previews remain visible with a closed store and cannot create 
   assert.match(listing,new RegExp(`tournament-activation-${capacity}-${color}\\.png`));
   assert.ok(fs.existsSync(path.join(__dirname,`../assets/commerce/tickets/tournament-activation-${capacity}-${color}.png`)));
  }
- assert.equal((listing.match(/暫停購買/g)||[]).length,5);
+ assert.equal((listing.match(/尚未開放購買/g)||[]).length,6);
  await t.ui.handle('commerce-product',{dataset:{id:'tournament_activation_64'}});
  const detail=t.ui.shop();assert.match(detail,/基本正取上限 64 人/);
- assert.match(detail,/<button class="btn btn-primary" disabled aria-disabled="true">暫停購買<\/button>/);
+ assert.match(detail,/<button class="btn btn-primary" disabled aria-disabled="true">尚未開放購買<\/button>/);
  await t.ui.handle('commerce-buy',{dataset:{id:'tournament_activation_64'}});
  c.products=[{id:'tournament_activation_64',version:1,purchasable:true,delivery:{kind:'ticket'}}];
  await t.ui.handle('commerce-buy',{dataset:{id:'tournament_activation_64'}});
@@ -100,19 +100,35 @@ test('storefront hides room quota and VIP categories, all-products results and c
 function ticketOffer(changes={}){
  return {id:'activation-32-sku',name:'賽事啟動券｜32 人',status:'published',purchasable:true,
   audience:'partner_organizer',version:4,priceTwd:300,
-  delivery:{kind:'ticket',assetId:'32',quantity:1,durationDays:30},...changes};
+  delivery:{kind:'ticket',assetId:'32',quantity:1,durationDays:0},...changes};
 }
 test('an eligible ticket offer replaces its preview and uses its real checkout SKU',async()=>{
  const t=setup({partner:true});t.ui.shop();
  const c=t.ui.context();c.storeOpen=true;c.products=[ticketOffer()];
  await t.ui.handle('commerce-category',{dataset:{id:'ticket'}});
- assert.equal((t.ui.shop().match(/暫停購買/g)||[]).length,4);
+ assert.equal((t.ui.shop().match(/尚未開放購買/g)||[]).length,4);
  await t.ui.handle('commerce-product',{dataset:{id:'tournament_activation_32'}});
  const details=t.ui.shop();
- assert.match(details,/有效合作主辦/);assert.match(details,/30 天/);assert.match(details,/最多持有 2 張/);
+ assert.match(details,/有效合作主辦/);assert.match(details,/無使用期限/);
  assert.match(details,/data-action="commerce-buy"[^>]*>建立訂單｜NT\$ 300/);
  await t.ui.handle('commerce-buy',{dataset:{id:'tournament_activation_32'}});
  assert.deepEqual(t.calls,[{action:'create-order',productId:'activation-32-sku',expectedVersion:4,operationId:'same-operation'}]);
+});
+test('new PTN sale mode shows a permanent voucher and opens room creation without a BXH pilot URL',async()=>{
+ const t=setup({partner:true});
+ t.sandbox.window.BXH_PTN_TICKET_SALE=true;
+ t.ui.shop();const c=t.ui.context();c.storeOpen=true;c.products=[ticketOffer()];
+ await t.ui.handle('commerce-category',{dataset:{id:'ticket'}});
+ await t.ui.handle('commerce-product',{dataset:{id:'tournament_activation_32'}});
+ assert.match(t.ui.shop(),/無使用期限/);
+ t.sandbox.activeTab='management';
+ await t.ui.handle('commerce-open-ticket-create',{});
+ assert.equal(t.ui.ticketPilot(),true);
+ c.ptnStatus={ok:true,code:null,canCreate:true};
+ c.tickets=[{id:'permanent-ticket',capacity:32,status:'available',expiresAt:null}];
+ assert.match(t.ui.ticketCreationPage(),/data-id="permanent-ticket"[^>]*><strong>32 人/);
+ await t.ui.handle('commerce-ticket-bind',{dataset:{id:'permanent-ticket'}});
+ assert.equal(c.ticketDraft.ticket.id,'permanent-ticket');
 });
 test('player mode hides ticket categories, catalog results, details and wallet',async()=>{
  const t=setup();t.ui.shop();const c=t.ui.context();const id='tournament_activation_32';
@@ -151,7 +167,7 @@ test('ineligible offers and closed checkout cannot create a partner ticket order
  c.storeOpen=true;c.products=[ticketOffer({audience:'all'}),ticketOffer({status:'draft'})];
  await t.ui.handle('commerce-buy',{dataset:{id}});
  assert.equal(t.calls.length,0);
- assert.match(t.ui.shop(),/暫停購買/);
+ assert.match(t.ui.shop(),/尚未開放購買/);
 });
 
 test('my tickets shows an owned bound ticket, and resets on account switch',async()=>{
@@ -221,6 +237,19 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} event management offers f
  await t.ui.handle('commerce-ticket-back',{});
  await t.ui.handle('commerce-close-ticket-create',{});
  assert.equal(t.ui.ticketCreationPage(),null);
+});
+test('an existing PTN room does not block selecting a second available ticket',async()=>{
+ const t=setup({partner:true});t.sandbox.activeTab='management';
+ t.sandbox.window.BXH_TICKET_ROOM_PILOT_CODE='BXH-TICKETTEST';
+ t.sandbox.window.BXH_TICKET_ROOM_PTN_PILOT=true;
+ await t.ui.handle('commerce-open-ticket-create',{});
+ const c=t.ui.context();c.ptnStatus={ok:true,code:'PTN-E50A3E'};
+ c.tickets=[{id:'another-ticket',capacity:32,status:'available',expiresAt:Date.now()+86400000}];
+ const picker=t.ui.ticketCreationPage();
+ assert.match(picker,/最近建立的 PTN 房間｜PTN-E50A3E/);
+ assert.match(picker,/data-id="another-ticket"[^>]*><strong>32 人/);
+ await t.ui.handle('commerce-ticket-bind',{dataset:{id:'another-ticket'}});
+ assert.equal(c.ticketDraft.ticket.id,'another-ticket');
 });
 
 test('scoped ticket room form uses Taiwan time and replays the exact V2 start request',async()=>{

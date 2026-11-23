@@ -4,6 +4,25 @@ const isPartnerRoomCode=code=>typeof code==='string'&&/^PTN-[A-Z0-9]{6}$/.test(c
 const validRegistrationRoomCode=code=>typeof code==='string'&&(/^BXH-[A-Z0-9]{4,16}$/.test(code)||isPartnerRoomCode(code));
 const ticketLifecyclePath=code=>isPartnerRoomCode(code)
  ?'systemSettings/commerceTicketPtnPilotV1':'systemSettings/commerceTicketLifecycleV1';
+// The original pilot room remains at the top level. Later PTN rooms have
+// independent bindings under rooms, so rotating the current room never
+// revokes management or scoring access to an earlier event.
+function ticketGateForCode(config,code){
+ if(!config)return null;
+ if(!isPartnerRoomCode(code))return config.roomCode===code?config:null;
+ const binding=config.rooms?.[code];
+ if(binding?.roomId)return {...config,...binding,roomCode:code};
+ return config.roomCode===code?config:null;
+}
+async function resolveTicketGate(db,code,tx,legacy){
+ if(isPartnerRoomCode(code)){
+  const ref=db.doc('commerceTicketRoomGates/'+code);
+  const current=(tx?await tx.get(ref):await ref.get()).data();
+  if(current)return ticketGateForCode(current,code);
+ }
+ const ref=db.doc(ticketLifecyclePath(code));
+ return ticketGateForCode(legacy===undefined?(tx?await tx.get(ref):await ref.get()).data():legacy,code);
+}
 
 function grantTime(value){
  if((typeof value!=='number'&&typeof value!=='string')||(typeof value==='string'&&!value.trim()))return NaN;
@@ -35,6 +54,7 @@ function activeTicketManager(user){
 // A delegate's authority belongs to one private PTN room, never to the
 // organization or to other rooms owned by the same organizer.
 async function authorizeTicketManager(tx,db,{uid,user,room,gate,code,now}){
+ gate=ticketGateForCode(gate,code);
  if(!activeTicketManager(user)||room?.eventAuthority!=='ticket'||room.createdByRole!=='partner_organizer'||
     typeof room.ownerUid!=='string'||room.createdBy!==room.ownerUid||
     gate?.ownerUid!==room.ownerUid||gate.roomCode!==code||
@@ -58,4 +78,4 @@ function checkTicketContract(contract,grant,uid){
     grantTime(contract.startsAt)!==grant.startsAt||grantTime(contract.expiresAt)!==grant.expiresAt)throw Error('permission-denied');
 }
 
-module.exports={ticketHostGrant,checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,authorizeTicketManager,activeTicketManager};
+module.exports={ticketHostGrant,checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,ticketGateForCode,resolveTicketGate,authorizeTicketManager,activeTicketManager};

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "audience": "partner_organizer",
+  "currency": "TWD",
+  "saleSetting": "systemSettings/commerceTicketPtnSaleV1",
+  "initiallyEnabled": false,
+  "products": [
+    {"id": "product_27acdfb3-8bba-4337-897c-1d9e8e29ce62", "capacity": 32, "priceTwd": 300},
+    {"id": "product_218d32c9-4ae8-4e41-aaa8-0d1835331dbe", "capacity": 64, "priceTwd": 600},
+    {"id": "product_cbd4644c-e1e1-4da3-b41a-8bef47e50415", "capacity": 96, "priceTwd": 1000},
+    {"id": "product_2ab9cda4-bc64-4692-8250-456181b6fe58", "capacity": 128, "priceTwd": 1500},
+    {"id": "product_6442f6f9-cdde-410f-8c0a-916dd19a1afa", "capacity": 160, "priceTwd": 2000}
+  ],
+  "delivery": {"kind": "ticket", "quantity": 1, "durationDays": 0},
+  "terms": "僅授權有效的合作主辦可購買。每張券可建立一間對應人數上限的積分賽房間，開賽時扣用。啟動券沒有使用期限；開房及開賽時仍須具備有效的合作主辦授權。訂單的付款期限依結帳頁所示。"
+}
