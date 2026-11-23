@@ -39,8 +39,8 @@ test('Home R2 prerequisite: an open tab offers a new build and keeps its room af
     navigations.push(url.href);
     const build = url.searchParams.get('bxh_build') === next ? next : current;
     const script = build === current ? guard : guard.replace(marker, 'var CURRENT_BUILD=' + JSON.stringify(build) + ';');
-    return route.fulfill({ contentType: 'text/html', headers: { 'cache-control': 'no-store' }, body:
-      '<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1">' +
+    return route.fulfill({ contentType: 'text/html; charset=utf-8', headers: { 'cache-control': 'no-store' }, body:
+      '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
       '<meta name="fixture-build"><script>' + script + '</script><main>Isolated update fixture</main>' +
       '<script>document.querySelector("[name=fixture-build]").content=' + JSON.stringify(build) + '</script>' });
   });
@@ -60,11 +60,15 @@ test('Home R2 prerequisite: an open tab offers a new build and keeps its room af
   expect(navigations).toHaveLength(1);
   expect(page.url()).toBe(origin + roomPath);
 
-  const destination = page.waitForURL(url => url.searchParams.get('bxh_build') === next);
-  const nextResponse = page.waitForResponse(isVersion);
-  await banner.getByRole('button', { name: '立即更新' }).click();
-  await destination;
-  expect(await (await nextResponse).json()).toEqual({ build: next });
+  const update = banner.getByRole('button', { name: '立即更新', exact: true });
+  await expect(banner.locator('button')).toHaveText('立即更新');
+  await expect(update).toBeVisible();
+  const [, , nextResponse] = await Promise.all([
+    update.click(),
+    page.waitForURL(url => url.searchParams.get('bxh_build') === next),
+    page.waitForResponse(isVersion),
+  ]);
+  expect(await nextResponse.json()).toEqual({ build: next });
   const after = new URL(page.url());
   expect(after.origin).toBe(origin);
   expect(after.searchParams.get('room')).toBe('BXH-DEMO');
