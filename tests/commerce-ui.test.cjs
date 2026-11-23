@@ -346,6 +346,26 @@ test('partner can recover their PTN room from management without a pilot URL',as
  t.setUid('different-user');
  assert.doesNotMatch(t.ui.ownedTicketRoomCard(),/房號 PTN-TST001/);
 });
+
+test('PTN management read shows the actual failure class instead of a checkout retry message',async()=>{
+ const t=setup({partner:true}),code='PTN-TST001';
+ t.sandbox.activeTab='management';
+ let failure='permission-denied';
+ t.sandbox.window.engagementService.ticketRoomOperation=async request=>{
+  if(request.action==='ticket-ptn-status')return {ok:true,code};
+  throw Error(failure);
+ };
+ await t.ui.handle('commerce-refresh-owned-ptn');
+ await t.ui.handle('commerce-open-owned-ptn');
+ assert.match(t.ui.ticketCreationPage(),/管理權限驗證失敗/);
+ assert.doesNotMatch(t.ui.ticketCreationPage(),/重複下單/);
+ failure='app-check-unavailable';
+ await t.ui.load('ticket-room-state');
+ assert.match(t.ui.ticketCreationPage(),/網站驗證未完成/);
+ failure='deadline-exceeded';
+ await t.ui.load('ticket-room-state');
+ assert.match(t.ui.ticketCreationPage(),/賽事資料讀取逾時/);
+});
 test('PTN takeover replaces stale legacy header only after server owner verification',async()=>{
  const t=setup({partner:true}),code='PTN-TST001';
  t.sandbox.activeTab='management';
