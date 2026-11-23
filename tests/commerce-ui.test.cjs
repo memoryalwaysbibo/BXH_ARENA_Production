@@ -347,6 +347,17 @@ test('partner can recover their PTN room from management without a pilot URL',as
  assert.doesNotMatch(t.ui.ownedTicketRoomCard(),/房號 PTN-TST001/);
 });
 
+test('PTN discovery reports its read error and keeps manual room takeover available',async()=>{
+ const t=setup({partner:true});
+ t.sandbox.activeTab='management';
+ t.sandbox.window.engagementService.ticketRoomOperation=async()=>{
+  throw Object.assign(Error('INTERNAL'),{code:'functions/internal'});
+ };
+ await t.ui.handle('commerce-refresh-owned-ptn');
+ assert.match(t.ui.ownedTicketRoomCard(),/賽事服務處理失敗（internal）/);
+ assert.match(t.ui.ownedTicketRoomCard(),/data-commerce-form="ticket-open-code"/);
+});
+
 test('PTN management read shows the actual failure class instead of a checkout retry message',async()=>{
  const t=setup({partner:true}),code='PTN-TST001';
  t.sandbox.activeTab='management';
