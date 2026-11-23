@@ -27,7 +27,7 @@ function visibleProducts(c){
    &&p.delivery.assetId===String(preview.capacity)&&p.delivery.quantity===1&&p.delivery.durationDays===0
    &&p.priceTwd===preview.priceTwd
    &&Number.isSafeInteger(p.priceTwd)&&p.priceTwd>0&&Number.isSafeInteger(p.version)&&p.version>0);
-  return offer?{...offer,id:preview.id,orderProductId:offer.id,previewOnly:false}:preview;
+  return offer?{...offer,id:preview.id,orderProductId:offer.id,imageUrl:preview.imageUrl,previewOnly:false}:preview;
  });
  return [...ticketCards,...otherProducts];
 }
