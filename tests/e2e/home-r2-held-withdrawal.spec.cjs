@@ -6,8 +6,11 @@ const controller = "// Local ARENA fixture build only. No production Firebase or
 
 test.use({ serviceWorkers: 'block' });
 test('Home R2 trusted withdrawal removes a pressed fixture card before pointer release', async ({page}) => {
-  await page.route('**/*', r => r.abort());
-  await page.setContent('<!doctype html><meta charset="utf-8"><main data-lobby-root><p id="r1">Unchanged R1 control</p><section id="cards"></section></main>');
+  const localFixture = 'http://127.0.0.1:4173/__r2_held_fixture/';
+  await page.route('**/*', r => r.request().url() === localFixture
+    ? r.fulfill({contentType:'text/html; charset=utf-8',body:'<!doctype html><meta charset="utf-8"><main data-lobby-root><p id="r1">Unchanged R1 control</p><section id="cards"></section></main>'})
+    : r.abort());
+  await page.goto(localFixture);
   await page.addScriptTag({content: controller});
   await page.addScriptTag({content: adapter + '\n' + function(){
     let notify, resolveFirst, ready = false, held = false, activated = 0;
