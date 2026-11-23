@@ -140,7 +140,7 @@ test('published PTN vouchers show their own capacity artwork even when catalog i
  }
  assert.ok(!listing.includes('https://example.invalid/32.png'));
  c.productId='tournament_activation_96';
- assert.match(t.ui.shop(),/commerce-hero\" src=\"assets\\/commerce\\/tickets\\/tournament-activation-96-purple\\.png\"/);
+ assert.ok(t.ui.shop().includes('class="commerce-hero" src="assets/commerce/tickets/tournament-activation-96-purple.png"'));
 });
 test('new PTN sale mode shows a permanent voucher and opens room creation without a BXH pilot URL',async()=>{
  const t=setup({partner:true});
