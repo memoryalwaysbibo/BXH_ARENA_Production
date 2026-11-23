@@ -61,13 +61,13 @@ function makeBootTransport(load){
 }
 function browserBoot({mode,app,sdkBase,project,source,first}){
  if(location.origin!==app||location.pathname!=='/'||location.search!=='?r2full='+mode)return;
- const counts={r1:0,watch:0,first:0,delta:0,stops:0,hold:{},waiting:{},release:{},error:null};
+ const counts={r1:0,watch:0,first:0,delta:0,stops:0,hold:{},waiting:{},release:{},error:null,r1Fallback:false,trace:[]};
  window.r2FullFixture=counts;
- const r1={ok:true,items:mode==='summary'?[]:[first],fromCache:false,hasPendingWrites:false,requiresLifecycleReconcile:false};
+ const r1=()=>({ok:true,items:mode==='summary'&&!counts.r1Fallback?[]:[first],fromCache:false,hasPendingWrites:false,requiresLifecycleReconcile:false});
  window.cloudSync={
   isEnabled:()=>true,connect:async()=>true,
-  subscribePublicTournaments(cb){counts.r1++;let active=true;queueMicrotask(()=>{if(active)cb(r1);});return()=>{active=false;};},
-  queryPublicTournaments:async()=>r1
+  subscribePublicTournaments(cb){counts.r1++;counts.trace.push('R1-WATCH');let active=true;queueMicrotask(()=>{if(active)cb(r1());});return()=>{active=false;};},
+  queryPublicTournaments:async()=>r1()
  };
  if(mode!=='summary')return;
  const boot=new Function('return ('+source+')')();
@@ -102,7 +102,7 @@ function browserBoot({mode,app,sdkBase,project,source,first}){
      if(!snap.exists()&&confirmed(snap)){err(Error('R2 version missing'));return;}
      next({...snap.data(),fromCache:snap.metadata.fromCache,hasPendingWrites:snap.metadata.hasPendingWrites});
     },err);
-    return()=>{counts.stops++;off();};
+    return()=>{counts.stops++;counts.trace.push('R2-STOP');off();};
    }};
  });
 }
@@ -203,4 +203,47 @@ for(const change of ['private','delete'])test('R2 exact #860 guest + Firestore d
   expect((await counters(old.page)).r1).toBeGreaterThan(0);
  }finally{await old.context.close();}
 });
+// Keep the original #860 guest document open while turning the fixture off.
+test('R2 exact #860 guest same-tab rollback drops a delayed Web SDK reply', async ({browser,request})=>{
+ const fx=fixture();
+ const legacyId='BXH-LAB-R1-CONTROL';
+ await seed(request,[first(1,[card(A,'R2 before rollback'),card(B,'R2 control')]),signal(1,null),d('arenaHomeLab/delta'),
+  w('publicTournaments/'+A,source(A,'R2 before rollback')),w('publicTournaments/'+B,source(B,'R2 control'))]);
+ const {context,page,seen}=await open(browser,fx,'summary',source(legacyId,'Refreshed R1 after rollback'));
+ try{
+  const openedUrl=page.url();
+  const r2=page.locator('[data-lobby-root] [data-home-summary-fixture]');
+  const legacy=page.locator('[data-lobby-code="'+legacyId+'"]');
+  await expect(r2).toHaveCount(2);
+  await expect(legacy).toHaveCount(0);
+  expect(await counters(page)).toMatchObject({r1:0,watch:1,first:1,delta:0,error:null});
+
+  await page.evaluate(()=>{window.r2FullFixture.hold={delta:2};});
+  await seed(request,[first(2,[card(A,'late old update'),card(B,'R2 control')]),signal(2,1),delta(1,2)]);
+  await expect.poll(async()=>(await counters(page)).waiting.delta).toBe(2);
+  const before=await page.evaluate(()=>{
+   const f=window.r2FullFixture;
+   f.priorCycle=homeSummaryLab.settled();
+   f.sameDocument=document;
+   f.r1Fallback=true;
+   delete window.BXH_ARENA_HOME_LAB_TRANSPORT;
+   syncPublicTournamentsRealtimeState();
+   return {sameDocument:document===f.sameDocument, trace:[...f.trace], stops:f.stops, cards:homeSummaryLab.snapshot().cards};
+  });
+  expect(before).toMatchObject({sameDocument:true,trace:['R2-STOP','R1-WATCH'],stops:1,cards:null});
+  await expect(legacy).toBeAttached();
+  await expect(r2).toHaveCount(0);
+
+  await page.evaluate(async()=>{window.r2FullFixture.release.delta();await window.r2FullFixture.priorCycle;});
+  await expect(legacy).toBeAttached();
+  await expect(r2).toHaveCount(0);
+  expect(await counters(page)).toMatchObject({r1:1,watch:1,first:1,delta:1,error:null});
+  expect(await page.evaluate(()=>({sameDocument:document===window.r2FullFixture.sameDocument,
+    stops:window.r2FullFixture.stops,trace:window.r2FullFixture.trace,ids:lobbyBoundaryItems().map(x=>x.code)})))
+   .toEqual({sameDocument:true,stops:1,trace:['R2-STOP','R1-WATCH'],ids:[legacyId]});
+  expect(page.url()).toBe(openedUrl);
+  expect(seen.firestore).toBeGreaterThan(0);  // Real demo Web SDK used before the switch.
+ }finally{await context.close();}
+});
+
 module.exports={routeDecision,fixture};
