@@ -43,7 +43,7 @@ function context(){
 }
 function errorMessage(e){
  const m=String(e?.message||e||'');
- const labels={'service-unavailable':'商城服務準備中，請稍後再試。','store-closed':'商城尚未開放購買。','delivery-not-ready':'此類商品的交付功能尚未完成驗證，暫時不能上架或購買。','product-unavailable':'商品目前無法購買，請重新整理商城。','product-changed':'商品內容已更新，請重新整理後確認。','version-conflict':'資料已被更新，請重新整理後再編輯。','contract-required':'此商品限已簽約且授權有效的活動主辦購買。','contract-expired':'主辦合約尚未生效或已到期。','partner-organizer-required':'此商品限授權有效的合作主辦購買。','ticket-holding-limit':'已達同時持有 2 張的上限，待付款訂單也計入預留名額。','ticket-monthly-limit':'本月已達五款合計 4 張的限購上限。','ticket-quota-needs-review':'票券資料需要核對，請聯絡 BXH。','ticket-lifecycle-disabled':'目前沒有開放這間票券房的試點操作。','ticket-unavailable':'這張券目前無法用來建房，請重新整理票券。','ticket-expired':'啟動券已到期，或會在預定開賽前到期。','ticket-binding-invalid':'票券與房間資料不一致，請重新整理。','forfeit-room-not-live':'只有進行中的賽事可以登記棄權。','forfeit-match-stale':'對戰資料已更新，請重新整理後再操作。','forfeit-round-waiting':'這場對戰目前尚未開放。','ticket-ptn-slot-occupied':'這個試點已有賽事，請返回選券頁管理。','room-code-conflict':'試點房號已使用，請重新整理。','bracket-version-conflict':'抽籤資料已變更，請重新整理後再操作。','bracket-roster-changed':'可出賽名單已變更，請重新整理後再操作。','registration-roster-stale':'報名名單已更新，請重新整理後再操作。','registration-queue-pending':'報名資料正在更新，請稍後再試。','registration-queue-disabled':'這間賽事尚未開放 V2 操作。','early-start-confirmation-required':'尚未到預定開賽時間。','not-found':'目前找不到這間票券房。','unpaid-order-exists':'此商品已有未完成訂單，請到我的訂單查看。','already-owned':'你已持有此 Skin，無須重複購買。','bank-receipt-used':'這筆銀行交易已核銷，請確認是否重複使用。','amount-mismatch':'金額不符，請先釐清差額再確認。','payment-window-closed':'已超過付款期限或訂單狀態已變更，請聯絡 BXH。','invalid-remittance':'請填寫匯款末五碼與正確的轉帳時間。','refund-needs-review':'商品已有使用或後續異動，需要人工評估，暫不能自動收回。','transition-forbidden':'訂單狀態已變更，請重新讀取確認。','operation-conflict':'操作識別碼與原請求不一致，請保留訂單編號聯絡 BXH。','storage-unavailable':'瀏覽器無法保存待確認操作，請允許工作階段儲存後再試。','super-admin-required':'只有最高管理員可以執行此操作。','account-inactive':'帳號目前不可購買。','invalid-bank':'請確認三碼銀行代碼及收款帳號。','invalid-number':'請檢查金額、數量或期限。','invalid-text':'請完整填寫欄位。','invalid-image':'商品圖片請使用 HTTPS 網址。','invalid-vip-duration':'VIP 須設定有效天數，數量為 1。','invalid-quota-duration':'場次額度的期限沿用合約，商品天數請填 0。','cancel-unavailable':'這筆訂單已無法自行取消。','order-unavailable':'找不到可查看的訂單。','invalid-action':'無法執行這項操作。'};
+ const labels={'service-unavailable':'商城服務準備中，請稍後再試。','store-closed':'商城尚未開放購買。','delivery-not-ready':'此類商品的交付功能尚未完成驗證，暫時不能上架或購買。','product-unavailable':'商品目前無法購買，請重新整理商城。','product-changed':'商品內容已更新，請重新整理後確認。','version-conflict':'資料已被更新，請重新整理後再編輯。','contract-required':'此商品限已簽約且授權有效的活動主辦購買。','contract-expired':'主辦合約尚未生效或已到期。','partner-organizer-required':'此商品限授權有效的合作主辦購買。','ticket-holding-limit':'已達同時持有 2 張的上限，待付款訂單也計入預留名額。','ticket-monthly-limit':'本月已達五款合計 4 張的限購上限。','ticket-quota-needs-review':'票券資料需要核對，請聯絡 BXH。','ticket-lifecycle-disabled':'目前沒有開放這間票券房的試點操作。','ticket-unavailable':'這張券目前無法用來建房，請重新整理票券。','ticket-expired':'啟動券已到期，或會在預定開賽前到期。','ticket-binding-invalid':'票券與房間資料不一致，請重新整理。','forfeit-room-not-live':'只有進行中的賽事可以登記棄權。','forfeit-match-stale':'對戰資料已更新，請重新整理後再操作。','forfeit-round-waiting':'這場對戰目前尚未開放。','ticket-ptn-slot-occupied':'PTN 試點房間數已達上限，請聯絡 BXH。','room-code-conflict':'試點房號已使用，請重新整理。','bracket-version-conflict':'抽籤資料已變更，請重新整理後再操作。','bracket-roster-changed':'可出賽名單已變更，請重新整理後再操作。','registration-roster-stale':'報名名單已更新，請重新整理後再操作。','registration-queue-pending':'報名資料正在更新，請稍後再試。','registration-queue-disabled':'這間賽事尚未開放 V2 操作。','early-start-confirmation-required':'尚未到預定開賽時間。','not-found':'目前找不到這間票券房。','unpaid-order-exists':'此商品已有未完成訂單，請到我的訂單查看。','already-owned':'你已持有此 Skin，無須重複購買。','bank-receipt-used':'這筆銀行交易已核銷，請確認是否重複使用。','amount-mismatch':'金額不符，請先釐清差額再確認。','payment-window-closed':'已超過付款期限或訂單狀態已變更，請聯絡 BXH。','invalid-remittance':'請填寫匯款末五碼與正確的轉帳時間。','refund-needs-review':'商品已有使用或後續異動，需要人工評估，暫不能自動收回。','transition-forbidden':'訂單狀態已變更，請重新讀取確認。','operation-conflict':'操作識別碼與原請求不一致，請保留訂單編號聯絡 BXH。','storage-unavailable':'瀏覽器無法保存待確認操作，請允許工作階段儲存後再試。','super-admin-required':'只有最高管理員可以執行此操作。','account-inactive':'帳號目前不可購買。','invalid-bank':'請確認三碼銀行代碼及收款帳號。','invalid-number':'請檢查金額、數量或期限。','invalid-text':'請完整填寫欄位。','invalid-image':'商品圖片請使用 HTTPS 網址。','invalid-vip-duration':'VIP 須設定有效天數，數量為 1。','invalid-quota-duration':'場次額度的期限沿用合約，商品天數請填 0。','cancel-unavailable':'這筆訂單已無法自行取消。','order-unavailable':'找不到可查看的訂單。','invalid-action':'無法執行這項操作。'};
  for(const [k,v]of Object.entries(labels))if(m.includes(k))return v;
  return '連線尚未確認，請重試；系統會沿用原操作避免重複下單。';
 }
@@ -249,17 +249,17 @@ function ticketCreationPage(){
  }
  const ptn=ptnCreation(c);
  if(ptn&&!c.ptnStatus)schedule('ticket-ptn-status',true);
- else schedule('my-tickets',c.tickets===null&&!(ptn&&c.ptnStatus.code));
+ else schedule('my-tickets',c.tickets===null);
  const bound=ptn?isPtnCode(c.ptnStatus?.code):c.tickets?.some(ticket=>ticket.boundRoomCode===pilotCode());
  const locked=c.loading||c.busy||!!c.pending;
  const options=ticketPreviews.map(({capacity})=>{
   const available=(c.tickets||[]).filter(ticket=>ticket.capacity===capacity&&ticketAvailable(ticket));
   const first=available.sort((a,b)=>a.expiresAt-b.expiresAt)[0];
-  const enabled=first&&!bound&&!locked&&(!ptn||c.ptnStatus?.ok===true);
+  const enabled=first&&(!bound||ptn)&&!locked&&(!ptn||c.ptnStatus?.ok===true&&c.ptnStatus.canCreate!==false);
   const status=c.tickets===null?'尚未取得持有狀態':available.length?`可用 ${available.length} 張`:'無可用票券';
   return `<button class="panel commerce-category btn ${enabled?'btn-primary':'btn-ghost'}" data-action="commerce-ticket-bind" data-id="${esc(first?.id||'')}" ${enabled?'':'disabled'}><strong>${capacity} 人</strong><span>${status}</span></button>`;
  }).join('');
- return `<section class="commerce"><div class="panel-title"><h2>新增賽事｜選券建房</h2><button class="btn btn-ghost" data-action="commerce-close-ticket-create">返回賽事管理</button></div>${notices(c)}${c.loading?'<p role="status">正在讀取啟動券……</p>':''}<div class="commerce-grid">${options}</div>${bound?`<p>此試點房已建立${ptn?'｜'+esc(ticketRoomCode(c)):''}。</p><button class="btn btn-primary" data-action="commerce-ticket-room" ${locked?'disabled':''}>管理已建立的賽事</button>`:''}<button class="btn btn-ghost" data-action="commerce-refresh-tickets" ${locked?'disabled':''}>重新整理票券</button></section>`;
+ return `<section class="commerce"><div class="panel-title"><h2>新增賽事｜選券建房</h2><button class="btn btn-ghost" data-action="commerce-close-ticket-create">返回賽事管理</button></div>${notices(c)}${c.loading?'<p role="status">正在讀取啟動券……</p>':''}<div class="commerce-grid">${options}</div>${bound?`<p>${ptn?'最近建立的 PTN 房間｜'+esc(ticketRoomCode(c)):'此試點房已建立'}。</p><button class="btn btn-primary" data-action="commerce-ticket-room" ${locked?'disabled':''}>管理已建立的賽事</button>`:''}<button class="btn btn-ghost" data-action="commerce-refresh-tickets" ${locked?'disabled':''}>重新整理票券</button></section>`;
 }
 
 function shop(){
@@ -336,7 +336,7 @@ async function handle(action,target){
   c.ticketsOpen=action==='commerce-open-tickets';c.tickets=null;c.ticketRoomOpen=false;c.ticketDraft=null;c.error='';render();return;
  }
  if(action==='commerce-ticket-bind'&&ticketPilot()&&ticketViewOpen(c)&&!c.pending){
-  if(ptnCreation(c)?(!c.ptnStatus?.ok||c.ptnStatus.code):
+  if(ptnCreation(c)?(!c.ptnStatus?.ok||c.ptnStatus.canCreate===false):
      ticketCreationView(c)&&c.tickets?.some(ticket=>ticket.boundRoomCode===pilotCode()))return;
   const ticket=c.tickets?.find(ticket=>ticket.id===id&&ticketAvailable(ticket));
   if(ticket){c.ticketDraft={ticket};c.ticketRoomOpen=true;c.error='';c.success='';render();}
@@ -399,7 +399,7 @@ async function handle(action,target){
    :{...data,action:'ticket-room-draw',baseDrawId:room.drawId});
  }
  if(action==='commerce-refresh-tickets'&&ticketViewOpen(c)){
-  if(ptnCreation(c)&&(!c.ptnStatus||c.ptnStatus.code))return load('ticket-ptn-status');
+  if(ptnCreation(c)&&!c.ptnStatus)return load('ticket-ptn-status');
   return load('my-tickets');
  }
  if(action==='commerce-refresh-products')return load('catalog');

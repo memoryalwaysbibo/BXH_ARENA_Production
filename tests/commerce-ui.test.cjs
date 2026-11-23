@@ -222,6 +222,19 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} event management offers f
  await t.ui.handle('commerce-close-ticket-create',{});
  assert.equal(t.ui.ticketCreationPage(),null);
 });
+test('an existing PTN room does not block selecting a second available ticket',async()=>{
+ const t=setup({partner:true});t.sandbox.activeTab='management';
+ t.sandbox.window.BXH_TICKET_ROOM_PILOT_CODE='BXH-TICKETTEST';
+ t.sandbox.window.BXH_TICKET_ROOM_PTN_PILOT=true;
+ await t.ui.handle('commerce-open-ticket-create',{});
+ const c=t.ui.context();c.ptnStatus={ok:true,code:'PTN-E50A3E'};
+ c.tickets=[{id:'another-ticket',capacity:32,status:'available',expiresAt:Date.now()+86400000}];
+ const picker=t.ui.ticketCreationPage();
+ assert.match(picker,/最近建立的 PTN 房間｜PTN-E50A3E/);
+ assert.match(picker,/data-id="another-ticket"[^>]*><strong>32 人/);
+ await t.ui.handle('commerce-ticket-bind',{dataset:{id:'another-ticket'}});
+ assert.equal(c.ticketDraft.ticket.id,'another-ticket');
+});
 
 test('scoped ticket room form uses Taiwan time and replays the exact V2 start request',async()=>{
  const t=setup({partner:true});const c=t.ui.context(),code='BXH-TICKETTEST',roomId='ticket-fixture-generation';

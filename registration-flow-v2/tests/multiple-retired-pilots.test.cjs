@@ -77,6 +77,16 @@ test('PTN intake and recovery use only their assigned room while the BXH gate st
  assert.equal((await f.call(endpoints.registrationRosterQueueV2,undefined,{action:'create-ticket-room'})).ok,true);
  await assert.rejects(endpoints.registrationRosterQueueV2.run({data:{action:'create-ticket-room'}}),/registration-queue-disabled/);
 });
+test('the second PTN room keeps its own intake and sweep without retiring the first room',async()=>{
+ const f=fixture(),next='PTN-NEW001',endpoints=f.create();
+ f.configurePtn({rooms:{[next]:{roomId:'next-room-generation',ownerUid:'pilot-owner'}},latestRoomCode:next});
+ const submit=code=>f.call(endpoints.registrationQueueV2,code,{action:'submit',
+  operation:{code,route:'family',payload:{action:'join',code}}});
+ await submit(f.ptn);await submit(next);
+ await assert.rejects(submit('PTN-AAAAAA'),/registration-queue-disabled/);
+ await endpoints.registrationQueueV2Sweep.run({});
+ assert.deepEqual(f.drains,[f.pilot,f.ptn,next]);
+});
 
 test('closed intake keeps both old pilots queryable and background work stays scoped to the current pilot',async()=>{
  const f=fixture(),endpoints=f.create();

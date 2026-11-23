@@ -6,7 +6,7 @@ const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
 const {advance:advanceQrCheckinFence}=require('../../qr-checkin/backend/qr-checkin-fence.cjs');
 const {startMs}=require('../../qr-checkin/backend/overlays/lifecycle/operations-core.js');
 const {registrationQueueOwnsRoom}=require('./legacy-writer.cjs');
-const {checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,authorizeTicketManager}=require('./ticket-host.cjs');
+const {checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,ticketGateForCode,authorizeTicketManager}=require('./ticket-host.cjs');
 
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const commonFields=['code','roomId','rosterRevision','operationId'];
@@ -35,7 +35,7 @@ async function readReservedTicket({db,tx,room,pub,state,roomId,code,uid,grant,no
  const ref=db.doc('commerceTickets/'+access.ticketId);
  const settings=db.doc(ticketLifecyclePath(code));
  const [ticketSnap,releaseSnap]=await tx.getAll(ref,settings);
- const release=releaseSnap.data(),ticket=ticketSnap.data();
+ const release=ticketGateForCode(releaseSnap.data(),code),ticket=ticketSnap.data();
  if(release?.enabled!==true||release.roomCode!==code||release.roomId!==roomId||release.ownerUid!==uid)throw Error('ticket-lifecycle-disabled');
  if(ticket?.version!==1||ticket.id!==access.ticketId||ticket.orderId!==access.ticketId||ticket.status!=='reserved'||
     ticket.ownerUid!==uid||ticket.boundRoomCode!==code||ticket.boundRoomId!==roomId||ticket.usedAt||
@@ -221,7 +221,7 @@ function createTicketForfeitHandler({db,enabled=async()=>false,clock=Date.now}){
   return db.runTransaction(async tx=>{
    const [actor,roomSnap,publicSnap,gateSnap,prior]=await tx.getAll(db.doc('users/'+uid),roomRef,publicRef,
     db.doc(ticketLifecyclePath(code)),operation);
-   const user=actor.data(),room=roomSnap.data(),pub=publicSnap.data(),gate=gateSnap.data();
+   const user=actor.data(),room=roomSnap.data(),pub=publicSnap.data(),gate=ticketGateForCode(gateSnap.data(),code);
    await authorizeTicketManager(tx,db,{uid,user,room,gate,code,now});
    if(gate.roomId!==roomId||room.ticketAccessV1?.roomId!==roomId||
       pub?.ticketRoomVersion!==1||pub.eventAuthority!=='ticket')throw Error('ticket-binding-invalid');
@@ -298,7 +298,7 @@ function createTicketScoreHandler({db,enabled=async()=>false,clock=Date.now}){
   return db.runTransaction(async tx=>{
    const [actor,roomSnap,publicSnap,gateSnap,prior]=await tx.getAll(db.doc('users/'+uid),roomRef,publicRef,
     db.doc(ticketLifecyclePath(code)),operation);
-   const user=actor.data(),room=roomSnap.data(),pub=publicSnap.data(),gate=gateSnap.data();
+   const user=actor.data(),room=roomSnap.data(),pub=publicSnap.data(),gate=ticketGateForCode(gateSnap.data(),code);
    const authority=await authorizeTicketManager(tx,db,{uid,user,room,gate,code,now});
    if(gate.roomId!==roomId||room.ticketAccessV1?.roomId!==roomId||
       pub?.ticketRoomVersion!==1||pub.eventAuthority!=='ticket')throw Error('ticket-binding-invalid');

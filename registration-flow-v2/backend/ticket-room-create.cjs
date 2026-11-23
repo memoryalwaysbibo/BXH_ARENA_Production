@@ -2,7 +2,7 @@
 const {forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked}=require('./lifecycle.cjs');
 
 const {createHash,randomBytes,randomUUID}=require('node:crypto');
-const {ticketHostGrant,checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,authorizeTicketManager,activeTicketManager}=require('./ticket-host.cjs');
+const {ticketHostGrant,checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,ticketGateForCode,authorizeTicketManager,activeTicketManager}=require('./ticket-host.cjs');
 const {authorizeTicketRemoval}=require('./queue.cjs');
 
 const fields=new Set(['action','code','ticketId','operationId','name','location','stations',
@@ -60,21 +60,26 @@ function createTicketRoomHandler({db,clock=Date.now,newPartnerCode=()=>`PTN-${ra
   const ticket=db.doc('commerceTickets/'+ticketId),order=db.doc('commerceOrders/'+ticketId);
   const release=db.doc(auto?ptnReleasePath:ticketLifecyclePath(input.code));
   const requestHash=digest(input);
+  const createOperation=auto?db.doc('commerceTicketRoomCreateOps/'+digest([uid,operationId])):null;
   const attempt=candidate=>db.runTransaction(async tx=>{
    const now=clock();
-   const [profileSnap,ticketSnap,orderSnap,gateSnap]=await tx.getAll(db.doc('users/'+uid),ticket,order,release);
+   const [profileSnap,ticketSnap,orderSnap,gateSnap,createSnap]=await tx.getAll(db.doc('users/'+uid),ticket,order,release,...(auto?[createOperation]:[]));
    const grant=ticketHostGrant(profileSnap.data(),now);
    if(!grant)throw Error('permission-denied');
    const held=ticketSnap.data(),paid=orderSnap.data(),gate=gateSnap.data();
    if(auto&&(!gate||gate.ownerUid!==uid))throw Error('ticket-lifecycle-disabled');
-   const code=auto?(gate.roomCode??candidate):input.code;
+   const legacyReceipt=auto&&gate?.roomCode
+    ?await tx.get(db.doc('tournaments/'+gate.roomCode).collection('operationLog').doc('ticket-room-create-'+digest([uid,operationId])))
+    :null;
+   const code=auto?(createSnap?.data()?.code|| (legacyReceipt?.exists?gate.roomCode:candidate)):input.code;
    if(auto&&!isPartnerRoomCode(code))throw Error('ticket-lifecycle-disabled');
    const room=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code);
    const receipt=room.collection('operationLog').doc('ticket-room-create-'+digest([uid,operationId]));
    const [roomSnap,publicSnap,receiptSnap]=await tx.getAll(room,pub,receipt);
-   if(receiptSnap.exists){
+   if(receiptSnap.exists||createSnap?.exists){
     const prior=receiptSnap.data(),existing=roomSnap.data();
-    if(prior.requestHash!==requestHash)throw Error('operation-conflict');
+    if(prior?.requestHash!==requestHash||createSnap?.exists&&
+       (createSnap.data().requestHash!==requestHash||createSnap.data().code!==code||createSnap.data().roomId!==prior?.roomId))throw Error('operation-conflict');
     if(!existing||publicSnap.data()?.ticketRoomVersion!==1||existing.ownerUid!==uid||
        existing.ticketAccessV1?.ticketId!==ticketId||existing.ticketAccessV1?.roomId!==prior.roomId||
        held?.boundRoomCode!==code||held?.boundRoomId!==prior.roomId)throw Error('room-receipt-inconsistent');
@@ -83,7 +88,7 @@ function createTicketRoomHandler({db,clock=Date.now,newPartnerCode=()=>`PTN-${ra
    if(gate?.bindingEnabled!==true||gate.ownerUid!==uid)throw Error('ticket-lifecycle-disabled');
    if(auto){
     if(gate.enabled!==true)throw Error('ticket-lifecycle-disabled');
-    if(gate.roomCode!=null||gate.roomId!=null)throw Error('ticket-ptn-slot-occupied');
+    if(Object.keys(gate.rooms||{}).length>=8)throw Error('ticket-ptn-slot-occupied');
    }else if(gate.roomCode!==code||!roomIdPattern.test(gate.roomId||''))throw Error('ticket-lifecycle-disabled');
    if(roomSnap.exists||publicSnap.exists)throw Error('room-code-conflict');
    if(held?.version!==1||held.id!==ticketId||held.orderId!==ticketId||held.ownerUid!==uid||
@@ -102,7 +107,11 @@ function createTicketRoomHandler({db,clock=Date.now,newPartnerCode=()=>`PTN-${ra
    tx.create(room,privateRoom);
    tx.create(pub,publicRoom);
    tx.update(ticket,{status:'reserved',boundRoomCode:code,boundRoomId:roomId,updatedAt:now});
-   if(auto)tx.update(release,{roomCode:code,roomId});
+   if(auto){
+    const rooms={...(gate.rooms||{}),[code]:{roomId,ownerUid:uid}};
+    tx.update(release,{rooms,latestRoomCode:code,...(gate.roomCode?{}:{roomCode:code,roomId})});
+    tx.create(createOperation,{requestHash,code,roomId,ticketId,ownerUid:uid,at:now});
+   }
    tx.create(receipt,{requestHash,roomId});
    return {ok:true,code,roomId};
   });
@@ -124,7 +133,9 @@ function createPtnStatusHandler({db,clock=Date.now}){
   if(!ticketHostGrant(actor.data(),clock())||gate?.ownerUid!==uid||
      gate.bindingEnabled!==true||gate.enabled!==true)throw Error('permission-denied');
   if(gate.roomCode!=null&&!isPartnerRoomCode(gate.roomCode))throw Error('ticket-lifecycle-disabled');
-  return {ok:true,code:gate.roomCode??null};
+  const latest=gate.latestRoomCode??gate.roomCode??null;
+  if(latest&&!isPartnerRoomCode(latest))throw Error('ticket-lifecycle-disabled');
+  return {ok:true,code:latest,canCreate:Object.keys(gate.rooms||{}).length<8};
  };
 }
 function createTicketRoomStateHandler({db,clock=Date.now}){
@@ -138,7 +149,7 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
   return db.runTransaction(async tx=>{
    const [actor,gateSnap,roomSnap]=await tx.getAll(db.doc('users/'+uid),
     db.doc(ticketLifecyclePath(code)),db.doc('tournaments/'+code));
-   const gate=gateSnap.data(),room=roomSnap.data();
+   const gate=ticketGateForCode(gateSnap.data(),code),room=roomSnap.data();
    if(gate?.bindingEnabled!==true&&gate?.enabled!==true)throw Error('ticket-lifecycle-disabled');
    if(!room)throw Error('not-found');
    const authority=await authorizeTicketManager(tx,db,{uid,user:actor.data(),room,gate,code,now:clock()});
@@ -209,7 +220,7 @@ function createTicketScheduleHandler({db,clock=Date.now}){
    const now=clock();
    const [actorSnap,gateSnap,roomSnap,publicSnap,receiptSnap]=await tx.getAll(
     db.doc('users/'+uid),db.doc(ticketLifecyclePath(code)),roomRef,publicRef,receipt);
-   const gate=gateSnap.data(),room=roomSnap.data(),pub=publicSnap.data();
+   const gate=ticketGateForCode(gateSnap.data(),code),room=roomSnap.data(),pub=publicSnap.data();
    const authority=await authorizeTicketManager(tx,db,{uid,user:actorSnap.data(),room,gate,code,now});
    const grant=authority.grant;
    if(gate.bindingEnabled!==true||gate.enabled!==true||pub?.ticketRoomVersion!==1)throw Error('permission-denied');
@@ -248,7 +259,7 @@ function createTicketDelegateSearchHandler({db,clock=Date.now}){
   const code=data.code,query=data.query.trim();
   return db.runTransaction(async tx=>{
    const [actorSnap,roomSnap,gateSnap]=await tx.getAll(db.doc('users/'+uid),db.doc('tournaments/'+code),db.doc(ticketLifecyclePath(code)));
-   const gate=gateSnap.data();
+   const gate=ticketGateForCode(gateSnap.data(),code);
    const authority=await authorizeTicketManager(tx,db,{uid,user:actorSnap.data(),room:roomSnap.data(),gate,code,now:clock()});
    if(!authority.owner||gate.enabled!==true||gate.bindingEnabled!==true)throw Error('permission-denied');
    const rows=new Map();
@@ -278,7 +289,7 @@ function createTicketDelegateHandler({db,clock=Date.now}){
   return db.runTransaction(async tx=>{
    const roomRef=db.doc('tournaments/'+code);
    const [actorSnap,roomSnap,gateSnap]=await tx.getAll(db.doc('users/'+uid),roomRef,db.doc(ticketLifecyclePath(code)));
-   const room=roomSnap.data(),gate=gateSnap.data();
+   const room=roomSnap.data(),gate=ticketGateForCode(gateSnap.data(),code);
    const authority=await authorizeTicketManager(tx,db,{uid,user:actorSnap.data(),room,gate,code,now:clock()});
    if(!authority.owner||gate.enabled!==true||gate.bindingEnabled!==true)throw Error('permission-denied');
    if(delegateUid){
