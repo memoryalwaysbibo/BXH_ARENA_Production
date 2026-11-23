@@ -26,6 +26,7 @@ FILES = ('registration-flow-v2/backend/bindings.cjs',
          'registration-flow-v2/backend/ticket-host.cjs')
 SETTINGS = ('commerceV1', 'commerceTicketCheckoutV1',
             'commerceDeliveryV1', 'commerceTicketPtnPilotV1',
+            'commerceTicketPtnSaleV1',
             'commerceTicketLifecycleV1')
 
 
@@ -124,6 +125,9 @@ def main():
                                   'roomCode', 'latestRoomCode', 'storeOpen'))
         if name == 'commerceTicketPtnPilotV1':
             output['roomsCount'] = len(nested(fields, 'rooms'))
+        if name == 'commerceTicketPtnSaleV1':
+            output['productIds'] = summary(nested(fields, 'productIds'),
+                                           ('32', '64', '96', '128', '160'))
         if name == 'commerceV1':
             output['bankConfigured'] = bool(nested(fields, 'bank'))
             output['paymentHours'] = value(fields.get('paymentHours'))
