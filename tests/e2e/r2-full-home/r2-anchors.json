@@ -1,0 +1,114 @@
+{
+  "modules/main-app/core.js": [
+    [
+      "const PUBLIC_TOURNAMENTS_RECONCILE_MS = 90000;",
+      "const PUBLIC_TOURNAMENTS_RECONCILE_MS = 90000;\n\n// This adapter is reachable only with an explicit local synthetic transport.\nlet homeSummaryLab=null, homeSummaryLabOwner=null, homeSummaryLabItems=null;\nfunction isHomeSummaryLabLobby(){\n  return isTournamentLobbyVisible()&&!cloudJoinModalOpen&&!!window.BXHArenaHomeSummaryLab?.getLocalTransport();\n}\nfunction homeSummaryLabSnapshot(){\n  return homeSummaryLab?.snapshot()||{cards:null,freshness:\"unknown\",error:false};\n}\nfunction syncHomeSummaryLab({restart=false}={}){\n  if(!isHomeSummaryLabLobby()){homeSummaryLab?.stop({discard:true});homeSummaryLabItems=null;return false;}\n  if(!homeSummaryLab||homeSummaryLabOwner!==lobbyAuthKey()){\n    homeSummaryLab?.stop({discard:true});homeSummaryLabItems=null;\n    homeSummaryLabOwner=lobbyAuthKey();\n    homeSummaryLab=window.BXHArenaHomeSummaryLab.create({\n      transport:window.BXHArenaHomeSummaryLab.getLocalTransport(),notify:change=>{\n        // A trusted summary reset intentionally carries no room IDs. Remove\n        // only old R2 cards before the normal render can defer for a gesture.\n        if(change?.reason===\"confirmed-reset\"&&isHomeSummaryLabLobby()){\n          for(const card of document.querySelectorAll?.(\"[data-lobby-root] [data-home-summary-fixture]\")||[]){\n            card.remove();\n          }\n        }\n        homeSummaryLabItems=homeSummaryLabSnapshot().displayCards?.map(window.BXHArenaHomeSummaryLab.toLobbyItem)||null;\n        lobbyRegistrationBoundaryAt=nextLobbyRegistrationBoundary(homeSummaryLabItems);\n        requestLobbyRender();\n      }\n    });\n  }\n  if(document.hidden){homeSummaryLab.stop();return true;}\n  if(restart)homeSummaryLab.stop();\n  homeSummaryLab.start();\n  return true;\n}\nfunction lobbyBoundaryItems(){return isHomeSummaryLabLobby()?homeSummaryLabItems:publicTournamentsCache;}\n"
+    ],
+    [
+      "lobbyRegistrationBoundaryAt=nextLobbyRegistrationBoundary(publicTournamentsCache);",
+      "lobbyRegistrationBoundaryAt=nextLobbyRegistrationBoundary(lobbyBoundaryItems());"
+    ],
+    [
+      "Math.min(lobbyRegistrationBoundaryAt,nextLobbyRegistrationBoundary(publicTournamentsCache))",
+      "Math.min(lobbyRegistrationBoundaryAt,nextLobbyRegistrationBoundary(lobbyBoundaryItems()))"
+    ],
+    [
+      "function lobbyRegistrationStateKnown(t){\n  if(publicTournamentsFreshness!==\"server\"||!t)",
+      "function lobbyRegistrationStateKnown(t,freshness=publicTournamentsFreshness){\n  if(freshness!==\"server\"||!t)"
+    ],
+    [
+      "async function reconcilePublicTournamentsNow(reason=\"manual\"){\n  const context=captureLobbyContext();",
+      "async function reconcilePublicTournamentsNow(reason=\"manual\"){\n  const context=captureLobbyContext();\n  if(isHomeSummaryLabLobby()){syncHomeSummaryLab();return false;}"
+    ],
+    [
+      "function syncPublicTournamentsRealtimeState(){\n  reconcileLobbyContext();",
+      "function syncPublicTournamentsRealtimeState(){\n  reconcileLobbyContext();\n  if(syncHomeSummaryLab()){stopPublicTournamentsRealtime();return;}"
+    ],
+    [
+      "function lobbySummary(raw){\n",
+      "function lobbySummary(raw,freshness){\n"
+    ],
+    [
+      "const regStatus = lobbyRegistrationStateKnown(raw)?",
+      "const regStatus = lobbyRegistrationStateKnown(raw,freshness)?"
+    ],
+    [
+      "function lobbyLists(rawList){",
+      "function lobbyLists(rawList,freshness){"
+    ],
+    [
+      "    .map(lobbySummary)\n    .filter(lobbyMatchesActiveFilters);",
+      "    .map(raw=>lobbySummary(raw,freshness))\n    .filter(lobbyMatchesActiveFilters);"
+    ],
+    [
+      "function renderTournamentLobbyContent(opts={}){\n  const loggedIn=!!opts.loggedIn;",
+      "function renderTournamentLobbyContent(opts={}){\n  const lab=isHomeSummaryLabLobby();\n  const loggedIn=!lab&&!!opts.loggedIn;\n  const labState=lab?homeSummaryLabSnapshot():null;\n  const isFiltered=!!(findEventsFilters.keyword||findEventsFilters.date||findEventsFilters.region||(findEventsFilters.format&&findEventsFilters.format!==\"all\"));\n  const catalog=labState?.catalogSupported?labState.catalog:null;\n  const needsSearch=!!(catalog&&isFiltered&&catalog.mode!==\"search\");\n  const list=lab?(needsSearch&&homeSummaryLabItems?[]:homeSummaryLabItems):publicTournamentsCache;\n  const catalogNotice=!catalog?\"\":catalog.loading?\"正在讀取測試賽事…\":catalog.error?\"查詢失敗，可重試。\":catalog.stale?\"賽事資料有更新，請重新查詢。\":needsSearch?\"這組篩選尚未查詢。\":\"\";\n  const canMore=!!(catalog&&!catalog.loading&&!needsSearch&&!catalog.error&&!catalog.stale&&\n    (catalog.next||(!catalog.mode&&!isFiltered&&labState.cards?.length===20)));\n  const error=lab?(labState.error?\"測試摘要暫時無法讀取，請重試\":null):publicTournamentsError;"
+    ],
+    [
+      "  if(publicTournamentsCache!==null && typeof queuePublicTournamentsBackgroundRefresh===\"function\") queuePublicTournamentsBackgroundRefresh();\n  if(publicTournamentsCache===null){",
+      "  if(!lab&&list!==null && typeof queuePublicTournamentsBackgroundRefresh===\"function\") queuePublicTournamentsBackgroundRefresh();\n  if(list===null&&!error){"
+    ],
+    [
+      "  if(publicTournamentsError) return `<div class=\"panel\"><div class=\"empty-state\">${esc(publicTournamentsError)}</div>",
+      "  if(error) return `<div class=\"panel\"><div class=\"empty-state\">${esc(error)}</div>"
+    ],
+    [
+      "const {live,settling,registration,waiting,ended,total}=lobbyLists(publicTournamentsCache);",
+      "const {live,settling,registration,waiting,ended,total}=lobbyLists(list,labState?.freshness);"
+    ],
+    [
+      "      <div class=\"settings-page-title\">賽事大廳</div>",
+      "      <div class=\"settings-page-title\">賽事大廳${lab?\"（本機測試資料）\":\"\"}</div>"
+    ],
+    [
+      "  return `<details data-lobby-code=\"${esc(t.code)}\" class=\"lobby-compact-card",
+      "  return `<details ${t.raw?.homeSummaryFixture===true?'data-home-summary-fixture':\"\"} data-lobby-code=\"${esc(t.code)}\" class=\"lobby-compact-card"
+    ],
+    [
+      "      ${`<div class=\"lobby-event-intro-head\">",
+      "      ${t.raw?.homeSummaryFixture===true?\"\":`<div class=\"lobby-event-intro-head\">"
+    ],
+    [
+      "    ${lobbyFilterPanelHtml()}\n    ${filtered?`<div class=\"lobby-filter-summary\">",
+      "    ${lab?`<div class=\"hint\">${catalog?\"首頁先讀最多 20 場；搜尋會查完整測試目錄。\":\"本機摘要最多顯示 20 場；搜尋僅比對這批測試資料。\"}</div>`:\"\"}\n    ${lobbyFilterPanelHtml()}\n    ${filtered?`<div class=\"lobby-filter-summary\">"
+    ],
+    [
+      "    ${lobbySectionHtml(\"ended\",\"⚪ 已結束 / 已取消\",ended.length,endedBody,false)}",
+      "    ${lobbySectionHtml(\"ended\",\"⚪ 已結束 / 已取消\",ended.length,endedBody,false)}\n    ${catalogNotice?`<p class=\"hint\" role=\"status\">${catalogNotice}</p>`:\"\"}\n    ${canMore?`<button class=\"btn btn-ghost\" data-action=\"home-summary-catalog-more\">載入更多</button>`:\"\"}\n    ${!catalog?.loading&&(catalog?.stale||catalog?.error||needsSearch)?`<button class=\"btn btn-ghost\" data-action=\"home-summary-catalog-retry\">重新查詢</button>`:\"\"}"
+    ],
+    [
+      "  if(action===\"apply-find-events-filter\"){",
+      "  if(action===\"home-summary-catalog-more\"||action===\"home-summary-catalog-retry\"){\n    if(isHomeSummaryLabLobby()&&homeSummaryLabSnapshot().catalogSupported){\n      if(action===\"home-summary-catalog-more\")void homeSummaryLab.more();\n      else if(homeSummaryLabSnapshot().catalog.mode)void homeSummaryLab.retryCatalog();\n      else void homeSummaryLab.search({...findEventsFilters});\n    }\n    return;\n  }\n  if(action===\"apply-find-events-filter\"){"
+    ],
+    [
+      "      format: document.getElementById(\"fe-format\")?.value || \"all\"\n    };\n    findEventsFiltersOpen = false;",
+      "      format: document.getElementById(\"fe-format\")?.value || \"all\"\n    };\n    if(isHomeSummaryLabLobby()&&homeSummaryLabSnapshot().catalogSupported){\n      const f=findEventsFilters;\n      if(f.keyword||f.date||f.region||f.format!==\"all\")void homeSummaryLab.search({...f});else homeSummaryLab.clearCatalog();\n    }\n    findEventsFiltersOpen = false;"
+    ],
+    [
+      "      keyword: document.getElementById(\"fe-quick-search\")?.value.trim() || \"\"\n    });",
+      "      keyword: document.getElementById(\"fe-quick-search\")?.value.trim() || \"\"\n    });\n    if(isHomeSummaryLabLobby()&&homeSummaryLabSnapshot().catalogSupported){\n      const f=findEventsFilters;\n      if(f.keyword||f.date||f.region||f.format!==\"all\")void homeSummaryLab.search({...f});else homeSummaryLab.clearCatalog();\n    }"
+    ],
+    [
+      "    findEventsFilters = { keyword:\"\", date:\"\", region:\"\", format:\"all\" };\n    findEventsFiltersOpen = false;",
+      "    findEventsFilters = { keyword:\"\", date:\"\", region:\"\", format:\"all\" };\n    if(isHomeSummaryLabLobby()&&homeSummaryLabSnapshot().catalogSupported)homeSummaryLab.clearCatalog();\n    findEventsFiltersOpen = false;"
+    ],
+    [
+      "function handleAction(action, target){",
+      "function handleAction(action, target){\n  // Fixture cards exercise rendering/updates only, never live room endpoints.\n  if(target?.closest?.(\"[data-home-summary-fixture]\"))return;"
+    ],
+    [
+      "  if(action===\"load-public-tournaments\" || action===\"refresh-public-tournaments\"){\n    const context=captureLobbyContext();",
+      "  if(action===\"load-public-tournaments\" || action===\"refresh-public-tournaments\"){\n    const context=captureLobbyContext();\n    if(isHomeSummaryLabLobby()){syncHomeSummaryLab({restart:action===\"refresh-public-tournaments\"});return;}"
+    ]
+  ],
+  "index.html": [
+    [
+      "<script id=\"bxh-main-app-m7\"",
+      "<script src=\"modules/main-app/home-summary-lab.js\"></script>\n<script id=\"bxh-main-app-m7\""
+    ],
+    [
+      "src=\"modules/main-app/core.js?v=",
+      "src=\"modules/main-app/core.js?home-summary-lab=1&v="
+    ]
+  ]
+}

@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Dedicated demo project only, never copied into arena rules.
+    match /publicTournaments/{id} { allow get, list: if resource.data.visibility == "public"; }
+    match /arenaHomeLab/{id} { allow get: if id in ["first","version","delta"]; }
+    match /arenaHomeLabPrivateCatalog/{doc} { allow read, write: if false; }
+  }
+}
