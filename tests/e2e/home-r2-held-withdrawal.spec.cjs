@@ -11,8 +11,7 @@ test('Home R2 trusted withdrawal removes a pressed fixture card before pointer r
     ? r.fulfill({contentType:'text/html; charset=utf-8',body:'<!doctype html><meta charset="utf-8"><main data-lobby-root><p id="r1">Unchanged R1 control</p><section id="cards"></section></main>'})
     : r.abort());
   await page.goto(localFixture);
-  await page.addScriptTag({content: controller});
-  await page.addScriptTag({content: adapter + '\n' + function(){
+  const install = function(){
     let notify, resolveFirst, ready = false, held = false, activated = 0;
     const panel = document.getElementById('cards');
     const target = {id:'DEMO-PRESSED',title:'Pressed fixture'};
@@ -48,8 +47,13 @@ test('Home R2 trusted withdrawal removes a pressed fixture card before pointer r
     window.lab = {initial(){version(1);return homeSummaryLab.settled();},cached(){version(2,true);return homeSummaryLab.settled();},
       withdraw:()=>version(2), pending:()=>ready,held:()=>held,activated:()=>activated,
       release(){resolveFirst();return homeSummaryLab.settled();}};
-  }.toString().replace(/^function\(\)\s*\{|\}\s*$/g,'')});
-  await page.evaluate(() => window.lab.initial());
+  };
+  // Use the test evaluation channel so bootstrap exceptions fail at their origin.
+  await page.evaluate(({adapter, controller, install}) => {
+    new Function(controller + '\n' + adapter + '\n;(' + install + ')();')();
+    if(typeof window.lab?.initial!=='function')throw Error('R2 loopback fixture did not install');
+    return window.lab.initial();
+  }, {adapter, controller, install:install.toString()});
   const pressed = page.locator('#DEMO-PRESSED button');
   await expect(pressed).toBeVisible();
   const rect = await pressed.boundingBox();
