@@ -5,6 +5,7 @@ import io
 import json
 import subprocess
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 
@@ -14,7 +15,11 @@ ROOT = f'https://firestore.googleapis.com/v1/projects/{PROJECT}/databases/(defau
 FUNCTIONS = ('registrationRosterQueueV2', 'registrationQueueV2',
              'registrationQueueV2Worker', 'registrationQueueV2Sweep',
              'registrationDrawV2', 'registrationStartV2')
-COMMERCE_FUNCTION = 'commerceService'
+INSPECT_FUNCTIONS = {
+    'commerceService': ('/service.cjs', '/ticket-purchase.cjs', '/domain.cjs'),
+    'ladderAutoSettlement': ('/ladder-auto-settlement.js',
+                            '/ladder-settlement-core.js'),
+}
 FILES = ('registration-flow-v2/backend/bindings.cjs',
          'registration-flow-v2/backend/lifecycle.cjs',
          'registration-flow-v2/backend/ticket-room-create.cjs',
@@ -38,6 +43,33 @@ def firestore(path, token):
         if error.code == 404:
             return {}
         raise
+
+
+def ticket_products(token):
+    cursor = ''
+    for _ in range(4):
+        query = '?pageSize=100'
+        if cursor:
+            query += '&pageToken=' + urllib.parse.quote(cursor, safe='')
+        req = urllib.request.Request(ROOT + '/commerceProducts' + query,
+                                     headers={'Authorization': 'Bearer ' + token})
+        with urllib.request.urlopen(req, timeout=20) as response:
+            page = json.load(response)
+        for row in page.get('documents', []):
+            fields = row.get('fields', {})
+            delivery = nested(fields, 'delivery')
+            if value(delivery.get('kind')) != 'ticket':
+                continue
+            print(json.dumps({'ticketProduct': row['name'].rsplit('/', 1)[-1],
+                'summary': summary(fields, ('name', 'status', 'priceTwd',
+                                            'audience', 'version')),
+                'delivery': summary(delivery, ('kind', 'assetId',
+                                               'quantity', 'durationDays'))},
+                ensure_ascii=False))
+        cursor = page.get('nextPageToken', '')
+        if not cursor:
+            return
+    raise RuntimeError('ticket-product-inventory-exceeds-read-limit')
 
 
 def value(item):
@@ -76,13 +108,14 @@ def main():
                       for path in FILES if path in source_zip.namelist()}
         print(json.dumps({'function': function, 'generation': generation,
                           'hashes': hashes}, ensure_ascii=False))
-    generation, archive = source_archive(COMMERCE_FUNCTION)
-    with zipfile.ZipFile(io.BytesIO(archive)) as source_zip:
-        hashes = {path: hashlib.sha256(source_zip.read(path)).hexdigest()
-                  for path in source_zip.namelist()
-                  if path.endswith(('/service.cjs', '/ticket-purchase.cjs', '/domain.cjs'))}
-    print(json.dumps({'function': COMMERCE_FUNCTION, 'generation': generation,
-                      'hashes': hashes}, ensure_ascii=False))
+    for function, suffixes in INSPECT_FUNCTIONS.items():
+        generation, archive = source_archive(function)
+        with zipfile.ZipFile(io.BytesIO(archive)) as source_zip:
+            hashes = {path: hashlib.sha256(source_zip.read(path)).hexdigest()
+                      for path in source_zip.namelist()
+                      if path.endswith(suffixes)}
+        print(json.dumps({'function': function, 'generation': generation,
+                          'hashes': hashes}, ensure_ascii=False))
     settings = {}
     for name in SETTINGS:
         fields = firestore('systemSettings/' + name, token)
@@ -115,6 +148,7 @@ def main():
         'ptnOwnerConfigured': bool(value(ptn.get('ownerUid'))),
         'ptnRoomConfigured': bool(value(ptn.get('roomId'))),
     }}, ensure_ascii=False))
+    ticket_products(token)
     print('PTN_MULTI_READ_ONLY: no production changes')
 
 
