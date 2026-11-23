@@ -197,10 +197,10 @@
 <script src="modules/main-app/ladder-location.js?v=20261019.1"></script>
 <link rel="stylesheet" href="commerce.css?v=20261123-ptn-referee.1">
 <script>
+  window.BXH_PTN_TICKET_SALE = true;
   if (new URLSearchParams(location.search).get("ticketPilot") === "BXH-TKFB6E3F94") {
     window.BXH_TICKET_ROOM_PILOT_CODE = "BXH-TKFB6E3F94";
     window.BXH_TICKET_ROOM_PTN_PILOT = new URLSearchParams(location.search).get("ticketPtn") === "1";
-    window.BXH_PTN_TICKET_SALE = new URLSearchParams(location.search).get("ptnSale") === "1";
   }
 </script>
 <script src="commerce-ui.js?v=20261123-ptn-five-vouchers.1"></script>
