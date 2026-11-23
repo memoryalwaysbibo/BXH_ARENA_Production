@@ -12,7 +12,8 @@ function fixture(){
  const ptn='PTN-P1L0T1';
  let ticketGate,ptnGate;
  let gate={roomCode:pilot,workersEnabled:true,intakeEnabled:true,lifecycleEnabled:true};
- const db={doc:path=>({get:async()=>({data:()=>path.endsWith('/registrationFlowV2Pilot')?gate:
+ const db={doc:path=>({get:async()=>({data:()=>path.startsWith('commerceTicketRoomGates/')?undefined:
+  path.endsWith('/registrationFlowV2Pilot')?gate:
   path.endsWith('/commerceTicketPtnPilotV1')?ptnGate:ticketGate})})};
  const queue={status:async(...args)=>{status.push(args);return {operation:{state:'completed'}};},
   enqueue:async(...args)=>{writes.push(args);return {operation:{state:'queued'}};},
