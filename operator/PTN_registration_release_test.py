@@ -3,11 +3,29 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import PTN_registration_release as release
 
 
 class RegistrationReleaseTest(unittest.TestCase):
+    def test_trigger_filter_order_does_not_change_identity(self):
+        a = {'eventTrigger': {'eventType': 'written', 'eventFilters': [
+            {'attribute': 'database', 'value': '(default)'},
+            {'attribute': 'document', 'value': 'tournaments/{code}'},
+        ]}}
+        b = json.loads(json.dumps(a))
+        b['eventTrigger']['eventFilters'].reverse()
+        self.assertEqual(release.identity(a), release.identity(b))
+
+    def test_transient_metadata_difference_is_rechecked(self):
+        before = {'buildConfig': {'source': {'storageSource': {'generation': '1'}}},
+                  'updateTime': 'initial'}
+        transient = {'buildConfig': {'source': {'storageSource': {'generation': '2'}}}}
+        with patch.object(release, 'describe', side_effect=[transient, before]) as describe:
+            release.require_stable('registrationQueueV2Worker', before, 'during preflight')
+            self.assertEqual(describe.call_count, 2)
+
     def test_fingerprint_ignores_metadata_only_changes_but_detects_source_drift(self):
         name = 'registrationQueueV2Worker'
         info = {'buildConfig': {'entryPoint': name, 'runtime': 'nodejs22',

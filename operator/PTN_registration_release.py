@@ -36,10 +36,16 @@ def describe(name):
 
 def identity(info):
     build, service = info.get('buildConfig', {}), info.get('serviceConfig', {})
+    event = info.get('eventTrigger')
+    if event is not None:
+        event = dict(event)
+        event['eventFilters'] = sorted(event.get('eventFilters', []),
+                                       key=lambda f: (f.get('attribute', ''),
+                                                      f.get('operator', ''), f.get('value', '')))
     return (build.get('entryPoint'), build.get('runtime'),
             info.get('labels', {}).get('firebase-functions-codebase'),
             service.get('serviceAccountEmail'), service.get('availableMemory'),
-            service.get('timeoutSeconds'), info.get('eventTrigger'),
+            service.get('timeoutSeconds'), event,
             service.get('environmentVariables'))
 
 
@@ -51,6 +57,16 @@ def fingerprint(info):
             service.get('availableCpu'), service.get('maxInstanceCount'),
             service.get('maxInstanceRequestConcurrency'), service.get('ingressSettings'),
             info.get('eventTrigger', {}).get('retryPolicy'))
+
+
+def require_stable(name, before, phase):
+    baseline = fingerprint(before)
+    for _ in range(3):
+        current = fingerprint(describe(name))
+        if current == baseline:
+            return
+    changed = [i for i in range(len(baseline)) if baseline[i] != current[i]]
+    raise ValueError(name + ': live function changed ' + phase + '; fields=' + str(changed))
 
 
 def preflight(root, name, before):
@@ -85,8 +101,7 @@ def main():
     name = args.name
     before = describe(name)
     code = preflight(args.stage_root, name, before)
-    if fingerprint(describe(name)) != fingerprint(before):
-        raise ValueError(name + ': live function changed during preflight')
+    require_stable(name, before, 'during preflight')
     print('PTN_REGISTRATION_PREFLIGHT_OK', name, GENERATION[name], flush=True)
     if not args.apply:
         print('PREPARE_ONLY: no production changes')
@@ -98,8 +113,7 @@ def main():
     try:
         subprocess.run(['npm', '--prefix', str(code), 'install', '--omit=dev',
                         '--ignore-scripts', '--no-audit', '--no-fund'], check=True)
-        if fingerprint(describe(name)) != fingerprint(before):
-            raise ValueError(name + ': live function changed before deploy')
+        require_stable(name, before, 'before deploy')
         env = dict(os.environ, GOOGLE_CLOUD_QUOTA_PROJECT=PROJECT)
         subprocess.run(['firebase', 'deploy', '--config', str(release / 'firebase.json'),
                         '--project', PROJECT, '--only', f'functions:{CODEBASE}:{name}',
