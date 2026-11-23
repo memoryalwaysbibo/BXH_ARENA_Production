@@ -53,7 +53,9 @@ function ticketRoomReadError(e){
  if(message.includes('permission-denied')||message.includes('unauthenticated')||message.includes('auth-required'))return '管理權限驗證失敗，請確認目前登入的帳號與此房主辦或代理人相同。';
  if(message.includes('deadline-exceeded')||message.includes('initialization-timeout'))return '賽事資料讀取逾時，請重新整理賽事。';
  if(message.includes('unavailable')||message.includes('network-request-failed'))return '目前無法連接賽事服務，請確認網路後重新整理賽事。';
- return errorMessage(e);
+ if(e?.code==='functions/internal'||message.includes('functions/internal'))return '賽事服務處理失敗（internal），請聯絡 BXH 查詢服務紀錄。';
+ const known=errorMessage(e);
+ return known.includes('重複下單')?'賽事資料讀取失敗，請聯絡 BXH 查詢服務紀錄。':known;
 }
 const permanentErrors=/forfeit-(room-not-live|match-stale|round-waiting)|registration-(queue-pending|queue-disabled|roster-stale)|early-start-confirmation-required|bracket-started|ticket-lifecycle-disabled|ticket-unavailable|ticket-expired|ticket-binding-invalid|room-code-conflict|ticket-ptn-slot-occupied|bracket-version-conflict|bracket-roster-changed|permission-denied|not-found|partner-organizer-required|ticket-holding-limit|ticket-monthly-limit|product-unavailable|store-closed|delivery-not-ready|product-changed|version-conflict|contract-required|contract-expired|unpaid-order-exists|already-owned|bank-receipt-used|amount-mismatch|payment-window-closed|invalid-|refund-needs-review|transition-forbidden|cancel-unavailable|account-inactive|super-admin-required|order-unavailable/;
 const money=n=>'NT$ '+Number(n||0).toLocaleString('zh-TW');
@@ -210,7 +212,8 @@ async function discoverOwnedPtn(){
  }catch(error){
   if(c===context()&&c.ownedPtn===loading){
    const message=String(error?.message||'');
-   c.ownedPtn={failed:!message.includes('permission-denied')||message.includes('app-check-unavailable')};
+   const failed=!message.includes('permission-denied')||message.includes('app-check-unavailable');
+   c.ownedPtn={failed,error:failed?ticketRoomReadError(error):''};
   }
  }finally{
   if(c===context()&&canSeeTickets()&&inManagement())render();
@@ -222,7 +225,7 @@ function ownedTicketRoomCard(){
  if(!c.ownedPtn&&canSeeTickets()){
   setTimeout(()=>{if(c===context()&&!c.ownedPtn)void discoverOwnedPtn();},0);
  }
- return `<section class="panel tournament-management-card"><h3>PTN 合作賽事管理</h3>${c.ownedPtn?.failed?'<p>暫時無法查詢自己建立的房間。</p><button class="btn btn-ghost" data-action="commerce-refresh-owned-ptn">重新查詢</button>':''}${isPtnCode(c.ownedPtn?.code)?`<p>房號 ${esc(c.ownedPtn.code)}</p><button class="btn btn-primary btn-sm" data-action="commerce-open-owned-ptn">管理房間</button>`:''}<form data-commerce-form="ticket-open-code">${input('code','代理或最高管理員接管 PTN 房號',c.ptnCodeDraft||'','text','placeholder="PTN-XXXXXX" maxlength="10" required')}<button class="btn btn-ghost">依房號接管</button></form><p class="hint">只有開房者、該房代理人及 BXH 最高管理員可通過管理權限驗證。</p></section>`;
+ return `<section class="panel tournament-management-card"><h3>PTN 合作賽事管理</h3>${c.ownedPtn?.failed?`<p role="alert">${esc(c.ownedPtn.error)}</p><button class="btn btn-ghost" data-action="commerce-refresh-owned-ptn">重新查詢</button>`:''}${isPtnCode(c.ownedPtn?.code)?`<p>房號 ${esc(c.ownedPtn.code)}</p><button class="btn btn-primary btn-sm" data-action="commerce-open-owned-ptn">管理房間</button>`:''}<form data-commerce-form="ticket-open-code">${input('code','代理或最高管理員接管 PTN 房號',c.ptnCodeDraft||'','text','placeholder="PTN-XXXXXX" maxlength="10" required')}<button class="btn btn-ghost">依房號接管</button></form><p class="hint">只有開房者、該房代理人及 BXH 最高管理員可通過管理權限驗證。</p></section>`;
 }
 function ticketCreationPage(){
  const c=context();
