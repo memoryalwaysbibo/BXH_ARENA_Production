@@ -40,6 +40,16 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
    if(m==='invalid-operation')throw new HttpsError('invalid-argument',m);
    if(m==='permission-denied'||m==='not-found')throw new HttpsError(m,m);
    if(['registration-queue-disabled','operation-conflict','tournament-started',...preconditions].includes(m))throw new HttpsError('failed-precondition',m);
+   if(data?.action==='ticket-room-state'&&isPartnerRoomCode(data?.code)){
+     // Record only error classification and source location. Never log room state,
+     // request payload, player identity or the exception message.
+     const frame=String(error?.stack||'').split('\n').slice(1)
+      .map(line=>line.match(/(?:backend|engine)\/[A-Za-z0-9_./-]+\.cjs:\d+:\d+/)?.[0])
+      .find(Boolean)||'unknown';
+     const type=String(error?.name||'Error').replace(/[^A-Za-z]/g,'').slice(0,40)||'Error';
+     const code=String(error?.code??'').replace(/[^A-Za-z0-9/_-]/g,'').slice(0,40);
+     console.error('PTN room state read failed',{type,code,frame});
+   }
    throw new HttpsError('unavailable','registration-operation-unconfirmed');
   }
  });
