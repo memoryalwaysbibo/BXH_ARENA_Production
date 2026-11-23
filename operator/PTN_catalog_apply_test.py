@@ -36,6 +36,8 @@ class DraftApplyTest(unittest.TestCase):
         self.assertTrue(all(w['update']['fields']['status'] == field('draft') for w in writes))
         self.assertTrue(all(w['update']['fields']['delivery']['mapValue']['fields']['durationDays'] == field(0)
                             for w in writes))
+        self.assertEqual([w['update']['fields']['delivery']['mapValue']['fields']['assetId']
+                          for w in writes], [field(str(cap)) for cap in (32, 64, 96, 128, 160)])
 
 
 if __name__ == '__main__':

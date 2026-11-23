@@ -24,6 +24,8 @@ class CatalogStageTest(unittest.TestCase):
         self.assertTrue(all(row['fields']['status']['stringValue'] == 'draft' for row in output))
         self.assertTrue(all(row['fields']['delivery']['mapValue']['fields']['durationDays'] ==
                             field(0) for row in output))
+        self.assertEqual([row['fields']['delivery']['mapValue']['fields']['assetId']
+                          for row in output], [field(str(cap)) for cap in (32, 64, 96, 128, 160)])
         self.assertEqual(output[0]['precondition'], {'updateTime': base['updateTime']})
         self.assertTrue(all(row['precondition'] == {'exists': False} for row in output[1:]))
         with self.assertRaisesRegex(ValueError, 'live product or sale setting differs'):
