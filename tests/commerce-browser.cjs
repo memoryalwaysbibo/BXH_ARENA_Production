@@ -22,7 +22,7 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
    window.esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
    window.testView='shop';window.render=()=>document.querySelector('#app').innerHTML=window.testView==='admin'?BXHCommerce.adminPage():window.testView==='orders'?BXHCommerce.orders():window.testView==='management'?(BXHCommerce.ticketCreationPage()||'<button data-action="commerce-open-ticket-create">＋ 新增賽事</button>'):BXHCommerce.shop();
    window.testProduct={id:'skin_test',version:1,name:'星空獵人 Skin（隔離測試）',description:'收藏外觀示範。這是隔離測試商品，沒有正式販售。',terms:'永久持有；測試商品說明。',priceTwd:100,imageUrl:'https://example.invalid/skin.svg',audience:'all',sort:0,status:'published',purchasable:true,delivery:{kind:'skin',assetId:'test_skin',quantity:1,durationDays:0}};
-   window.ticketOffer={...testProduct,id:'activation_ticket_32',version:4,name:'賽事啟動券｜32 人',priceTwd:300,audience:'partner_organizer',delivery:{kind:'ticket',assetId:'32',quantity:1,durationDays:30}};
+   window.ticketOffer={...testProduct,id:'activation_ticket_32',version:4,name:'賽事啟動券｜32 人',priceTwd:300,audience:'partner_organizer',delivery:{kind:'ticket',assetId:'32',quantity:1,durationDays:0}};
    window.testOrders=[];window.testCalls=[];
    window.engagementService={commerce:async p=>{
     testCalls.push(p);
@@ -149,7 +149,7 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
   await page.getByRole('button',{name:'＋ 新增賽事'}).waitFor();
   await page.evaluate(()=>{activeTab='commerce-shop';testView='shop';render();});
   await page.locator('[data-action="commerce-product"][data-id="tournament_activation_32"]').click();
-  await page.getByText('同時最多持有 2 張，每月五款合計限購 4 張。').waitFor();
+  await page.getByText('無使用期限',{exact:true}).waitFor();
   await page.locator('[data-commerce-consent]').check();
   await page.locator('[data-action="commerce-buy"]').click();
   await page.getByText('BXH-SO-TEST002',{exact:true}).waitFor();
