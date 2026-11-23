@@ -182,6 +182,27 @@ function forfeitMatchAvailable(match){
   !match.callPass&&!match.skippedAt);
 }
 
+// Keep PTN scoring eligibility independent of the referee engine's exported
+// helper list. The closed roster callable can carry an older engine archive.
+function ticketRoundBlocked(match,matches,meta){
+ if((meta?.formatType||'single')!=='single'||!match||match.bracket!=='SE')return false;
+ return matches.some(m=>m&&m.bracket==='SE'&&!m.isBye&&!m.completed&&
+  Number(m.round||0)<Number(match.round||0)&&
+  (m.status!=='in_progress'||!!m.skippedAt||!!m.callPass));
+}
+
+function ticketBronzeBlocked(match,matches,meta){
+ if(!match||match.bracket!=='SE'||(meta?.formatType||'single')!=='single'||!meta?.bronzeMatch)return false;
+ const se=matches.filter(m=>m&&m.bracket==='SE'&&!m.isBye);
+ if(!se.length)return false;
+ const finalRound=Math.max(...se.map(m=>Number(m.round)||0));
+ if(finalRound<1||Number(match.round||0)!==finalRound)return false;
+ const semis=se.filter(m=>Number(m.round||0)===finalRound-1);
+ if(semis.length!==2||!semis.every(m=>m.completed&&m.loserId))return false;
+ const bronze=matches.find(m=>m&&m.bracket==='BZ'&&!m.isBye);
+ return !bronze?.completed;
+}
+
 function createTicketForfeitHandler({db,enabled=async()=>false,clock=Date.now}){
  return async request=>{
   const uid=request.auth?.uid,input=request.data||{};
@@ -223,8 +244,8 @@ function createTicketForfeitHandler({db,enabled=async()=>false,clock=Date.now}){
       publicMatch?.b?.playerId!==playerIds[1])throw Error('forfeit-match-stale');
    const actorName=String(user.realName||user.gameId||user.displayName||'合作主辦').slice(0,80);
    const engine=createEngine(state,{uid,name:actorName},now,operationId);
-   if(engine.singleElimRoundDispatchBlocked(match,state.matches,state.meta)||
-      engine.singleElimBronzeBeforeFinalBlocked(match,state.matches,state.meta))throw Error('forfeit-round-waiting');
+   if(ticketRoundBlocked(match,state.matches,state.meta)||
+      ticketBronzeBlocked(match,state.matches,state.meta))throw Error('forfeit-round-waiting');
    const decision=engine.evaluateQuickDecision(match,opponentId);
    if(!decision.ok)throw Error('forfeit-match-stale');
    const partialScore={scoreA:match.scoreA??null,scoreB:match.scoreB??null,log:match.log||[],faultActions:match.faultActions||[]};
@@ -307,8 +328,8 @@ function createTicketScoreHandler({db,enabled=async()=>false,clock=Date.now}){
       !['standard',undefined,null].includes(state.meta.scoringMode))throw Error('score-match-stale');
    const actorName=String(user.realName||user.gameId||user.displayName||'合作主辦').slice(0,80);
    const engine=createEngine(state,{uid,name:actorName},now,operationId);
-   if(engine.singleElimRoundDispatchBlocked(match,state.matches,state.meta)||
-      engine.singleElimBronzeBeforeFinalBlocked(match,state.matches,state.meta))throw Error('score-round-waiting');
+   if(ticketRoundBlocked(match,state.matches,state.meta)||
+      ticketBronzeBlocked(match,state.matches,state.meta))throw Error('score-round-waiting');
    match.scoringMode='standard';
    if(command==='score'){
     if(engine.checkWinnerSide(match))throw Error('score-match-stale');
@@ -353,4 +374,5 @@ function createTicketScoreHandler({db,enabled=async()=>false,clock=Date.now}){
  };
 }
 
-module.exports={createStartHandler,createDrawHandler,createTicketForfeitHandler,createTicketScoreHandler,forfeitMatchAvailable};
+module.exports={createStartHandler,createDrawHandler,createTicketForfeitHandler,createTicketScoreHandler,
+ forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked};
