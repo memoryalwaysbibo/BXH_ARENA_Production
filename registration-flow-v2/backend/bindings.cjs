@@ -7,7 +7,7 @@ const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
 const {createStartHandler,createDrawHandler,createTicketForfeitHandler,createTicketScoreHandler}=require('./lifecycle.cjs');
 const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketRemoveHandler,createTicketDelegateHandler,createTicketDelegateSearchHandler}=require('./ticket-room-create.cjs');
-const {isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,ticketGateForCode}=require('./ticket-host.cjs');
+const {isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,resolveTicketGate}=require('./ticket-host.cjs');
 function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled,pilotRoom=null,retiredRoom=null,retiredRooms=[],ticketPilot=async()=>null}){
  if(createFamilyRegistration?.v2CapacityAware!==true)throw Error('queue-family-capacity-source-required');
  const familyFactory=store=>createFamilyRegistration(store,Date.now,{myEventsProofEnabled:true});
@@ -123,7 +123,7 @@ function createPilotBindings({pilotRoom,retiredRoom=null,retiredRooms=[],...depe
   const ticketRef=dependencies.db.doc(ticketLifecyclePath(ptn?'PTN-000000':code));
   const snapshot=tx?await tx.get(ticketRef):await ticketRef.get();
   const root=snapshot.data();
-  const config=code===undefined?root:ticketGateForCode(root,code);
+  const config=code===undefined?root:await resolveTicketGate(dependencies.db,code,tx,root);
   if(config?.enabled!==true||config.bindingEnabled!==true||!(ptn?isPartnerRoomCode(config.roomCode):validRoom(config.roomCode))||
      config.roomCode===pilotRoom||retired.includes(config.roomCode)||
      (code!==undefined&&code!==config.roomCode)||

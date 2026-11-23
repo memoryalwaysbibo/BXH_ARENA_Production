@@ -7,7 +7,7 @@ const {ticketGateForCode,authorizeTicketManager}=require('../backend/ticket-host
 test('a second paid ticket creates an independent PTN room and retries cannot consume it twice',async()=>{
  const now=1800000000000,owner='owner',oldCode='PTN-E50A3E',code='PTN-NEW001';
  const ticketId='BXH-SO-'+'A'.repeat(24),oldId='legacy-room-id',rows=new Map();
- const db={doc(path){return {path,collection(name){return {doc(id){return db.doc(path+'/'+name+'/'+id);}}}};},
+ const db={doc(path){return {path,get:async()=>snap(path),collection(name){return {doc(id){return db.doc(path+'/'+name+'/'+id);}}}};},
   async getAll(...refs){return Promise.all(refs.map(ref=>tx.get(ref)));},
   async runTransaction(fn){return fn(tx);}};
  const snap=path=>({exists:rows.has(path),data:()=>rows.get(path)});
@@ -35,4 +35,39 @@ test('a second paid ticket creates an independent PTN room and retries cannot co
  const newRoom=rows.get('tournaments/'+code);
  assert.equal((await authorizeTicketManager(tx,db,{uid:owner,user:rows.get('users/'+owner),room:newRoom,gate,code,now})).owner,true);
  await assert.rejects(create({...request,data:{...request.data,operationId:'OP_NEW_02'}}),/ticket-unavailable/);
+});
+
+test('published vouchers create independent PTN gates for two eligible organizers without an expiry',async()=>{
+ const now=1800000000000,rows=new Map(),prices={'32':300,'160':2000};
+ const snapshot=path=>({exists:rows.has(path),data:()=>rows.get(path)});
+ const db={doc(path){return {path,get:async()=>snapshot(path),collection(name){return {doc(id){return db.doc(path+'/'+name+'/'+id);}}}};},
+  async getAll(...refs){return refs.map(ref=>snapshot(ref.path));},
+  async runTransaction(fn){return fn(tx);}};
+ const tx={get:async ref=>snapshot(ref.path),getAll:async(...refs)=>refs.map(ref=>snapshot(ref.path)),
+  create(ref,value){assert.equal(rows.has(ref.path),false);rows.set(ref.path,value);},
+  update(ref,patch){rows.set(ref.path,{...rows.get(ref.path),...patch});},
+  set(ref,patch){rows.set(ref.path,{...rows.get(ref.path),...patch});}};
+ rows.set('systemSettings/commerceTicketPtnSaleV1',{enabled:true,productIds:{'32':'ptn-32','160':'ptn-160'}});
+ for(const [index,capacity] of ['32','160'].entries()){
+  const uid='host-'+index,id='BXH-SO-'+String(index).repeat(24);
+  rows.set('users/'+uid,{active:true,role:'player',partnerOrganizer:{status:'active',scope:'manual',organizationId:'org-'+index,expiresAtMs:now+86400000}});
+  rows.set('commerceTickets/'+id,{version:2,id,orderId:id,ownerUid:uid,status:'available',boundRoomCode:null,
+   boundRoomId:null,addedCapacity:0,expiresAt:null,capacity:Number(capacity),contractCode:null});
+  rows.set('commerceOrders/'+id,{id,ownerUid:uid,ticketPurchaseVersion:3,paymentStatus:'paid',deliveryStatus:'delivered',
+   ticketOrganizationId:'org-'+index,contractCode:null,amountTwd:prices[capacity],
+   productSnapshot:{id:'ptn-'+capacity,delivery:{kind:'ticket',assetId:capacity,quantity:1,durationDays:0}}});
+  const code='PTN-NEW00'+index;
+  const create=createTicketRoomHandler({db,clock:()=>now,newPartnerCode:()=>code});
+  const request={auth:{uid},app:{},data:{action:'create-ticket-room',ticketId:id,
+   operationId:'purchase-'+index,name:'合作積分賽',location:'台南',stations:1,
+   registrationOpenAt:now-1000,registrationCloseAt:now+3600000,startAt:now+7200000}};
+  const first=await create(request),replay=await create(request);
+  assert.equal(first.code,code);assert.equal(replay.replayed,true);
+  const gate=rows.get('commerceTicketRoomGates/'+code);
+  assert.equal(gate.ownerUid,uid);
+  assert.equal(gate.roomId,first.roomId);
+  assert.equal(rows.get('tournaments/'+code).ptnSettlementVersion,1);
+  assert.equal(rows.get('commerceTickets/'+id).status,'reserved');
+  assert.equal((await createPtnStatusHandler({db,clock:()=>now})({auth:{uid},app:{},data:{action:'ticket-ptn-status'}})).code,code);
+ }
 });

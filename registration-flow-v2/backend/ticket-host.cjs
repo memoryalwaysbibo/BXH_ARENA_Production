@@ -14,6 +14,15 @@ function ticketGateForCode(config,code){
  if(binding?.roomId)return {...config,...binding,roomCode:code};
  return config.roomCode===code?config:null;
 }
+async function resolveTicketGate(db,code,tx,legacy){
+ if(isPartnerRoomCode(code)){
+  const ref=db.doc('commerceTicketRoomGates/'+code);
+  const current=(tx?await tx.get(ref):await ref.get()).data();
+  if(current)return ticketGateForCode(current,code);
+ }
+ const ref=db.doc(ticketLifecyclePath(code));
+ return ticketGateForCode(legacy===undefined?(tx?await tx.get(ref):await ref.get()).data():legacy,code);
+}
 
 function grantTime(value){
  if((typeof value!=='number'&&typeof value!=='string')||(typeof value==='string'&&!value.trim()))return NaN;
@@ -69,4 +78,4 @@ function checkTicketContract(contract,grant,uid){
     grantTime(contract.startsAt)!==grant.startsAt||grantTime(contract.expiresAt)!==grant.expiresAt)throw Error('permission-denied');
 }
 
-module.exports={ticketHostGrant,checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,ticketGateForCode,authorizeTicketManager,activeTicketManager};
+module.exports={ticketHostGrant,checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,ticketGateForCode,resolveTicketGate,authorizeTicketManager,activeTicketManager};
