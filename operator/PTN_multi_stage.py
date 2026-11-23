@@ -161,7 +161,7 @@ def main():
     report = []
     for name, (generation, _) in TARGETS.items():
         binding = describe(name)
-        if binding[2] != generation or not binding[3]:
+        if binding[2] != generation or (not binding[3] and name != 'ladderAutoSettlement'):
             raise ValueError(name + ': live generation or codebase changed')
         category = ('room' if name.startswith('registration') else
                     'commerce' if name in ('commerceService', 'commerceDelivery') else 'settlement')

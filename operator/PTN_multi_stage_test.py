@@ -21,7 +21,8 @@ class StageTest(unittest.TestCase):
             def fake_checkout(path, repo, ref):
                 path.mkdir()
             def fake_describe(name):
-                return ('bucket', 'source.zip', targets[name][0], 'codebase')
+                return ('bucket', 'source.zip', targets[name][0],
+                        None if name == 'ladderAutoSettlement' else 'codebase')
             def fake_stage(root, name, binding, candidate, category):
                 seen[name] = (candidate, category)
                 return {'function': name, 'generation': binding[2], 'codebase': binding[3]}
@@ -35,6 +36,19 @@ class StageTest(unittest.TestCase):
                 'registrationQueueV2': (root / 'candidates/front', 'room'),
                 'commerceService': (root / 'candidates/commerce/release/commerce/functions', 'commerce'),
                 'ladderAutoSettlement': (root / 'candidates/settlement/release/bucket-settlement-package/auto', 'settlement')})
+
+    def test_requires_codebase_for_other_functions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'stage'
+            root.mkdir()
+            with (patch.dict(release.TARGETS, {'commerceService': ('22', ())}, clear=True),
+                  patch.object(release.tempfile, 'mkdtemp', return_value=str(root)),
+                  patch.object(release, 'checkout', side_effect=lambda path, repo, ref: path.mkdir()),
+                  patch.object(release, 'describe', return_value=('bucket', 'source.zip', '22', None)),
+                  patch.object(release, 'stage_one') as stage):
+                with self.assertRaisesRegex(ValueError, 'codebase changed'):
+                    release.main()
+                stage.assert_not_called()
 
     def test_preserves_unreviewed_files_and_rejects_source_drift(self):
         live = {'domain.cjs': b'module.exports=1;', 'service.cjs': b'module.exports=2;',
