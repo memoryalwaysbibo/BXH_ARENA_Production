@@ -114,9 +114,16 @@ def main():
         with zipfile.ZipFile(io.BytesIO(archive)) as source_zip:
             hashes = {path: hashlib.sha256(source_zip.read(path)).hexdigest()
                       for path in source_zip.namelist()
-                      if path.endswith(suffixes)}
+                      if 'node_modules/' not in path and any(
+                          path == suffix.lstrip('/') or path.endswith(suffix)
+                          for suffix in suffixes)}
+            candidates = sorted(path for path in source_zip.namelist()
+                                if 'node_modules/' not in path and
+                                (path.endswith('.cjs') or path.endswith('.js')))
         print(json.dumps({'function': function, 'generation': generation,
-                          'hashes': hashes}, ensure_ascii=False))
+                          'hashes': hashes,
+                          'sourcePaths': candidates[:40] if not hashes else []},
+                         ensure_ascii=False))
     settings = {}
     for name in SETTINGS:
         fields = firestore('systemSettings/' + name, token)
