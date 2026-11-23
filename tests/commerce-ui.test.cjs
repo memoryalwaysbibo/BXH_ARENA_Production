@@ -124,6 +124,24 @@ test('an eligible ticket offer replaces its preview and uses its real checkout S
  await t.ui.handle('commerce-buy',{dataset:{id:'tournament_activation_32'}});
  assert.deepEqual(t.calls,[{action:'create-order',productId:'activation-32-sku',expectedVersion:4,operationId:'same-operation'}]);
 });
+test('published PTN vouchers show their own capacity artwork even when catalog images repeat 32',()=>{
+ const t=setup({partner:true});t.ui.shop();
+ const c=t.ui.context();c.storeOpen=true;
+ c.products=[32,64,96,128,160].map((capacity,index)=>ticketOffer({
+  id:'sku-'+capacity,name:'賽事啟動券｜'+capacity+' 人',
+  priceTwd:[300,600,1000,1500,2000][index],
+  imageUrl:'https://example.invalid/32.png',
+  delivery:{kind:'ticket',assetId:String(capacity),quantity:1,durationDays:0}
+ }));
+ c.category='ticket';const listing=t.ui.shop();
+ for(const [capacity,color] of [[32,'green'],[64,'blue'],[96,'purple'],[128,'orange'],[160,'red']]){
+  const filename='tournament-activation-'+capacity+'-'+color+'.png';
+  assert.equal(listing.split(filename).length-1,1);
+ }
+ assert.ok(!listing.includes('https://example.invalid/32.png'));
+ c.productId='tournament_activation_96';
+ assert.match(t.ui.shop(),/commerce-hero\" src=\"assets\\/commerce\\/tickets\\/tournament-activation-96-purple\\.png\"/);
+});
 test('new PTN sale mode shows a permanent voucher and opens room creation without a BXH pilot URL',async()=>{
  const t=setup({partner:true});
  t.sandbox.window.BXH_PTN_TICKET_SALE=true;
