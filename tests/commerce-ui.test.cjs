@@ -601,7 +601,11 @@ test('PTN room tabs use official cards and keep completed rosters read-only',()=
  const people=t.ui.ticketManagedTab('people');
  assert.match(people,/commerce-ptn-management/);
  assert.match(people,/class="grid grid-3"/);
- assert.match(people,/正取名單（2 \/ 32）/);
+ assert.match(people,/正取選手（2 \/ 32）/);
+ assert.match(people,/aria-label="人員管理分類"/);
+ assert.match(people,/people-roster-table/);
+ assert.match(people,/data-id="pending"/);
+ assert.match(people,/data-id="staff"/);
  assert.match(people,/甲/);
  assert.doesNotMatch(people,/data-action="commerce-ticket-remove"|合作賽<script>/);
  t.sandbox.activeTab='bracket';
@@ -611,6 +615,28 @@ test('PTN room tabs use official cards and keep completed rosters read-only',()=
  const operations=t.ui.ticketManagedTab('operations');
  assert.match(operations,/自動結算/);
  assert.doesNotMatch(operations,/data-action="archive-complete"|尚未接入合作賽事/);
+});
+test('PTN people panel switches official sections without crossing rooms or offering unsupported roster writes',async()=>{
+ const t=setup({partner:true}),code='PTN-TST002';
+ t.sandbox.activeTab='people';
+ const c=t.ui.context();c.view='ticket-manage';c.ownedPtn={code};c.ticketRoomOpen=true;c.roomManageOpen=true;
+ c.ticketRoom={ok:true,code,name:'測試',phase:'waiting',capacity:32,confirmedCount:2,eligibleCount:2,
+  participants:[{name:'甲',registrationId:'entry-1'},{name:'乙',registrationId:'entry-2'}]};
+ let html=t.ui.ticketManagedTab('people');
+ assert.match(html,/data-action="commerce-ticket-remove"/);
+ assert.match(html,/data-id="entry-1"/);
+ await t.ui.handle('commerce-ticket-people-section',{dataset:{id:'tools'}});
+ html=t.ui.ticketManagedTab('people');
+ assert.match(html,/同步最新正取名單/);
+ assert.doesNotMatch(html,/隨機 32 位|現場新增選手/);
+ await t.ui.handle('commerce-ticket-people-section',{dataset:{id:'pending'}});
+ assert.match(t.ui.ticketManagedTab('people'),/目前設定為免報到/);
+ await t.ui.handle('commerce-ticket-people-section',{dataset:{id:'waitlist'}});
+ assert.match(t.ui.ticketManagedTab('people'),/尚未啟用備取/);
+ await t.ui.handle('commerce-ticket-people-section',{dataset:{id:'bracket'}});
+ assert.match(t.ui.ticketManagedTab('people'),/抽籤與開賽/);
+ await t.ui.handle('commerce-ticket-people-section',{dataset:{id:'invalid'}});
+ assert.equal(c.peopleSection,'bracket');
 });
 test('PTN owner alone can assign one delegate and a super admin can enter by room code',async()=>{
  const t=setup(),code='PTN-AGENT1';
