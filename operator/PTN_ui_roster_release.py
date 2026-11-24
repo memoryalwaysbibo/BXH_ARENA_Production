@@ -8,7 +8,6 @@ import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -142,6 +141,14 @@ def main():
             if (after['buildConfig']['source']['storageSource'].get('generation') == GENERATION or
                     fingerprint(after)[1:] != fingerprint(before)[1:]):
                 raise ValueError('deployment source/configuration must be inspected')
+            deployed = after['buildConfig']['source']['storageSource']
+            deployed_archive = root / 'deployed.zip'
+            run('gcloud', 'storage', 'cp',
+                'gs://' + deployed['bucket'] + '/' + deployed['object'] + '#' + str(deployed['generation']),
+                str(deployed_archive))
+            with zipfile.ZipFile(deployed_archive) as archive:
+                if digest(archive.read(TARGET)) != NEW_SHA256:
+                    raise ValueError('deployed ticket-room projection differs')
             print('PTN_UI_BACKEND_DEPLOYED',
                   after['buildConfig']['source']['storageSource']['generation'])
             return 0
