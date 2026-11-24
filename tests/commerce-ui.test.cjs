@@ -57,6 +57,25 @@ test('partner ticket room entry is available without an old pilot URL flag',()=>
  t.setPartner(false);
  assert.equal(t.ui.ticketPilot(),false);
 });
+test('launched PTN sale can create an unassigned room without opening legacy routes',()=>{
+ const root=path.join(__dirname,'..');
+ const cloud=fs.readFileSync(path.join(root,'modules/cloud/cloud-runtime.js'),'utf8');
+ const start=cloud.indexOf('async ticketRoomOperation({action,code,...payload}){');
+ const end=cloud.indexOf("if(action==='ticket-room-remove')",start);
+ assert.ok(start>=0&&end>start);
+ const gate=cloud.slice(start+'async ticketRoomOperation({action,code,...payload}){'.length,end);
+ const allowed=new Function('action','code','window','ticketRegistrationPilot',gate+'return true;');
+ const sale={BXH_PTN_TICKET_SALE:true,BXH_TICKET_ROOM_PTN_PILOT:false};
+ const legacy={BXH_PTN_TICKET_SALE:false,BXH_TICKET_ROOM_PTN_PILOT:true};
+ const known=code=>/^PTN-[A-Z0-9]{6}$/.test(code||'');
+ assert.equal(allowed('create-ticket-room',undefined,sale,known),true);
+ assert.equal(allowed('ticket-ptn-status',undefined,sale,known),true);
+ assert.throws(()=>allowed('ticket-room-state',undefined,sale,known),/ticket-lifecycle-disabled/);
+ assert.throws(()=>allowed('create-ticket-room',undefined,{BXH_PTN_TICKET_SALE:false,BXH_TICKET_ROOM_PTN_PILOT:false},known),/ticket-lifecycle-disabled/);
+ assert.equal(allowed('create-ticket-room',undefined,legacy,known),true);
+ assert.throws(()=>allowed('create-ticket-room','BXH-UNLISTED',sale,known),/ticket-lifecycle-disabled/);
+ assert.equal(allowed('ticket-room-state','PTN-ABCDEF',sale,known),true);
+});
 test('an old admin catalog response cannot populate the player shop after navigation',async()=>{
  const t=setup();t.setAdmin(true);t.ui.adminPage();
  let resolve;t.sandbox.window.engagementService.commerce=()=>new Promise(r=>resolve=r);
