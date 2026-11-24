@@ -101,11 +101,13 @@ def prepare(token, now):
                 body.get('ladderPointsAwarded') is True):
             raise ValueError(label + ' state changed')
         check_matches(body)
-    if (state['championId'] != view['championId'] or
+    bucket_keys = ('scoreStorage', 'scoreBucketProjection', 'bucketMigration',
+                   'deletionStatus')
+    if (any(key in a or key in state for key in bucket_keys) or
+            state['championId'] != view['championId'] or
             state['runnerUpId'] != view['runnerUpId'] or
-            state.get('scoreStorage') is not None or
             any(state.get(key) for key in ('ladderResults', 'ladderAwardedAt', 'settlementCompletedAt'))):
-        raise ValueError('private/public result or settlement evidence changed')
+        raise ValueError('bucket ownership, results, or settlement evidence changed')
     private_after = dict(state)
     public_after = dict(view)
     common = {'archiveStatus': 'completed', 'completedAt': now,
