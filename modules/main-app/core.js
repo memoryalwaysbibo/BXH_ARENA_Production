@@ -14041,8 +14041,8 @@ function renderBxhEventTemplateSettingsSection(readOnly){
   return body;
 }
 
-  const partnerSettings=isPartnerOrganizerMode();
 function renderSettings(){
+  const partnerSettings=isPartnerOrganizerMode();
   const settingsReadOnly=state.archiveStatus==="completed";
   const ladderModeLocked=settingsReadOnly||state.matches.some(m=>!!m.winnerId);
   const onsiteRosterLocked=onsiteRegistrationSettingsLocked()&&state.onsiteWaitlistFinalized!==true;
