@@ -15524,8 +15524,8 @@ function renderPlayerApplyScreen(){
         <div class="hint">BXH 賽事長期採用本名制，請填寫與報名資料一致的真實姓名。</div>
       </div>
       <div class="field"><label>Email（必填）</label><input type="email" id="apply-email" autocomplete="username"></div>
-      <div class="field"><label>密碼（必填，至少 8 碼）</label><input type="password" id="apply-password" autocomplete="new-password"></div>
-      <div class="field"><label>再次輸入密碼（必填）</label><input type="password" id="apply-password2" autocomplete="new-password"></div>
+      <div class="field"><label>密碼（必填，至少 6 碼）</label><input type="password" id="apply-password" minlength="6" autocomplete="new-password"></div>
+      <div class="field"><label>再次輸入密碼（必填）</label><input type="password" id="apply-password2" minlength="6" autocomplete="new-password"></div>
       <div class="field">
         <label for="apply-nickname">遊戲 ID／ARENA 角色名稱（必填）</label>
         <input type="text" id="apply-nickname" maxlength="24" required>
@@ -22737,7 +22737,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const agree = document.getElementById("apply-agree")?.checked || false;
     if(!realName){ playerApplyError="請輸入真實姓名"; render(); return; }
     if(!email){ playerApplyError="請輸入 Email"; render(); return; }
-    if(password.length<8){ playerApplyError="密碼至少需要 8 碼"; render(); return; }
+    if(password.length<6){ playerApplyError="密碼至少需要 6 碼"; render(); return; }
     if(password!==password2){ playerApplyError="兩次輸入的密碼不一致"; render(); return; }
     if(!nickname){ playerApplyError="請填寫 ARENA 角色名稱"; render(); return; }
     if(!phone){ playerApplyError="請填寫手機號碼"; render(); return; }
