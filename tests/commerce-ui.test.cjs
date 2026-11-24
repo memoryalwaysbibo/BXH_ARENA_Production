@@ -590,7 +590,7 @@ test('PTN official-style score panel locks scoring at four and recommends the wi
  assert.equal((panel.match(/data-command="score"[^>]*disabled/g)||[]).length,8);
  assert.doesNotMatch(panel,/data-action="score"|data-command="fault"|本局重賽/);
 });
-test('PTN room tabs use official cards and keep completed rosters read-only',()=>{
+test('PTN room tabs keep the official navigation and completed rosters read-only without repeating the room summary',()=>{
  const t=setup({partner:true}),code='PTN-TST001';
  const c=t.ui.context();c.view='ticket-manage';c.ownedPtn={code};c.ticketRoomOpen=true;c.roomManageOpen=true;
  c.ticketRoom={ok:true,code,name:'合作賽<script>',location:'台南',capacity:32,confirmedCount:2,
@@ -600,7 +600,7 @@ test('PTN room tabs use official cards and keep completed rosters read-only',()=
  t.sandbox.activeTab='people';
  const people=t.ui.ticketManagedTab('people');
  assert.match(people,/commerce-ptn-management/);
- assert.match(people,/class="grid grid-3"/);
+ assert.doesNotMatch(people,/人員管理｜|ptn-room-card-heading|賽事地點/);
  assert.match(people,/正取選手（2 \/ 32）/);
  assert.match(people,/aria-label="人員管理分類"/);
  assert.match(people,/people-roster-table/);
@@ -609,8 +609,10 @@ test('PTN room tabs use official cards and keep completed rosters read-only',()=
  assert.match(people,/甲/);
  assert.doesNotMatch(people,/data-action="commerce-ticket-remove"|合作賽<script>/);
  t.sandbox.activeTab='bracket';
- assert.match(t.ui.ticketManagedTab('bracket'),/冠軍：甲/);
- assert.match(t.ui.ticketManagedTab('bracket'),/已完成 1 \/ 1 場正式對戰/);
+ const bracket=t.ui.ticketManagedTab('bracket');
+ assert.match(bracket,/冠軍：甲/);
+ assert.match(bracket,/已完成 1 \/ 1 場正式對戰/);
+ assert.doesNotMatch(bracket,/對戰表｜|ptn-room-card-heading/);
  t.sandbox.activeTab='operations';
  const operations=t.ui.ticketManagedTab('operations');
  assert.match(operations,/自動結算/);
