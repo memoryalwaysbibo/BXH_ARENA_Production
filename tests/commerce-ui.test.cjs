@@ -423,6 +423,35 @@ test('partner can recover their PTN room from management without a pilot URL',as
  assert.doesNotMatch(t.ui.ownedTicketRoomCard(),/房號 PTN-TST001/);
 });
 
+test('partner can leave a PTN management tab and select an earlier bound room',async()=>{
+ const t=setup({partner:true}),latest='PTN-64ROOM',earlier='PTN-32ROOM',calls=[];
+ t.sandbox.activeTab='management';
+ t.sandbox.window.engagementService.ticketRoomOperation=async request=>{
+  calls.push({...request});
+  return request.action==='ticket-ptn-status'?{ok:true,code:latest}
+   :{ok:true,code:request.code,name:request.code,phase:'waiting',capacity:request.code===latest?64:32,
+     eligibleCount:0,registrationOpenAt:Date.now()-60000,registrationCloseAt:Date.now()+3600000,
+     startAt:Date.now()+7200000,ticketStatus:'reserved'};
+ };
+ t.sandbox.window.engagementService.commerce=async()=>({ok:true,tickets:[
+  {id:'first',capacity:32,status:'reserved',boundRoomCode:earlier},
+  {id:'second',capacity:64,status:'reserved',boundRoomCode:latest}]});
+ await t.ui.handle('commerce-refresh-owned-ptn');
+ await t.ui.load('my-tickets');
+ await t.ui.handle('commerce-open-owned-ptn');
+ await t.ui.handle('commerce-ticket-open-manage');
+ t.sandbox.activeTab='people';
+ assert.match(t.ui.ticketManagedTab('people'),/data-action="commerce-ticket-back"/);
+ await t.ui.handle('commerce-ticket-back');
+ assert.equal(t.sandbox.activeTab,'management');
+ assert.equal(t.ui.ticketManagementContext(),null);
+ await t.ui.load('my-tickets');
+ assert.match(t.ui.ownedTicketRoomCard(),/PTN-32ROOM｜管理房間/);
+ await t.ui.handle('commerce-open-ticket-room',{dataset:{id:earlier}});
+ assert.equal(t.ui.ticketManagementContext().code,earlier);
+ assert.deepEqual(calls.filter(request=>request.action==='ticket-room-state').map(request=>request.code),[latest,earlier]);
+});
+
 test('PTN discovery reports its read error and keeps manual room takeover available',async()=>{
  const t=setup({partner:true});
  t.sandbox.activeTab='management';
