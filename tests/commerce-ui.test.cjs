@@ -446,10 +446,37 @@ test('partner can leave a PTN management tab and select an earlier bound room',a
  assert.equal(t.sandbox.activeTab,'management');
  assert.equal(t.ui.ticketManagementContext(),null);
  await t.ui.load('my-tickets');
- assert.match(t.ui.ownedTicketRoomCard(),/PTN-32ROOM｜管理房間/);
+ await t.ui.loadPtnRoomCards();
+ const cards=t.ui.ownedTicketRoomCard();
+ assert.match(cards,/PTN-32ROOM/);
+ assert.match(cards,/正取 0 \/ 32 人/);
+ assert.match(cards,/正取 0 \/ 64 人/);
+ assert.match(cards,/data-id="PTN-32ROOM">進入管理/);
  await t.ui.handle('commerce-open-ticket-room',{dataset:{id:earlier}});
  assert.equal(t.ui.ticketManagementContext().code,earlier);
- assert.deepEqual(calls.filter(request=>request.action==='ticket-room-state').map(request=>request.code),[latest,earlier]);
+ assert.deepEqual(calls.filter(request=>request.action==='ticket-room-state').map(request=>request.code),[latest,latest,earlier,earlier]);
+});
+
+test('PTN small cards show verified room facts, escape names and retain entry on a failed read',async()=>{
+ const t=setup({partner:true});t.sandbox.activeTab='management';
+ const code='PTN-CARD01',failed='PTN-FAIL01';
+ t.sandbox.window.engagementService.commerce=async()=>({ok:true,tickets:[
+  {id:'one',capacity:64,boundRoomCode:code},{id:'two',capacity:32,boundRoomCode:failed}]});
+ t.sandbox.window.engagementService.ticketRoomOperation=async ({code:roomCode})=>{
+  if(roomCode===failed)throw Error('unavailable');
+  return {ok:true,code:roomCode,name:'64測試<script>',location:'實驗室',phase:'waiting',capacity:64,confirmedCount:12,
+   registrationEnabled:true,registrationOpenAt:Date.now()-1000,registrationCloseAt:Date.now()+60000};
+ };
+ await t.ui.load('my-tickets');await t.ui.loadPtnRoomCards();
+ const html=t.ui.ownedTicketRoomCard();
+ assert.match(html,/64測試&lt;script&gt;/);
+ assert.doesNotMatch(html,/<script>/);
+ assert.match(html,/房號 PTN-CARD01｜實驗室/);
+ assert.match(html,/正取 12 \/ 64 人｜報名中/);
+ assert.match(html,/房號 PTN-FAIL01/);
+ assert.match(html,/正取 — \/ 32 人｜資料讀取中/);
+ assert.match(html,/data-id="PTN-FAIL01">進入管理/);
+ t.setUid('another-user');assert.equal(Object.keys(t.ui.context().ptnRoomCards).length,0);
 });
 
 test('PTN discovery reports its read error and keeps manual room takeover available',async()=>{
