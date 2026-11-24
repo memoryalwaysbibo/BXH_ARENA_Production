@@ -32,7 +32,11 @@ function authHarness(getUserProfile) {
   const start = core.indexOf('let authStateGeneration=0;');
   const end = core.indexOf('\n          processAuthStateChange = processAuthStateChangeImpl;', start);
   assert(start >= 0 && end > start, 'auth state implementation source boundary exists');
-  const source = core.slice(start, end) + '\nglobalThis.__authChange=processAuthStateChangeImpl;';
+  const modalDeclarations = [...core.matchAll(/^let pendingModal = null;$/gm)];
+  assert.equal(modalDeclarations.length, 1, 'exact initial modal declaration is required');
+  const source = modalDeclarations[0][0] + '\n' + core.slice(start, end) +
+    '\nglobalThis.__authChange=processAuthStateChangeImpl;' +
+    '\nglobalThis.__modal={set(value){pendingModal=value;},get(){return pendingModal;}};';
   const context = {
     window: {
       storage: { async delete() {}, async set() {} },
@@ -309,6 +313,21 @@ test('a late Admin auth callback cannot replace the newer authenticated route', 
   assert.equal(context.appPhase, 'app');
   assert.equal(context.activeTab, 'management');
   assert.deepEqual(context.communityHostAccountChanges, ['stale-admin', 'current-admin']);
+});
+
+test('account identity change clears only an obsolete player password modal', async () => {
+  const context = authHarness(async () => ({ active: true, role: 'admin' }));
+  const sent = { type: 'player-password-change', uid: 'current-account' };
+  context.__modal.set(sent);
+  await context.__authChange({ uid: 'current-account', email: 'current@example.test' });
+  assert.equal(context.__modal.get(), sent, 'same account can keep its current password prompt');
+  await context.__authChange(null);
+  assert.equal(context.__modal.get(), null, 'logout clears the password prompt');
+  const other = { type: 'generic' };
+  context.__modal.set(other);
+  context.pendingLoginIntent = 'admin';
+  await context.__authChange({ uid: 'another-account', email: 'another@example.test' });
+  assert.equal(context.__modal.get(), other, 'other prompt types remain unaffected');
 });
 
 test('an old Admin room read cannot update state after switching rooms', async () => {
