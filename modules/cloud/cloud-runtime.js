@@ -1043,7 +1043,8 @@
     async ticketRoomOperation({action,code,...payload}){
       const unassigned=code===undefined&&['create-ticket-room','ticket-ptn-status'].includes(action);
       const discoverOwnedRoom=unassigned&&action==='ticket-ptn-status';
-      if(!ticketRegistrationPilot(code)&&!discoverOwnedRoom&&!(unassigned&&window.BXH_TICKET_ROOM_PTN_PILOT===true))throw Error('ticket-lifecycle-disabled');
+      const saleCreate=unassigned&&action==='create-ticket-room'&&window.BXH_PTN_TICKET_SALE===true;
+      if(!ticketRegistrationPilot(code)&&!discoverOwnedRoom&&!saleCreate&&!(unassigned&&window.BXH_TICKET_ROOM_PTN_PILOT===true))throw Error('ticket-lifecycle-disabled');
       if(action==='ticket-room-remove'){
         const {operationId,registrationId}=payload;
         const poll=()=>callEngagementFunction('registrationRosterQueueV2',{action:'status',code,operationId},8000);
