@@ -518,6 +518,7 @@
     // accounts, regardless of what the caller passes in.
     async applyPlayerAccount({ email, password, realName, nickname, phone }){
       if(!authReady) return { ok:false, error:"雲端服務尚未就緒" };
+      if(typeof password!=="string" || password.length<6) return { ok:false, error:"密碼至少需要 6 碼" };
       try{
         const cred = await ax.createUserWithEmailAndPassword(authHandle, email, password);
         const uid = cred.user.uid;
@@ -847,6 +848,32 @@
       if(!authReady) return { ok:false, error:"雲端服務尚未就緒" };
       try{ await ax.sendPasswordResetEmail(authHandle, email); return { ok:true }; }
       catch(e){ return { ok:false, error: friendlyAuthError(e) }; }
+    },
+
+    async changeMyPlayerPassword(expectedUid, currentPassword, newPassword){
+      const user=authReady&&authHandle?.currentUser;
+      if(!expectedUid||user?.uid!==expectedUid||!user.email)return {ok:false,error:"登入狀態已變更，請重新登入。"};
+      if(!user.providerData?.some(p=>p.providerId==="password"))return {ok:false,error:"此帳號未設定 ARENA 密碼，請透過原登入服務管理密碼。"};
+      if(typeof currentPassword!=="string"||!currentPassword||typeof newPassword!=="string"||newPassword.length<6)return {ok:false,error:"請輸入目前密碼，並設定至少 6 碼的新密碼。"};
+      try{
+        const credential=ax.EmailAuthProvider.credential(user.email,currentPassword);
+        const reauth=await ax.reauthenticateWithCredential(user,credential);
+        if(authHandle.currentUser!==user||reauth?.user?.uid!==expectedUid)return {ok:false,error:"登入狀態已變更，請重新登入。"};
+        await ax.updatePassword(user,newPassword);
+        return {ok:true};
+      }catch(e){
+        const messages={
+          "auth/invalid-credential":"目前密碼不正確。",
+          "auth/wrong-password":"目前密碼不正確。",
+          "auth/weak-password":"新密碼強度不足。",
+          "auth/password-does-not-meet-requirements":"新密碼未達安全要求。",
+          "auth/too-many-requests":"嘗試次數過多，請稍後再試。",
+          "auth/requires-recent-login":"請重新登入後再試。",
+          "auth/network-request-failed":"網路連線失敗，請稍後再試。",
+          "auth/user-disabled":"此帳號已停用，請聯絡管理員。"
+        };
+        return {ok:false,error:Object.hasOwn(messages,e?.code)?messages[e.code]:"無法更新密碼，請稍後再試。"};
+      }
     },
 
     async changePassword(currentPassword, newPassword){
