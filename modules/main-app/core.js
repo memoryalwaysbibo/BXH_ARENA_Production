@@ -14041,6 +14041,7 @@ function renderBxhEventTemplateSettingsSection(readOnly){
   return body;
 }
 
+  const partnerSettings=isPartnerOrganizerMode();
 function renderSettings(){
   const settingsReadOnly=state.archiveStatus==="completed";
   const ladderModeLocked=settingsReadOnly||state.matches.some(m=>!!m.winnerId);
@@ -14064,21 +14065,21 @@ function renderSettings(){
     </div>
     <div class="btn-row">
       <button class="btn btn-ghost btn-sm" data-action="cloud-open-admin-list">返回賽事管理</button>
-      ${aiCreateBetaActorAllowed()?'<button class="btn btn-ghost btn-sm ai-create-assist-btn" data-action="ai-create-open">✨ AI 協助建立 <span style="opacity:.62">BETA</span></button>':""}
+      ${!partnerSettings&&aiCreateBetaActorAllowed()?'<button class="btn btn-ghost btn-sm ai-create-assist-btn" data-action="ai-create-open">✨ AI 協助建立 <span style="opacity:.62">BETA</span></button>':""}
       ${isPartnerOrganizerMode()?(window.BXHCommerce?.ticketPilot?.()?'<button class="btn btn-primary btn-sm" data-action="commerce-open-ticket-create">＋ 選券建房</button>':'<span class="hint">合作主辦建房目前僅開放指定票券試點</span>'):'<button class="btn btn-primary btn-sm" data-action="new-tournament-blank">＋ 新增賽事</button>'}
     </div>
   </div>
 
-  ${renderAiCreateAssistant()}
-  ${aiCreateLastApplied && (settingsFormDraftDirty||registrationFormDraftDirty)?`<div class="ai-create-applied-banner">
+  ${!partnerSettings?renderAiCreateAssistant():""}
+  ${!partnerSettings&&aiCreateLastApplied && (settingsFormDraftDirty||registrationFormDraftDirty)?`<div class="ai-create-applied-banner">
     <strong>✨ AI 草稿已套用｜${esc(aiCreateLastApplied.eventName)}</strong>
     <span>已填入：${aiCreateLastApplied.mappedFields.map(esc).join("、")}。目前只是未儲存草稿，請逐欄審核後再按「儲存賽事設定」。</span>
     ${aiCreateLastApplied.warnings.length?`<div class="ai-create-applied-warnings">⚠️ ${aiCreateLastApplied.warnings.map(esc).join("　")}</div>`:""}
   </div>`:""}
-  ${renderAiCreateSuggestionPanel()}
-  ${renderAiCreateReviewPanel()}
+  ${!partnerSettings?renderAiCreateSuggestionPanel():""}
+  ${!partnerSettings?renderAiCreateReviewPanel():""}
 
-  <div class="settings-section-head" style="margin-top:0;">
+  ${partnerSettings?"":`<div class="settings-section-head" style="margin-top:0;">
     <span class="settings-section-num">1</span>
     <span class="settings-section-title">報名方式</span>
     <span class="settings-section-desc">統一使用線上報名；可依現場需求設定開放時間</span>
@@ -14089,10 +14090,10 @@ function renderSettings(){
         <div class="smc-title">線上報名</div><div class="smc-desc">玩家可由賽事大廳或 QR CODE 進入報名。</div>
       </button>
     </div>
-  </div>
+  </div>`}
 
   <div class="settings-section-head">
-    <span class="settings-section-num">2</span>
+    <span class="settings-section-num">${partnerSettings?1:2}</span>
     <span class="settings-section-title">活動基本資料</span>
     <span class="settings-section-desc">活動資訊、活動時間與線上報名資料集中設定</span>
   </div>
@@ -14102,9 +14103,9 @@ function renderSettings(){
       <label>賽事類型</label>
       ${ladderModeLocked?`<div class="banner warn"><span>本場已有比賽結果或已完成封存，賽事類型已鎖定。</span></div>`:""}
       <div class="settings-choice-row">
-        <button class="scoring-mode-card ${ladderMode==="general"?"active":""}" data-action="set-ladder-mode" data-mode="general" ${ladderModeLocked?'disabled':''}>
+        ${partnerSettings?"":`<button class="scoring-mode-card ${ladderMode==="general"?"active":""}" data-action="set-ladder-mode" data-mode="general" ${ladderModeLocked?'disabled':''}>
           <div class="smc-title">一般賽事</div><div class="smc-desc">交流／主題活動，不影響 BXH 天梯。</div>
-        </button>
+        </button>`}
         <button class="scoring-mode-card ${ladderMode==="ranked"?"active":""}" data-action="set-ladder-mode" data-mode="ranked" ${ladderModeLocked?'disabled':''}>
           <div class="smc-title">${isTester()?'測試積分賽事':'積分賽事'}</div><div class="smc-desc">${isTester()?'寫入獨立測試天梯，不影響正式 BXH 天梯。':'納入 BXH 天梯，完賽後自動結算積分。'}</div>
         </button>
@@ -14172,13 +14173,13 @@ function renderSettings(){
       <div class="settings-integrated-registration">${renderRegistrationSettingsPanel(false)}</div>
     `:`
       <div class="settings-mini-title">既有現場房間</div>
-      <p class="hint">本場保留原有設定與名單。若要開放帳號報名，請選擇上方「線上報名」並完成設定。</p>
+      <p class="hint">${partnerSettings?'本場保留原有設定與名單。':'本場保留原有設定與名單。若要開放帳號報名，請選擇上方「線上報名」並完成設定。'}</p>
     `}
   </div>
 
   ${renderBxhEventTemplateSettingsSection(settingsReadOnly)}
   <div class="settings-section-head">
-    <span class="settings-section-num">4</span>
+    <span class="settings-section-num">${partnerSettings?2:4}</span>
     <span class="settings-section-title">賽制與比賽判定</span>
     <span class="settings-section-desc">決定怎麼打、幾台、如何判定勝負</span>
   </div>
