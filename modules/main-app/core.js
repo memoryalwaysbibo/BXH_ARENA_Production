@@ -4219,7 +4219,7 @@ function bxhEventTemplateContext(){
 function canUseBxhStandardTemplate(){
   return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true &&
     (["super_admin","admin","staff"].includes(userProfile.role) || (typeof isPartnerOrganizerMode==="function"&&isPartnerOrganizerMode())) &&
-    state && state.meta && state.meta.eventAuthority!=="community");
+    state && state.meta && !["community","ticket"].includes(state.meta.eventAuthority) && state.eventAuthority!=="ticket");
 }
 function roomStandardTemplateConfig(st=state){
   if(!st.eventInfo) st.eventInfo=emptyEventInfoV2();
@@ -4227,6 +4227,7 @@ function roomStandardTemplateConfig(st=state){
   return st.eventInfo.standardTemplate;
 }
 function roomStandardTemplateSelected(st=state){
+  if(st.meta?.eventAuthority==="ticket"||st.eventAuthority==="ticket") return false;
   const cfg=roomStandardTemplateConfig(st);
   const explicit=!!(cfg.templateId || cfg.snapshot || cfg.version || cfg.versionLabel);
   if(explicit) return cfg.enabled===true;
@@ -4305,7 +4306,7 @@ function buildPublicEventInfo(st){
   return {
     schemaVersion:EVENT_INFO_SCHEMA_VERSION,
     venue:safeVenue,
-    standardTemplate:(cfg.enabled===true && snapshot)?{
+    standardTemplate:(st?.meta?.eventAuthority!=="ticket" && st?.eventAuthority!=="ticket" && cfg.enabled===true && snapshot)?{
       enabled:true,
       templateId:String(cfg.templateId||snapshot.id||"bxh-standard"),
       version:Math.max(1,Number(cfg.version||snapshot.version)||1),
@@ -17184,6 +17185,7 @@ function resetTournamentDetailState(){
 
 
 function renderTournamentStandardTemplate(t){
+  if(t?.eventAuthority==="ticket"||t?.parsedData?.meta?.eventAuthority==="ticket"||String(t?.code||"").startsWith("PTN-")) return "";
   const cfg=t&&t.parsedData&&t.parsedData.eventInfo&&t.parsedData.eventInfo.standardTemplate;
   if(!cfg||cfg.enabled!==true||!cfg.snapshot)return "";
   const s=cfg.snapshot;
