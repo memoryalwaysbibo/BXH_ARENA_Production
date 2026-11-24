@@ -40,7 +40,7 @@ function context(){
  const session=currentAuthUid()+':'+engagementSessionEpoch;
  if(!state||state.session!==session){
   let pending=null;try{pending=JSON.parse(sessionStorage.getItem(storageKey())||'null');if(pending?.uid!==currentAuthUid())pending=null;}catch{}
-  state={session,products:null,productsCursor:null,tickets:null,ticketsOpen:false,ticketRoomOpen:false,ticketRoom:null,ticketDraft:null,orders:null,ordersCursor:null,config:null,capabilities:{},loading:false,busy:false,error:'',success:'',category:'',productId:'',order:null,adminZone:'orders',status:'reported',draft:null,configDraft:null,pending,formDrafts:{},generation:0,storeOpen:null};
+  state={session,products:null,productsCursor:null,tickets:null,ticketsOpen:false,ticketRoomOpen:false,ticketRoom:null,ticketDraft:null,ptnRoomCards:{},ptnRoomCardScheduled:false,ptnRoomCardLoading:false,ptnRoomLimit:5,orders:null,ordersCursor:null,config:null,capabilities:{},loading:false,busy:false,error:'',success:'',category:'',productId:'',order:null,adminZone:'orders',status:'reported',draft:null,configDraft:null,pending,formDrafts:{},generation:0,storeOpen:null};
  }
  return state;
 }
@@ -235,6 +235,49 @@ async function discoverOwnedPtn(){
   if(c===context()&&canSeeTickets()&&inManagement())render();
  }
 }
+function ptnRoomCodes(c){
+ return [...new Set([c.ownedPtn?.code,...(c.tickets||[]).map(ticket=>ticket.boundRoomCode)].filter(isPtnCode))];
+}
+async function loadPtnRoomCards(){
+ const c=context();
+ if(c.ptnRoomCardLoading||!canSeeTickets()||!inManagement()||c.view==='ticket-manage')return;
+ const codes=ptnRoomCodes(c).slice(0,c.ptnRoomLimit).filter(code=>!c.ptnRoomCards[code]);
+ if(!codes.length)return;
+ c.ptnRoomCardLoading=true;
+ codes.forEach(code=>{c.ptnRoomCards[code]={loading:true};});
+ render();
+ const results=await Promise.allSettled(codes.map(code=>call({action:'ticket-room-state',code})));
+ if(c!==context())return;
+ results.forEach((result,i)=>{
+  const code=codes[i];
+  c.ptnRoomCards[code]=result.status==='fulfilled'&&result.value?.code===code
+   ?{room:result.value}:{error:true};
+ });
+ c.ptnRoomCardLoading=false;
+ if(inManagement()&&c.view!=='ticket-manage')render();
+}
+function schedulePtnRoomCards(c){
+ if(c.tickets===null||c.ptnRoomCardScheduled||c.ptnRoomCardLoading||!canSeeTickets()||!inManagement()||!ptnRoomCodes(c).slice(0,c.ptnRoomLimit).some(code=>!c.ptnRoomCards[code]))return;
+ c.ptnRoomCardScheduled=true;
+ setTimeout(()=>{
+  c.ptnRoomCardScheduled=false;
+  if(c===context())void loadPtnRoomCards();
+ },0);
+}
+function ptnRoomCard(code,c){
+ const snapshot=c.ptnRoomCards[code],room=snapshot?.room;
+ const capacity=Number(room?.capacity||c.tickets?.find(ticket=>ticket.boundRoomCode===code)?.capacity||0);
+ const count=Number.isSafeInteger(room?.confirmedCount)?room.confirmedCount:Number.isSafeInteger(room?.eligibleCount)?room.eligibleCount:null;
+ const phase=room?.phase==='live'?'進行中':room?.phase==='done'?'已結束':room?.phase==='cancelled'?'已取消':room?.phase==='waiting'?'尚未開始':snapshot?.error?'資料待確認':'讀取中';
+ const registration=room?.phase==='waiting'?(room.registrationEnabled===false?'報名已關閉':room.registrationOpenAt>Date.now()?'即將開放':room.registrationCloseAt<=Date.now()?'報名已關閉':'報名中'):'報名已關閉';
+ return `<div class="panel tournament-management-card ptn-room-card" style="margin:0;">
+  <div class="ptn-room-card-heading"><strong>${esc(room?.name||'票券賽事')}</strong><span class="badge ${room?.phase==='live'?'badge-neon':'badge-metal'}">${esc(phase)}</span></div>
+  <div class="hint" style="margin-top:6px;overflow-wrap:anywhere;">房號 ${esc(code)}${room?.location?'｜'+esc(room.location):''}</div>
+  <div class="hint" style="margin-top:6px;">正取 ${count===null?'—':count}${capacity?' / '+capacity:''} 人｜${room?esc(registration):'資料讀取中'}</div>
+  ${snapshot?.error?'<div class="hint" role="status">房間摘要暫時無法讀取，仍可進入房間重試。</div>':''}
+  <div class="btn-row" style="margin-top:10px;"><button type="button" class="btn btn-primary btn-sm" data-action="commerce-open-ticket-room" data-id="${esc(code)}">進入管理</button></div>
+ </div>`;
+}
 function ownedTicketRoomCard(){
  if(!canManagePtn()||!inManagement()||!currentAuthUid())return '';
  const c=context();
@@ -242,8 +285,9 @@ function ownedTicketRoomCard(){
   setTimeout(()=>{if(c===context()&&!c.ownedPtn)void discoverOwnedPtn();},0);
  }
   if(canSeeTickets())schedule('my-tickets',c.tickets===null);
-  const rooms=canSeeTickets()?[...new Set((c.tickets||[]).map(ticket=>ticket.boundRoomCode).filter(isPtnCode))]:[];
-  return `<section class="panel tournament-management-card"><h3>PTN 合作賽事管理</h3>${c.ownedPtn?.failed?`<p role="alert">${esc(c.ownedPtn.error)}</p><button class="btn btn-ghost" data-action="commerce-refresh-owned-ptn">重新查詢</button>`:''}${isPtnCode(c.ownedPtn?.code)?`<p>最近建立：${esc(c.ownedPtn.code)}</p><button class="btn btn-primary btn-sm" data-action="commerce-open-owned-ptn">管理最近房間</button>`:''}${rooms.length?`<h4>已綁定啟動券的房間</h4><div class="btn-row">${rooms.map(code=>`<button type="button" class="btn btn-ghost btn-sm" data-action="commerce-open-ticket-room" data-id="${esc(code)}">${esc(code)}｜管理房間</button>`).join('')}</div>`:''}${canSeeTickets()?`<button type="button" class="btn btn-ghost btn-sm" data-action="commerce-refresh-ptn-rooms">重新整理我的房間</button>`:''}<form data-commerce-form="ticket-open-code">${input('code','代理或最高管理員接管 PTN 房號',c.ptnCodeDraft||'','text','placeholder="PTN-XXXXXX" maxlength="10" required')}<button class="btn btn-ghost">依房號接管</button></form><p class="hint">只有開房者、該房代理人及 BXH 最高管理員可通過管理權限驗證。</p></section>`;
+  if(canSeeTickets())schedulePtnRoomCards(c);
+  const rooms=ptnRoomCodes(c);
+  return `<section class="panel ptn-room-management"><div class="panel-title"><span>PTN 合作賽事管理</span>${canSeeTickets()?`<button type="button" class="btn btn-ghost btn-sm" data-action="commerce-refresh-ptn-rooms">重新整理</button>`:''}</div><div class="hint">每次顯示最多 5 間房間；選擇小卡即可進入管理。</div>${c.ownedPtn?.failed?`<p role="alert">${esc(c.ownedPtn.error)}</p><button class="btn btn-ghost" data-action="commerce-refresh-owned-ptn">重新查詢</button>`:''}${rooms.length?`<div class="ptn-room-cards">${rooms.slice(0,c.ptnRoomLimit).map(code=>ptnRoomCard(code,c)).join('')}</div>${rooms.length>c.ptnRoomLimit?`<button type="button" class="btn btn-ghost" data-action="commerce-more-ptn-rooms">再載入 5 間</button>`:''}`:c.tickets===null||c.ownedPtn?.loading?'<p role="status">正在讀取房間……</p>':'<p class="hint">目前沒有已綁券的房間。</p>'}<details class="ptn-room-code-entry"><summary>依房號接管其他 PTN 房間</summary><form data-commerce-form="ticket-open-code">${input('code','代理或最高管理員接管 PTN 房號',c.ptnCodeDraft||'','text','placeholder="PTN-XXXXXX" maxlength="10" required')}<button class="btn btn-ghost">依房號接管</button></form><p class="hint">只有開房者、該房代理人及 BXH 最高管理員可通過管理權限驗證。</p></details></section>`;
 }
 function ticketCreationPage(){
  const c=context();
@@ -318,7 +362,8 @@ async function handle(action,target){
  if(c.busy||c.loading)return;
  const id=target?.dataset?.id;
  if(action==='commerce-refresh-owned-ptn')return discoverOwnedPtn();
- if(action==='commerce-refresh-ptn-rooms'&&canSeeTickets()&&inManagement()){c.tickets=null;return load('my-tickets');}
+ if(action==='commerce-refresh-ptn-rooms'&&canSeeTickets()&&inManagement()){c.ptnRoomCards={};c.tickets=null;return load('my-tickets');}
+ if(action==='commerce-more-ptn-rooms'&&canSeeTickets()&&inManagement()){c.ptnRoomLimit+=5;render();return;}
  if(action==='commerce-open-owned-ptn'){
   if(!canManagePtn()||!inManagement()||!isPtnCode(c.ownedPtn?.code))return;
   enter('ticket-manage');
@@ -493,5 +538,5 @@ document.addEventListener('input',e=>{
  if(form.dataset.commerceForm==='config')c.configDraft={...v,enabled:v.enabled==='on'};
 });
 document.addEventListener('change',e=>{if(!e.target.matches?.('[data-commerce-status]'))return;const c=context();if(c.loading||c.busy)return;c.status=e.target.value;c.orders=null;void load('admin-orders');});
-window.BXHCommerce={shop,orders,adminPage,handle,context,load,ticketPilot,ticketCreationPage,ownedTicketRoomCard,ticketManagementContext,ticketManagedTab};
+window.BXHCommerce={shop,orders,adminPage,handle,context,load,loadPtnRoomCards,ticketPilot,ticketCreationPage,ownedTicketRoomCard,ticketManagementContext,ticketManagedTab};
 })();
