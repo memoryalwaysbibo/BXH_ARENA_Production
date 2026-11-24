@@ -269,15 +269,22 @@ test('keyboard focus remains usable across a public update', async ({ page }) =>
 test('snapshot bursts coalesce to one flush and keep the last count', async ({ page }) => {
   await openLobby(page);
   await expandCard(page);
-  const flushes = await page.evaluate(() => {
+  // Start the burst only after the native summary click and any deferred
+  // rendering have settled. Otherwise the first flush can legitimately be
+  // deferred by the held-pointer guard and retried after release.
+  const baseline = await page.waitForFunction(() => {
+    if (lobbyReleaseTimer !== null || lobbyGestureTarget !== null ||
+        lobbyFrame !== null || lobbyRenderPending) return false;
     const before = lobbyFixture.flushes;
     for (let count = 3; count <= 12; count++) {
       const rows = structuredClone(lobbyFixture.rows);
       rows[0].confirmedCount = count;
       lobbyFixture.publish(rows);
     }
-    return before;
+    return { before };
   });
+  const { before: flushes } = await baseline.jsonValue();
+  await baseline.dispose();
   await settle(page);
   expect(await page.evaluate(before => lobbyFixture.flushes - before, flushes)).toBe(1);
   await expect(card(page).locator('.lobby-detail-grid')).toContainText('12 / 32');
