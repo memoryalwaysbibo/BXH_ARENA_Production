@@ -332,4 +332,12 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  await release.update({enabled:false});
  assert.equal((await start(startRequest)).replayed,true);
  await assert.rejects(start({...startRequest,data:{...startData,operationId:'ticket-fresh-start'}}),/bracket-started/);
+ await room.update({tournamentPhase:'done'});
+ const history=await status(statusRequest);
+ assert.equal(history.phase,'done');
+ assert.equal(history.participants.length,29);
+ assert.ok(history.participants.every(player=>player.name&&!Object.hasOwn(player,'registrationId')));
+ assert.equal(history.bracket.length,finalState.matches.length);
+ assert.equal(history.matches.length,0);
+ assert.ok(history.bracket.every(item=>item.canScore===false));
 });
