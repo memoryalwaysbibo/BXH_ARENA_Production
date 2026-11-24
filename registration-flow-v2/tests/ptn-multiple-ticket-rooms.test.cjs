@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {createTicketRoomHandler,createPtnStatusHandler}=require('../backend/ticket-room-create.cjs');
+const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler}=require('../backend/ticket-room-create.cjs');
 const {ticketGateForCode,authorizeTicketManager}=require('../backend/ticket-host.cjs');
 
 test('a second paid ticket creates an independent PTN room and retries cannot consume it twice',async()=>{
@@ -69,5 +69,23 @@ test('published vouchers create independent PTN gates for two eligible organizer
   assert.equal(rows.get('tournaments/'+code).ptnSettlementVersion,1);
   assert.equal(rows.get('commerceTickets/'+id).status,'reserved');
   assert.equal((await createPtnStatusHandler({db,clock:()=>now})({auth:{uid},app:{},data:{action:'ticket-ptn-status'}})).code,code);
+  if(capacity==='32'){
+   const existing=rows.get('tournaments/'+code),state=JSON.parse(existing.data);
+   state.players=[{id:'a',name:'甲',source:'online',registrationId:'private-a'},
+    {id:'b',name:'乙',source:'online',registrationId:'private-b'}];
+   state.startedAt=now;state.championId='a';state.runnerUpId='b';state.archiveStatus='completed';
+   state.matches=[{id:'final',seq:0,round:0,bracket:'SE',completed:true,scoreA:4,scoreB:2,
+    a:{playerId:'a'},b:{playerId:'b'},winnerId:'a',loserId:'b'}];
+   rows.set('tournaments/'+code,{...existing,tournamentPhase:'done',confirmedCount:2,data:JSON.stringify(state)});
+   rows.set('commerceTickets/'+id,{...rows.get('commerceTickets/'+id),status:'consumed'});
+   const result=await createTicketRoomStateHandler({db,clock:()=>now})(
+    {auth:{uid},app:{},data:{action:'ticket-room-state',code}});
+   assert.equal(result.phase,'done');
+   assert.deepEqual(result.participants,[{name:'甲'},{name:'乙'}]);
+   assert.equal(result.bracket.length,1);
+   assert.equal(result.bracket[0].completed,true);
+   assert.equal(result.bracket[0].canScore,false);
+   assert.deepEqual(result.matches,[]);
+  }
  }
 });

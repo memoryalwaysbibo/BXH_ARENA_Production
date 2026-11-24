@@ -278,7 +278,8 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} event management offers f
  if(ptn){
   await t.ui.load('ticket-room-state');
   assert.equal(operations.at(-1).code,code);
-  assert.match(t.ui.ticketCreationPage(),/PTN-TST001｜已開賽/);
+  assert.match(t.ui.ticketCreationPage(),/房號<\/div><div class="value small">PTN-TST001/);
+  assert.match(t.ui.ticketCreationPage(),/比賽中/);
   assert.match(t.ui.ticketCreationPage(),/已扣用 1 張啟動券/);
  }
  await t.ui.handle('commerce-ticket-back',{});
@@ -336,7 +337,8 @@ test('scoped ticket room form uses Taiwan time and replays the exact V2 start re
  await t.ui.handle('commerce-retry',{});
  assert.deepEqual(operations.at(-2),operations.at(-1));
  await t.ui.load('ticket-room-state');
- assert.match(t.ui.shop(),/BXH-TICKETTEST｜已開賽/);
+ assert.match(t.ui.shop(),/房號<\/div><div class="value small">BXH-TICKETTEST/);
+ assert.match(t.ui.shop(),/比賽中/);
 });
 
 test('ticket organizer can remove an entrant before start and must redraw',async()=>{
@@ -557,7 +559,7 @@ test('PTN live takeover shows bracket and scores only its verified room',async()
  await t.ui.handle('commerce-open-owned-ptn',{});
  await t.ui.handle('commerce-ticket-open-manage');
  t.sandbox.activeTab='bracket';
- assert.match(t.ui.ticketManagedTab('bracket'),/甲 3 : 0 乙/);
+ assert.match(t.ui.ticketManagedTab('bracket'),/class="commerce-ptn-match-score"[^>]*><span>甲<\/span><strong>3 : 0<\/strong><span>乙<\/span>/);
  t.sandbox.activeTab='referee';
  const panel=t.ui.ticketManagedTab('referee');
  assert.match(panel,/court-grid court-grid-1 commerce-ptn-courts/);
@@ -587,6 +589,28 @@ test('PTN official-style score panel locks scoring at four and recommends the wi
  assert.match(panel,/data-command="confirm" >確認比賽結果/);
  assert.equal((panel.match(/data-command="score"[^>]*disabled/g)||[]).length,8);
  assert.doesNotMatch(panel,/data-action="score"|data-command="fault"|本局重賽/);
+});
+test('PTN room tabs use official cards and keep completed rosters read-only',()=>{
+ const t=setup({partner:true}),code='PTN-TST001';
+ const c=t.ui.context();c.view='ticket-manage';c.ownedPtn={code};c.ticketRoomOpen=true;c.roomManageOpen=true;
+ c.ticketRoom={ok:true,code,name:'合作賽<script>',location:'台南',capacity:32,confirmedCount:2,
+  eligibleCount:2,phase:'done',participants:[{name:'甲'},{name:'乙'}],championName:'甲',
+  bracket:[{id:'final',round:0,seq:0,completed:true,scoreA:4,scoreB:2,
+   a:{name:'甲'},b:{name:'乙'}}]};
+ t.sandbox.activeTab='people';
+ const people=t.ui.ticketManagedTab('people');
+ assert.match(people,/commerce-ptn-management/);
+ assert.match(people,/class="grid grid-3"/);
+ assert.match(people,/正取名單（2 \/ 32）/);
+ assert.match(people,/甲/);
+ assert.doesNotMatch(people,/data-action="commerce-ticket-remove"|合作賽<script>/);
+ t.sandbox.activeTab='bracket';
+ assert.match(t.ui.ticketManagedTab('bracket'),/冠軍：甲/);
+ assert.match(t.ui.ticketManagedTab('bracket'),/已完成 1 \/ 1 場正式對戰/);
+ t.sandbox.activeTab='operations';
+ const operations=t.ui.ticketManagedTab('operations');
+ assert.match(operations,/自動結算/);
+ assert.doesNotMatch(operations,/data-action="archive-complete"|尚未接入合作賽事/);
 });
 test('PTN owner alone can assign one delegate and a super admin can enter by room code',async()=>{
  const t=setup(),code='PTN-AGENT1';

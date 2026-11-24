@@ -243,18 +243,19 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
    if(!Array.isArray(state.players)||!Number.isSafeInteger(rosterRevision)||rosterRevision<0)throw Error('ticket-binding-invalid');
    const eligibleCount=state.players.filter(player=>!state.meta?.checkinRequired||player.checkedIn===true).length;
    const names=new Map(state.players.map(player=>[player.id,player.name]));
+   const bracketVisible=['live','settling','done'].includes(room.tournamentPhase);
    const matches=room.tournamentPhase==='live'&&!state.championId&&gate.enabled===true
     ?state.matches.filter(forfeitMatchAvailable).map(match=>({id:match.id,seq:match.seq,round:match.round,
      a:{id:match.a.playerId,name:names.get(match.a.playerId)||'選手 A'},
      b:{id:match.b.playerId,name:names.get(match.b.playerId)||'選手 B'},updatedAt:match.updatedAt||0})):[];
-   const bracket=room.tournamentPhase==='live'&&Array.isArray(state.matches)?state.matches.map(match=>({
+   const bracket=bracketVisible&&Array.isArray(state.matches)?state.matches.map(match=>({
     id:match.id,seq:match.seq,round:match.round,bracket:match.bracket||null,station:match.station||null,
     status:match.status||'pending',isBye:!!match.isBye,completed:!!match.completed,
     a:match.a?.playerId?{id:match.a.playerId,name:names.get(match.a.playerId)||'選手 A'}:null,
     b:match.b?.playerId?{id:match.b.playerId,name:names.get(match.b.playerId)||'選手 B'}:null,
     scoreA:Number(match.scoreA||0),scoreB:Number(match.scoreB||0),winnerId:match.winnerId||null,
     updatedAt:match.updatedAt||0,
-    canScore:gate.enabled===true&&!state.championId&&forfeitMatchAvailable(match)&&
+    canScore:room.tournamentPhase==='live'&&gate.enabled===true&&!state.championId&&forfeitMatchAvailable(match)&&
      !['quick'].includes(match.scoringMode)&&!['quick'].includes(state.meta.scoringMode)&&
      !ticketRoundBlocked(match,state.matches,state.meta)&&
      !ticketBronzeBlocked(match,state.matches,state.meta)
@@ -269,10 +270,10 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
     registrationOpenAt:room.registrationOpenAt,registrationCloseAt:room.registrationCloseAt,
     registrationEnabled:room.registrationEnabled,updatedAt:room.updatedAt,
     drawId:state.bracketDraw?.id??null,drawReady:state.bracketDraw?.rosterRevision===rosterRevision,rosterRevision,eligibleCount,
-    ...(ticketStatus?{ticketStatus}:{}),...(room.tournamentPhase==='live'?{matches,bracket,
+    ...(ticketStatus?{ticketStatus}:{}),...(bracketVisible?{matches,bracket,
      championName:names.get(state.championId)||null}:{}),
-    participants:room.tournamentPhase==='waiting'?state.players.filter(player=>player.source==='online'&&player.registrationId)
-     .map(player=>({registrationId:player.registrationId,name:player.name})):[]};
+    participants:state.players.filter(player=>player.source==='online'&&player.registrationId)
+     .map(player=>({name:player.name,...(room.tournamentPhase==='waiting'?{registrationId:player.registrationId}:{})}))};
   });
  };
 }
