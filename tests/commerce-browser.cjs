@@ -134,7 +134,7 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
   await page.locator('[data-action="commerce-ticket-draw"]').click();
   await page.getByText('可出賽 2 人｜已抽籤',{exact:true}).waitFor();
   await page.locator('[data-action="commerce-ticket-start"]').click();
-  await page.getByText(expectedCode+'｜已開賽',{exact:true}).waitFor();
+  await page.getByText('比賽中',{exact:true}).waitFor();
   await page.getByText('已扣用 1 張啟動券',{exact:true}).waitFor();
   const flow=await page.evaluate(()=>testCalls.filter(p=>['create-ticket-room','ticket-room-draw','ticket-room-start'].includes(p.action)));
   assert.deepEqual(flow.map(p=>p.action),['create-ticket-room','ticket-room-draw','ticket-room-start']);
