@@ -10955,26 +10955,26 @@ function selectSingleBracketPlayerPath(id){
     (lines.length?lines.join('\n'):'尚未安排場次')+'\n\n包含目前範圍以外的已知場次；高亮只標示已確認晉級的路線。再次點選同一位選手可取消。');
 }
 
-function seMatchBoxHtml(m, roundIdx, boxIdx, headLabel){
+function seMatchBoxHtml(m, roundIdx, boxIdx, headLabel, view=null){
   if(m.isBye){
-    return `<div class="match-box bye-placeholder" aria-hidden="true" data-id="${m.id}" data-round="${roundIdx}" data-index="${boxIdx}">
+    return `<div class="match-box bye-placeholder" aria-hidden="true" data-id="${esc(m.id)}" data-round="${roundIdx}" data-index="${boxIdx}">
       <div class="mb-head"><span>輪空</span><span></span></div>
-      <div class="mb-row" data-side="A">${playerBracketRowHtml(m.a?.playerId,"輪空")}<span class="sc"></span></div>
-      <div class="mb-row" data-side="B">${playerBracketRowHtml(m.b?.playerId,"輪空")}<span class="sc"></span></div>
+      <div class="mb-row" data-side="A">${view ? view.row(m.a?.playerId,"輪空") : playerBracketRowHtml(m.a?.playerId,"輪空")}<span class="sc"></span></div>
+      <div class="mb-row" data-side="B">${view ? view.row(m.b?.playerId,"輪空") : playerBracketRowHtml(m.b?.playerId,"輪空")}<span class="sc"></span></div>
       <div class="match-status-bar ms-bar-pending">等待中</div>
     </div>`;
   }
-  const matchNo=displayMatchNumber(m);
-  const aName = m.a ? playerName(m.a.playerId) : (m.isBye ? "（輪空）" : "待定");
-  const bName = m.b ? playerName(m.b.playerId) : (m.isBye ? "（輪空）" : "待定");
+  const matchNo=view ? view.number(m) : displayMatchNumber(m);
+  const aName = m.a ? (view ? m.a.name : playerName(m.a.playerId)) : (m.isBye ? "（輪空）" : "待定");
+  const bName = m.b ? (view ? m.b.name : playerName(m.b.playerId)) : (m.isBye ? "（輪空）" : "待定");
   const aWin = m.completed && m.winnerId && m.a && m.winnerId===m.a.playerId;
   const bWin = m.completed && m.winnerId && m.b && m.winnerId===m.b.playerId;
   return `
-  <div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}${courtSwapMatchClass(m)}" style="${activeMatchCourtAtmosphereStyle(m)}" data-action="open-match" data-id="${m.id}" data-round="${roundIdx}" data-index="${boxIdx}" data-match-number="${matchNo==null?'':matchNo}">
+  <div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}${view?"":courtSwapMatchClass(m)}" style="${activeMatchCourtAtmosphereStyle(m)}" ${view ? "" : 'data-action="open-match"'} data-id="${esc(m.id)}" data-round="${roundIdx}" data-index="${boxIdx}" data-match-number="${matchNo==null?'':matchNo}">
     ${matchNo==null?'':`<span class="match-order-badge" aria-label="第 ${matchNo} 場">${matchNo}</span>`}
-    <div class="mb-head"><span>${headLabel}${quickModeTagHtml(m)}${courtSwapMatchBadge(m)}</span><span>台${m.station}</span></div>
-    <div class="mb-row ${aWin?'winner':''}" data-side="A">${singleBracketPlayerHtml(m.a?.playerId,aName)}<span class="sc">${matchScoreCellHtml(m,"A")}</span></div>
-    <div class="mb-row ${bWin?'winner':''}" data-side="B">${singleBracketPlayerHtml(m.b?.playerId,bName)}<span class="sc">${matchScoreCellHtml(m,"B")}</span></div>
+    <div class="mb-head"><span>${headLabel}${quickModeTagHtml(m)}${view?"":courtSwapMatchBadge(m)}</span><span>台${esc(m.station??"—")}</span></div>
+    <div class="mb-row ${aWin?'winner':''}" data-side="A">${view ? view.row(m.a?.playerId,aName) : singleBracketPlayerHtml(m.a?.playerId,aName)}<span class="sc">${matchScoreCellHtml(m,"A")}</span></div>
+    <div class="mb-row ${bWin?'winner':''}" data-side="B">${view ? view.row(m.b?.playerId,bName) : singleBracketPlayerHtml(m.b?.playerId,bName)}<span class="sc">${matchScoreCellHtml(m,"B")}</span></div>
     ${matchStatusBarHtml(m)}
   </div>`;
 }
@@ -11700,36 +11700,36 @@ function renderCompactSingleElimBracket(){
   </div>`;
 }
 
-function renderSingleElimBracket(forceTree=false){
+function renderSingleElimBracket(forceTree=false, view=null){
   if(!forceTree && effectiveSingleBracketLayout()==="compact") return renderCompactSingleElimBracket();
-  const total = numRoundsTotal();
-  const startRound = forceTree ? boardStageStartRound() : 0;
+  const total = view ? view.total : numRoundsTotal();
+  const startRound = view ? 0 : forceTree ? boardStageStartRound() : 0;
   let cols = "";
   for(let r=startRound;r<total;r++){
-    const ms = matchesInRound(r);
+    const ms = view ? view.round(r) : matchesInRound(r);
     const isFinalRound=r===total-1;
-    const title = isFinalRound ? "冠亞" : singleRoundTitle(r);
-    const boxes = ms.map((m,i)=> seMatchBoxHtml(m, r, i, displayMatchLabel(m))).join("");
+    const title = isFinalRound ? "冠亞" : (view ? view.title(r) : singleRoundTitle(r));
+    const boxes = ms.map((m,i)=> seMatchBoxHtml(m, r, i, view ? view.label(m) : displayMatchLabel(m), view)).join("");
     cols += `<div class="se-col ${isFinalRound?"se-final-stage-col":""}" data-round="${r}" ${isFinalRound?'data-final-stage="championship"':""}><div class="se-col-title">${title}</div>${isFinalRound?'<div class="se-stage-tag se-stage-tag-final">冠亞</div>':""}${boxes}</div>`;
   }
   let bronzeCol = "";
-  const bronze = state.bronzeMatchId ? getMatch(state.bronzeMatchId) : null;
+  const bronze = view ? view.bronze : state.bronzeMatchId ? getMatch(state.bronzeMatchId) : null;
   if(bronze){
-    const bronzeBox=matchBoxHtml(bronze,"季殿").replace('class="match-box','class="match-box se-bronze-match');
+    const bronzeBox=(view ? seMatchBoxHtml(bronze, bronze.round, 0, "季殿", view) : matchBoxHtml(bronze,"季殿")).replace('class="match-box','class="match-box se-bronze-match');
     bronzeCol = `<div class="bracket-col se-bronze-col"><div class="bracket-col-title">季殿</div><div class="se-stage-tag se-stage-tag-bronze">季殿</div>${bronzeBox}</div>`;
   }
-  const championHtml = state.championId ? `
+  const championHtml = (view ? view.champion : state.championId) ? `
   <div class="champion-box">
     <div class="cap">冠　軍</div>
-    <div class="name">${esc(playerName(state.championId))}</div>
-    ${state.runnerUpId ? `<div class="hint" style="margin-top:10px;">亞軍：${esc(playerName(state.runnerUpId))}</div>`:""}
-    ${state.meta.bronzeMatch && state.thirdId ? `<div class="hint">季軍：${esc(playerName(state.thirdId))}　殿軍：${esc(playerName(state.fourthId))}</div>`:""}
+    <div class="name">${esc(view ? view.champion : playerName(state.championId))}</div>
+    ${!view && state.runnerUpId ? `<div class="hint" style="margin-top:10px;">亞軍：${esc(playerName(state.runnerUpId))}</div>`:""}
+    ${!view && state.meta.bronzeMatch && state.thirdId ? `<div class="hint">季軍：${esc(playerName(state.thirdId))}　殿軍：${esc(playerName(state.fourthId))}</div>`:""}
   </div>` : "";
-  const finalsChampionHtml = state.championId ? `
+  const finalsChampionHtml = (view ? view.champion : state.championId) ? `
     <div class="se-finals-champion-card" aria-label="本場賽事冠軍">
       <span class="board-trophy">${trophySvg()}</span>
       <div class="board-champion-label">冠軍</div>
-      <div class="board-champion-name">${esc(playerName(state.championId))}</div>
+      <div class="board-champion-name">${esc(view ? view.champion : playerName(state.championId))}</div>
     </div>` : "";
   const treeHtml = `<div class="se-bracket-outer ${total===1?'se-bracket-two-player':''}" id="se-bracket-outer">
     <svg class="se-bracket-svg" id="se-bracket-svg"></svg>
@@ -11739,12 +11739,33 @@ function renderSingleElimBracket(forceTree=false){
   return `
   ${championHtml}
   <div class="panel">
-    ${eventTitleBar('<button class="btn btn-ghost btn-sm" data-action="print-bracket">列印 / 另存 PDF</button>')}
+    ${view ? '<div class="event-title-bar"><div class="event-title-center">'+esc(view.name)+'</div></div>' : eventTitleBar('<button class="btn btn-ghost btn-sm" data-action="print-bracket">列印 / 另存 PDF</button>')}
     <div class="hint" style="margin-bottom:10px;">輪空節點已隱藏且不占用正式場次編號。</div>
-    <div class="bracket-wrap">${wrapBracketWatermark(treeHtml)}</div>
+    <div class="bracket-wrap">${wrapBracketWatermark(view?'<div class="board-canvas">'+treeHtml+'</div>':treeHtml)}</div>
   </div>
   `;
 }
+
+// Shared bracket rendering for the verified PTN manager projection.
+function ticketBracketView(room){
+  if(!room?.ok || !Array.isArray(room.bracket) || !room.bracket.length)return null;
+  const matches=room.bracket.map(m=>({...m,a:m.a?{...m.a,playerId:m.a.id}:null,b:m.b?{...m.b,playerId:m.b.id}:null,
+    log:(m.scoreA||m.scoreB)?[{}]:[],status:m.completed?'completed':(['pending','ready','in_progress','paused'].includes(m.status)?m.status:'pending')}));
+  const round=r=>matches.filter(m=>m.bracket!=='BZ'&&m.round===r).sort((a,b)=>a.seq-b.seq);
+  const total=Math.max(...matches.filter(m=>m.bracket!=='BZ').map(m=>m.round))+1;
+  if(!Number.isInteger(total)||total<1||total>8)return null;
+  for(let r=0;r<total;r++)round(r).forEach((m,i)=>{m.indexInRound=i;});
+  const played=matches.filter(m=>!m.isBye).sort((a,b)=>a.seq-b.seq);
+  const number=m=>played.indexOf(m)+1;
+  return {matches,round,total,number,label:m=>window.BXHFormatUtils.matchSequenceLabel(number(m)),
+    title:r=>{const n=2**(total-r);return r===0&&round(0).some(m=>m.isBye)?(n/2)+'強入圍戰':n===4?'四強':n+'強';},
+    row:(id,name)=>'<span class="player-line"><span class="seed-num seed-empty"></span><span class="nm">'+esc(name)+'</span></span>',
+    bronze:matches.find(m=>m.bracket==='BZ'),champion:room.championName,name:room.name||'合作賽事'};
+}
+window.BXHSharedTicketBracket={render(room){
+  const view=ticketBracketView(room);
+  return view?renderSingleElimBracket(true,view):'';
+}};
 
 /* ==== single-elim tree: dynamic DOM-measured layout + SVG connectors ==== */
 function layoutSingleElimBracket(suffix){
@@ -11756,7 +11777,12 @@ function layoutSingleElimBracket(suffix){
       .sort((a,b)=>(+a.getAttribute("data-round"))-(+b.getAttribute("data-round")));
     if(!allCols.length) return;
     const maxRound = allCols.reduce((mx,c)=>Math.max(mx,+c.getAttribute("data-round")),0);
-    const inBoard = !!outer.closest?.("#board-canvas") && suffix!=="-print";
+    const isTicket=!!outer.closest?.(".commerce-ptn-management");
+    const view=isTicket?ticketBracketView(window.BXHCommerce?.verifiedBracketRoom?.()):null;
+    if(isTicket&&!view)return;
+    const roundMatches=view?view.round:matchesInRound;
+    const findMatch=view?id=>view.matches.find(m=>m.id===id):getMatch;
+    const inBoard = (!!outer.closest?.("#board-canvas")||isTicket) && suffix!=="-print";
 
     if(!inBoard){
       const round0Col = outer.querySelector('.se-col[data-round="0"]');
@@ -11829,10 +11855,10 @@ function layoutSingleElimBracket(suffix){
 
     // Later rounds sit midway between their two feeder matches.
     for(let r=anchorRound+1;r<=maxRound;r++){
-      const logicalPrev=matchesInRound(r-1);
+      const logicalPrev=roundMatches(r-1);
       const boxes=realBoxesByRound.get(r)||[];
       boxes.forEach(box=>{
-        const m=getMatch(box.getAttribute("data-id"));
+        const m=findMatch(box.getAttribute("data-id"));
         if(!m)return;
         const a=logicalPrev[m.indexInRound*2],b=logicalPrev[m.indexInRound*2+1];
         const ca=a?centers.get(a.id):undefined,cb=b?centers.get(b.id):undefined;
@@ -11846,11 +11872,11 @@ function layoutSingleElimBracket(suffix){
     // tightly above/below the destination center so they never overlap.
     for(let r=anchorRound-1;r>=0;r--){
       const boxes=realBoxesByRound.get(r)||[];
-      const nextLogical=matchesInRound(r+1);
-      const logicalHere=matchesInRound(r);
+      const nextLogical=roundMatches(r+1);
+      const logicalHere=roundMatches(r);
       const desired=[];
       boxes.forEach(box=>{
-        const m=getMatch(box.getAttribute("data-id"));
+        const m=findMatch(box.getAttribute("data-id"));
         if(!m)return;
         const dest=nextLogical[Math.floor(m.indexInRound/2)];
         const destBox=dest?outer.querySelector('.match-box[data-id="'+dest.id+'"]'):null;
@@ -11896,7 +11922,7 @@ function layoutSingleElimBracket(suffix){
 
 function positionSingleElimFinalDecorations(outer){
   try{
-    if(!outer || !outer.closest?.("#board-canvas")) return;
+    if(!outer || !outer.closest?.("#board-canvas,.commerce-ptn-management")) return;
     const finalCol=outer.querySelector('.se-final-stage-col');
     const finalBox=finalCol&&finalCol.querySelector('.match-box:not(.bye-placeholder)');
     const finalTag=finalCol&&finalCol.querySelector('.se-stage-tag-final');
@@ -11942,7 +11968,10 @@ function drawSingleElimConnectors(outer, allCols, maxRound, suffix){
   suffix = suffix || "";
   const svg = document.getElementById("se-bracket-svg"+suffix);
   if(!svg) return;
-  const matches=new Map(state.matches.map(m=>[m.id,m]));
+  const ticket=outer.closest?.(".commerce-ptn-management") ? window.BXHCommerce?.verifiedBracketRoom?.() : null;
+  const view=ticket?ticketBracketView(ticket):null;
+  if(outer.closest?.(".commerce-ptn-management")&&!view)return;
+  const matches=new Map((view ? view.matches : state.matches).map(m=>[m.id,m]));
   const colsWrap = document.getElementById("se-bracket-cols"+suffix);
   const totalWidth = colsWrap ? colsWrap.scrollWidth : outer.scrollWidth;
   const totalHeight = colsWrap ? colsWrap.scrollHeight : outer.scrollHeight;
@@ -12014,8 +12043,8 @@ function drawSingleElimConnectors(outer, allCols, maxRound, suffix){
     });
   }
   svg.innerHTML = paths;
-  applySingleBracketPlayerPath(outer);
-  markBoardOwnPlayer();
+  if(!view){applySingleBracketPlayerPath(outer);
+  markBoardOwnPlayer();}
 }
 
 let __seRelayoutQueued = false;

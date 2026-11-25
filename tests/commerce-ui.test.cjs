@@ -5,6 +5,11 @@ function setup({partner=false}={}){
  const storage=new Map(),calls=[],listeners={};let uid='buyer',epoch=1,admin=false,fail=false;
  const sandbox={window:{engagementService:{commerce:async p=>{calls.push(JSON.parse(JSON.stringify(p)));if(fail)throw Error('network-timeout');return {ok:true,order:{id:'ORDER_TEST'}};}}},currentAuthUid:()=>uid,get engagementSessionEpoch(){return epoch;},isSuperAdmin:()=>admin,isPartnerOrganizerMode:()=>partner,render(){},setTimeout(){},URL,Date,crypto:{randomUUID:()=> 'same-operation'},confirm:()=>true,esc:v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),sessionStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},document:{addEventListener:(k,f)=>listeners[k]=f,querySelector:()=>({checked:true})}};
  vm.createContext(sandbox);vm.runInContext(source,sandbox);
+ const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
+ const extract=(start,end)=>core.slice(core.indexOf(start),core.indexOf(end,core.indexOf(start)));
+ Object.assign(sandbox,{matchStatusClass:()=>'',activeMatchCourtAtmosphereStyle:()=>'',quickModeTagHtml:()=>'',matchScoreCellHtml:(m,side)=>String(m['score'+side]),matchStatusBarHtml:()=>'',wrapBracketWatermark:s=>s,trophySvg:()=>'',state:new Proxy({},{get(){throw Error('PTN must not read official state')}})});
+ sandbox.window.BXHFormatUtils={matchSequenceLabel:n=>String(n)};
+ vm.runInContext(extract('function seMatchBoxHtml(', 'const BOARD_MEDAL_SVG')+extract('function renderSingleElimBracket(', '/* ==== single-elim tree'),sandbox);
  return {ui:sandbox.window.BXHCommerce,calls,storage,listeners,sandbox,setUid:v=>{uid=v;epoch++;},setAdmin:v=>admin=v,setPartner:v=>partner=v,setFail:v=>fail=v};
 }
 test('pending order retries reuse original operation/payload even after a connection failure',async()=>{
@@ -580,7 +585,7 @@ test('PTN live takeover shows bracket and scores only its verified room',async()
  await t.ui.handle('commerce-open-owned-ptn',{});
  await t.ui.handle('commerce-ticket-open-manage');
  t.sandbox.activeTab='bracket';
- assert.match(t.ui.ticketManagedTab('bracket'),/class="commerce-ptn-match-score"[^>]*><span>甲<\/span><strong>3 : 0<\/strong><span>乙<\/span>/);
+ assert.match(t.ui.ticketManagedTab('bracket'),/class="nm">甲<\/span>.*class="sc">3<\/span>/);
  t.sandbox.activeTab='referee';
  const panel=t.ui.ticketManagedTab('referee');
  assert.match(panel,/court-grid court-grid-1 commerce-ptn-courts/);
@@ -632,11 +637,11 @@ test('PTN live dashboard and bracket tree show court progress and actual advance
  assert.doesNotMatch(live,/第 1 輪・第 1 場<\/strong>/);
  t.sandbox.activeTab='bracket';
  const tree=t.ui.ticketManagedTab('bracket');
- assert.match(tree,/commerce-ptn-tree-links/);
- assert.match(tree,/M280 75 H300 V150 H320/);
- assert.match(tree,/M280 225 H300 V150 H320/);
- assert.match(tree,/第 2 輪/);
- assert.match(tree,/冠軍/);
+ assert.match(tree,/se-bracket-svg/);
+ assert.match(tree,/data-round="0" data-index="0"/);
+ assert.match(tree,/data-round="0" data-index="1"/);
+ assert.match(tree,/冠亞/);
+ assert.doesNotMatch(tree,/data-action="open-match"/);
 });
 test('PTN room tabs keep the official navigation and completed rosters read-only without repeating the room summary',()=>{
  const t=setup({partner:true}),code='PTN-TST001';
@@ -658,8 +663,8 @@ test('PTN room tabs keep the official navigation and completed rosters read-only
  assert.doesNotMatch(people,/data-action="commerce-ticket-remove"|合作賽<script>/);
  t.sandbox.activeTab='bracket';
  const bracket=t.ui.ticketManagedTab('bracket');
- assert.match(bracket,/class="commerce-ptn-champion"|commerce-ptn-champion/);
- assert.match(bracket,/等待賽果|<div class="commerce-ptn-match">甲<\/div>/);
+ assert.match(bracket,/se-finals-champion-card/);
+ assert.match(bracket,/class="board-champion-name">甲<\/div>/);
  assert.match(bracket,/已完成 1 \/ 1 場正式對戰/);
  assert.doesNotMatch(bracket,/對戰表｜|ptn-room-card-heading/);
  t.sandbox.activeTab='operations';
