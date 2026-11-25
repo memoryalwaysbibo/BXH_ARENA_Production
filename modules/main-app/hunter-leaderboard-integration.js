@@ -6,6 +6,17 @@ const original=renderLadderLeaderboardPage;
 let view='ladder',controller,teamController;
 const teamVisible=()=>window.BXH_TEAM_FULL_ENABLED===true&&!!currentAuthUid()&&typeof userProfile==='object'&&userProfile?.active===true&&userProfile.isTestAccount!==true&&['player','staff','admin','super_admin'].includes(userProfile.role);
 const teamBoard=()=>teamController||(teamController=window.BXHTeamLeaderboard.create({loadMembers:teamId=>window.engagementService.tournamentOperation('teamRead',{action:'members',teamId}),load:query=>window.engagementService.tournamentOperation('teamRead',{action:'ranking',query}),identity:()=>teamVisible()?currentAuthUid():null,onChange:()=>renderPreservingScroll()}));
+// Refresh the visible first page once after a substantial time away.
+let teamHiddenAt=0;
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden){teamHiddenAt=Date.now();return;}
+ const elapsed=teamHiddenAt?Date.now()-teamHiddenAt:0;
+ teamHiddenAt=0;
+ if(elapsed<30000||view!=='team'||!teamVisible()||!teamController)return;
+ const active=(appPhase==='player-center'&&playerActiveTab==='ladder')||(appPhase==='app'&&activeTab==='ladder');
+ const state=teamController.state();
+ if(active&&document.querySelector('.team-board')&&state.data&&!state.loading&&state.offset===0&&state.expanded.size===0)void teamController.refresh();
+});
 const board=()=>controller||(controller=window.BXHHunterLeaderboard.create({
  load:payload=>window.engagementService.tournamentOperation('getHunterLeaderboard',payload),
  identity:()=>currentAuthUid(),onChange:()=>renderPreservingScroll()
