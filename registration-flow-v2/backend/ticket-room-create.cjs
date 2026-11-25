@@ -269,6 +269,7 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
      delegateGameId:delegate?String(delegate.gameId||'').slice(0,80):null,
      canAssignDelegate:authority.owner}:{}),
     capacity:room.capacity,confirmedCount:room.confirmedCount,phase:room.tournamentPhase,startAt:room.startAt,
+    stations:Number.isInteger(state.meta?.stations)&&state.meta.stations>=1&&state.meta.stations<=12?state.meta.stations:null,
     registrationOpenAt:room.registrationOpenAt,registrationCloseAt:room.registrationCloseAt,
     registrationEnabled:room.registrationEnabled,updatedAt:room.updatedAt,
     drawId:state.bracketDraw?.id??null,drawReady:state.bracketDraw?.rosterRevision===rosterRevision,rosterRevision,eligibleCount,

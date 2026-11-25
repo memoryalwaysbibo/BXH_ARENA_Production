@@ -12525,13 +12525,13 @@ function previousMatchCorrectionHtml(stationNum,currentId){
     </div>
   </div>`;
 }
-function refereeWorkstationHeader(m, stationNum){
-  const closed=state.forcedCourtExits?.[stationNum]?.closed;
-  const exitButton=state.bracketSize&&(closed?canManageCourtRetirement():canForceExitCourt(stationNum))&&state.archiveStatus!=="completed"?`<details class="ref-court-maintenance"><summary>更多操作</summary><div><p>整台管理操作，與裁判入席／退出無關。</p><button type="button" class="btn btn-sm ref-court-exit-btn" data-action="${closed?'court-force-reopen':'court-force-exit'}" data-station="${stationNum}" ${courtRetirementBusy?'disabled':''}>${closed?'重新啟用本台':'裁判台強制退場'}</button></div></details>`:"";
-  const assigned=refereeDisplayForStation(stationNum);
-  const status=refereeStationStatus(m);
+function refereeWorkstationHeader(m, stationNum, ticketView=null){
+  const closed=!ticketView&&state.forcedCourtExits?.[stationNum]?.closed;
+  const exitButton=!ticketView&&state.bracketSize&&(closed?canManageCourtRetirement():canForceExitCourt(stationNum))&&state.archiveStatus!=="completed"?`<details class="ref-court-maintenance"><summary>更多操作</summary><div><p>整台管理操作，與裁判入席／退出無關。</p><button type="button" class="btn btn-sm ref-court-exit-btn" data-action="${closed?'court-force-reopen':'court-force-exit'}" data-station="${stationNum}" ${courtRetirementBusy?'disabled':''}>${closed?'重新啟用本台':'裁判台強制退場'}</button></div></details>`:"";
+  const assigned=ticketView?"尚未入席":refereeDisplayForStation(stationNum);
+  const status=ticketView?{label:"等待開賽",cls:"waiting"}:refereeStationStatus(m);
   const matchMeta=m?`${esc(refereeStageLabel(m))} · 第 ${m.indexInRound+1} 場`:"等待安排場次";
-  return `<div class="ref-workstation-head"><div class="ref-workstation-identity"><span class="court-badge">台${stationNum}</span><div><span>責任裁判</span><b title="${esc(assigned)}">${esc(assigned)}</b></div></div><div class="ref-workstation-meta"><span class="ref-station-status ${status.cls}">${status.label}</span><small>${matchMeta}｜已完成 ${stationCompletedCount(stationNum)} 場${refereeStationRestrictionEnabled()?"｜桌次限制":""}</small>${exitButton}</div></div>${window.BXHRefereeSeats?.render(state,stationNum)||""}`;
+  return `<div class="ref-workstation-head"><div class="ref-workstation-identity"><span class="court-badge">台${stationNum}</span><div><span>責任裁判</span><b title="${esc(assigned)}">${esc(assigned)}</b></div></div><div class="ref-workstation-meta"><span class="ref-station-status ${status.cls}">${status.label}</span><small>${matchMeta}｜已完成 ${ticketView?0:stationCompletedCount(stationNum)} 場${!ticketView&&refereeStationRestrictionEnabled()?"｜桌次限制":""}</small>${exitButton}</div></div>${ticketView?"":window.BXHRefereeSeats?.render(state,stationNum)||""}`;
 }
 function renderQuickDecisionPanel(m, court, stationNum){
   const aName = playerName(m.a.playerId), bName = playerName(m.b.playerId);
@@ -12551,10 +12551,10 @@ function renderQuickDecisionPanel(m, court, stationNum){
   </div>`;
 }
 
-function courtAtmosphereStyle(stationNum){
+function courtAtmosphereStyle(stationNum,roomId=state.id){
   // Automatically assigns a visually distinct atmosphere-light hue to each court.
   // The golden-angle step keeps adjacent courts far apart in hue without requiring manual setup.
-  const base = Array.from(String(state.id||"BXH")).reduce((sum,ch)=>sum+ch.charCodeAt(0),0) % 360;
+  const base = Array.from(String(roomId||"BXH")).reduce((sum,ch)=>sum+ch.charCodeAt(0),0) % 360;
   const hue = (base + (Math.max(1,stationNum)-1) * 137.508) % 360;
   return `--court-hue:${hue.toFixed(1)};--court-accent:hsl(${hue.toFixed(1)} 88% 62%);--court-glow:hsla(${hue.toFixed(1)} 88% 58% / .30);--court-glow-soft:hsla(${hue.toFixed(1)} 88% 58% / .10);`;
 }
@@ -12607,19 +12607,19 @@ function renderCourtCard(stationNum){
   </div>`;
 }
 
-function renderRefereeScorePanel(match,stationNum){
+function renderRefereeScorePanel(match,stationNum,ticketWaiting=false){
   // A display-only placeholder: never inserted into state.matches or court assignments.
   const waiting=!match;
   const m=match||{id:'',scoreA:0,scoreB:0,log:[],status:'pending',completed:false};
   const aName=waiting?'—':playerName(m.a.playerId),bName=waiting?'—':playerName(m.b.playerId);
   const winSide = waiting?null:checkWinnerSide(m);
   const warnBanner = m.completed ? `<div class="banner warn"><span>此對戰已完成確認，任何得分或重賽操作將修改已確認的比賽結果，請謹慎操作。</span></div>` : "";
-  const locked = !!(pendingModal && pendingModal.type==="confirm-result" && pendingModal.matchId===m.id);
-  const preStartLocked=!state.startedAt;
+  const locked = !ticketWaiting&&!!(pendingModal && pendingModal.type==="confirm-result" && pendingModal.matchId===m.id);
+  const preStartLocked=ticketWaiting||!state.startedAt;
   const stationLocked=waiting||!canOperateStation(stationNum);
   const uploadSaving=!waiting&&refereeUploadPending(m);
   const operationLocked=stationLocked||uploadSaving;
-  const enchantmentPending=state.meta&&state.meta.playMode==="enchantment";
+  const enchantmentPending=!ticketWaiting&&state.meta&&state.meta.playMode==="enchantment";
   const faultSaving=!waiting&&refereeFaultWritePending(m);
   const scoreLocked=waiting || locked || faultSaving || preStartLocked || operationLocked || !!winSide || enchantmentPending;
 
@@ -12643,7 +12643,7 @@ function renderRefereeScorePanel(match,stationNum){
     ${warnBanner}
     ${!waiting&&preStartLocked?`<div class="banner warn" style="margin:12px 16px 0;"><span>賽事尚未開始。比分、判定與場次控制目前鎖定。</span></div>`:""}
     <div class="match-status-controls ref-match-toolbar">
-      <span class="msc-label">場次狀態：${waiting?'等待對戰｜計分尚未開放':matchStatusBarHtml(m, true)}</span>
+      <span class="msc-label">場次狀態：${waiting?(ticketWaiting?'等待開賽':'等待對戰｜計分尚未開放'):matchStatusBarHtml(m, true)}</span>
       <div class="msc-btns">
         ${!waiting&&state.startedAt&&m.status==="in_progress" ? `<button class="btn btn-ghost btn-sm" data-action="pause-match-status" data-id="${m.id}" ${operationLocked?'disabled':''}>暫停比賽</button>` : ""}
         ${!waiting&&state.startedAt&&m.status==="paused" ? `<button class="btn btn-ghost btn-sm" data-action="resume-match-status" data-id="${m.id}" ${operationLocked?'disabled':''}>恢復比賽</button>` : ""}
@@ -12671,7 +12671,7 @@ function renderRefereeScorePanel(match,stationNum){
 
     <div class="score-log">${m.log.map(l=>`<span>${l.side==='A'?esc(aName):esc(bName)} ${POINT_LABELS[l.type]}</span>`).join("") || '<span>尚無得分紀錄</span>'}</div>
 
-    ${refereeUploadStatusHtml(stationNum)}
+    ${ticketWaiting?"":refereeUploadStatusHtml(stationNum)}
     <div class="btn-row ref-result-actions" style="margin-top:16px;">
       <button class="btn btn-ghost ref-undo-score" ${waiting?'':`data-action="undo-score" data-id="${m.id}"`} ${!undoAvailable||locked||faultSaving||operationLocked?'disabled':''}>${undoLabel}</button>
       <button class="btn btn-ghost ref-rematch" ${waiting?'':`data-action="rematch" data-id="${m.id}"`} ${locked||faultSaving||operationLocked?'disabled':''}>本局重賽</button>
@@ -12787,14 +12787,21 @@ function refereeWaitingControls(stationNum){
   })||"";
   return tools+renderRefereeScorePanel(null,stationNum);
 }
-function renderWaitingRefereeCourt(stationNum){
-  const seatsEnabled=state.meta?.refereeSeatsV1?.version===1;
-  return `<div class="panel court-card referee-workstation referee-workstation-waiting" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
-    ${refereeWorkstationHeader(null,stationNum)}
-    ${seatsEnabled?"":'<div class="hint" role="status">本場尚未啟用三席裁判制。</div>'}
-    ${refereeWaitingControls(stationNum)}
+function renderWaitingRefereeCourt(stationNum,ticketView=null){
+  const seatsEnabled=!ticketView&&state.meta?.refereeSeatsV1?.version===1;
+  return `<div class="panel court-card referee-workstation referee-workstation-waiting" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum,ticketView?ticketView.roomId:state.id)}">
+    ${refereeWorkstationHeader(null,stationNum,ticketView)}
+    ${ticketView?'<div class="hint" role="status">裁判邀請及入席尚未啟用。</div>':seatsEnabled?"":'<div class="hint" role="status">本場尚未啟用三席裁判制。</div>'}
+    ${ticketView?renderRefereeScorePanel(null,stationNum,true):refereeWaitingControls(stationNum)}
   </div>`;
 }
+// Only render authoritative, configured courts; no seat or scoring writes here.
+window.BXHSharedTicketWaitingCourts={render(room){
+  const n=room?.stations;
+  if(room?.phase!=="waiting"||!Number.isInteger(n)||n<1||n>12)return "";
+  const grid=n===1?"court-grid court-grid-1":n===2?"court-grid court-grid-2":n===4?"court-grid court-grid-many court-grid-4fit":"court-grid court-grid-many";
+  return '<div class="'+grid+'">'+Array.from({length:n},(_,i)=>renderWaitingRefereeCourt(i+1,room)).join("")+'</div>';
+}};
 function canUseRefereeSyncRecovery(){
   return !!(state?.cloudCode&&state.id&&state.startedAt&&state.meta?.battleMode!=="team"&&currentAuthUid()&&canOperateCurrentTournament());
 }
@@ -12915,7 +12922,7 @@ function renderReferee(){
   const quickNav = refereeBracketRoundtripNav("bracket")+refereeSyncRecoveryControlsHtml()
     +(isCommunityRoomOwner()&&!window.BXHRefereeSeats?.enabled(state)?window.BXHRefereeSeats?.settings()||"":"");
   if(!state.bracketSize){
-    return quickNav+selector+`<div class="${gridClass}">${stations.map(renderWaitingRefereeCourt).join("")}</div>`;
+    return quickNav+selector+`<div class="${gridClass}">${stations.map(station=>renderWaitingRefereeCourt(station)).join("")}</div>`;
   }
   const rm = refereeMatches();
   if(rm.length===0){
