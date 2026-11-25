@@ -585,8 +585,10 @@ test('PTN live takeover shows bracket and scores only its verified room',async()
  assert.match(panel,/data-command="confirm" disabled/);
  assert.equal((panel.match(/data-command="score"/g)||[]).length,8);
  await t.ui.handle('commerce-ticket-score',{dataset:{id:match.id,command:'score',side:'A',finish:'spin'}});
- assert.deepEqual(calls.at(-1),{action:'ticket-room-score',code,roomId:'ticket-room-generation',
+ assert.deepEqual(calls.findLast(call=>call.action==='ticket-room-score'),{action:'ticket-room-score',code,roomId:'ticket-room-generation',
   matchId:match.id,matchUpdatedAt:123,command:'score',side:'A',finish:'spin',operationId:'same-operation'});
+ assert.equal(t.ui.context().ticketRoom?.code,code);
+ assert.match(core,/renderStableRefereeScreen\(app,html,'ptn:'/);
  t.setUid('another-user');
  assert.equal(t.ui.ticketManagementContext(),null);
 });
@@ -602,6 +604,30 @@ test('PTN official-style score panel locks scoring at four and recommends the wi
  assert.match(panel,/data-command="confirm" >確認比賽結果/);
  assert.equal((panel.match(/data-command="score"[^>]*disabled/g)||[]).length,8);
  assert.doesNotMatch(panel,/data-action="score"|data-command="fault"|本局重賽/);
+});
+test('PTN live dashboard and bracket tree show court progress and actual advancement links',()=>{
+ const t=setup({partner:true}),code='PTN-TST001';
+ const c=t.ui.context();c.view='ticket-manage';c.ownedPtn={code};c.ticketRoomOpen=true;c.roomManageOpen=true;
+ const player=name=>({name});
+ c.ticketRoom={ok:true,code,name:'四人測試',phase:'live',confirmedCount:4,eligibleCount:4,
+  bracket:[
+   {id:'s1',round:0,seq:0,bracket:'SE',station:1,completed:true,scoreA:4,scoreB:2,a:player('甲'),b:player('乙')},
+   {id:'s2',round:0,seq:1,bracket:'SE',station:2,completed:true,scoreA:0,scoreB:4,a:player('丙'),b:player('丁')},
+   {id:'final',round:1,seq:2,bracket:'SE',station:1,scoreA:0,scoreB:0,a:player('甲'),b:player('丁')}]
+ };
+ t.sandbox.activeTab='live';
+ const live=t.ui.ticketManagedTab('live');
+ assert.match(live,/live-dashboard-panel/);
+ assert.match(live,/已完成 2 \/ 3 場/);
+ assert.match(live,/甲<\/span><strong>0 : 0<\/strong><span>丁/);
+ assert.doesNotMatch(live,/第 1 輪・第 1 場<\/strong>/);
+ t.sandbox.activeTab='bracket';
+ const tree=t.ui.ticketManagedTab('bracket');
+ assert.match(tree,/commerce-ptn-tree-links/);
+ assert.match(tree,/M280 75 H300 V150 H320/);
+ assert.match(tree,/M280 225 H300 V150 H320/);
+ assert.match(tree,/第 2 輪/);
+ assert.match(tree,/冠軍/);
 });
 test('PTN room tabs keep the official navigation and completed rosters read-only without repeating the room summary',()=>{
  const t=setup({partner:true}),code='PTN-TST001';
@@ -623,7 +649,8 @@ test('PTN room tabs keep the official navigation and completed rosters read-only
  assert.doesNotMatch(people,/data-action="commerce-ticket-remove"|合作賽<script>/);
  t.sandbox.activeTab='bracket';
  const bracket=t.ui.ticketManagedTab('bracket');
- assert.match(bracket,/冠軍：甲/);
+ assert.match(bracket,/class="commerce-ptn-champion"|commerce-ptn-champion/);
+ assert.match(bracket,/等待賽果|<div class="commerce-ptn-match">甲<\/div>/);
  assert.match(bracket,/已完成 1 \/ 1 場正式對戰/);
  assert.doesNotMatch(bracket,/對戰表｜|ptn-room-card-heading/);
  t.sandbox.activeTab='operations';
