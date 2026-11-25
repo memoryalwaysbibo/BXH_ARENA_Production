@@ -178,7 +178,7 @@ function ticketForfeitPanel(room,pending){
    <button type="button" class="btn btn-ghost" data-action="commerce-ticket-forfeit" data-id="${esc(match.id)}" data-side="b" ${pending?'disabled':''}>${esc(match.b.name)} 棄權</button></li>`).join('')}</ul></details>`;
 }
 function ticketBracketPanel(room){
- if(room.phase==='waiting')return '<div class="empty-state">賽事尚未開賽；完成抽籤後可在這裡查看對戰表。</div>';
+ if(room.phase==='waiting'&&!room.drawId)return '<div class="empty-state">尚未抽籤；抽籤完成後可在這裡預覽對戰表。</div>';
  const matches=room.bracket||[];
  const played=matches.filter(match=>!match.isBye),completed=played.filter(match=>match.completed).length;
  const rounds=new Map(),bronze=[];
@@ -208,10 +208,10 @@ function ticketBracketPanel(room){
  }
  const tree=levels.map(({round,items},column)=>`<section class="commerce-ptn-round" aria-label="第 ${round+1} 輪" style="left:${column*320}px"><h3>第 ${round+1} 輪</h3>${items.map((match,i)=>`<div class="commerce-ptn-tree-node" style="top:${centers[column][i]}px">${card(match)}</div>`).join('')}</section>`).join('');
  const championTop=centers.at(-1)?.[0]??height/2;
- return `<div class="panel"><div class="panel-title">對戰樹狀圖</div>${matches.length?`<p class="hint">已完成 ${completed} / ${played.length} 場正式對戰；向右滑動可查看晉級路線。</p><div class="commerce-ptn-tree-scroll" role="region" aria-label="賽事樹狀圖" tabindex="0"><div class="commerce-ptn-tree" style="width:${width}px;height:${height+60}px"><svg class="commerce-ptn-tree-links" width="${width}" height="${height+60}" aria-hidden="true"><path d="${lines.join(' ')}"/></svg>${tree}<section class="commerce-ptn-round commerce-ptn-champion" style="left:${levels.length*320}px"><h3>冠軍</h3><div class="commerce-ptn-tree-node" style="top:${championTop}px"><div class="commerce-ptn-match">${esc(room.championName||'等待賽果')}</div></div></section></div></div>${bronze.length?`<h3>季殿賽</h3><div class="commerce-ptn-match-grid">${bronze.map(card).join('')}</div>`:''}`:'<div class="empty-state">對戰資料尚未取得，請重新整理房間。</div>'}</div>`;
+ return `<div class="panel"><div class="panel-title">對戰樹狀圖</div>${room.phase==='waiting'?`<div class="banner ${room.drawReady===false?'warn':''}">${room.drawReady===false?'正取名單已變更，請重新抽籤。':'抽籤預覽；正式開賽並扣券後才可記分。'}</div>`:''}${matches.length?`<p class="hint">已完成 ${completed} / ${played.length} 場正式對戰；向右滑動可查看晉級路線。</p><div class="commerce-ptn-tree-scroll" role="region" aria-label="賽事樹狀圖" tabindex="0"><div class="commerce-ptn-tree" style="width:${width}px;height:${height+60}px"><svg class="commerce-ptn-tree-links" width="${width}" height="${height+60}" aria-hidden="true"><path d="${lines.join(' ')}"/></svg>${tree}<section class="commerce-ptn-round commerce-ptn-champion" style="left:${levels.length*320}px"><h3>冠軍</h3><div class="commerce-ptn-tree-node" style="top:${championTop}px"><div class="commerce-ptn-match">${esc(room.championName||'等待賽果')}</div></div></section></div></div>${bronze.length?`<h3>季殿賽</h3><div class="commerce-ptn-match-grid">${bronze.map(card).join('')}</div>`:''}`:'<div class="empty-state">對戰資料尚未取得，請重新整理房間。</div>'}</div>`;
 }
 function ticketLivePanel(room){
- if(room.phase==='waiting')return '<div class="empty-state">賽事尚未開賽。</div>';
+ if(room.phase==='waiting')return '<div class="empty-state">賽事尚未開賽；對戰組合可先至「對戰表」預覽，正式開賽後顯示即時戰況。</div>';
  const matches=(room.bracket||[]).filter(match=>!match.isBye),done=matches.filter(match=>match.completed).length;
  const percent=matches.length?Math.round(done/matches.length*100):0;
  const active=matches.filter(match=>!match.completed&&match.a&&match.b);
@@ -220,7 +220,7 @@ function ticketLivePanel(room){
  return `<section class="commerce-ptn-live"><div class="panel live-dashboard-panel"><div class="live-summary-strip"><div class="live-summary-line"><strong class="live-summary-name">${esc(room.name||'票券賽事')}</strong><span class="live-summary-chip">${Number(room.confirmedCount??room.eligibleCount??0)} 人</span><span class="live-summary-chip">已完成 ${done} / ${matches.length} 場</span></div><div class="live-energy-row"><div class="live-energy-track" style="--live-progress:${percent}%"><div class="live-energy-fill"></div><i class="live-energy-tip"></i></div><strong class="live-energy-percent">${percent}%</strong></div></div><div class="live-dashboard-courts"><h3>各台即時戰況</h3><div class="live-court-grid ${stations.length<=1?'live-court-grid-1':''}">${courts||`<div class="empty-state">${room.championName?'冠軍：'+esc(room.championName):'目前沒有可進行的對戰。'}</div>`}</div></div></div></section>`;
 }
 function ticketRefereePanel(room,pending){
- if(room.phase!=='live')return '<p>賽事尚未開賽。</p>';
+ if(room.phase!=='live')return '<p>賽事尚未開賽；正式開賽並扣券後才能進入裁判台記分。</p>';
  const matches=(room.bracket||[]).filter(match=>match.canScore&&match.a&&match.b);
  const finishes=[['spin','旋轉勝利＋1分'],['knockout','擊飛勝利＋2分'],['burst','爆裂勝利＋2分'],['extreme','極限勝利＋3分']];
  const card=match=>{
