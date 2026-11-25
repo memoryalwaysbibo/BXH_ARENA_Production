@@ -51,6 +51,12 @@ function activeTicketManager(user){
   !['deleted','disabled','frozen'].includes(user.accountStatus);
 }
 
+function ticketPermissionDenied(stage){
+ const error=Error('permission-denied');
+ error.ptnPermissionStage=stage;
+ return error;
+}
+
 // A delegate's authority belongs to one private PTN room, never to the
 // organization or to other rooms owned by the same organizer.
 async function authorizeTicketManager(tx,db,{uid,user,room,gate,code,now}){
@@ -59,15 +65,15 @@ async function authorizeTicketManager(tx,db,{uid,user,room,gate,code,now}){
     typeof room.ownerUid!=='string'||room.createdBy!==room.ownerUid||
     gate?.ownerUid!==room.ownerUid||gate.roomCode!==code||
     room.ticketAccessV1?.ownerUid!==room.ownerUid||
-    room.ticketAccessV1?.roomId!==gate.roomId)throw Error('permission-denied');
+    room.ticketAccessV1?.roomId!==gate.roomId)throw ticketPermissionDenied('room-binding');
  const owner=uid===room.ownerUid;
  const admin=user.role==='super_admin';
  const delegate=isPartnerRoomCode(code)&&user.role==='player'&&room.ptnDelegateUid===uid;
- if(!owner&&!admin&&!delegate)throw Error('permission-denied');
+ if(!owner&&!admin&&!delegate)throw ticketPermissionDenied('actor-role');
  const ownerUser=owner?user:(await tx.get(db.doc('users/'+room.ownerUid))).data();
  const grant=ticketHostGrant(ownerUser,now);
  if(!grant||room.partnerOrganizationCode!==grant.organizationId||
-    (room.partnerContractOrderCode||null)!==grant.order)throw Error('permission-denied');
+    (room.partnerContractOrderCode||null)!==grant.order)throw ticketPermissionDenied('owner-grant');
  return {grant,ownerUid:room.ownerUid,owner,admin,delegate};
 }
 
@@ -75,7 +81,7 @@ function checkTicketContract(contract,grant,uid){
  if(!grant.order)return;
  if(contract?.orderCode!==grant.order||contract.targetUid!==uid||contract.status!=='active'||
     contract.signedBy!==uid||!contract.signatureHash||!contract.signedAt||
-    grantTime(contract.startsAt)!==grant.startsAt||grantTime(contract.expiresAt)!==grant.expiresAt)throw Error('permission-denied');
+    grantTime(contract.startsAt)!==grant.startsAt||grantTime(contract.expiresAt)!==grant.expiresAt)throw ticketPermissionDenied('contract-proof');
 }
 
 module.exports={ticketHostGrant,checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,ticketGateForCode,resolveTicketGate,authorizeTicketManager,activeTicketManager};

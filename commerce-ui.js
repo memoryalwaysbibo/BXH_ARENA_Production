@@ -60,6 +60,15 @@ function ticketRoomReadError(e){
  const known=errorMessage(e);
  return known.includes('重複下單')?'賽事資料讀取失敗，請聯絡 BXH 查詢服務紀錄。':known;
 }
+function ticketRoomMutationError(e){
+ const message=String(e?.message||e||'');
+ if(message.includes('app-check-unavailable')||message.includes('網站驗證未完成'))return '網站驗證未完成，請重新載入頁面後再操作。';
+ if(message.includes('permission-denied')||message.includes('unauthenticated')||message.includes('auth-required'))return '賽事管理權限驗證失敗。請重新整理房間，並確認目前登入的是這間房的主辦、代理人或最高管理員。';
+ const known=errorMessage(e);
+ if(!known.includes('重複下單'))return known;
+ if(message.includes('unavailable')||message.includes('deadline-exceeded')||message.includes('network-request-failed'))return '賽事操作尚未確認，請先重新整理房間，再確認原操作結果。';
+ return known;
+}
 const permanentErrors=/forfeit-(room-not-live|match-stale|round-waiting)|registration-(queue-pending|queue-disabled|roster-stale)|early-start-confirmation-required|bracket-started|ticket-lifecycle-disabled|ticket-unavailable|ticket-expired|ticket-binding-invalid|room-code-conflict|ticket-ptn-slot-occupied|bracket-version-conflict|bracket-roster-changed|permission-denied|not-found|partner-organizer-required|ticket-holding-limit|ticket-monthly-limit|product-unavailable|store-closed|delivery-not-ready|product-changed|version-conflict|contract-required|contract-expired|unpaid-order-exists|already-owned|bank-receipt-used|amount-mismatch|payment-window-closed|invalid-|refund-needs-review|transition-forbidden|cancel-unavailable|account-inactive|super-admin-required|order-unavailable/;
 const money=n=>'NT$ '+Number(n||0).toLocaleString('zh-TW');
 const date=n=>n?new Date(n).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'—';
@@ -132,7 +141,8 @@ async function mutate(payload){
   }
   c.success=({ 'create-ticket-room':'已建房並綁定啟動券。','ticket-room-schedule':'報名與開賽時間已更新。','ticket-room-delegate':'代理權已更新。','ticket-room-draw':'抽籤完成。','ticket-room-start':'正式開賽，啟動券已扣用。','ticket-room-remove':'已移除選手。請重新抽籤。','ticket-room-forfeit':'已登記棄權，對手晉級。','ticket-room-score':r.completed?'賽果已確認，選手已晉級。':'分數已儲存。'})[action]||'操作已確認完成。';
  }catch(e){if(c===context()){
-  c.error=errorMessage(e);
+  const failedAction=c.pending?.payload?.action||payload.action;
+  c.error=failedAction?.startsWith('ticket-room-')?ticketRoomMutationError(e):errorMessage(e);
   if(permanentErrors.test(String(e?.message||e))){c.pending=null;try{sessionStorage.removeItem(storageKey());}catch{}}
  }}finally{if(c===context()){c.busy=false;render();}}
 }
