@@ -22249,7 +22249,7 @@ function handleAction(action, target){
   if(action.startsWith("court-call-")){handleCourtCall(action,target);return;}
   if(action.startsWith("raffle-")){handleRaffle(action,target);return;}
   if(action.startsWith("mailbox-")){handleMailbox(action,target);return;}
-  if(action==="commerce-open-ticket-create" && isPartnerOrganizerMode() && activeTab!=="management"){
+  if(["commerce-open-ticket-create","commerce-open-ticket-room"].includes(action) && isPartnerOrganizerMode() && activeTab!=="management"){
     activeTab="management";
     adminTournamentListOpen=false;
   }
