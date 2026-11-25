@@ -28,7 +28,7 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   handlers:{family:familyFactory,roster:rosterFactory,promotion:promotionFactory}});
  const api=createApi({queue,family:familyFactory(db),enabled:code=>isRetired(code)||intakeEnabled(code)});
  const managementApi=createManagementApi({queue,enabled:intakeEnabled,authorize:authorizeManagement});
- const bind=(handler,{options,preconditions=[],allowRetired=()=>false,allowUnassigned=()=>false}={})=>onCall({region:'asia-east1',cors:true,timeoutSeconds:30,maxInstances:5,...options},async req=>{
+ const bind=(handler,{options,preconditions=[],allowRetired=()=>false,allowUnassigned=()=>false,auditPtnLifecycle=false}={})=>onCall({region:'asia-east1',cors:true,timeoutSeconds:30,maxInstances:5,...options},async req=>{
   const data=req.data;
   if(stagedOnly||(!primaryRoom(data?.code)&&!(isRetired(data?.code)&&allowRetired(data))&&
       !(req.auth?.uid&&(allowUnassigned(data)||await ticketAllowed(data?.code))))){
@@ -38,7 +38,15 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
    const m=String(error.message||'');
    if(m==='auth-required')throw new HttpsError('unauthenticated',m);
    if(m==='invalid-operation')throw new HttpsError('invalid-argument',m);
-   if(m==='permission-denied'||m==='not-found')throw new HttpsError(m,m);
+   if(m==='permission-denied'||m==='not-found'){
+    if(m==='permission-denied'&&auditPtnLifecycle&&isPartnerRoomCode(data?.code)){
+     const stages=new Set(['room-binding','actor-role','owner-grant','actor-inactive','contract-proof']);
+     console.warn('PTN lifecycle authorization refused',{
+      stage:stages.has(error?.ptnPermissionStage)?error.ptnPermissionStage:'unclassified',
+     });
+    }
+    throw new HttpsError(m,m);
+   }
    if(['registration-queue-disabled','operation-conflict','tournament-started',...preconditions].includes(m))throw new HttpsError('failed-precondition',m);
    if(data?.action==='ticket-room-state'&&isPartnerRoomCode(data?.code)){
      // Record only error classification and source location. Never log room state,
@@ -78,6 +86,7 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
  });
  const lifecycleOptions={
   options:{enforceAppCheck:true},
+  auditPtnLifecycle:true,
   // Lifecycle validates the original receipt before checking the write gate.
   allowRetired:()=>true,
   preconditions:['bracket-room-changed','bracket-started','draw-mode-not-supported','start-mode-not-supported','early-start-confirmation-required',

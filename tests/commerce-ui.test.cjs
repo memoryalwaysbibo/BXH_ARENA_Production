@@ -511,6 +511,19 @@ test('PTN management read shows the actual failure class instead of a checkout r
  await t.ui.load('ticket-room-state');
  assert.match(t.ui.ticketCreationPage(),/賽事資料讀取逾時/);
 });
+
+test('PTN draw permission refusal reports authorization and clears the pending receipt',async()=>{
+ const t=setup({partner:true}),c=t.ui.context(),code='PTN-DRAW01';
+ t.sandbox.activeTab='management';
+ c.view='ticket-manage';c.ownedPtn={code};c.ticketRoomOpen=true;
+ c.ticketRoom={ok:true,code,roomId:'room-generation',phase:'waiting',eligibleCount:2,rosterRevision:1,drawId:null};
+ t.sandbox.window.engagementService.ticketRoomOperation=async()=>{throw Error('permission-denied functions/permission-denied');};
+ await t.ui.handle('commerce-ticket-draw',{});
+ assert.match(c.error,/賽事管理權限驗證失敗/);
+ assert.doesNotMatch(c.error,/重複下單/);
+ assert.equal(c.pending,null);
+ assert.equal(t.storage.size,0);
+});
 test('PTN takeover replaces stale legacy header only after server owner verification',async()=>{
  const t=setup({partner:true}),code='PTN-TST001';
  t.sandbox.activeTab='management';

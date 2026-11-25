@@ -80,7 +80,11 @@ function createLifecycleHandler(action,{db,enabled=async()=>false,clock=Date.now
    const authority=ticketRoom?await authorizeTicketManager(tx,db,{uid,user,room,gate:gateSnap.data(),code,now}):null;
    const grant=authority?.grant;
    if(user?.active!==true||user.deleted||user.isTestAccount||['deleted','disabled','frozen'].includes(user.accountStatus)||
-      (!ticketRoom&&!['admin','super_admin'].includes(user.role)))throw Error('permission-denied');
+      (!ticketRoom&&!['admin','super_admin'].includes(user.role))){
+    const error=Error('permission-denied');
+    if(ticketRoom)error.ptnPermissionStage='actor-inactive';
+    throw error;
+   }
    if(!room||!pub)throw Error('not-found');
    const state=JSON.parse(room.data),mirror=JSON.parse(pub.bracketView);
    if(state.id!==roomId)throw Error('bracket-room-changed');
