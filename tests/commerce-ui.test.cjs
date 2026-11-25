@@ -784,3 +784,17 @@ test('manual room code entry uses the same single verified navigation flow',asyn
  assert.equal(t.sandbox.activeTab,'registrations');assert.equal(t.ui.ticketManagementContext().code,code);
  await t.ui.handle('commerce-ticket-back');assert.equal(t.sandbox.activeTab,'management');assert.equal(t.ui.ticketManagementContext(),null);
 });
+
+test('PTN shared room actions are collapsed by default and exposed on errors or pending operations',()=>{
+ const t=setup({partner:true}),code='PTN-TST001';
+ const c=t.ui.context();c.view='ticket-manage';c.ownedPtn={code};c.ticketRoomOpen=true;c.roomManageOpen=true;
+ c.ticketRoom={ok:true,code,phase:'waiting',capacity:32,participants:[]};
+ for(const tab of ['management','registrations','settings','people','operations']){
+  t.sandbox.activeTab=tab;
+  const html=()=>tab==='management'?t.ui.ticketCreationPage():t.ui.ticketManagedTab(tab);
+  assert.match(html(),/<details class="ptn-room-utility" >[\s\S]*?commerce-ticket-back[\s\S]*?commerce-ticket-refresh[\s\S]*?<\/details>/);
+  c.error='讀取失敗';assert.match(html(),/<details class="ptn-room-utility" open>/);
+  c.error='';c.pending={};assert.match(html(),/<details class="ptn-room-utility" open>/);
+  c.pending=null;
+ }
+});
