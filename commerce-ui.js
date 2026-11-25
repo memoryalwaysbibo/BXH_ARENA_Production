@@ -98,13 +98,13 @@ async function call(payload){
  if(!r?.ok)throw Error(r?.error||'request-failed');
  return r;
 }
-async function load(kind,more=false){
+async function load(kind,more=false,quiet=false){
  const c=context();if(c.loading||c.busy||!currentAuthUid())return;
  if(kind.startsWith('admin-')&&!isSuperAdmin())return;
  if(kind==='my-tickets'&&!canSeeTickets())return;
  if(kind==='ticket-room-state'&&(!canOperateTicketRoom(c)||!ticketRoomCode(c)))return;
  if(kind==='ticket-ptn-status'&&(!ticketPilot()||!ptnCreation(c)))return;
- const generation=++c.generation;c.loading=true;c.error='';render();
+ const generation=++c.generation;c.loading=true;c.error='';if(!quiet)render();
  try{
   const cursor=more?(kind.includes('products')||kind==='catalog'?c.productsCursor:c.ordersCursor):null;
   const r=await call(kind==='ticket-room-state'?{action:kind,code:ticketRoomCode(c)}:kind==='ticket-ptn-status'?{action:kind}:{action:kind,cursor,...(kind==='admin-orders'?{status:c.status}:{})});if(c!==context()||generation!==c.generation)return;
@@ -119,7 +119,7 @@ async function load(kind,more=false){
 }
 async function mutate(payload){
  const c=context();if(c.busy||c.loading)return;
- const view=c.view;c.busy=true;c.error='';c.success='';render();
+ const view=c.view,scoring=payload.action==='ticket-room-score';c.busy=true;c.error='';c.success='';render();
  try{
   if(!c.pending){
    const pending={uid:currentAuthUid(),payload:{...payload,operationId:crypto.randomUUID()}};
@@ -132,7 +132,11 @@ async function mutate(payload){
   if(r.product){c.draft={...r.product,delivery:{...r.product.delivery}};c.products=null;}
   if(r.config){c.config=r.config;c.configDraft=null;}
   if(ticketActions.has(action)){
-   c.tickets=null;c.ticketDraft=null;c.ticketRoom=null;c.scheduleDraft=null;c.delegateSearch=null;
+   c.tickets=null;c.ticketDraft=null;if(!scoring)c.ticketRoom=null;c.scheduleDraft=null;c.delegateSearch=null;
+   if(scoring&&c.ticketRoom?.code===payload.code){
+    const match=c.ticketRoom.bracket?.find(item=>item.id===payload.matchId);
+    if(match){match.scoreA=r.scoreA;match.scoreB=r.scoreB;match.completed=r.completed;match.canScore=!r.completed;}
+   }
    if(action==='create-ticket-room'&&isPtnCode(r.code))c.ownedPtn={code:r.code};
    if(view===c.view&&canOperateTicketRoom(c)){
     if(action==='create-ticket-room'&&ptnCreation(c)&&isPtnCode(r.code))c.ptnStatus={ok:true,code:r.code};
@@ -144,7 +148,12 @@ async function mutate(payload){
   const failedAction=c.pending?.payload?.action||payload.action;
   c.error=failedAction?.startsWith('ticket-room-')?ticketRoomMutationError(e):errorMessage(e);
   if(permanentErrors.test(String(e?.message||e))){c.pending=null;try{sessionStorage.removeItem(storageKey());}catch{}}
- }}finally{if(c===context()){c.busy=false;render();}}
+ }}finally{if(c===context()){
+  c.busy=false;
+  // Keep the current court mounted until the authoritative post-score read arrives.
+  if(scoring&&!c.pending)void load('ticket-room-state',false,true);
+  else render();
+ }}
 }
 function schedule(kind,empty){const c=context();if(empty&&!c.loading&&!c.busy&&!c.error)setTimeout(()=>load(kind),0);}
 function productDetails(p,c){
@@ -172,7 +181,43 @@ function ticketBracketPanel(room){
  if(room.phase==='waiting')return '<div class="empty-state">賽事尚未開賽；完成抽籤後可在這裡查看對戰表。</div>';
  const matches=room.bracket||[];
  const played=matches.filter(match=>!match.isBye),completed=played.filter(match=>match.completed).length;
- return `<div class="panel"><div class="panel-title">對戰表</div>${room.championName?`<div class="banner" role="status"><span>冠軍：${esc(room.championName)}</span></div>`:''}${matches.length?`<p class="hint">已完成 ${completed} / ${played.length} 場正式對戰</p><div class="commerce-ptn-match-grid">${matches.map(match=>`<article class="commerce-ptn-match"><div class="commerce-ptn-match-head"><strong>第 ${Number(match.round)+1} 輪・第 ${Number(match.seq)+1} 場${match.station?'｜'+Number(match.station)+' 號台':''}</strong><span class="badge ${match.completed?'badge-neon':'badge-metal'}">${match.isBye?'輪空':match.completed?'已完成':match.a&&match.b?'待進行':'等待晉級'}</span></div><div class="commerce-ptn-match-score"><span>${esc(match.a?.name||'待定')}</span><strong>${Number(match.scoreA||0)} : ${Number(match.scoreB||0)}</strong><span>${esc(match.b?.name||'待定')}</span></div></article>`).join('')}</div>`:'<div class="empty-state">對戰資料尚未取得，請重新整理房間。</div>'}</div>`;
+ const rounds=new Map(),bronze=[];
+ for(const match of matches){
+  if(match.bracket==='BZ'){bronze.push(match);continue;}
+  const round=Number(match.round)||0;
+  if(!rounds.has(round))rounds.set(round,[]);
+  rounds.get(round).push(match);
+ }
+ const card=match=>`<article class="commerce-ptn-match"><div class="commerce-ptn-match-head"><strong>第 ${Number(match.round)+1} 輪・第 ${Number(match.seq)+1} 場${match.station?'｜'+Number(match.station)+' 號台':''}</strong><span class="badge ${match.completed?'badge-neon':'badge-metal'}">${match.isBye?'輪空':match.completed?'已完成':match.a&&match.b?'待進行':'等待晉級'}</span></div><div class="commerce-ptn-match-score"><span>${esc(match.a?.name||'待定')}</span><strong>${Number(match.scoreA||0)} : ${Number(match.scoreB||0)}</strong><span>${esc(match.b?.name||'待定')}</span></div></article>`;
+ const levels=[...rounds].sort(([a],[b])=>a-b).map(([round,items])=>({round,items:items.sort((a,b)=>Number(a.seq)-Number(b.seq))}));
+ const width=levels.length*320+280,height=Math.max(160,(levels[0]?.items.length||1)*150);
+ const centers=[];
+ for(let column=0;column<levels.length;column++){
+  const count=levels[column].items.length,previous=centers[column-1];
+  centers.push(Array.from({length:count},(_,i)=>previous?.length===count*2
+   ?(previous[2*i]+previous[2*i+1])/2:(i+0.5)*height/count));
+ }
+ const lines=[];
+ for(let column=0;column<levels.length;column++){
+  const source=centers[column],next=centers[column+1]||[centers[column].length===1?centers[column][0]:height/2];
+  if(source.length!==next.length*2&&source.length!==1)continue;
+  source.forEach((y,i)=>{
+   const target=next[Math.floor(i/2)]??next[0],x=column*320+280,via=x+20,end=x+40;
+   lines.push(`M${x} ${y} H${via} V${target} H${end}`);
+  });
+ }
+ const tree=levels.map(({round,items},column)=>`<section class="commerce-ptn-round" aria-label="第 ${round+1} 輪" style="left:${column*320}px"><h3>第 ${round+1} 輪</h3>${items.map((match,i)=>`<div class="commerce-ptn-tree-node" style="top:${centers[column][i]}px">${card(match)}</div>`).join('')}</section>`).join('');
+ const championTop=centers.at(-1)?.[0]??height/2;
+ return `<div class="panel"><div class="panel-title">對戰樹狀圖</div>${matches.length?`<p class="hint">已完成 ${completed} / ${played.length} 場正式對戰；向右滑動可查看晉級路線。</p><div class="commerce-ptn-tree-scroll" role="region" aria-label="賽事樹狀圖" tabindex="0"><div class="commerce-ptn-tree" style="width:${width}px;height:${height+60}px"><svg class="commerce-ptn-tree-links" width="${width}" height="${height+60}" aria-hidden="true"><path d="${lines.join(' ')}"/></svg>${tree}<section class="commerce-ptn-round commerce-ptn-champion" style="left:${levels.length*320}px"><h3>冠軍</h3><div class="commerce-ptn-tree-node" style="top:${championTop}px"><div class="commerce-ptn-match">${esc(room.championName||'等待賽果')}</div></div></section></div></div>${bronze.length?`<h3>季殿賽</h3><div class="commerce-ptn-match-grid">${bronze.map(card).join('')}</div>`:''}`:'<div class="empty-state">對戰資料尚未取得，請重新整理房間。</div>'}</div>`;
+}
+function ticketLivePanel(room){
+ if(room.phase==='waiting')return '<div class="empty-state">賽事尚未開賽。</div>';
+ const matches=(room.bracket||[]).filter(match=>!match.isBye),done=matches.filter(match=>match.completed).length;
+ const percent=matches.length?Math.round(done/matches.length*100):0;
+ const active=matches.filter(match=>!match.completed&&match.a&&match.b);
+ const stations=[...new Set(active.map(match=>Number(match.station)||1))].sort((a,b)=>a-b);
+ const courts=stations.map(station=>`<section class="panel live-court-card"><h3>${station} 號台</h3>${active.filter(match=>(Number(match.station)||1)===station).map(match=>`<div class="commerce-ptn-match-head"><span>第 ${Number(match.round)+1} 輪・第 ${Number(match.seq)+1} 場</span><span class="badge badge-metal">${match.scoreA||match.scoreB?'進行中':'待進行'}</span></div><div class="commerce-ptn-match-score"><span>${esc(match.a.name)}</span><strong>${Number(match.scoreA||0)} : ${Number(match.scoreB||0)}</strong><span>${esc(match.b.name)}</span></div>`).join('')}</section>`).join('');
+ return `<section class="commerce-ptn-live"><div class="panel live-dashboard-panel"><div class="live-summary-strip"><div class="live-summary-line"><strong class="live-summary-name">${esc(room.name||'票券賽事')}</strong><span class="live-summary-chip">${Number(room.confirmedCount??room.eligibleCount??0)} 人</span><span class="live-summary-chip">已完成 ${done} / ${matches.length} 場</span></div><div class="live-energy-row"><div class="live-energy-track" style="--live-progress:${percent}%"><div class="live-energy-fill"></div><i class="live-energy-tip"></i></div><strong class="live-energy-percent">${percent}%</strong></div></div><div class="live-dashboard-courts"><h3>各台即時戰況</h3><div class="live-court-grid ${stations.length<=1?'live-court-grid-1':''}">${courts||`<div class="empty-state">${room.championName?'冠軍：'+esc(room.championName):'目前沒有可進行的對戰。'}</div>`}</div></div></div></section>`;
 }
 function ticketRefereePanel(room,pending){
  if(room.phase!=='live')return '<p>賽事尚未開賽。</p>';
@@ -209,7 +254,7 @@ function ticketHostManagementPanel(c,room,pending,scheduleForm,tab){
  const delegate=room.canAssignDelegate?`<div class="panel"><div class="panel-title">房間代理人（最多一名）</div><p>目前代理人：${room.delegateUid?`${esc(room.delegateName||'未設定姓名')}（${esc(room.delegateGameId||'未設定遊戲 ID')}）`:'尚未指定'}</p><form data-commerce-form="ticket-delegate-search">${input('query','搜尋本名或遊戲 ID','','text','minlength="2" maxlength="80" required')}<button class="btn btn-primary" ${pending?'disabled':''}>搜尋帳號</button></form>${c.delegateSearch?.code===room.code?`<p>搜尋「${esc(c.delegateSearch.query)}」：${c.delegateSearch.players.length} 筆結果</p><ul>${c.delegateSearch.players.map((player,i)=>`<li>${esc(player.name)}（${esc(player.gameId||'未設定遊戲 ID')}） <button type="button" class="btn btn-ghost" data-action="commerce-ticket-select-delegate" data-id="${i}" ${pending?'disabled':''}>選為代理人</button></li>`).join('')}</ul>`:''}${room.delegateUid?`<button class="btn btn-ghost" data-action="commerce-ticket-revoke-delegate" ${pending?'disabled':''}>撤銷代理權</button>`:''}</div>`:room.delegateUid?`<div class="panel"><div class="panel-title">房間代理人</div><p>${esc(room.delegateName||'未設定姓名')}（${esc(room.delegateGameId||'未設定遊戲 ID')}）</p></div>`:'';
  const settings=`<div class="panel"><div class="panel-title">合作主辦設定</div><div class="grid grid-2"><div class="stat-box"><div class="label">賽事名稱</div><div class="value small">${esc(room.name)}</div></div><div class="stat-box"><div class="label">場地</div><div class="value small">${esc(room.location||'未設定')}</div></div></div>${scheduleForm||'<p class="hint">開賽後不能調整報名時間。</p>'}</div>${delegate}`;
  const operations=`<div class="panel"><div class="panel-title">賽事操作</div><p class="hint">合作積分賽由系統在所有對戰與名次確認後自動結算。請於「對戰表」確認賽果，並在房間結束後核對積分入帳。</p>${room.phase==='live'&&room.championName?'<div class="banner warn">冠軍已產生，正在等待自動結算；請重新整理房間確認狀態。</div>':''}</div>`;
- const content=tab==='settings'?settings:tab==='people'?ticketPeoplePanel(c,room,pending,drawPanel,delegate):tab==='registrations'?`${registrationPanel}${rosterPanel}${drawPanel}`:tab==='bracket'||tab==='live'?ticketBracketPanel(room):tab==='referee'?ticketRefereePanel(room,pending):operations;
+ const content=tab==='settings'?settings:tab==='people'?ticketPeoplePanel(c,room,pending,drawPanel,delegate):tab==='registrations'?`${registrationPanel}${rosterPanel}${drawPanel}`:tab==='bracket'?ticketBracketPanel(room):tab==='live'?ticketLivePanel(room):tab==='referee'?ticketRefereePanel(room,pending):operations;
  return `<section class="commerce commerce-ptn-management"><div class="panel-title"><button type="button" class="btn btn-ghost" data-action="commerce-ticket-back">← 返回賽事管理／切換房間</button><button class="btn btn-ghost btn-sm" data-action="commerce-ticket-refresh" ${c.loading?'disabled':''}>重新整理房間</button></div>${notices(c)}${c.loading?'<p role="status">正在讀取房間資料……</p>':''}${content}</section>`;
 }
 function ticketManagedTab(tab){
