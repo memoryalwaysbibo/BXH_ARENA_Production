@@ -12531,7 +12531,7 @@ function refereeWorkstationHeader(m, stationNum, ticketView=null){
   const assigned=ticketView?"尚未入席":refereeDisplayForStation(stationNum);
   const status=ticketView?{label:"等待開賽",cls:"waiting"}:refereeStationStatus(m);
   const matchMeta=m?`${esc(refereeStageLabel(m))} · 第 ${m.indexInRound+1} 場`:"等待安排場次";
-  return `<div class="ref-workstation-head"><div class="ref-workstation-identity"><span class="court-badge">台${stationNum}</span><div><span>責任裁判</span><b title="${esc(assigned)}">${esc(assigned)}</b></div></div><div class="ref-workstation-meta"><span class="ref-station-status ${status.cls}">${status.label}</span><small>${matchMeta}｜已完成 ${ticketView?0:stationCompletedCount(stationNum)} 場${!ticketView&&refereeStationRestrictionEnabled()?"｜桌次限制":""}</small>${exitButton}</div></div>${ticketView?"":window.BXHRefereeSeats?.render(state,stationNum)||""}`;
+  return `<div class="ref-workstation-head"><div class="ref-workstation-identity"><span class="court-badge">台${stationNum}</span><div><span>責任裁判</span><b title="${esc(assigned)}">${esc(assigned)}</b></div></div><div class="ref-workstation-meta"><span class="ref-station-status ${status.cls}">${status.label}</span><small>${matchMeta}｜已完成 ${ticketView?0:stationCompletedCount(stationNum)} 場${!ticketView&&refereeStationRestrictionEnabled()?"｜桌次限制":""}</small>${exitButton}</div></div>${ticketView?(window.BXHRefereeSeats?.renderPendingTicketSeats?.(stationNum)||""):window.BXHRefereeSeats?.render(state,stationNum)||""}`;
 }
 function renderQuickDecisionPanel(m, court, stationNum){
   const aName = playerName(m.a.playerId), bName = playerName(m.b.playerId);
