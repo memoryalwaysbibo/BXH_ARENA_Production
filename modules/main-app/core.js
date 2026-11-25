@@ -21250,6 +21250,12 @@ function renderRefereeCourtView(app,html){
   const maintenanceKey=refereeTabOpen()?refereeCourtViewKey():null;
   const openCourts=maintenanceKey&&app.__bxhMaintenanceKey===maintenanceKey&&typeof app.querySelectorAll==="function"
     ?new Set([...app.querySelectorAll(".ref-court-maintenance[open]")].map(el=>el.closest(".court-card")?.id).filter(Boolean)):new Set();
+  const ticketRoom=activeTab==='referee'&&appPhase==='app'?window.BXHCommerce?.ticketManagementContext?.():null;
+  if(ticketRoom?.verified){
+    renderStableRefereeScreen(app,html,'ptn:'+currentAuthUid()+':'+ticketRoom.code);
+    app.__bxhMaintenanceKey=null;
+    return true;
+  }
   if(refereeCourtFocusActive()){
     renderStableRefereeScreen(app,html,refereeCourtViewKey());
     app.__bxhMaintenanceKey=maintenanceKey;
