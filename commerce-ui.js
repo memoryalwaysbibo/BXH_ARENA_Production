@@ -237,14 +237,14 @@ function ticketHostManagementPanel(c,room,pending,scheduleForm,tab){
  const settings=`<div class="panel"><div class="panel-title">合作主辦設定</div><div class="grid grid-2"><div class="stat-box"><div class="label">賽事名稱</div><div class="value small">${esc(room.name)}</div></div><div class="stat-box"><div class="label">場地</div><div class="value small">${esc(room.location||'未設定')}</div></div></div>${scheduleForm||'<p class="hint">開賽後不能調整報名時間。</p>'}</div>${delegate}`;
  const operations=`<div class="panel"><div class="panel-title">賽事操作</div><p class="hint">合作積分賽由系統在所有對戰與名次確認後自動結算。請於「對戰表」確認賽果，並在房間結束後核對積分入帳。</p>${room.phase==='live'&&room.championName?'<div class="banner warn">冠軍已產生，正在等待自動結算；請重新整理房間確認狀態。</div>':''}</div>`;
  const content=tab==='settings'?settings:tab==='people'?ticketPeoplePanel(c,room,pending,drawPanel,delegate):tab==='registrations'?`${registrationPanel}${rosterPanel}${drawPanel}`:tab==='bracket'?ticketBracketPanel(room):tab==='live'?ticketLivePanel(room):tab==='referee'?ticketRefereePanel(room,pending):operations;
- return `<section class="commerce commerce-ptn-management"><div class="panel-title"><button type="button" class="btn btn-ghost" data-action="commerce-ticket-back">← 返回賽事管理／切換房間</button><button class="btn btn-ghost btn-sm" data-action="commerce-ticket-refresh" ${c.loading?'disabled':''}>重新整理房間</button></div>${notices(c)}${c.loading?'<p role="status">正在讀取房間資料……</p>':''}${content}</section>`;
+ return `<section class="commerce commerce-ptn-management">${notices(c)}${c.loading?'<p role="status">正在讀取房間資料……</p>':''}${content}</section>`;
 }
 function ticketManagedTab(tab){
  const c=context();
  if(!c.roomManageOpen||!ticketManagementView(c)||!['registrations','settings','people','live','bracket','referee','operations'].includes(tab))return null;
  schedule('ticket-room-state',c.ticketRoom===null);
  const room=c.ticketRoom;
-  if(room?.ok!==true||room.code!==c.ownedPtn.code)return `<section class="panel commerce"><button type="button" class="btn btn-ghost" data-action="commerce-ticket-back">← 返回賽事管理／切換房間</button><h2>管理房間</h2>${notices(c)}<p role="status">${c.loading?'正在驗證票券房管理權限並讀取賽事……':'房間尚未通過管理權限驗證，請重新整理或返回賽事管理。'}</p><button type="button" class="btn btn-ghost" data-action="commerce-ticket-refresh" ${c.loading?'disabled':''}>重新整理房間</button></section>`;
+  if(room?.ok!==true||room.code!==c.ownedPtn.code)return `<section class="panel commerce"><button type="button" class="btn btn-ghost" data-action="commerce-ticket-back">← 返回列表</button><h2>管理房間</h2>${notices(c)}<p role="status">${c.loading?'正在驗證票券房管理權限並讀取賽事……':'房間尚未通過管理權限驗證，請重新整理或返回賽事管理。'}</p><button type="button" class="btn btn-ghost" data-action="commerce-ticket-refresh" ${c.loading?'disabled':''}>重試讀取</button></section>`;
  const pending=c.loading||c.busy||!!c.pending;
  const scheduleForm=room.phase==='waiting'&&['registrationOpenAt','registrationCloseAt','startAt'].every(key=>Number.isSafeInteger(room[key]))?`<details open><summary>調整報名與開賽時間</summary><form data-commerce-form="ticket-schedule"><p>時間以台灣時間填寫；報名截止與預定開賽必須在未來。</p>${['registrationOpenAt','registrationCloseAt','startAt'].map((key,i)=>input(key,['報名開放','報名截止','預定開賽'][i]+'（台灣時間）',c.scheduleDraft?.[key]||new Date(room[key]+8*3600000).toISOString().slice(0,16),'datetime-local','required')).join('')}<button class="btn btn-primary" ${pending?'disabled':''}>儲存賽事時間</button></form></details>`:'';
  return ticketHostManagementPanel(c,room,pending,scheduleForm,tab);
@@ -355,6 +355,12 @@ function ownedTicketRoomCard(){
 function ticketCreationPage(){
  const c=context();
  if(ticketManagementView(c)){
+  // The normal management tab is the room list once initial verification has finished.
+  if(!c.roomEntryPending&&!c.busy&&!c.pending){
+   const manual=c.ownedPtn?.manual;
+   enter('management');if(manual)c.ownedPtn=null;
+   return null;
+  }
   return ticketManagedTab('registrations');
  }
  if(!ticketPilot()||!ticketCreationView(c))return null;

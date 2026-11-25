@@ -160,8 +160,12 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
    assert.equal(await page.locator('[data-action="commerce-ticket-open-manage"]').count(),0);
    await page.evaluate(()=>{activeTab='people';render();});
    await page.getByText('正取選手（0 / 0）',{exact:true}).waitFor();
-   await page.locator('[data-action="commerce-ticket-back"]').click();
+   assert.equal(await page.locator('[data-action="commerce-ticket-back"]').count(),0);
+   assert.equal(await page.getByRole('button',{name:'重新整理房間',exact:true}).count(),0);
+   await page.evaluate(()=>{activeTab='management';render();});
+   await page.getByRole('button',{name:'＋ 新增賽事'}).waitFor();
    assert.equal(await page.evaluate(()=>activeTab),'management');
+   assert.equal(await page.evaluate(()=>BXHCommerce.ticketManagementContext()),null);
   }
   await page.evaluate(()=>{activeTab='commerce-shop';testView='shop';render();});
   await page.locator('[data-action="commerce-product"][data-id="tournament_activation_32"]').click();

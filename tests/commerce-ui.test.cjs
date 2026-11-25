@@ -450,8 +450,9 @@ test('partner can leave a PTN management tab and select an earlier bound room',a
  await t.ui.handle('commerce-open-owned-ptn');
  assert.equal(t.sandbox.activeTab,'registrations');
  t.sandbox.activeTab='people';
- assert.match(t.ui.ticketManagedTab('people'),/data-action="commerce-ticket-back"/);
- await t.ui.handle('commerce-ticket-back');
+ assert.doesNotMatch(t.ui.ticketManagedTab('people'),/data-action="commerce-ticket-back"/);
+ t.sandbox.activeTab='management';
+ assert.equal(t.ui.ticketCreationPage(),null);
  assert.equal(t.sandbox.activeTab,'management');
  assert.equal(t.ui.ticketManagementContext(),null);
  await t.ui.load('my-tickets');
@@ -783,4 +784,21 @@ test('manual room code entry uses the same single verified navigation flow',asyn
  await t.listeners.submit({target:{closest:()=>form},preventDefault(){}});
  assert.equal(t.sandbox.activeTab,'registrations');assert.equal(t.ui.ticketManagementContext().code,code);
  await t.ui.handle('commerce-ticket-back');assert.equal(t.sandbox.activeTab,'management');assert.equal(t.ui.ticketManagementContext(),null);
+});
+
+test('PTN verified room tabs remove the legacy toolbar and the management tab returns to the list',()=>{
+ const t=setup({partner:true}),code='PTN-TST001';
+ const c=t.ui.context();c.view='ticket-manage';c.ownedPtn={code};c.ticketRoomOpen=true;c.roomManageOpen=true;
+ c.ticketRoom={ok:true,code,phase:'waiting',capacity:32,participants:[]};
+ for(const tab of ['registrations','settings','people','operations']){
+  t.sandbox.activeTab=tab;
+  const html=t.ui.ticketManagedTab(tab);
+  assert.doesNotMatch(html,/ptn-room-utility|commerce-ticket-back|重新整理房間<\/button>/);
+  c.error='讀取失敗';assert.match(t.ui.ticketManagedTab(tab),/讀取失敗/);
+  c.error='';
+ }
+ t.sandbox.activeTab='management';
+ assert.equal(t.ui.ticketCreationPage(),null);
+ assert.equal(t.ui.ticketManagementContext(),null);
+ assert.match(t.ui.ownedTicketRoomCard(),/PTN 合作賽事管理/);
 });
