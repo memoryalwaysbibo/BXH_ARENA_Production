@@ -10233,9 +10233,9 @@ function liveCurrentMatchForStation(stationNum){
   return {court,m};
 }
 
-function liveScoreCellHtml(m,side){
+function liveScoreCellHtml(m,side,roomId=state.id){
   const value=Number(side==="A"?m.scoreA:m.scoreB)||0;
-  const key=String(state.id||"room")+"|"+String(m.id||"match")+"|"+side;
+  const key=String(roomId||"room")+"|"+String(m.id||"match")+"|"+side;
   const previous=liveScoreSnapshot.get(key);
   liveScoreSnapshot.set(key,value);
   if(liveScoreSnapshot.size>512) liveScoreSnapshot.clear();
@@ -10245,10 +10245,10 @@ function liveScoreCellHtml(m,side){
   return '<span class="live-score-slot is-roll" aria-label="'+esc(String(value))+'"><span class="live-score-old">'+esc(String(previous))+'</span><span class="live-score-new">'+esc(String(value))+'</span></span>';
 }
 
-function liveTournamentStageInfo(realMatches,fmt){
+function liveTournamentStageInfo(realMatches,fmt,bracketSize=state.bracketSize){
   const unfinished=(realMatches||[]).filter(m=>m&&!m.completed&&m.bracket!=="BZ");
   if(fmt==="single"){
-    const size=Math.max(2,Number(state.bracketSize)||2);
+    const size=Math.max(2,Number(bracketSize)||2);
     const nodes=[];
     for(let n=size;n>2;n=Math.max(2,Math.floor(n/2))) nodes.push(n+"強");
     nodes.push("決賽");
@@ -10327,38 +10327,95 @@ let liveSelectedCourt=0;
 let liveSelectedRoom="";
 let liveCourtSwitchScrollLeft=0;
 let liveCourtSwitchCenterRequested=false;
-function liveCourtSelection(stationCount){
-  const room=String(state.cloudCode||state.id||"");
+function liveCourtSelection(stationCount,view=null){
+  const room=String(view?view.code:state.cloudCode||state.id||"");
   if(room!==liveSelectedRoom){liveSelectedRoom=room;liveSelectedCourt=0;liveCourtSwitchScrollLeft=0;}
   if((liveSelectedCourt<1&&liveSelectedCourt!==-1)||liveSelectedCourt>stationCount){
     liveSelectedCourt=Array.from({length:stationCount},(_,i)=>i+1)
-      .find(i=>liveCurrentMatchForStation(i).m&&!liveCurrentMatchForStation(i).m.completed)||1;
+      .find(i=>{const m=view?view.current(i):liveCurrentMatchForStation(i).m;return m&&!m.completed;})||1;
     liveCourtSwitchCenterRequested=true;
   }
   return liveSelectedCourt;
 }
-function liveCourtCardHtml(stationNum,selectedCourt){
-  const current=liveCurrentMatchForStation(stationNum);
+function liveCourtCardHtml(stationNum,selectedCourt,view=null){
+  const current=view?{court:null,m:view.current(stationNum)}:liveCurrentMatchForStation(stationNum);
   const court=current.court,m=current.m;
-  const assigned=state.meta?.refereeSeatsV1?.version===1?"主裁判與備用裁判":refereeDisplayForStation(stationNum);
-  const future=state.matches.some(mm=>!mm.isBye&&Number(mm.station)===Number(stationNum)&&!mm.completed);
-  const status=m?refereeStationStatus(m):(future?{label:"等待中",cls:"waiting"}:{label:"已完成",cls:"done"});
-  const stage=m?(esc(refereeStageLabel(m))+" · 第 "+(Number(m.indexInRound||0)+1)+" 場"):(future?"等待安排場次":"本台賽程完成");
+  const assigned=view?"尚未提供席位資訊":state.meta?.refereeSeatsV1?.version===1?"主裁判與備用裁判":refereeDisplayForStation(stationNum);
+  const future=(view?view.matches:state.matches).some(mm=>!mm.isBye&&Number(mm.station)===Number(stationNum)&&!mm.completed);
+  const status=view?.phase==="waiting"?{label:"等待開賽",cls:"waiting"}:m?refereeStationStatus(m):(future?{label:"等待中",cls:"waiting"}:{label:"已完成",cls:"done"});
+  const stage=m?(esc(view?view.label(m):refereeStageLabel(m))+" · 第 "+(Number(m.indexInRound||0)+1)+" 場"):(future?"等待安排場次":"本台賽程完成");
   const safeCourt=court||{currentMatchId:m&&m.id||null,nextMatchId:null};
-  const nextPreview=liveNextMatchCompactHtml(safeCourt,stationNum);
+  const nextPreview=view?(view.activeCount(stationNum)>1?'<div class="hint">本台有多場待核對的進行中／預備場次，請至對戰表確認。</div>':""):liveNextMatchCompactHtml(safeCourt,stationNum);
   let body="";
   if(m&&m.a&&m.b){
     const score=m.scoringMode==="quick"
       ? '<span class="live-score-current">VS</span>'
-      : liveScoreCellHtml(m,"A")+'<span class="live-score-separator">:</span>'+liveScoreCellHtml(m,"B");
-    body='<div class="live-court-match"><div class="live-court-player" title="'+esc(playerName(m.a.playerId))+'">'+esc(playerName(m.a.playerId))+'</div><div class="live-court-score">'+score+'</div><div class="live-court-player" title="'+esc(playerName(m.b.playerId))+'">'+esc(playerName(m.b.playerId))+'</div></div><div class="live-court-stage">'+stage+'</div>'+nextPreview;
+      : liveScoreCellHtml(m,"A",view?view.code:state.id)+'<span class="live-score-separator">:</span>'+liveScoreCellHtml(m,"B",view?view.code:state.id);
+    body='<div class="live-court-match"><div class="live-court-player" title="'+esc((view?m.a.name:playerName(m.a.playerId)))+'">'+esc((view?m.a.name:playerName(m.a.playerId)))+'</div><div class="live-court-score">'+score+'</div><div class="live-court-player" title="'+esc((view?m.b.name:playerName(m.b.playerId)))+'">'+esc((view?m.b.name:playerName(m.b.playerId)))+'</div></div><div class="live-court-stage">'+stage+'</div>'+nextPreview;
   }else if(m){
     body='<div class="live-court-empty"><b>等待晉級結果</b><span>此場對戰選手尚未確定</span></div>'+nextPreview;
+  }else if(view?.phase==="waiting"){
+    body='<div class="live-court-empty"><b>等待開賽</b><span>正式開賽後顯示對戰場次</span></div>';
   }else{
     body='<div class="live-court-empty"><b>'+(future?"等待晉級結果":"本台賽程已完成")+'</b><span>'+(future?"前序賽果確認後將自動安排":"目前沒有待執行場次")+'</span></div>'+(future?nextPreview:"");
   }
-  return '<section class="live-court-card" data-live-court="'+stationNum+'" data-selected="'+(selectedCourt===-1||stationNum===selectedCourt)+'" style="'+courtAtmosphereStyle(stationNum)+'"><div class="live-court-head"><div class="live-court-titleline"><span class="court-badge">'+stationNum+'號台</span><span class="live-court-ref" title="'+esc(assigned)+'">裁判：'+esc(assigned)+'</span></div><span class="ref-station-status '+status.cls+'">'+status.label+'</span></div>'+body+'</section>';
+  return '<section class="live-court-card" data-live-court="'+stationNum+'" data-selected="'+(selectedCourt===-1||stationNum===selectedCourt)+'" style="'+courtAtmosphereStyle(stationNum,view?view.code:state.id)+'"><div class="live-court-head"><div class="live-court-titleline"><span class="court-badge">'+stationNum+'號台</span><span class="live-court-ref" title="'+esc(assigned)+'">裁判：'+esc(assigned)+'</span></div><span class="ref-station-status '+status.cls+'">'+status.label+'</span></div>'+body+'</section>';
 }
+function renderLiveDashboard({realMatches,fmt,officialCount,pct,view=null}){
+  const stationCount=view?view.stations:Math.max(1,Number(state.meta.stations)||1);
+  const selectedCourt=liveCourtSelection(stationCount,view);
+  const liveCourtsHtml=Array.from({length:stationCount},(_,i)=>liveCourtCardHtml(i+1,selectedCourt,view)).join("");
+  const liveCourtSwitchHtml=stationCount>1?`<div class="live-court-switch" role="group" aria-label="切換現場戰鬥台"><div class="live-court-switch-track"><button type="button" class="live-court-switch-btn live-court-switch-all ${selectedCourt===-1?"is-selected":""}" data-action="live-select-court" data-court="0" aria-pressed="${selectedCourt===-1}"><strong>全部</strong><span>${stationCount}台</span></button>${Array.from({length:stationCount},(_,i)=>{
+    const n=i+1,m=view?view.current(n):liveCurrentMatchForStation(n).m;
+    const hasFuture=(view?view.matches:state.matches).some(mm=>!mm.isBye&&Number(mm.station)===n&&!mm.completed);
+    const status=view?.phase==="waiting"?"等待開賽":m?refereeStationStatus(m).label:(hasFuture?"等待中":"已完成");
+    return `<button type="button" class="live-court-switch-btn ${n===selectedCourt?"is-selected":""}" data-action="live-select-court" data-court="${n}" aria-pressed="${n===selectedCourt}" style="${courtAtmosphereStyle(n,view?view.code:state.id)}"><strong>${n}號台</strong><span>${esc(status)}</span></button>`;
+  }).join("")}</div></div>`:"";
+  const liveStage=view?.phase==="waiting"?{label:"等待開賽",nodes:[],currentIndex:0}:liveTournamentStageInfo(realMatches,fmt,view?view.bracketSize:state.bracketSize);
+  return `
+  <div class="panel live-dashboard-panel">
+    <div class="live-summary-strip">
+      <div class="live-summary-line">
+        <div class="live-summary-name" title="${esc((view?view.name:state.meta.name)||"未命名賽事")}">${esc((view?view.name:state.meta.name)||"未命名賽事")}</div>
+        <span class="live-summary-chip">${officialCount} 人</span>
+        <span class="live-summary-chip">目前 ${esc(liveStage.label)}</span>
+        ${view?'<button class="btn btn-ghost live-summary-refresh" data-action="commerce-ticket-refresh" aria-label="刷新即時戰況">↻</button>':state.cloudCode?`<button class="btn btn-ghost live-summary-refresh ${liveRefreshBusy?"is-busy":""}" data-action="live-refresh" ${liveRefreshBusy?"disabled":""} title="刷新即時戰況" aria-label="刷新即時戰況">↻</button>`:""}
+      </div>
+      <div class="live-energy-row">
+        <div class="live-energy-track" style="--live-progress:${pct}%"><div class="live-energy-fill"></div><i class="live-energy-tip"></i></div>
+        <strong class="live-energy-percent">${pct}%</strong>
+      </div>
+      ${liveStageNodesHtml(liveStage)}
+    </div>
+    <div class="live-dashboard-courts">
+      ${liveCourtSwitchHtml}
+      <div class="live-court-grid ${stationCount===1?"live-court-grid-1":""}" data-mobile-switcher="${stationCount>1}">${liveCourtsHtml}</div>
+    </div>
+    ${view||publicWatchReturnContext?"":renderArchiveControls()}
+  </div>`;
+}
+
+// Read-only PTN projection. A scheduled match is not treated as a dispatched
+// match unless the backend marks it ready, paused or in progress.
+function ticketLiveView(room){
+  if(!room?.ok||!Number.isInteger(room.stations)||room.stations<1||room.stations>12)return null;
+  const all=Array.isArray(room.bracket)?room.bracket:[];
+  const matches=all.filter(m=>!m.isBye).map(m=>({...m,indexInRound:all.filter(x=>x.round===m.round&&x.bracket===m.bracket&&Number(x.seq)<Number(m.seq)).length}));
+  const activeFor=n=>room.phase==="live"?matches.filter(m=>Number(m.station)===n&&!m.completed&&["ready","in_progress","paused"].includes(m.status)):[];
+  const current=n=>{
+    const active=activeFor(n);
+    return active.find(m=>m.status==="in_progress"||m.status==="paused")||active[0]||null;
+  };
+  const bracketSize=2**Math.max(1,...matches.filter(m=>m.bracket!=="BZ").map(m=>Number(m.round)+1));
+  return {code:room.code,name:room.name,stations:room.stations,phase:room.phase,matches,current,activeCount:n=>activeFor(n).length,bracketSize,
+    label:m=>m.bracket==="BZ"?"季軍賽":m.round===Math.log2(bracketSize)-1?"決賽":"第 "+(Number(m.round)+1)+" 輪"};
+}
+window.BXHSharedTicketLive={render(room){
+  const view=ticketLiveView(room);if(!view)return "";
+  const realMatches=view.matches,pct=realMatches.length?Math.round(realMatches.filter(m=>m.completed).length/realMatches.length*100):0;
+  return renderLiveDashboard({realMatches,fmt:"single",officialCount:Number(room.confirmedCount??room.eligibleCount??0),pct,view});
+}};
+
 function renderLive(){
   const fmt = state.meta.formatType || "single";
   const stats = computeStats();
@@ -10369,15 +10426,6 @@ function renderLive(){
   const officialPlayers=eligiblePlayers();
   const officialCount=officialPlayers.length;
 
-  const stationCount=Math.max(1,Number(state.meta.stations)||1);
-  const selectedCourt=liveCourtSelection(stationCount);
-  const liveCourtsHtml=Array.from({length:stationCount},(_,i)=>liveCourtCardHtml(i+1,selectedCourt)).join("");
-  const liveCourtSwitchHtml=stationCount>1?`<div class="live-court-switch" role="group" aria-label="切換現場戰鬥台"><div class="live-court-switch-track"><button type="button" class="live-court-switch-btn live-court-switch-all ${selectedCourt===-1?"is-selected":""}" data-action="live-select-court" data-court="0" aria-pressed="${selectedCourt===-1}"><strong>全部</strong><span>${stationCount}台</span></button>${Array.from({length:stationCount},(_,i)=>{
-    const n=i+1,current=liveCurrentMatchForStation(n),m=current.m;
-    const hasFuture=state.matches.some(mm=>!mm.isBye&&Number(mm.station)===n&&!mm.completed);
-    const status=m?refereeStationStatus(m).label:(hasFuture?"等待中":"已完成");
-    return `<button type="button" class="live-court-switch-btn ${n===selectedCourt?"is-selected":""}" data-action="live-select-court" data-court="${n}" aria-pressed="${n===selectedCourt}" style="${courtAtmosphereStyle(n)}"><strong>${n}號台</strong><span>${esc(status)}</span></button>`;
-  }).join("")}</div></div>`:"";
   const rankingOpen=typeof window==="undefined"||Number(window.innerWidth||0)>640;
 
   let rankRows = "";
@@ -10417,28 +10465,7 @@ function renderLive(){
   const spectatorNotice=spectatorSettling
     ? '<div class="banner warn"><span>所有對戰已完成，主辦正在處理最終結算；目前排名為暫定資訊，正式名次確認後會出現在「查看最終結果」。</span></div>'
     : "";
-  const liveStage=liveTournamentStageInfo(realMatches,fmt);
-  const liveDashboardHtml=`
-  <div class="panel live-dashboard-panel">
-    <div class="live-summary-strip">
-      <div class="live-summary-line">
-        <div class="live-summary-name" title="${esc(state.meta.name||"未命名賽事")}">${esc(state.meta.name||"未命名賽事")}</div>
-        <span class="live-summary-chip">${officialCount} 人</span>
-        <span class="live-summary-chip">目前 ${esc(liveStage.label)}</span>
-        ${state.cloudCode?`<button class="btn btn-ghost live-summary-refresh ${liveRefreshBusy?"is-busy":""}" data-action="live-refresh" ${liveRefreshBusy?"disabled":""} title="刷新即時戰況" aria-label="刷新即時戰況">↻</button>`:""}
-      </div>
-      <div class="live-energy-row">
-        <div class="live-energy-track" style="--live-progress:${pct}%"><div class="live-energy-fill"></div><i class="live-energy-tip"></i></div>
-        <strong class="live-energy-percent">${pct}%</strong>
-      </div>
-      ${liveStageNodesHtml(liveStage)}
-    </div>
-    <div class="live-dashboard-courts">
-      ${liveCourtSwitchHtml}
-      <div class="live-court-grid ${stationCount===1?"live-court-grid-1":""}" data-mobile-switcher="${stationCount>1}">${liveCourtsHtml}</div>
-    </div>
-    ${publicWatchReturnContext?"":renderArchiveControls()}
-  </div>`;
+  const liveDashboardHtml=renderLiveDashboard({realMatches,fmt,officialCount,pct});
   const liveRankingHtml=`
   <details class="panel live-ranking-panel" ${(rankingOpen||spectatorSettling)?"open":""}>
     <summary>${spectatorSettling?"暫定選手排名":"即時選手排名"}</summary>
@@ -25024,8 +25051,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="live-select-court"){
     const n=Number(target.getAttribute("data-court"));
-    const count=Math.max(1,Number(state.meta.stations)||1);
-    if(!Number.isInteger(n)||n<0||n>count)return;
+    const ticket=activeTab==="live"?window.BXHCommerce?.verifiedBracketRoom?.():null;
+    const count=ticket?ticketLiveView(ticket)?.stations:Math.max(1,Number(state.meta.stations)||1);
+    if(!count||!Number.isInteger(n)||n<0||n>count)return;
     liveSelectedCourt=n===0?-1:n;
     document.querySelectorAll(".live-court-switch-btn").forEach(button=>{
       const selected=Number(button.getAttribute("data-court"))===n;

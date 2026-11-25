@@ -185,13 +185,7 @@ function ticketBracketPanel(room){
 }
 
 function ticketLivePanel(room){
- if(room.phase==='waiting')return '<div class="empty-state">賽事尚未開賽；對戰組合可先至「對戰表」預覽，正式開賽後顯示即時戰況。</div>';
- const matches=(room.bracket||[]).filter(match=>!match.isBye),done=matches.filter(match=>match.completed).length;
- const percent=matches.length?Math.round(done/matches.length*100):0;
- const active=matches.filter(match=>!match.completed&&match.a&&match.b);
- const stations=[...new Set(active.map(match=>Number(match.station)||1))].sort((a,b)=>a-b);
- const courts=stations.map(station=>`<section class="panel live-court-card"><h3>${station} 號台</h3>${active.filter(match=>(Number(match.station)||1)===station).map(match=>`<div class="commerce-ptn-match-head"><span>第 ${Number(match.round)+1} 輪・第 ${Number(match.seq)+1} 場</span><span class="badge badge-metal">${match.scoreA||match.scoreB?'進行中':'待進行'}</span></div><div class="commerce-ptn-match-score"><span>${esc(match.a.name)}</span><strong>${Number(match.scoreA||0)} : ${Number(match.scoreB||0)}</strong><span>${esc(match.b.name)}</span></div>`).join('')}</section>`).join('');
- return `<section class="commerce-ptn-live"><div class="panel live-dashboard-panel"><div class="live-summary-strip"><div class="live-summary-line"><strong class="live-summary-name">${esc(room.name||'票券賽事')}</strong><span class="live-summary-chip">${Number(room.confirmedCount??room.eligibleCount??0)} 人</span><span class="live-summary-chip">已完成 ${done} / ${matches.length} 場</span></div><div class="live-energy-row"><div class="live-energy-track" style="--live-progress:${percent}%"><div class="live-energy-fill"></div><i class="live-energy-tip"></i></div><strong class="live-energy-percent">${percent}%</strong></div></div><div class="live-dashboard-courts"><h3>各台即時戰況</h3><div class="live-court-grid ${stations.length<=1?'live-court-grid-1':''}">${courts||`<div class="empty-state">${room.championName?'冠軍：'+esc(room.championName):'目前沒有可進行的對戰。'}</div>`}</div></div></div></section>`;
+ return window.BXHSharedTicketLive?.render(room)||'<div class="empty-state">尚未取得裁判台配置，請重新整理房間。</div>';
 }
 function ticketRefereePanel(room,pending){
  if(room.phase==='waiting')return window.BXHSharedTicketWaitingCourts?.render(room)||'<p>賽事尚未開賽；尚未取得裁判台配置，請重新整理房間。</p>';

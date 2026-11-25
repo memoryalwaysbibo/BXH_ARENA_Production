@@ -11,6 +11,8 @@ function setup({partner=false}={}){
  sandbox.window.BXHFormatUtils={matchSequenceLabel:n=>String(n)};
  Object.assign(sandbox,{bracketViewMode:'board',boardTheme:'gold',boardZoom:1,boardPanX:0,boardPanY:0,boardStageSelection:{key:'',size:0},BOARD_STAGE_SIZES:[128,64,32,16],BOARD_THEMES:{gold:{label:'帝王金'}},FORMAT_LABELS:{single:'單淘汰賽'},LOGO_SRC:'',SHARE_ICON_SVG:'',BOARD_ICON_EXPORT:'',BOARD_ICON_MINUS:'',BOARD_ICON_PLUS:'',BOARD_ICON_FULLSCREEN:'',matchLegendHtml:()=>''});
  vm.runInContext(extract('function renderBracketModeControls(', 'let singleBracketPathSelection')+extract('function activeTicketBoardView(', '// View-only identity')+extract('function availableBoardStage(', 'function singleRoundTitle(')+extract('function seMatchBoxHtml(', 'const BOARD_MEDAL_SVG')+extract('function renderSingleElimBracket(', '/* ==== single-elim tree'),sandbox);
+ Object.assign(sandbox,{liveScoreSnapshot:new Map(),liveRefreshBusy:false,publicWatchReturnContext:null,courtAtmosphereStyle:()=>'',refereeStationStatus:m=>({label:m.status==='in_progress'?'進行中':'準備中',cls:'ready'})});
+ vm.runInContext(extract('function liveScoreCellHtml(', 'function liveNextEtaState(')+extract('let liveSelectedCourt=', 'function renderLive(){'),sandbox);
  return {ui:sandbox.window.BXHCommerce,calls,storage,listeners,sandbox,setUid:v=>{uid=v;epoch++;},setAdmin:v=>admin=v,setPartner:v=>partner=v,setFail:v=>fail=v};
 }
 test('pending order retries reuse original operation/payload even after a connection failure',async()=>{
@@ -562,7 +564,7 @@ test('PTN takeover replaces stale legacy header only after server owner verifica
  assert.doesNotMatch(t.ui.ticketManagedTab('bracket'),/抽籤預覽/);
  assert.match(t.ui.ticketManagedTab('bracket'),/甲/);
  t.sandbox.activeTab='live';
- assert.match(t.ui.ticketManagedTab('live'),/正式開賽後顯示即時戰況/);
+ assert.match(t.ui.ticketManagedTab('live'),/尚未取得裁判台配置/);
  const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
  assert.match(core,/ticketManagementContext\?\.\(\)/);
  assert.match(core,/票券賽事 \$\{esc\(ticket\.code\)\}/);
@@ -624,17 +626,17 @@ test('PTN live dashboard and bracket tree show court progress and actual advance
  const t=setup({partner:true}),code='PTN-TST001';
  const c=t.ui.context();c.view='ticket-manage';c.ownedPtn={code};c.ticketRoomOpen=true;c.roomManageOpen=true;
  const player=name=>({name});
- c.ticketRoom={ok:true,code,name:'四人測試',phase:'live',confirmedCount:4,eligibleCount:4,
+ c.ticketRoom={ok:true,code,name:'四人測試',phase:'live',stations:2,confirmedCount:4,eligibleCount:4,
   bracket:[
    {id:'s1',round:0,seq:0,bracket:'SE',station:1,completed:true,scoreA:4,scoreB:2,a:player('甲'),b:player('乙')},
    {id:'s2',round:0,seq:1,bracket:'SE',station:2,completed:true,scoreA:0,scoreB:4,a:player('丙'),b:player('丁')},
-   {id:'final',round:1,seq:2,bracket:'SE',station:1,scoreA:0,scoreB:0,a:player('甲'),b:player('丁')}]
+   {id:'final',round:1,seq:2,bracket:'SE',station:1,status:'ready',scoreA:0,scoreB:0,a:player('甲'),b:player('丁')}]
  };
  t.sandbox.activeTab='live';
  const live=t.ui.ticketManagedTab('live');
  assert.match(live,/live-dashboard-panel/);
- assert.match(live,/已完成 2 \/ 3 場/);
- assert.match(live,/甲<\/span><strong>0 : 0<\/strong><span>丁/);
+ assert.match(live,/67%/);
+ assert.match(live,/live-court-player" title="甲"/);assert.match(live,/live-court-player" title="丁"/);assert.match(live,/data-live-court="2"/);
  assert.doesNotMatch(live,/第 1 輪・第 1 場<\/strong>/);
  t.sandbox.activeTab='bracket';
  const tree=t.ui.ticketManagedTab('bracket');
@@ -744,4 +746,18 @@ test('PTN pre-start configured courts share the official waiting scorer without 
  assert.equal((html.match(/data-type="spin" disabled/g)||[]).length,8);
  c.ticketRoom.stations=null;
  assert.doesNotMatch(t.ui.ticketManagedTab('referee'),/referee-workstation-waiting/);
+});
+
+test('PTN shared live dashboard shows configured courts before draw without inventing current matches',()=>{
+ const t=setup({partner:true}),c=t.ui.context(),code='PTN-TST001';
+ c.view='ticket-manage';c.ownedPtn={code};c.ticketRoomOpen=true;c.roomManageOpen=true;
+ c.ticketRoom={ok:true,code,roomId:'ptn',name:'候賽',phase:'waiting',stations:4,eligibleCount:0};
+ t.sandbox.activeTab='live';
+ let html=t.ui.ticketManagedTab('live');
+ assert.equal((html.match(/data-live-court="/g)||[]).length,4);
+ assert.match(html,/等待開賽/);assert.doesNotMatch(html,/live-court-player"/);
+ c.ticketRoom={...c.ticketRoom,phase:'live',bracket:[{id:'future',seq:0,round:0,station:1,status:'pending',a:{name:'未派場甲'},b:{name:'未派場乙'}}]};
+ html=t.ui.ticketManagedTab('live');
+ assert.doesNotMatch(html,/未派場甲|未派場乙/);
+ assert.match(html,/等待中/);
 });
