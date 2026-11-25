@@ -4,7 +4,7 @@ const {chromium}=require('playwright');
 const root=path.join(__dirname,'..');
 const core=fs.readFileSync(path.join(root,'modules/main-app/core.js'),'utf8');
 const extract=(start,end)=>core.slice(core.indexOf(start),core.indexOf(end,core.indexOf(start)));
-const script=extract('const MATCH_STATUS_LABELS =','function matchBoxHtml(')+extract('function seMatchBoxHtml(','const BOARD_MEDAL_SVG')+extract('function renderSingleElimBracket(','let __seRelayoutQueued');
+const script=extract('function renderBracketModeControls(', 'let singleBracketPathSelection')+extract('function activeTicketBoardView(', '// View-only identity')+extract('function availableBoardStage(', 'function singleRoundTitle(')+extract('const MATCH_STATUS_LABELS =','function matchBoxHtml(')+extract('function seMatchBoxHtml(','const BOARD_MEDAL_SVG')+extract('function renderSingleElimBracket(','let __seRelayoutQueued');
 function fixture(size,byes){
  const matches=[];let seq=0;
  const player=i=>({id:'p'+i,name:'選手 '+i});
@@ -32,7 +32,8 @@ function fixture(size,byes){
    window.trophySvg=()=>'';window.courtAtmosphereStyle=()=>'';window.BXHFormatUtils={matchSequenceLabel:n=>String(n)};
    window.state=new Proxy({},{get(){throw Error('official state must not be read by PTN');}});
    window.getMatch=window.matchesInRound=()=>{throw Error('official match state must not be read');};
-   window.BXHCommerce={verifiedBracketRoom:()=>window.fixture};
+   window.BXHCommerce={verifiedBracketRoom:()=>window.fixture};window.activeTab='bracket';
+   Object.assign(window,{bracketViewMode:'board',boardTheme:'gold',boardZoom:1,boardPanX:0,boardPanY:0,boardStageSelection:{key:'',size:0},BOARD_STAGE_SIZES:[128,64,32,16],BOARD_THEMES:{gold:{label:'帝王金'}},FORMAT_LABELS:{single:'單淘汰賽'},LOGO_SRC:'',SHARE_ICON_SVG:'',BOARD_ICON_EXPORT:'',BOARD_ICON_MINUS:'',BOARD_ICON_PLUS:'',BOARD_ICON_FULLSCREEN:''});
   });
   await page.addScriptTag({content:script});
   for(const [size,byes] of [[2,0],[4,0],[32,3],[64,11],[128,2],[256,15]]){
@@ -40,13 +41,14 @@ function fixture(size,byes){
     window.fixture=room;document.querySelector('#app').innerHTML=BXHSharedTicketBracket.render(room);layoutSingleElimBracket('');
     const outer=document.querySelector('#se-bracket-outer');
     return {paths:outer.querySelectorAll('path[data-source-match]').length,visible:outer.querySelectorAll('.se-col .match-box:not(.bye-placeholder)').length,
-     overflow:document.documentElement.scrollWidth>innerWidth,scrollable:document.querySelector('.bracket-wrap').scrollWidth>=document.querySelector('.bracket-wrap').clientWidth,
+     overflow:document.documentElement.scrollWidth>innerWidth,scrollable:document.querySelector('#board-viewport').clientHeight>100,
+     finalVisible:outer.querySelector('.se-final-stage-col .match-box').getBoundingClientRect().height>40,
      edges:[...outer.querySelectorAll('path[data-source-match]')].map(p=>[p.dataset.sourceMatch,p.dataset.targetMatch])};
    },fixture(size,byes));
    assert.equal(result.paths,Math.max(0,size-2-byes),width+' '+size+' edges');
    assert.equal(result.visible,size-1-byes);
    assert.equal(result.overflow,false,width+' '+size+' page width');
-   assert.ok(result.scrollable);
+   assert.ok(result.scrollable);assert.ok(result.finalVisible);
    assert.ok(result.edges.every(([a,b])=>a!==b));
   }
   assert.deepEqual(errors,[]);await page.close();

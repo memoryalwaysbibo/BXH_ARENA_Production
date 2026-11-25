@@ -180,10 +180,8 @@ function ticketForfeitPanel(room,pending){
 function ticketBracketPanel(room){
  if(room.phase==='waiting'&&!room.drawId)return '<div class="empty-state">尚未抽籤；抽籤完成後可在這裡預覽對戰表。</div>';
  const shared=window.BXHSharedTicketBracket?.render(room);
- const played=(room.bracket||[]).filter(m=>!m.isBye);
- return '<div class="panel"><div class="panel-title">對戰樹狀圖</div>'+
-  (room.phase==='waiting'?'<div class="banner">'+(room.drawReady===false?'正取名單已變更，請重新抽籤。':'抽籤預覽；正式開賽並扣券後才可記分。')+'</div>':'')+
-  (shared?'<p class="hint">已完成 '+played.filter(m=>m.completed).length+' / '+played.length+' 場正式對戰</p>'+shared:'<div class="empty-state">對戰資料尚未取得，請重新整理房間。</div>')+'</div>';
+ return (room.drawReady===false?'<div class="banner warn">正取名單已變更，請重新抽籤。</div>':'')+
+  (shared||'<div class="empty-state">對戰資料尚未取得，請重新整理房間。</div>');
 }
 
 function ticketLivePanel(room){
