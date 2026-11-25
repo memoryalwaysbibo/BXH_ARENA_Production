@@ -13,7 +13,10 @@ function fixture(owner='a',pending='a',existing=false){
   currentAuthUid:()=>pending,currentRenderViewportKey:()=> 'complete',captureHorizontalNavPositions:()=>[],restoreHorizontalNavPositions:()=>{},
   __lastRenderedViewportKey:null,__viewportRestoreToken:0,requestAnimationFrame:fn=>fn(),setTimeout:fn=>fn(),
   authShellOpen:()=>'',authShellClose:()=>'',authBrandHeader:()=>'',esc:s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))});
- for(const name of ['renderPlayerCompleteProfileScreen','captureRenderViewport','finishRenderViewport'])vm.runInContext(cut(name),ctx);
+ const modalDeclarations=[...source.matchAll(/^let pendingModal = null;$/gm)];
+ assert.equal(modalDeclarations.length,1,'exact initial modal declaration is required');
+ vm.runInContext(modalDeclarations[0][0],ctx);
+ for(const name of ['renderPlayerCompleteProfileScreen','isCurrentPlayerPasswordModal','captureRenderViewport','finishRenderViewport'])vm.runInContext(cut(name),ctx);
  return {ctx,render:()=>ctx.renderPlayerCompleteProfileScreen(),stats:()=>({focused,selected})};
 }
 test('completion rerender retains all fields for the same pending UID and escapes HTML',()=>{
