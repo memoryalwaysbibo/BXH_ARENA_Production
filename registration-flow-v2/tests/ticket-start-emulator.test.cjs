@@ -214,6 +214,10 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  assert.equal((await ticket.get()).data().status,'reserved');
  const confirmed=await status(statusRequest);
  assert.equal(confirmed.drawReady,true);
+ assert.equal(confirmed.phase,'waiting');
+ assert.ok(confirmed.bracket.length>0);
+ assert.equal(confirmed.bracket.some(match=>match.canScore),false);
+ assert.deepEqual(confirmed.matches,[]);
  const removalUid=confirmed.participants.find(player=>player.registrationId!==remainingUid).registrationId;
  const remove=createTicketRemoveHandler({db,queue,enabled:async candidate=>candidate===code,clock:()=>now});
  const removal={auth:creation.auth,app:creation.app,data:{action:'ticket-room-remove',code,
@@ -236,6 +240,7 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  assert.equal(changed.eligibleCount,29);
  assert.equal(changed.drawReady,false);
  assert.equal(changed.drawId,firstDraw.drawId);
+ assert.ok(changed.bracket.length>0);
  await assert.rejects(start({auth:{uid:owner},data:{code,roomId,drawId:firstDraw.drawId,
   rosterRevision:changed.rosterRevision,confirmEarlyStart:true,operationId:'stale-ticket-bracket'}}),/bracket-roster-changed/);
  const result=await draw({auth:{uid:owner},data:{...request.data,baseDrawId:firstDraw.drawId,

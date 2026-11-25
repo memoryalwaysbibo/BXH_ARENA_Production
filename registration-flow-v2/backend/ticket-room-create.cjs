@@ -243,7 +243,9 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
    if(!Array.isArray(state.players)||!Number.isSafeInteger(rosterRevision)||rosterRevision<0)throw Error('ticket-binding-invalid');
    const eligibleCount=state.players.filter(player=>!state.meta?.checkinRequired||player.checkedIn===true).length;
    const names=new Map(state.players.map(player=>[player.id,player.name]));
-   const bracketVisible=['live','settling','done'].includes(room.tournamentPhase);
+   // The committed draw can be previewed by an authorized manager before start.
+   const bracketVisible=['live','settling','done'].includes(room.tournamentPhase)||
+    room.tournamentPhase==='waiting'&&!!state.bracketDraw?.id;
    const matches=room.tournamentPhase==='live'&&!state.championId&&gate.enabled===true
     ?state.matches.filter(forfeitMatchAvailable).map(match=>({id:match.id,seq:match.seq,round:match.round,
      a:{id:match.a.playerId,name:names.get(match.a.playerId)||'選手 A'},

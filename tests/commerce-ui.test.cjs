@@ -549,6 +549,14 @@ test('PTN takeover replaces stale legacy header only after server owner verifica
  assert.doesNotMatch(t.ui.ticketManagedTab('settings'),/查看玩家報名頁|entry=register/);
  t.sandbox.activeTab='referee';
  assert.match(t.ui.ticketManagedTab('referee'),/賽事尚未開賽/);
+ t.ui.context().ticketRoom={...t.ui.context().ticketRoom,drawId:'draw-preview',drawReady:true,
+  bracket:[{id:'preview-1',seq:0,round:0,a:{name:'甲'},b:{name:'乙'},scoreA:0,scoreB:0,canScore:false}]};
+ t.sandbox.activeTab='bracket';
+ assert.match(t.ui.ticketManagedTab('bracket'),/對戰樹狀圖/);
+ assert.match(t.ui.ticketManagedTab('bracket'),/抽籤預覽/);
+ assert.match(t.ui.ticketManagedTab('bracket'),/甲/);
+ t.sandbox.activeTab='live';
+ assert.match(t.ui.ticketManagedTab('live'),/正式開賽後顯示即時戰況/);
  const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
  assert.match(core,/ticketManagementContext\?\.\(\)/);
  assert.match(core,/票券賽事 \$\{esc\(ticket\.code\)\}/);
