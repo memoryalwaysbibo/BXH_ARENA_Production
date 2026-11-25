@@ -11741,7 +11741,7 @@ function renderSingleElimBracket(forceTree=false, view=null){
   <div class="panel">
     ${view ? '<div class="event-title-bar"><div class="event-title-center">'+esc(view.name)+'</div></div>' : eventTitleBar('<button class="btn btn-ghost btn-sm" data-action="print-bracket">列印 / 另存 PDF</button>')}
     <div class="hint" style="margin-bottom:10px;">輪空節點已隱藏且不占用正式場次編號。</div>
-    <div class="bracket-wrap${view?' board-canvas':''}">${wrapBracketWatermark(treeHtml)}</div>
+    <div class="bracket-wrap">${wrapBracketWatermark(view?'<div class="board-canvas">'+treeHtml+'</div>':treeHtml)}</div>
   </div>
   `;
 }

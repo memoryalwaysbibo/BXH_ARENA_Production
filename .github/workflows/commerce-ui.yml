@@ -27,3 +27,5 @@ jobs:
       - run: npm install --no-package-lock --ignore-scripts
       - run: npx playwright install --with-deps chromium
       - run: node tests/commerce-browser.cjs
+
+      - run: node tests/ptn-shared-bracket.browser.cjs
