@@ -450,8 +450,9 @@ test('partner can leave a PTN management tab and select an earlier bound room',a
  await t.ui.handle('commerce-open-owned-ptn');
  assert.equal(t.sandbox.activeTab,'registrations');
  t.sandbox.activeTab='people';
- assert.match(t.ui.ticketManagedTab('people'),/data-action="commerce-ticket-back"/);
- await t.ui.handle('commerce-ticket-back');
+ assert.doesNotMatch(t.ui.ticketManagedTab('people'),/data-action="commerce-ticket-back"/);
+ t.sandbox.activeTab='management';
+ assert.equal(t.ui.ticketCreationPage(),null);
  assert.equal(t.sandbox.activeTab,'management');
  assert.equal(t.ui.ticketManagementContext(),null);
  await t.ui.load('my-tickets');
@@ -785,16 +786,19 @@ test('manual room code entry uses the same single verified navigation flow',asyn
  await t.ui.handle('commerce-ticket-back');assert.equal(t.sandbox.activeTab,'management');assert.equal(t.ui.ticketManagementContext(),null);
 });
 
-test('PTN shared room actions are collapsed by default and exposed on errors or pending operations',()=>{
+test('PTN verified room tabs remove the legacy toolbar and the management tab returns to the list',()=>{
  const t=setup({partner:true}),code='PTN-TST001';
  const c=t.ui.context();c.view='ticket-manage';c.ownedPtn={code};c.ticketRoomOpen=true;c.roomManageOpen=true;
  c.ticketRoom={ok:true,code,phase:'waiting',capacity:32,participants:[]};
- for(const tab of ['management','registrations','settings','people','operations']){
+ for(const tab of ['registrations','settings','people','operations']){
   t.sandbox.activeTab=tab;
-  const html=()=>tab==='management'?t.ui.ticketCreationPage():t.ui.ticketManagedTab(tab);
-  assert.match(html(),/<details class="ptn-room-utility" >[\s\S]*?commerce-ticket-back[\s\S]*?commerce-ticket-refresh[\s\S]*?<\/details>/);
-  c.error='讀取失敗';assert.match(html(),/<details class="ptn-room-utility" open>/);
-  c.error='';c.pending={};assert.match(html(),/<details class="ptn-room-utility" open>/);
-  c.pending=null;
+  const html=t.ui.ticketManagedTab(tab);
+  assert.doesNotMatch(html,/ptn-room-utility|commerce-ticket-back|重新整理房間<\/button>/);
+  c.error='讀取失敗';assert.match(t.ui.ticketManagedTab(tab),/讀取失敗/);
+  c.error='';
  }
+ t.sandbox.activeTab='management';
+ assert.equal(t.ui.ticketCreationPage(),null);
+ assert.equal(t.ui.ticketManagementContext(),null);
+ assert.match(t.ui.ownedTicketRoomCard(),/PTN 合作賽事管理/);
 });
