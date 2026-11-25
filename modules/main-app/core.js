@@ -11434,7 +11434,8 @@ function currentRoundLabelForBoard(){
 }
 
 function activeTicketBoardView(){
-  return activeTab==="bracket"?ticketBracketView(window.BXHCommerce?.verifiedBracketRoom?.()):null;
+  const room=activeTab==="bracket"?window.BXHCommerce?.verifiedBracketRoom?.():null;
+  return room?ticketBracketView(room):null;
 }
 function boardStageContext(view=activeTicketBoardView()){
   if(view)return JSON.stringify([view.code,2**view.total,"single","individual"]);
