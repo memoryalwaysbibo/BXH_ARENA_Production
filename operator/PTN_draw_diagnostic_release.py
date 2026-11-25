@@ -11,6 +11,7 @@ from pathlib import Path, PurePosixPath
 import subprocess
 import sys
 import tempfile
+import urllib.request
 import zipfile
 
 PROJECT = 'bxh-arena'
@@ -18,6 +19,7 @@ REGION = 'asia-east1'
 FUNCTION = 'registrationDrawV2'
 CODEBASE = 'bxh-registration-v2-closed'
 REF = 'dafb953264721775ab938553cb0e8338c1b95068'
+RAW = 'https://raw.githubusercontent.com/memoryalwaysbibo/BXH_ARENA_Production/' + REF + '/'
 GENERATION = '1795453463375594'
 TARGETS = {
     'registration-flow-v2/backend/bindings.cjs': (
@@ -44,6 +46,18 @@ def run(*args, cwd=None, capture=False, env=None):
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def download_candidate(root):
+    for path, (_, expected_hash) in TARGETS.items():
+        request = urllib.request.Request(RAW + path, headers={'User-Agent': 'BXH-PTN-draw-release'})
+        with urllib.request.urlopen(request, timeout=30) as response:
+            content = response.read()
+        if digest(content) != expected_hash:
+            raise ValueError('candidate source differs from reviewed commit: ' + path)
+        target = root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
 
 
 def describe():
@@ -118,12 +132,7 @@ def main():
         with tempfile.TemporaryDirectory(prefix='bxh-ptn-ui-') as temp:
             root = Path(temp)
             checkout = root / 'candidate'
-            run('git', 'init', '-q', str(checkout))
-            run('git', '-C', str(checkout), 'fetch', '-q', '--depth=1',
-                'https://github.com/memoryalwaysbibo/BXH_ARENA_Production.git', REF)
-            run('git', '-C', str(checkout), 'checkout', '-q', '--detach', 'FETCH_HEAD')
-            if run('git', '-C', str(checkout), 'rev-parse', 'HEAD', capture=True).strip() != REF:
-                raise ValueError('candidate commit changed')
+            download_candidate(checkout)
             archive = root / 'live.zip'
             run('gcloud', 'storage', 'cp',
                 'gs://' + storage['bucket'] + '/' + storage['object'] + '#' + GENERATION,
