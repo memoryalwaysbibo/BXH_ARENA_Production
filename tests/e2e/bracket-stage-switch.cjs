@@ -25,7 +25,7 @@ function productionFunction(name) {
 }
 
 const functionNames = [
-  'boardStageContext', 'availableBoardStage', 'selectedBoardStage', 'boardStageStartRound',
+  'activeTicketBoardView', 'boardStageContext', 'availableBoardStage', 'selectedBoardStage', 'boardStageStartRound',
   'boardStageSummary', 'boardExportLabel', 'renderBoardStageSwitch', 'setBoardStage',
   'getMatch', 'orderedMatches', 'refereeMatches', 'displayMatchNumber', 'displayMatchLabel',
   'matchesInRound', 'numRoundsTotal', 'singleRoundTitle', 'effectiveSingleBracketLayout',
@@ -85,7 +85,7 @@ function fixture(count, { completed = false, bronze = false, code = 'BXH-STAGES'
 }
 
 const scaffold = `
-  let state, bracketViewMode='board', singleBracketLayoutMode='full';
+  let state, activeTab='bracket', bracketViewMode='board', singleBracketLayoutMode='full';
   let firebaseUser=null, myRegistrationsOwner='', myRegistrationsCache=null, boardSelfSelection=null;
   function lobbyAuthKey(){return firebaseUser?.uid||''}
   function playerBracketNumber(id){return String(state.players.findIndex(p=>p.id===id)+1)}
