@@ -17,3 +17,19 @@
 .commerce-ptn-management{display:grid;gap:14px}.commerce-ptn-management>.panel-title{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.commerce-ptn-management>.panel{margin:0}.commerce-ptn-management .stat-box .value{overflow-wrap:anywhere}
 .commerce-ptn-match-grid{display:grid;gap:10px;margin-top:12px}.commerce-ptn-match{border:1px solid var(--border);border-radius:10px;padding:14px;background:rgba(255,255,255,.025)}.commerce-ptn-match-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.commerce-ptn-match-score{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px;margin-top:12px}.commerce-ptn-match-score span{min-width:0;overflow-wrap:anywhere}.commerce-ptn-match-score span:last-child{text-align:right}.commerce-ptn-match-score strong{font-size:1.25em;white-space:nowrap;color:var(--gold)}
 @media(max-width:520px){.commerce-ptn-management .grid{grid-template-columns:repeat(2,minmax(0,1fr))}.commerce-ptn-match-score{gap:6px}.commerce-ptn-match-score strong{font-size:1.05em}}
+
+/* Keep PTN on the same dashboard vocabulary as the official event view. */
+.commerce-ptn-live .live-dashboard-panel{max-width:none}
+.commerce-ptn-live .live-summary-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.commerce-ptn-live .live-dashboard-courts{margin-top:18px}
+.commerce-ptn-live .live-court-card{min-width:0}
+.commerce-ptn-live .live-court-card .commerce-ptn-match-score{padding-top:16px}
+.commerce-ptn-tree-scroll{max-width:100%;overflow:auto;overscroll-behavior-x:contain;padding:10px 0 20px}
+.commerce-ptn-tree{position:relative;min-width:100%}
+.commerce-ptn-tree-links{position:absolute;inset:0;pointer-events:none;fill:none;stroke:var(--gold);stroke-width:1.5;opacity:.6}
+.commerce-ptn-round{position:absolute;top:0;bottom:0;width:280px}
+.commerce-ptn-round h3{margin:0;color:var(--gold);font-size:1rem}
+.commerce-ptn-tree-node{position:absolute;left:0;right:0;transform:translateY(-50%)}
+.commerce-ptn-round .commerce-ptn-match{min-width:0}
+.commerce-ptn-champion .commerce-ptn-match{font-weight:800;color:var(--gold)}
+@media(max-width:520px){.commerce-ptn-live .live-summary-line{align-items:flex-start}}
