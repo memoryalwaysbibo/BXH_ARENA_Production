@@ -9,7 +9,8 @@ function setup({partner=false}={}){
  const extract=(start,end)=>core.slice(core.indexOf(start),core.indexOf(end,core.indexOf(start)));
  Object.assign(sandbox,{matchStatusClass:()=>'',activeMatchCourtAtmosphereStyle:()=>'',quickModeTagHtml:()=>'',matchScoreCellHtml:(m,side)=>String(m['score'+side]),matchStatusBarHtml:()=>'',wrapBracketWatermark:s=>s,trophySvg:()=>'',state:new Proxy({},{get(){throw Error('PTN must not read official state')}})});
  sandbox.window.BXHFormatUtils={matchSequenceLabel:n=>String(n)};
- vm.runInContext(extract('function seMatchBoxHtml(', 'const BOARD_MEDAL_SVG')+extract('function renderSingleElimBracket(', '/* ==== single-elim tree'),sandbox);
+ Object.assign(sandbox,{bracketViewMode:'board',boardTheme:'gold',boardZoom:1,boardPanX:0,boardPanY:0,boardStageSelection:{key:'',size:0},BOARD_STAGE_SIZES:[128,64,32,16],BOARD_THEMES:{gold:{label:'帝王金'}},FORMAT_LABELS:{single:'單淘汰賽'},LOGO_SRC:'',SHARE_ICON_SVG:'',BOARD_ICON_EXPORT:'',BOARD_ICON_MINUS:'',BOARD_ICON_PLUS:'',BOARD_ICON_FULLSCREEN:'',matchLegendHtml:()=>''});
+ vm.runInContext(extract('function renderBracketModeControls(', 'let singleBracketPathSelection')+extract('function activeTicketBoardView(', '// View-only identity')+extract('function availableBoardStage(', 'function singleRoundTitle(')+extract('function seMatchBoxHtml(', 'const BOARD_MEDAL_SVG')+extract('function renderSingleElimBracket(', '/* ==== single-elim tree'),sandbox);
  return {ui:sandbox.window.BXHCommerce,calls,storage,listeners,sandbox,setUid:v=>{uid=v;epoch++;},setAdmin:v=>admin=v,setPartner:v=>partner=v,setFail:v=>fail=v};
 }
 test('pending order retries reuse original operation/payload even after a connection failure',async()=>{
@@ -557,8 +558,8 @@ test('PTN takeover replaces stale legacy header only after server owner verifica
  t.ui.context().ticketRoom={...t.ui.context().ticketRoom,drawId:'draw-preview',drawReady:true,
   bracket:[{id:'preview-1',seq:0,round:0,a:{name:'甲'},b:{name:'乙'},scoreA:0,scoreB:0,canScore:false}]};
  t.sandbox.activeTab='bracket';
- assert.match(t.ui.ticketManagedTab('bracket'),/對戰樹狀圖/);
- assert.match(t.ui.ticketManagedTab('bracket'),/抽籤預覽/);
+ assert.match(t.ui.ticketManagedTab('bracket'),/id="board-viewport"/);
+ assert.doesNotMatch(t.ui.ticketManagedTab('bracket'),/抽籤預覽/);
  assert.match(t.ui.ticketManagedTab('bracket'),/甲/);
  t.sandbox.activeTab='live';
  assert.match(t.ui.ticketManagedTab('live'),/正式開賽後顯示即時戰況/);
@@ -665,7 +666,7 @@ test('PTN room tabs keep the official navigation and completed rosters read-only
  const bracket=t.ui.ticketManagedTab('bracket');
  assert.match(bracket,/se-finals-champion-card/);
  assert.match(bracket,/class="board-champion-name">甲<\/div>/);
- assert.match(bracket,/已完成 1 \/ 1 場正式對戰/);
+ assert.match(bracket,/已完成/);
  assert.doesNotMatch(bracket,/對戰表｜|ptn-room-card-heading/);
  t.sandbox.activeTab='operations';
  const operations=t.ui.ticketManagedTab('operations');

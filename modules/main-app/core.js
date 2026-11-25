@@ -10842,19 +10842,23 @@ function renderBracket(){
     <div style="margin-top:16px;"><button class="btn btn-primary" data-action="goto-settings">前往賽事設定</button></div>
     </div></div>`;
   }
-  const treeIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4v16M5 7h5M5 17h5M10 7v4h5M10 17v-4h5"/><rect x="15" y="8.5" width="5" height="7" rx="1.2"/></svg>';
-  const listIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>';
   const quickNav = refereeBracketRoundtripNav("referee");
   const swapBanner = renderCourtSwapSelectionBanner();
-  const modeToggle = `<div class="bracket-view-toggle" role="group" aria-label="對戰表檢視模式">
-    <button class="bvt-btn ${bracketViewMode==='board'?'active':''}" data-action="set-bracket-view-mode" data-mode="board" aria-pressed="${bracketViewMode==='board'}">${treeIcon}<span>樹狀總覽</span></button>
-    <button class="bvt-btn ${bracketViewMode==='standard'?'active':''}" data-action="set-bracket-view-mode" data-mode="standard" aria-pressed="${bracketViewMode==='standard'}">${listIcon}<span>賽事清單</span></button>
-  </div>`;
-  const topControls=`<div class="bracket-top-controls">${modeToggle}${refreshBtn}</div>`;
+  const topControls=renderBracketModeControls(refreshBtn);
   if(bracketViewMode==="board"){
     return swapBanner + quickNav + topControls + renderBoardMode();
   }
   return swapBanner + quickNav + topControls + bracketCommitStatusHtml() + matchLegendHtml() + renderTournamentMatchList();
+}
+
+function renderBracketModeControls(refreshBtn){
+  const treeIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4v16M5 7h5M5 17h5M10 7v4h5M10 17v-4h5"/><rect x="15" y="8.5" width="5" height="7" rx="1.2"/></svg>';
+  const listIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>';
+  const modeToggle = `<div class="bracket-view-toggle" role="group" aria-label="對戰表檢視模式">
+    <button class="bvt-btn ${bracketViewMode==='board'?'active':''}" data-action="set-bracket-view-mode" data-mode="board" aria-pressed="${bracketViewMode==='board'}">${treeIcon}<span>樹狀總覽</span></button>
+    <button class="bvt-btn ${bracketViewMode==='standard'?'active':''}" data-action="set-bracket-view-mode" data-mode="standard" aria-pressed="${bracketViewMode==='standard'}">${listIcon}<span>賽事清單</span></button>
+  </div>`;
+  return `<div class="bracket-top-controls">${modeToggle}${refreshBtn}</div>`;
 }
 
 function tournamentMatchListGroup(m, fmt){
@@ -10865,20 +10869,20 @@ function tournamentMatchListGroup(m, fmt){
   return `${side}・第 ${Math.max(1,(Number(m.round)||0)+1)} 輪`;
 }
 
-function renderTournamentMatchList(){
-  const fmt=state.meta.formatType||"single";
+function renderTournamentMatchList(view=null){
+  const fmt=view?"single":state.meta.formatType||"single";
   const groups=new Map();
-  state.matches.filter(m=>!m.isBye).forEach(m=>{
-    const label=tournamentMatchListGroup(m,fmt);
+  (view?view.matches:state.matches).filter(m=>!m.isBye).forEach(m=>{
+    const label=view?(m.bracket==="BZ"?"季軍賽":view.title(m.round)):tournamentMatchListGroup(m,fmt);
     if(!groups.has(label)) groups.set(label,[]);
     groups.get(label).push(m);
   });
   const sections=[...groups.entries()].map(([label,matches])=>`<section class="compact-round">
     <div class="compact-round-head"><span class="compact-round-title">${esc(label)}</span><span class="compact-round-count">${matches.length} 場比賽</span></div>
-    <div class="compact-round-matches">${matches.map(m=>matchBoxHtml(m,displayMatchLabel(m))).join("")}</div>
+    <div class="compact-round-matches">${matches.map(m=>view?seMatchBoxHtml(m,m.round,m.indexInRound,view.label(m),view):matchBoxHtml(m,displayMatchLabel(m))).join("")}</div>
   </section>`).join("");
   return `<div class="panel tournament-match-list">
-    ${eventTitleBar('<button class="btn btn-ghost btn-sm" data-action="print-bracket">列印 / 另存 PDF</button>')}
+    ${view?'<div class="event-title-bar"><div class="event-title-center">'+esc(view.name)+'</div></div>':eventTitleBar('<button class="btn btn-ghost btn-sm" data-action="print-bracket">列印 / 另存 PDF</button>')}
     <div class="hint" style="margin-bottom:12px;">依賽程階段列出實際出賽場次、選手、狀態與戰鬥台；輪空不占用場次。</div>
     ${wrapBracketWatermark(`<div class="compact-bracket">${sections||'<div class="empty-state">目前沒有需要對戰的場次</div>'}</div>`)}
   </div>`;
@@ -11429,7 +11433,11 @@ function currentRoundLabelForBoard(){
   return "尚未開始";
 }
 
-function boardStageContext(){
+function activeTicketBoardView(){
+  return activeTab==="bracket"?ticketBracketView(window.BXHCommerce?.verifiedBracketRoom?.()):null;
+}
+function boardStageContext(view=activeTicketBoardView()){
+  if(view)return JSON.stringify([view.code,2**view.total,"single","individual"]);
   return JSON.stringify([state.cloudCode||state.id||"",state.bracketSize,state.meta.formatType||"single",state.meta.battleMode||"individual"]);
 }
 // View-only identity and positioning. Never fetch registrations or infer identity from names.
@@ -11533,18 +11541,19 @@ async function locateBoardSelf(){
   const status=match.completed?"本場已結束":match.status==="in_progress"?"正在比賽":match.status==="paused"?"暫停中":"等待上場";
   showToast((changed?"已切換為全部輪次・":"")+displayMatchLabel(match)+"・"+status+(match.completed?"":station?"・台 "+station:"・尚未派台"));
 }
-function availableBoardStage(size){
+function availableBoardStage(size,view=activeTicketBoardView()){
+  if(view)return size===0||(BOARD_STAGE_SIZES.includes(size)&&size<=2**view.total);
   const bracketSize=Number(state.bracketSize);
   return (state.meta.formatType||"single")==="single" && state.meta.battleMode!=="team"
     && bracketSize>=2 && Number.isInteger(Math.log2(bracketSize))
     && (size===0 || (BOARD_STAGE_SIZES.includes(size) && size<=bracketSize));
 }
-function selectedBoardStage(){
-  return boardStageSelection.key===boardStageContext() && availableBoardStage(boardStageSelection.size) ? boardStageSelection.size : 0;
+function selectedBoardStage(view=activeTicketBoardView()){
+  return boardStageSelection.key===boardStageContext(view) && availableBoardStage(boardStageSelection.size,view) ? boardStageSelection.size : 0;
 }
-function boardStageStartRound(){
-  const size=selectedBoardStage();
-  return size ? Math.max(0,numRoundsTotal()-Math.log2(size)) : 0;
+function boardStageStartRound(view=activeTicketBoardView()){
+  const size=selectedBoardStage(view);
+  return size ? Math.max(0,(view?view.total:numRoundsTotal())-Math.log2(size)) : 0;
 }
 function boardStageSummary(){
   const size=selectedBoardStage();
@@ -11569,7 +11578,7 @@ function setBoardStage(size){
   const canvas=document.getElementById("board-canvas");
   if(!canvas){render();return;}
   // Keep the shell/viewport in place so native fullscreen and focused controls survive.
-  canvas.innerHTML=renderSingleElimBracket(true);
+  canvas.innerHTML=renderSingleElimBracket(true,activeTicketBoardView());
   document.querySelectorAll('.board-stage-switch [data-stage]').forEach(button=>{
     const active=Number(button.getAttribute("data-stage"))===size;
     button.classList.toggle("active",active);
@@ -11584,17 +11593,17 @@ function setBoardStage(size){
   scheduleSeRelayout();
 }
 
-function renderBoardMode(){
-  const commitStatus=bracketCommitStatusHtml();
-  const fmt = state.meta.formatType || "single";
+function renderBoardMode(view=null){
+  const commitStatus=view?"":bracketCommitStatusHtml();
+  const fmt = view?"single":state.meta.formatType || "single";
   let inner;
   if(fmt==="double") inner = renderDoubleElimBracket();
   else if(fmt==="roundrobin") inner = renderRoundRobinBracket();
-  else inner = renderSingleElimBracket(true);
+  else inner = renderSingleElimBracket(true,view);
 
-  const st = tournamentStatus();
+  const st = view?view.phase:tournamentStatus();
   const stLabel = st==="waiting" ? "尚未開始" : (st==="done" ? "已完成" : "進行中");
-  const boardCode = state.cloudCode || "本機賽事";
+  const boardCode = view?view.code:state.cloudCode || "本機賽事";
   const standaloneChampionHtml = (fmt!=="single" && state.championId) ? `
     <div class="board-champion-area">
       <span class="board-trophy">${trophySvg()}</span>
@@ -11609,21 +11618,21 @@ function renderBoardMode(){
       <div class="board-header-left">
         <img class="board-logo" src="${LOGO_SRC}" alt="BXH">
         <div>
-          <div class="board-title">${esc(state.meta.name||"未命名賽事")}</div>
-          <div class="board-sub"><span>${esc(FORMAT_LABELS[fmt]||"")}</span><span>${esc(currentRoundLabelForBoard())}</span><span class="board-status-chip status-${st}">${stLabel}</span>${availableBoardStage(0)?`<span id="board-stage-summary" role="status">${boardStageSummary()}</span>`:""}</div>
+          <div class="board-title">${esc(view?view.name:state.meta.name||"未命名賽事")}</div>
+          <div class="board-sub"><span>${esc(FORMAT_LABELS[fmt]||"")}</span><span>${esc(view?(view.phase==="waiting"?"尚未開始":view.phase==="done"?"已完成":view.title(view.matches.find(m=>!m.completed&&!m.isBye)?.round||0)):currentRoundLabelForBoard())}</span><span class="board-status-chip status-${st}">${stLabel}</span>${availableBoardStage(0)?`<span id="board-stage-summary" role="status">${boardStageSummary()}</span>`:""}</div>
         </div>
       </div>
       <details class="board-share-menu">
         <summary class="share-btn" title="分享與儲存對戰表" aria-label="分享與儲存對戰表">${SHARE_ICON_SVG}</summary>
         <div class="board-share-options">
           <button class="btn btn-ghost btn-sm" data-action="board-export-image">${BOARD_ICON_EXPORT} 儲存${boardExportLabel()}</button>
-          <button class="btn btn-ghost btn-sm" data-action="open-share-modal">分享連結與 QR</button>
+          ${view?'<button class="btn btn-ghost btn-sm" data-action="ptn-board-share">複製對戰表連結</button>':'<button class="btn btn-ghost btn-sm" data-action="open-share-modal">分享連結與 QR</button>'}
         </div>
       </details>
     </div>
 
     <div class="board-toolbar">
-      ${availableBoardStage(0)?'<button type="button" class="btn btn-ghost btn-sm board-locate-self" data-action="board-locate-self">◎ 我在哪</button>':""}
+      ${!view&&availableBoardStage(0)?'<button type="button" class="btn btn-ghost btn-sm board-locate-self" data-action="board-locate-self">◎ 我在哪</button>':""}
       <span class="board-zoom-group">
         <button class="btn btn-ghost btn-sm" data-action="board-zoom-out" aria-label="縮小對戰表">${BOARD_ICON_MINUS}</button>
         <span class="board-zoom-pct" id="board-zoom-pct">${Math.round(boardZoom*100)}%</span>
@@ -11703,7 +11712,7 @@ function renderCompactSingleElimBracket(){
 function renderSingleElimBracket(forceTree=false, view=null){
   if(!forceTree && effectiveSingleBracketLayout()==="compact") return renderCompactSingleElimBracket();
   const total = view ? view.total : numRoundsTotal();
-  const startRound = view ? 0 : forceTree ? boardStageStartRound() : 0;
+  const startRound = forceTree ? boardStageStartRound(view) : 0;
   let cols = "";
   for(let r=startRound;r<total;r++){
     const ms = view ? view.round(r) : matchesInRound(r);
@@ -11741,7 +11750,7 @@ function renderSingleElimBracket(forceTree=false, view=null){
   <div class="panel">
     ${view ? '<div class="event-title-bar"><div class="event-title-center">'+esc(view.name)+'</div></div>' : eventTitleBar('<button class="btn btn-ghost btn-sm" data-action="print-bracket">列印 / 另存 PDF</button>')}
     <div class="hint" style="margin-bottom:10px;">輪空節點已隱藏且不占用正式場次編號。</div>
-    <div class="bracket-wrap">${wrapBracketWatermark(view?'<div class="board-canvas">'+treeHtml+'</div>':treeHtml)}</div>
+    <div class="bracket-wrap">${wrapBracketWatermark(treeHtml)}</div>
   </div>
   `;
 }
@@ -11757,14 +11766,14 @@ function ticketBracketView(room){
   for(let r=0;r<total;r++)round(r).forEach((m,i)=>{m.indexInRound=i;});
   const played=matches.filter(m=>!m.isBye).sort((a,b)=>a.seq-b.seq);
   const number=m=>played.indexOf(m)+1;
-  return {matches,round,total,number,label:m=>window.BXHFormatUtils.matchSequenceLabel(number(m)),
-    title:r=>{const n=2**(total-r);return r===0&&round(0).some(m=>m.isBye)?(n/2)+'強入圍戰':n===4?'四強':n+'強';},
+  return {code:room.code,phase:room.phase,matches,round,total,number,label:m=>window.BXHFormatUtils.matchSequenceLabel(number(m)),
+    title:r=>{const n=2**(total-r);return r===0&&round(0).some(m=>m.isBye)?(n/2)+'強入圍戰':n===2?'冠軍賽':n===4?'四強':n+'強';},
     row:(id,name)=>'<span class="player-line"><span class="seed-num seed-empty"></span><span class="nm">'+esc(name)+'</span></span>',
     bronze:matches.find(m=>m.bracket==='BZ'),champion:room.championName,name:room.name||'合作賽事'};
 }
 window.BXHSharedTicketBracket={render(room){
   const view=ticketBracketView(room);
-  return view?renderSingleElimBracket(true,view):'';
+  return view?renderBracketModeControls('<button class="btn btn-ghost btn-sm bracket-refresh-btn" data-action="commerce-ticket-refresh">↻ 刷新</button>')+(bracketViewMode==="board"?renderBoardMode(view):renderTournamentMatchList(view)):'';
 }};
 
 /* ==== single-elim tree: dynamic DOM-measured layout + SVG connectors ==== */
@@ -21431,7 +21440,7 @@ function renderApp(){
     }
   });
 
-  if(activeTab==="bracket" && (state.meta.formatType||"single")==="single" && state.bracketSize){
+  if(activeTab==="bracket" && document.getElementById("se-bracket-outer")){
     scheduleSeRelayout();
   }
   if(celebrationOpen){
@@ -21691,14 +21700,15 @@ async function exportBoardAsImage(){
     });
     const blob=await new Promise((resolve,reject)=>canvas.toBlob(v=>v?resolve(v):reject(Error('png-encode-failed')),'image/png'));
     const dateStr=new Date().toISOString().slice(0,10);
-    const safeName=(state.meta.name||'賽事').replace(/[\\\/:*?"<>|]/g,'_');
+    const exportName=activeTicketBoardView()?.name||state.meta.name||'賽事';
+    const safeName=exportName.replace(/[\\\/:*?"<>|]/g,'_');
     const filename='BXH_'+safeName+'_'+dateStr+'_'+exportLabel+'.png';
     let shared=false;
     try{
       if(typeof File==='function'&&navigator&&typeof navigator.share==='function'&&typeof navigator.canShare==='function'){
         const file=new File([blob],filename,{type:'image/png'});
         if(navigator.canShare({files:[file]})){
-          await navigator.share({title:'BXH ARENA｜'+exportLabel,text:state.meta.name||exportLabel,files:[file]});
+          await navigator.share({title:'BXH ARENA｜'+exportLabel,text:exportName,files:[file]});
           shared=true;
           showToast('已開啟系統分享；iPhone 請選「儲存影像」加入照片相簿。');
         }
@@ -21746,8 +21756,7 @@ function bindBoardModeInteractions(){
       viewport.style.cursor="grab";
     };
 
-    bindCompletedMatchCorrectionLongPress(viewport);
-    bindManualCourtAssignLongPress(viewport);
+    if(!viewport.closest?.(".commerce-ptn-management")){bindCompletedMatchCorrectionLongPress(viewport);bindManualCourtAssignLongPress(viewport);}
 
     listen(viewport, "wheel", (e)=>{
       if(!e.ctrlKey) return;
@@ -25052,6 +25061,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="cloud-close-test-result"){
     cloudTestResult = null; render();
     return;
+  }
+  if(action==="ptn-board-share"){
+    const view=activeTicketBoardView();if(view)copyTextToClipboard(buildTournamentEntryUrl(view.code,"bracket"),"已複製對戰表連結");return;
   }
   if(action==="open-share-modal"){
     shareTarget = target.closest("#celebration-overlay")&&shareTargetEnabled("result") ? "result" : target.closest("#board-shell") ? "bracket" : "event";
