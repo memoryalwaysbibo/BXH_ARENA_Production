@@ -77,7 +77,8 @@ function createLifecycleHandler(action,{db,enabled=async()=>false,clock=Date.now
    const user=userSnap.data();
    const room=roomSnap.data(),pub=publicSnap.data();
    const ticketRoom=room?.eventAuthority==='ticket'||pub?.eventAuthority==='ticket'||!!room?.ticketAccessV1||!!pub?.ticketRoomVersion;
-   const authority=ticketRoom?await authorizeTicketManager(tx,db,{uid,user,room,gate:gateSnap.data(),code,now}):null;
+   const gate=ticketRoom?await resolveTicketGate(db,code,tx,gateSnap.data()):null;
+   const authority=ticketRoom?await authorizeTicketManager(tx,db,{uid,user,room,gate,code,now}):null;
    const grant=authority?.grant;
    if(user?.active!==true||user.deleted||user.isTestAccount||['deleted','disabled','frozen'].includes(user.accountStatus)||
       (!ticketRoom&&!['admin','super_admin'].includes(user.role))){
