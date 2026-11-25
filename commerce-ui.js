@@ -194,7 +194,8 @@ function ticketLivePanel(room){
  return `<section class="commerce-ptn-live"><div class="panel live-dashboard-panel"><div class="live-summary-strip"><div class="live-summary-line"><strong class="live-summary-name">${esc(room.name||'票券賽事')}</strong><span class="live-summary-chip">${Number(room.confirmedCount??room.eligibleCount??0)} 人</span><span class="live-summary-chip">已完成 ${done} / ${matches.length} 場</span></div><div class="live-energy-row"><div class="live-energy-track" style="--live-progress:${percent}%"><div class="live-energy-fill"></div><i class="live-energy-tip"></i></div><strong class="live-energy-percent">${percent}%</strong></div></div><div class="live-dashboard-courts"><h3>各台即時戰況</h3><div class="live-court-grid ${stations.length<=1?'live-court-grid-1':''}">${courts||`<div class="empty-state">${room.championName?'冠軍：'+esc(room.championName):'目前沒有可進行的對戰。'}</div>`}</div></div></div></section>`;
 }
 function ticketRefereePanel(room,pending){
- if(room.phase!=='live')return '<p>賽事尚未開賽；正式開賽並扣券後才能進入裁判台記分。</p>';
+ if(room.phase==='waiting')return window.BXHSharedTicketWaitingCourts?.render(room)||'<p>賽事尚未開賽；尚未取得裁判台配置，請重新整理房間。</p>';
+ if(room.phase!=='live')return '<p>賽事已停止計分。</p>';
  const matches=(room.bracket||[]).filter(match=>match.canScore&&match.a&&match.b);
  const finishes=[['spin','旋轉勝利＋1分'],['knockout','擊飛勝利＋2分'],['burst','爆裂勝利＋2分'],['extreme','極限勝利＋3分']];
  const card=match=>{

@@ -59,7 +59,7 @@ test('published vouchers create independent PTN gates for two eligible organizer
   const code='PTN-NEW00'+index;
   const create=createTicketRoomHandler({db,clock:()=>now,newPartnerCode:()=>code});
   const request={auth:{uid},app:{},data:{action:'create-ticket-room',ticketId:id,
-   operationId:'purchase-'+index,name:'合作積分賽',location:'台南',stations:1,
+   operationId:'purchase-'+index,name:'合作積分賽',location:'台南',stations:capacity==='32'?4:1,
    registrationOpenAt:now-1000,registrationCloseAt:now+3600000,startAt:now+7200000}};
   const first=await create(request),replay=await create(request);
   assert.equal(first.code,code);assert.equal(replay.replayed,true);
@@ -70,6 +70,8 @@ test('published vouchers create independent PTN gates for two eligible organizer
   assert.equal(rows.get('commerceTickets/'+id).status,'reserved');
   assert.equal((await createPtnStatusHandler({db,clock:()=>now})({auth:{uid},app:{},data:{action:'ticket-ptn-status'}})).code,code);
   if(capacity==='32'){
+   const waiting=await createTicketRoomStateHandler({db,clock:()=>now})({auth:{uid},app:{},data:{action:'ticket-room-state',code}});
+   assert.equal(waiting.phase,'waiting');assert.equal(waiting.stations,4);assert.equal(waiting.bracket,undefined);
    const existing=rows.get('tournaments/'+code),state=JSON.parse(existing.data);
    state.players=[{id:'a',name:'甲',source:'online',registrationId:'private-a'},
     {id:'b',name:'乙',source:'online',registrationId:'private-b'}];
@@ -81,6 +83,7 @@ test('published vouchers create independent PTN gates for two eligible organizer
    const result=await createTicketRoomStateHandler({db,clock:()=>now})(
     {auth:{uid},app:{},data:{action:'ticket-room-state',code}});
    assert.equal(result.phase,'done');
+   assert.equal(result.stations,4);
    assert.deepEqual(result.participants,[{name:'甲'},{name:'乙'}]);
    assert.equal(result.bracket.length,1);
    assert.equal(result.bracket[0].completed,true);

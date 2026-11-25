@@ -727,3 +727,21 @@ test('PTN owner alone can assign one delegate and a super admin can enter by roo
  assert.equal(calls[1].delegateUid,null);
  assert.equal(calls[1].code,code);
 });
+
+test('PTN pre-start configured courts share the official waiting scorer without touching official state',()=>{
+ const t=setup({partner:true}),c=t.ui.context(),code='PTN-TST001';
+ c.view='ticket-manage';c.ownedPtn={code};c.ticketRoomOpen=true;c.roomManageOpen=true;
+ c.ticketRoom={ok:true,code,roomId:'fixture-ptn',name:'測試',phase:'waiting',stations:4,eligibleCount:0};
+ const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
+ const extract=(start,end)=>core.slice(core.indexOf(start),core.indexOf(end,core.indexOf(start)));
+ Object.assign(t.sandbox,{POINT_LABELS:{spin:'旋轉勝利＋1分',knockout:'擊飛勝利＋2分',burst:'爆裂勝利＋2分',extreme:'極限勝利＋3分'},refereeSwapControl:()=>'<button disabled>⇄</button>'});
+ vm.runInContext(extract('function refereeWorkstationHeader(','function renderQuickDecisionPanel(')+extract('function courtAtmosphereStyle(','function renderCourtCard(')+extract('function renderRefereeScorePanel(','function renderSkippedMatches(')+extract('function renderWaitingRefereeCourt(','function canUseRefereeSyncRecovery('),t.sandbox);
+ t.sandbox.activeTab='referee';
+ const html=t.ui.ticketManagedTab('referee');
+ assert.equal((html.match(/referee-workstation-waiting/g)||[]).length,4);
+ assert.match(html,/台4/);assert.match(html,/等待開賽/);
+ assert.doesNotMatch(html,/data-action="(?:score|fault|confirm-result|undo-score|rematch|commerce-ticket-score)"/);
+ assert.equal((html.match(/data-type="spin" disabled/g)||[]).length,8);
+ c.ticketRoom.stations=null;
+ assert.doesNotMatch(t.ui.ticketManagedTab('referee'),/referee-workstation-waiting/);
+});
