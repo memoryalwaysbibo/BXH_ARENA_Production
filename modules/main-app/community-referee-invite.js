@@ -6,10 +6,29 @@
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  let ctx,host=null,panel=null,epoch=0,entry=null,preview=null,entryBusy=false,entryError='',accepted=false,entryOp=null,entryActor='',actorGeneration=0,timer;
  const op=()=>root.crypto.randomUUID();
+ // A ticket-room integration must provide its own verified room context,
+ // server transport and entry handler. Never fall back to the community room.
+ const isTicketCode=code=>/^PTN-[A-Z0-9]{6}$/.test(code||'');
+ function ticketAdapter(){
+  const adapter=ctx?.ticketInvite;
+  return adapter?.enabled?.()===true&&typeof adapter.command==='function'&&typeof adapter.open==='function'?adapter:null;
+ }
+ function validInviteCode(code){
+  return /^BXH-[A-Z0-9]{4,16}$/.test(code||'')||isTicketCode(code)&&!!ticketAdapter();
+ }
+ function hostRoom(expectedCode=null){
+  if(isTicketCode(expectedCode)){
+   const ticket=ticketAdapter()?.hostRoom?.();
+   return ticket?.code===expectedCode?ticket:null;
+  }
+  const code=ctx?.state()?.cloudCode;
+  return ctx?.inviter?.()&&/^BXH-[A-Z0-9]{4,16}$/.test(code||'')&&(!expectedCode||code===expectedCode)?{code}:null;
+ }
+
  function parseUrl(raw){try{
   const u=new URL(raw,root.location.href),p=new URLSearchParams(u.hash.slice(1));
   const code=p.get('referee'),requestId=p.get('invite'),qrToken=p.get('token');
-  if(u.origin!==root.location.origin||!['http:','https:'].includes(u.protocol)||!/^BXH-[A-Z0-9]{4,16}$/.test(code||'')||!/^[-A-Za-z0-9]{1,80}$/.test(requestId||'')||!/^[A-Za-z0-9_-]{43}$/.test(qrToken||''))return null;
+  if(u.origin!==root.location.origin||!['http:','https:'].includes(u.protocol)||!validInviteCode(code)||!/^[-A-Za-z0-9]{1,80}$/.test(requestId||'')||!/^[A-Za-z0-9_-]{43}$/.test(qrToken||''))return null;
   return {code,requestId,qrToken};
  }catch{return null;}}
  function acceptUrl(raw){const next=parseUrl(raw);if(!next||entryBusy)return false;
@@ -19,15 +38,17 @@
  }
  function clearEntry(){entry=null;preview=null;entryError='';accepted=false;entryOp=null;const u=new URL(root.location.href);if(new URLSearchParams(u.hash.slice(1)).has('referee')){u.hash='';root.history.replaceState(null,'',u.href);}}
  function errorText(error){const raw=String(error?.message||error||'');
-  for(const [code,text] of Object.entries({'community-result-available':'比賽已有結果','qr-expired':'邀請 QR 已失效，請房主重新顯示。','invalid-qr':'邀請 QR 無效，請重新掃描。','seat-stale':'席位已變更，請重新選擇。','request-pending':'這個席位已有邀請等待確認。','already-seated':'您已在本台擔任裁判。','permission-denied':permissionDenied,'target-ineligible':'這位玩家目前無法接受裁判邀請。','room-read-only':'賽事目前不開放裁判異動。'}))if(raw.includes(code))return text;
+  for(const [code,text] of Object.entries({'ticket-invite-unavailable':'合作賽事裁判邀請尚未啟用。','community-result-available':'比賽已有結果','qr-expired':'邀請 QR 已失效，請房主重新顯示。','invalid-qr':'邀請 QR 無效，請重新掃描。','seat-stale':'席位已變更，請重新選擇。','request-pending':'這個席位已有邀請等待確認。','already-seated':'您已在本台擔任裁判。','permission-denied':permissionDenied,'target-ineligible':'這位玩家目前無法接受裁判邀請。','room-read-only':'賽事目前不開放裁判異動。'}))if(raw.includes(code))return text;
   return '尚未確認完成，請重試；重試會沿用原操作。';
  }
  async function call(data,operationId=op()){
-  const result=await root.cloudSync?.manageRefereeSeats?.({...data,operationId});
+  const adapter=isTicketCode(data.code)?ticketAdapter():null;
+  if(isTicketCode(data.code)&&!adapter)throw Error('ticket-invite-unavailable');
+  const result=await (adapter?adapter.command({...data,operationId}):root.cloudSync?.manageRefereeSeats?.({...data,operationId}));
   if(!result?.ok)throw Error(result?.reason||'cloud-unavailable');return result;
  }
  function close(){epoch++;clearTimeout(timer);panel?.remove();panel=null;host=null;}
- function hostCurrent(h){return host===h&&h.uid===ctx?.uid()&&h.code===ctx?.state()?.cloudCode&&ctx?.inviter?.();}
+ function hostCurrent(h){return host===h&&h.uid===ctx?.uid()&&h.code===hostRoom(h.code)?.code;}
  function showHost(h,body){if(!hostCurrent(h))return;
   panel?.remove();panel=document.createElement('div');panel.className='ref-seat-overlay';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-label','邀請裁判');
   panel.innerHTML='<div class="ref-seat-dialog"><h2>邀請裁判</h2><p>'+esc(h.base.station)+' 號台｜'+esc(labels[h.base.slot])+'</p>'+body+'<button type="button" class="btn btn-ghost" data-ref-invite="close">取消</button></div>';
@@ -55,8 +76,8 @@
    timer=setTimeout(()=>{if(hostCurrent(h))showHost(h,'<p>邀請 QR 已到期，請重新選擇席位產生。</p>');},Math.max(0,r.expiresAt-Date.now()));
   }catch(e){if(n===epoch)showHost(h,'<p role="alert">'+esc(errorText(e))+'</p><button type="button" class="btn btn-primary" data-ref-invite="qr">重試建立 QR</button>');}
  }
- function open(base){close();if(!ctx?.inviter?.()||!ctx.uid()||!ctx.state()?.cloudCode)return;
-  host={base,uid:ctx.uid(),code:ctx.state().cloudCode};options(host);
+ function open(base,code=null){close();const room=hostRoom(code);if(!ctx?.uid()||!room||!validInviteCode(room.code))return;
+  host={base,uid:ctx.uid(),code:room.code};options(host);
  }
  function bind(next){ctx=next;
   if(host&&!hostCurrent(host))close();
@@ -74,7 +95,7 @@
    if(!accepted){await call({...e,action:'accept-qr'},entryOp||(entryOp=op()));if(entry!==e||ctx.uid()!==actor||generation!==actorGeneration)return;accepted=true;}
    // Clear the URL intent while joining so the normal referee screen can render.
    const station=preview.station;clearEntry();
-   try{await ctx.open(e.code,station);}catch(error){if(ctx.uid()===actor&&generation===actorGeneration){entry=e;preview={station};accepted=true;throw error;}}
+   try{const adapter=isTicketCode(e.code)?ticketAdapter():null;if(isTicketCode(e.code)&&!adapter)throw Error('ticket-invite-unavailable');await (adapter?adapter.open(e.code,station):ctx.open(e.code,station));}catch(error){if(ctx.uid()===actor&&generation===actorGeneration){entry=e;preview={station};accepted=true;throw error;}}
   }catch(error){if(ctx.uid()===actor&&generation===actorGeneration){entryError=errorText(error);if(entryError==='比賽已有結果')preview=null;}}
   finally{if(ctx.uid()===actor&&generation===actorGeneration){entryBusy=false;ctx.render();}}
  }
