@@ -14,6 +14,12 @@ const viewportStart = core.indexOf('function captureRenderViewport()');
 const viewportEnd = core.indexOf('function render(){', viewportStart);
 if (viewportStart < 0 || viewportEnd <= viewportStart) throw Error('Core viewport integration functions are missing');
 const viewportSource = core.slice(viewportStart, viewportEnd);
+const modalDeclarations = [...core.matchAll(/^let pendingModal = null;$/gm)];
+if (modalDeclarations.length !== 1) throw Error('Core initial modal declaration is missing');
+const passwordModalStart = core.indexOf('function isCurrentPlayerPasswordModal(mm){');
+const passwordModalEnd = core.indexOf('\nfunction renderModal(){', passwordModalStart);
+if (passwordModalStart < 0 || passwordModalEnd <= passwordModalStart) throw Error('Core password modal viewport guard is missing');
+const passwordModalSource = core.slice(passwordModalStart, passwordModalEnd);
 // Observe completion of core's final scheduled restore without changing its
 // timing or scroll behavior. Tokens keep older renders from reporting readiness.
 const lastRestore = '  setTimeout(restore, 180);';
@@ -85,6 +91,8 @@ let __lastRenderedViewportKey = null, __viewportRestoreToken = 0;
 const currentRenderViewportKey = () => 'mailbox-fixture';
 const captureHorizontalNavPositions = () => ({});
 const restoreHorizontalNavPositions = () => {};
+${modalDeclarations[0][0]}
+${passwordModalSource}
 ${observedViewportSource}
 const runtime = () => ({ mailbox: () => window.BXHMailbox.mailboxContext() });
 const mineRows = [];

@@ -19030,6 +19030,10 @@ let googleLinkError="";
 // v13.23.1：玩家資料編輯視窗支援 Esc 關閉。
 // 不在儲存中時可直接退出；儲存中則避免中斷狀態。
 document.addEventListener("keydown",(ev)=>{
+  if(ev.key==="Escape" && pendingModal?.type==="player-password-change"){
+    if(!pendingModal.confirmBusy)closeModal();
+    return;
+  }
   if(ev.key==="Escape" && playerProfileEditOpen && !playerProfileEditBusy){
     playerProfileEditOpen=false;
     playerProfileEditError="";
@@ -19501,9 +19505,14 @@ function renderNewTournamentRegistrationVersion(){
   </fieldset>`;
 }
 
+function isCurrentPlayerPasswordModal(mm){
+  return !!mm&&mm.type==="player-password-change"&&appPhase==="player-center"&&playerActiveTab==="profile"&&
+    mm.uid===currentAuthUid()&&mm.epoch===engagementSessionEpoch&&window.cloudAuth?.getCurrentUser?.()?.uid===mm.uid;
+}
 function renderModal(){
   if(!pendingModal) return "";
   const mm = pendingModal;
+  if(mm.type==="player-password-change"&&!isCurrentPlayerPasswordModal(mm)){pendingModal=null;return "";}
   let body = mm.messageIsHtml ? `<div class="modal-rich-content">${mm.message||""}</div>` : `<p>${esc(mm.message).replace(/\n/g,"<br>")}</p>`;
   if(mm.showNewTournamentRegistrationVersion===true)body+=renderNewTournamentRegistrationVersion();
   mm.confirmDisabled = false;
@@ -19581,6 +19590,14 @@ function renderModal(){
     <div class="field"><label>房間密碼</label><input type="password" id="room-password-input" maxlength="20" autocomplete="off" placeholder="4～20 字元"></div>
     <p class="hint">驗證成功後會取得此房間的暫時 Access Grant；密碼不會保存在瀏覽器。</p>`;
     mm.confirmDisabled=false;
+  }
+  if(mm.type==="player-password-change"){
+    body=`<p>請輸入目前密碼確認身分。</p>
+      ${mm.error?`<div class="auth-error" role="alert">${esc(mm.error)}</div>`:""}
+      <div class="field"><label for="player-password-current">目前密碼</label><input id="player-password-current" type="password" autocomplete="current-password" ${mm.confirmBusy?"disabled":""}></div>
+      <div class="field"><label for="player-password-new">新密碼</label><input id="player-password-new" type="password" minlength="6" autocomplete="new-password" ${mm.confirmBusy?"disabled":""}></div>
+      <p class="hint">新密碼至少 6 碼。</p>
+      <div class="field"><label for="player-password-repeat">再次輸入新密碼</label><input id="player-password-repeat" type="password" minlength="6" autocomplete="new-password" ${mm.confirmBusy?"disabled":""}></div>`;
   }
   if(mm.type==="reauth-unarchive"){
     body = `<p>此賽事已封存為歷史紀錄。更正歷史結果需要重新確認您的身分。</p>
@@ -19971,6 +19988,9 @@ function captureRenderViewport(){
   const canReadWindow = typeof window!=="undefined";
   const focused=typeof document!=="undefined"?document.activeElement:null;
   const profileEditor=focused?.closest?.(".profile-edit-modal");
+  const passwordModal=isCurrentPlayerPasswordModal(pendingModal)&&!pendingModal.confirmBusy&&!pendingModal.resetPasswordFields?pendingModal:null;
+  const passwordFields=passwordModal?["player-password-current","player-password-new","player-password-repeat"].map(id=>document.getElementById(id)).filter(field=>field&&!field.disabled):[];
+  const passwordFocus=passwordFields.includes(focused)?focused:null;
   const profileFocus=typeof playerProfileEditOpen!=="undefined"&&playerProfileEditOpen&&typeof currentAuthUid==="function"&&profileEditor?.getAttribute("data-profile-uid")===currentAuthUid()&&focused?.id
     ? {uid:currentAuthUid(),id:focused.id,start:focused.selectionStart,end:focused.selectionEnd}:null;
   const completionUid=(typeof pendingNewPlayerProfile!=="undefined"&&pendingNewPlayerProfile?.uid)||(typeof pendingExistingAccountProfile!=="undefined"&&pendingExistingAccountProfile?.uid);
@@ -19984,13 +20004,20 @@ function captureRenderViewport(){
     y: canReadWindow ? (window.scrollY || 0) : 0,
     navScroll: captureHorizontalNavPositions(),
     mailbox: canReadWindow ? window.BXHMailbox?.captureViewport?.() : null,
-    profileFocus,completionFocus
+    profileFocus,completionFocus,passwordModal,passwordFields,passwordFocus
   };
 }
 function finishRenderViewport(snapshot){
   if(!snapshot) return;
   __lastRenderedViewportKey = snapshot.key;
   if(typeof window==="undefined") return;
+  if(snapshot.passwordModal===pendingModal&&isCurrentPlayerPasswordModal(pendingModal)&&!pendingModal.confirmBusy){
+    for(const field of snapshot.passwordFields||[]){
+      const replacement=document.getElementById(field.id);
+      if(replacement&&replacement!==field)replacement.replaceWith(field);
+    }
+    if(snapshot.passwordFocus&&document.getElementById(snapshot.passwordFocus.id)===snapshot.passwordFocus)snapshot.passwordFocus.focus({preventScroll:true});
+  }
   const focus=snapshot.profileFocus;
   if(focus&&typeof document!=="undefined"&&typeof currentAuthUid==="function"&&currentAuthUid()===focus.uid){
     const editor=document.querySelector(".profile-edit-modal"),field=document.getElementById(focus.id);
@@ -20084,6 +20111,7 @@ function render(){
   const recipientPanel=document.getElementById('title-recipient-panel');
   if(recipientPanel&&titleRecipientState?.key===currentAuthUid()+':'+engagementSessionEpoch){titleRecipientState.open=recipientPanel.open;}
   syncEngagementIdentity();
+  if(pendingModal?.type==="player-password-change"&&!isCurrentPlayerPasswordModal(pendingModal))pendingModal=null;
   reconcileHistoryCloudContext();
   rememberAuthenticatedView();
   const __viewportSnapshot = captureRenderViewport();
@@ -24020,7 +24048,16 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="player-change-password"){
-    showToast("修改密碼功能開發中");
+    const account=window.cloudAuth?.getCurrentUser?.();
+    if(!account?.uid||account.uid!==currentAuthUid()||typeof window.cloudAuth?.changeMyPlayerPassword!=="function"){
+      showToast("登入狀態已變更或服務尚未就緒，請重新整理後再試。");return;
+    }
+    if(!account.providers?.includes("password")){
+      openModal({type:"generic",title:"修改密碼",message:"此帳號未設定 ARENA 密碼。若使用 Google 登入，請到 Google 帳戶管理密碼。",confirmLabel:"知道了"});
+      return;
+    }
+    openModal({type:"player-password-change",title:"修改 ARENA 密碼",uid:account.uid,epoch:engagementSessionEpoch,confirmLabel:"更新密碼"});
+    document.getElementById("player-password-current")?.focus({preventScroll:true});
     return;
   }
   if(action==="player-link-google"){
@@ -26772,10 +26809,42 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     }});
     return;
   }
-  if(action==="modal-overlay" || action==="modal-cancel"){ closeModal(); return; }
+  if(action==="modal-overlay" || action==="modal-cancel"){
+    if(pendingModal?.type==="player-password-change"&&pendingModal.confirmBusy)return;
+    closeModal(); return;
+  }
   if(action==="modal-confirm"){
     const mm = pendingModal;
     if(!mm){ return; }
+    if(mm.type==="player-password-change"){
+      const stillSame=()=>isCurrentPlayerPasswordModal(mm);
+      if(mm.confirmBusy)return;
+      if(!stillSame()){closeModal(); return;}
+      const current=document.getElementById("player-password-current")?.value||"";
+      const next=document.getElementById("player-password-new")?.value||"";
+      const again=document.getElementById("player-password-repeat")?.value||"";
+      if(!current||next.length<6||next!==again){
+        for(const id of ["player-password-current","player-password-new","player-password-repeat"]){
+          const field=document.getElementById(id);if(field)field.value="";
+        }
+        mm.error=!current?"請輸入目前密碼。":next.length<6?"新密碼至少需要 6 碼。":"兩次輸入的新密碼不同。";
+        render(); return;
+      }
+      mm.confirmBusy=true;mm.error="";render();
+      (async()=>{
+        let result;
+        try{result=await window.cloudAuth.changeMyPlayerPassword(mm.uid,current,next);}
+        catch(e){result={ok:false,error:"無法更新密碼，請稍後再試。"};}
+        if(pendingModal!==mm)return;
+        if(!stillSame()){closeModal();return;}
+        if(result?.ok){closeModal();showToast("ARENA 密碼已更新。");return;}
+        mm.confirmBusy=false;mm.error=result?.error||"無法更新密碼，請稍後再試。";
+        mm.resetPasswordFields=true;
+        try{render();}finally{mm.resetPasswordFields=false;}
+        document.getElementById("player-password-current")?.focus({preventScroll:true});
+      })();
+      return;
+    }
     if(mm.type==='court-force-exit'&&mm.acknowledged!==true)return;
     if(mm.type==="confirm-result"){
       if(mm.confirmDisabled || mm.confirmBusy || refereeUploadPending(getMatch(mm.matchId))){ return; }
@@ -27151,6 +27220,7 @@ async function init(){
           let authStateGeneration=0;
           let googleLinkRedirectOutcomePending=null;
           async function processAuthStateChangeImpl(fbUser,googleLinkRedirectOutcome){
+            if(pendingModal?.type==="player-password-change"&&pendingModal.uid!==fbUser?.uid)pendingModal=null;
             if(playerProfileReminder?.syncAuth(fbUser)){
               playerProfileEditOpen=false;playerProfileEditError="";
             }
