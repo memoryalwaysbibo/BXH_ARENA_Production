@@ -588,6 +588,7 @@ test('PTN live takeover shows bracket and scores only its verified room',async()
  assert.deepEqual(calls.findLast(call=>call.action==='ticket-room-score'),{action:'ticket-room-score',code,roomId:'ticket-room-generation',
   matchId:match.id,matchUpdatedAt:123,command:'score',side:'A',finish:'spin',operationId:'same-operation'});
  assert.equal(t.ui.context().ticketRoom?.code,code);
+ const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
  assert.match(core,/renderStableRefereeScreen\(app,html,'ptn:'/);
  t.setUid('another-user');
  assert.equal(t.ui.ticketManagementContext(),null);
