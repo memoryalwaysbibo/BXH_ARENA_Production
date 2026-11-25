@@ -3,6 +3,10 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const {chromium}=require('playwright');
 const root=path.resolve(__dirname,'..');
 const appSource=fs.readFileSync(path.join(root,'modules/main-app/core.js'),'utf8');
+const navStart=appSource.indexOf('window.BXHTicketManagementNavigate=');
+const navEnd=appSource.indexOf('function renderApp(',navStart);
+assert.ok(navStart>=0&&navEnd>navStart);
+const ticketNavigation=appSource.slice(navStart,navEnd);
 const timeGuard=appSource.match(/document\.addEventListener\("change",\(e\)=>\{\n  const el=e\.target;\n  if\(!\(el instanceof HTMLInputElement\)\) return;\n  if\(el\.type!=="time"[\s\S]*?\}, true\);/)?.[0];
 assert.ok(timeGuard,'Actual application time-change handler is required');
 (async()=>{
@@ -20,7 +24,8 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
   await page.evaluate(()=>{
    window.currentAuthUid=()=>window.testUid||'buyer';window.engagementSessionEpoch=1;window.isSuperAdmin=()=>!!window.testAdmin;window.isPartnerOrganizerMode=()=>window.testUid==='ticket_buyer';window.activeTab='';
    window.esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-   window.testView='shop';window.render=()=>document.querySelector('#app').innerHTML=window.testView==='admin'?BXHCommerce.adminPage():window.testView==='orders'?BXHCommerce.orders():window.testView==='management'?(BXHCommerce.ticketCreationPage()||'<button data-action="commerce-open-ticket-create">＋ 新增賽事</button>'):BXHCommerce.shop();
+   window.hasAdminAccess=()=>isPartnerOrganizerMode()||isSuperAdmin();
+   window.testView='shop';window.render=()=>document.querySelector('#app').innerHTML=window.testView==='admin'?BXHCommerce.adminPage():window.testView==='orders'?BXHCommerce.orders():window.testView==='management'?((activeTab==='management'?BXHCommerce.ticketCreationPage():BXHCommerce.ticketManagedTab(activeTab))||('<button data-action="commerce-open-ticket-create">＋ 新增賽事</button>'+(window.testShowPtnCards?BXHCommerce.ownedTicketRoomCard():''))):BXHCommerce.shop();
    window.testProduct={id:'skin_test',version:1,name:'星空獵人 Skin（隔離測試）',description:'收藏外觀示範。這是隔離測試商品，沒有正式販售。',terms:'永久持有；測試商品說明。',priceTwd:100,imageUrl:'https://example.invalid/skin.svg',audience:'all',sort:0,status:'published',purchasable:true,delivery:{kind:'skin',assetId:'test_skin',quantity:1,durationDays:0}};
    window.ticketOffer={...testProduct,id:'activation_ticket_32',version:4,name:'賽事啟動券｜32 人',priceTwd:300,audience:'partner_organizer',delivery:{kind:'ticket',assetId:'32',quantity:1,durationDays:0}};
    window.testOrders=[];window.testCalls=[];
@@ -68,7 +73,7 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
   await page.addScriptTag({content:fs.readFileSync(path.join(root,'commerce-ui.js'),'utf8')});
   await page.addScriptTag({content:fs.readFileSync(path.join(root,'modules/main-app/domain-utils.js'),'utf8')});
   await page.evaluate(()=>{window.snapToHalfHourValue=window.BXHDomainUtils.snapToHalfHourValue;});
-  await page.addScriptTag({content:timeGuard});await page.evaluate(()=>render());
+  await page.addScriptTag({content:ticketNavigation});await page.addScriptTag({content:timeGuard});await page.evaluate(()=>render());
   assert.equal(await page.locator('[data-action="commerce-category"][data-id="ticket"]').count(),0);
   await page.locator('[data-action="commerce-category"][data-id="all"]').click();
   await page.getByText('星空獵人 Skin（隔離測試）',{exact:true}).waitFor();
@@ -147,6 +152,17 @@ assert.ok(timeGuard,'Actual application time-change handler is required');
   await page.getByRole('button',{name:'管理已建立的賽事'}).waitFor();
   await page.locator('[data-action="commerce-close-ticket-create"]').click();
   await page.getByRole('button',{name:'＋ 新增賽事'}).waitFor();
+  if(ptn){
+   await page.evaluate(()=>{window.testShowPtnCards=true;render();});
+   await page.locator('[data-action="commerce-open-ticket-room"][data-id="PTN-TEST32"]').click();
+   await page.getByText('報名資訊',{exact:true}).waitFor();
+   assert.equal(await page.evaluate(()=>activeTab),'registrations');
+   assert.equal(await page.locator('[data-action="commerce-ticket-open-manage"]').count(),0);
+   await page.evaluate(()=>{activeTab='people';render();});
+   await page.getByText('正取選手（0 / 0）',{exact:true}).waitFor();
+   await page.locator('[data-action="commerce-ticket-back"]').click();
+   assert.equal(await page.evaluate(()=>activeTab),'management');
+  }
   await page.evaluate(()=>{activeTab='commerce-shop';testView='shop';render();});
   await page.locator('[data-action="commerce-product"][data-id="tournament_activation_32"]').click();
   await page.getByText('無使用期限',{exact:true}).waitFor();

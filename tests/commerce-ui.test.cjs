@@ -11,6 +11,8 @@ function setup({partner=false}={}){
  sandbox.window.BXHFormatUtils={matchSequenceLabel:n=>String(n)};
  Object.assign(sandbox,{bracketViewMode:'board',boardTheme:'gold',boardZoom:1,boardPanX:0,boardPanY:0,boardStageSelection:{key:'',size:0},BOARD_STAGE_SIZES:[128,64,32,16],BOARD_THEMES:{gold:{label:'帝王金'}},FORMAT_LABELS:{single:'單淘汰賽'},LOGO_SRC:'',SHARE_ICON_SVG:'',BOARD_ICON_EXPORT:'',BOARD_ICON_MINUS:'',BOARD_ICON_PLUS:'',BOARD_ICON_FULLSCREEN:'',matchLegendHtml:()=>''});
  vm.runInContext(extract('function renderBracketModeControls(', 'let singleBracketPathSelection')+extract('function activeTicketBoardView(', '// View-only identity')+extract('function availableBoardStage(', 'function singleRoundTitle(')+extract('function seMatchBoxHtml(', 'const BOARD_MEDAL_SVG')+extract('function renderSingleElimBracket(', '/* ==== single-elim tree'),sandbox);
+ sandbox.hasAdminAccess=()=>partner||admin;
+ vm.runInContext(extract('window.BXHTicketManagementNavigate=','function renderApp('),sandbox);
  return {ui:sandbox.window.BXHCommerce,calls,storage,listeners,sandbox,setUid:v=>{uid=v;epoch++;},setAdmin:v=>admin=v,setPartner:v=>partner=v,setFail:v=>fail=v};
 }
 test('pending order retries reuse original operation/payload even after a connection failure',async()=>{
@@ -412,11 +414,10 @@ test('partner can recover their PTN room from management without a pilot URL',as
  assert.match(t.ui.ownedTicketRoomCard(),/PTN-TST001/);
  await t.ui.handle('commerce-open-owned-ptn',{dataset:{id:'PTN-OTHER1'}});
  assert.deepEqual(calls,[{action:'ticket-ptn-status'},{action:'ticket-room-state',code}]);
- assert.match(t.ui.ticketCreationPage(),/已綁定啟動券/);
+ assert.match(t.ui.ticketManagedTab('registrations'),/啟動券已綁定/);
  assert.deepEqual(JSON.parse(JSON.stringify(t.ui.ticketManagementContext())),{code,phase:'waiting',verified:true});
- assert.match(t.ui.ticketCreationPage(),/data-action="commerce-ticket-open-manage"[^>]*>管理房間/);
- await t.ui.handle('commerce-ticket-open-manage');
- t.sandbox.activeTab='registrations';
+ assert.equal(t.sandbox.activeTab,'registrations');
+ assert.doesNotMatch(t.ui.ticketManagedTab('registrations'),/commerce-ticket-open-manage/);
  assert.match(t.ui.ticketManagedTab('registrations'),/正式開賽並扣券/);
  assert.doesNotMatch(t.ui.ticketManagedTab('registrations'),/票券房管理/);
  t.sandbox.activeTab='management';
@@ -447,7 +448,7 @@ test('partner can leave a PTN management tab and select an earlier bound room',a
  await t.ui.handle('commerce-refresh-owned-ptn');
  await t.ui.load('my-tickets');
  await t.ui.handle('commerce-open-owned-ptn');
- await t.ui.handle('commerce-ticket-open-manage');
+ assert.equal(t.sandbox.activeTab,'registrations');
  t.sandbox.activeTab='people';
  assert.match(t.ui.ticketManagedTab('people'),/data-action="commerce-ticket-back"/);
  await t.ui.handle('commerce-ticket-back');
@@ -462,6 +463,8 @@ test('partner can leave a PTN management tab and select an earlier bound room',a
  assert.match(cards,/data-id="PTN-32ROOM">進入管理/);
  await t.ui.handle('commerce-open-ticket-room',{dataset:{id:earlier}});
  assert.equal(t.ui.ticketManagementContext().code,earlier);
+ assert.equal(t.sandbox.activeTab,'registrations');
+ assert.match(t.ui.ticketManagedTab('registrations'),/報名資訊/);
  assert.deepEqual(calls.filter(request=>request.action==='ticket-room-state').map(request=>request.code),[latest,latest,earlier,earlier]);
 });
 
@@ -541,9 +544,8 @@ test('PTN takeover replaces stale legacy header only after server owner verifica
  assert.equal(t.ui.ticketManagementContext(),null);
  await t.ui.handle('commerce-open-owned-ptn',{});
  assert.equal(t.ui.ticketManagementContext().code,code);
- assert.match(t.ui.ticketCreationPage(),/管理房間/);
- await t.ui.handle('commerce-ticket-open-manage');
- t.sandbox.activeTab='registrations';
+ assert.equal(t.sandbox.activeTab,'registrations');
+ assert.doesNotMatch(t.ui.ticketManagedTab('registrations'),/commerce-ticket-open-manage/);
  assert.equal(t.ui.ticketManagementContext().code,code);
  assert.match(t.ui.ticketManagedTab('registrations'),/報名資訊/);
  assert.match(t.ui.ticketManagedTab('registrations'),/報名已截止/);
@@ -584,7 +586,7 @@ test('PTN live takeover shows bracket and scores only its verified room',async()
  };
  await t.ui.handle('commerce-refresh-owned-ptn');
  await t.ui.handle('commerce-open-owned-ptn',{});
- await t.ui.handle('commerce-ticket-open-manage');
+ assert.equal(t.sandbox.activeTab,'registrations');
  t.sandbox.activeTab='bracket';
  assert.match(t.ui.ticketManagedTab('bracket'),/class="nm">甲<\/span>.*class="sc">3<\/span>/);
  t.sandbox.activeTab='referee';
@@ -744,4 +746,41 @@ test('PTN pre-start configured courts share the official waiting scorer without 
  assert.equal((html.match(/data-type="spin" disabled/g)||[]).length,8);
  c.ticketRoom.stations=null;
  assert.doesNotMatch(t.ui.ticketManagedTab('referee'),/referee-workstation-waiting/);
+});
+
+
+test('one click reserves PTN navigation while checking the selected room and never falls back to ordinary tabs',async()=>{
+ const t=setup({partner:true}),code='PTN-TST001';t.sandbox.activeTab='management';
+ let resolve;const requests=[];
+ t.sandbox.window.engagementService.ticketRoomOperation=request=>{requests.push(request);return new Promise(r=>resolve=r);};
+ const pending=t.ui.handle('commerce-open-ticket-room',{dataset:{id:code}});
+ assert.equal(t.ui.ticketManagementContext().verified,false);
+ assert.match(t.ui.ticketCreationPage(),/正在驗證票券房管理權限/);
+ t.sandbox.activeTab='people';
+ assert.match(t.ui.ticketManagedTab('people'),/正在驗證票券房管理權限/);
+ resolve({ok:true,code,phase:'waiting',name:'32人測試',capacity:32,participants:[{name:'選手甲'}]});await pending;
+ assert.equal(t.sandbox.activeTab,'people');
+ assert.match(t.ui.ticketManagedTab('people'),/選手甲/);
+ assert.equal(requests.length,1);
+});
+
+test('failed PTN verification can retry once from the same management screen without a second management click',async()=>{
+ const t=setup({partner:true}),code='PTN-TST001';t.sandbox.activeTab='management';
+ let ok=false;t.sandbox.window.engagementService.ticketRoomOperation=async()=>{if(!ok)throw Error('unavailable');return {ok:true,code,phase:'waiting'};};
+ await t.ui.handle('commerce-open-ticket-room',{dataset:{id:code}});
+ assert.equal(t.sandbox.activeTab,'management');assert.equal(t.ui.ticketManagementContext().verified,false);
+ assert.match(t.ui.ticketCreationPage(),/commerce-ticket-refresh/);
+ ok=true;await t.ui.handle('commerce-ticket-refresh');
+ assert.equal(t.sandbox.activeTab,'registrations');assert.equal(t.ui.ticketManagementContext().verified,true);
+ assert.match(t.ui.ticketManagedTab('registrations'),/報名資訊/);
+});
+
+test('manual room code entry uses the same single verified navigation flow',async()=>{
+ const t=setup({partner:true}),code='PTN-TST001';t.sandbox.activeTab='management';
+ t.sandbox.FormData=function(form){return Object.entries(form.values);};
+ t.sandbox.window.engagementService.ticketRoomOperation=async ({code:requested})=>({ok:true,code:requested,phase:'waiting'});
+ const form={dataset:{commerceForm:'ticket-open-code'},values:{code:code.toLowerCase()}};
+ await t.listeners.submit({target:{closest:()=>form},preventDefault(){}});
+ assert.equal(t.sandbox.activeTab,'registrations');assert.equal(t.ui.ticketManagementContext().code,code);
+ await t.ui.handle('commerce-ticket-back');assert.equal(t.sandbox.activeTab,'management');assert.equal(t.ui.ticketManagementContext(),null);
 });
