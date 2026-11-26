@@ -18,16 +18,16 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
  const previousSale=await sale.get(),previousConfig=await config.get();
  try{
   await db.doc('users/'+uid).set({active:true,role:'player',partnerOrganizer:{status:'active',scope:'manual',organizationId:uid,expiresAtMs:now+86400000}});
-  await inventory.set({ownerUid:uid,kind:'room_expansion',assetId:'tournament_expansion_1',status:'active',expiresAt:null,quantity:50});
-  await sale.set({enabled:true,productIds:{'32':'expansion-fixture-32','64':'expansion-fixture-64'}});
+  await inventory.set({ownerUid:uid,kind:'room_expansion',assetId:'tournament_expansion_1',status:'active',expiresAt:null,quantity:83});
+  await sale.set({enabled:true,productIds:{'32':'expansion-fixture-32','64':'expansion-fixture-64','160':'expansion-fixture-160'}});
   const rooms=[];
-  for(const base of [32,64]){
+  for(const base of [32,64,160]){
    const code='PTN-'+randomBytes(3).toString('hex').toUpperCase();
    const ticketId='BXH-SO-'+randomBytes(12).toString('hex').toUpperCase();
    const ticket=db.doc('commerceTickets/'+ticketId);
    await ticket.set({id:ticketId,orderId:ticketId,version:2,ownerUid:uid,status:'available',capacity:base,addedCapacity:0,boundRoomCode:null,boundRoomId:null,expiresAt:null,contractCode:null});
    await db.doc('commerceOrders/'+ticketId).set({id:ticketId,ownerUid:uid,ticketPurchaseVersion:3,paymentStatus:'paid',deliveryStatus:'delivered',
-    ticketOrganizationId:uid,contractCode:null,amountTwd:base===32?300:600,
+    ticketOrganizationId:uid,contractCode:null,amountTwd:({32:300,64:600,160:2000})[base],
     productSnapshot:{id:'expansion-fixture-'+base,delivery:{kind:'ticket',assetId:String(base),quantity:1,durationDays:0}}});
    const create=createTicketRoomHandler({db,clock:()=>now,newPartnerCode:()=>code});
    const {roomId}=await create({auth:{uid},app:{},data:{action:'create-ticket-room',ticketId,operationId:'create-'+base,name:'Expansion fixture',
@@ -53,11 +53,11 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   const duplicates=await Promise.all([expand(first),expand(first)]);
   assert.equal(duplicates.filter(r=>r.replayed).length,1);
   assert.equal(duplicates[0].capacityAfter,40);
-  assert.equal((await inventory.get()).data().quantity,42);
+  assert.equal((await inventory.get()).data().quantity,75);
   assert.equal((await read(a)).capacity,40);
   await assert.rejects(expand(request(a,9,'expansion-first')),/operation-conflict/);
   const second=await expand(request(b,12,'expansion-second'));
-  assert.equal(second.capacityAfter,76);assert.equal(second.balanceAfter,30);
+  assert.equal(second.capacityAfter,76);assert.equal(second.balanceAfter,63);
   for(const [r,total,added] of [[a,40,8],[b,76,12]]){
    const [priv,pub,ticket]=await db.getAll(r.room,r.pub,r.ticket);
    assert.equal(priv.data().capacity,total);assert.equal(pub.data().capacity,total);
@@ -83,8 +83,8 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(JSON.parse(resized.data().data).meta.stations,2);
   assert.equal(JSON.parse(resizedPublic.data().bracketView).meta.stations,2);
   assert.equal(resizedTicket.data().addedCapacity,8);
-  assert.equal(resizedInventory.data().quantity,30);
-  await assert.rejects(expand(request(a,31,'expansion-insufficient')),/insufficient-expansion-tickets/);
+  assert.equal(resizedInventory.data().quantity,63);
+  await assert.rejects(expand(request(a,64,'expansion-insufficient')),/insufficient-expansion-tickets/);
   await config.set({enabled:true,maxCapacity:45});
   await assert.rejects(expand(request(a,6,'expansion-overflow')),/invalid-expansion-capacity/);
   await config.set({enabled:true,maxCapacity:160});
@@ -94,7 +94,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   await a.pub.update({capacity:40});
   await a.room.update({tournamentPhase:'live'});
   await assert.rejects(expand(request(a,1,'expansion-live')),/expansion-room-unavailable/);
-  assert.equal((await inventory.get()).data().quantity,30);
+  assert.equal((await inventory.get()).data().quantity,63);
   assert.equal((await a.room.get()).data().capacity,40);
   assert.equal((await a.ticket.get()).data().addedCapacity,8);
   await a.room.update({tournamentPhase:'waiting'});
@@ -128,7 +128,24 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(startedTicket.status,'consumed');assert.equal(startedTicket.capacity,32);assert.equal(startedTicket.addedCapacity,8);
   assert.equal((await a.room.get()).data().tournamentPhase,'live');
   assert.equal((await a.pub.get()).data().capacity,40);
-  assert.equal((await inventory.get()).data().quantity,30);
+  assert.equal((await inventory.get()).data().quantity,63);
+  // First-stage acceptance target: 160 + 32 = 192, not a claim of live load.
+  const c=rooms[2];
+  await config.set({enabled:true,maxCapacity:192});
+  const patch=request(c,32,'expansion-192');
+  const applied=await expand(patch);
+  assert.equal(applied.capacityAfter,192);
+  assert.equal(applied.balanceAfter,31);
+  assert.equal((await expand(patch)).replayed,true);
+  await assert.rejects(expand(request(c,1,'expansion-193')),/invalid-expansion-capacity/);
+  const [cPrivate,cPublic,cTicket,cInventory]=await db.getAll(c.room,c.pub,c.ticket,inventory);
+  assert.equal(cPrivate.data().capacity,192);
+  assert.equal(cPublic.data().capacity,192);
+  assert.equal(JSON.parse(cPrivate.data().data).meta.registrationCapacity,192);
+  assert.equal(JSON.parse(cPublic.data().bracketView).meta.registrationCapacity,192);
+  assert.equal(cTicket.data().capacity,160);
+  assert.equal(cTicket.data().addedCapacity,32);
+  assert.equal(cInventory.data().quantity,31);
  }finally{
   if(previousSale.exists)await sale.set(previousSale.data());else await sale.delete();
   if(previousConfig.exists)await config.set(previousConfig.data());else await config.delete();
