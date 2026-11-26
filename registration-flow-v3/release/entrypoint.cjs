@@ -2,6 +2,9 @@
 const {initializeApp,getApps}=require('firebase-admin/app');
 const {getFirestore}=require('firebase-admin/firestore');
 const {onCall,HttpsError}=require('firebase-functions/v2/https');
+const {onDocumentUpdated}=require('firebase-functions/v2/firestore');
+const {createSummaryDelivery}=require('./registration-flow-v3/summary-delivery.cjs');
+const {createSummarySync}=require('./registration-flow-v3/summary-sync.cjs');
 const {createApi}=require('./registration-flow-v3/api.cjs');
 const {createRoomHandler}=require('./registration-flow-v3/create-room.cjs');
 if(!getApps().length)initializeApp();
@@ -27,3 +30,15 @@ function wrap(handler){
 const observe=metrics=>console.info(JSON.stringify({event:'registration-v3-transaction',...metrics}));
 exports.registrationFlowV3=wrap(createApi({db,observe}));
 exports.createRegistrationRoomV3=wrap(createRoomHandler({db}));
+
+const deliver=createSummaryDelivery({sync:createSummarySync({db,observe})});
+exports.registrationV3SummaryDelivery=onDocumentUpdated({
+ document:'tournaments/{code}/registrationV3State/ledger',region:'asia-east1',retry:true,
+ timeoutSeconds:60,maxInstances:10
+},async event=>{
+ if(process.env.BXH_REGISTRATION_V3_ENABLED!=='true')return;
+ const before=event.data?.before.data(),after=event.data?.after.data();
+ if(!after||before?.revision===after.revision)return;
+ // Read the latest canonical revision rather than replaying event snapshots.
+ await deliver(event.params.code);
+});
