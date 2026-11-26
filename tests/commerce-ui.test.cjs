@@ -829,3 +829,33 @@ test('PTN settings adjust station count independently of closed registration, th
  room.phase='live';await t.ui.load('ticket-room-state');t.sandbox.activeTab='settings';
  assert.doesNotMatch(t.ui.ticketManagedTab('settings'),/data-commerce-form="ticket-stations"/);
 });
+
+
+test('PTN live court controls require backend capability and use room-scoped resize/exit/claim/reopen actions',async()=>{
+ const t=setup({partner:true}),code='PTN-TST001',calls=[];
+ t.sandbox.activeTab='management';
+ const room={ok:true,code,roomId:'room-generation',name:'測試',phase:'live',stations:3,updatedAt:321,
+  bracket:[{id:'m1',station:3,scoreA:2,scoreB:0,a:{name:'甲'},b:{name:'乙'},canScore:true},{id:'detached',station:null,scoreA:1,scoreB:2,a:{name:'丙'},b:{name:'丁'},canScore:false}],
+  courtControl:{version:1,targetCount:2,courts:[{station:1,closed:false,draining:false,currentMatchId:null},{station:2,closed:true,draining:false,currentMatchId:null},{station:3,closed:false,draining:true,currentMatchId:'m1'}],detached:['detached']}};
+ t.sandbox.window.engagementService.ticketRoomOperation=async request=>{calls.push({...request});return request.action==='ticket-room-stations'?{ok:true}:{...room};};
+ await t.ui.handle('commerce-open-ticket-room',{dataset:{id:code}});
+ t.sandbox.activeTab='settings';assert.match(t.ui.ticketManagedTab('settings'),/目標 2 台，等待退場/);
+ assert.match(t.ui.ticketManagedTab('settings'),/name="stations" type="number" value="2"/);
+ t.sandbox.FormData=function(form){return Object.entries(form.values);};
+ const submit=async form=>t.listeners.submit({target:{closest:()=>form},preventDefault(){}});
+ await submit({dataset:{commerceForm:'ticket-stations'},values:{stations:'4'}});
+ assert.deepEqual(calls.at(-1),{action:'ticket-room-stations',code,roomId:room.roomId,expectedUpdatedAt:321,stations:4,operationId:'same-operation'});
+ await t.ui.load('ticket-room-state');t.sandbox.activeTab='referee';
+ const html=t.ui.ticketManagedTab('referee');assert.match(html,/待接管對戰/);assert.match(html,/丙 1 : 2 丁/);
+ assert.match(html,/data-command="exit" data-id="3"/);assert.match(html,/data-command="reopen" data-id="2"/);
+ assert.doesNotMatch(html,/<option value="[23]">/);
+ await t.ui.handle('commerce-ticket-court',{dataset:{id:'3',command:'exit'}});
+ assert.deepEqual(calls.at(-1),{action:'ticket-room-stations',code,roomId:room.roomId,expectedUpdatedAt:321,command:'exit',station:3,matchId:'m1',operationId:'same-operation'});
+ await t.ui.load('ticket-room-state');
+ await submit({dataset:{commerceForm:'ticket-court-claim',matchId:'detached'},values:{station:'1'}});
+ assert.deepEqual(calls.at(-1),{action:'ticket-room-stations',code,roomId:room.roomId,expectedUpdatedAt:321,command:'claim',station:1,matchId:'detached',operationId:'same-operation'});
+ await t.ui.load('ticket-room-state');
+ await t.ui.handle('commerce-ticket-court',{dataset:{id:'2',command:'reopen'}});
+ assert.equal(calls.at(-1).command,'reopen');
+ await t.ui.load('ticket-room-state');t.sandbox.activeTab='live';assert.doesNotMatch(t.ui.ticketManagedTab('live'),/丙<\/span>/);
+});

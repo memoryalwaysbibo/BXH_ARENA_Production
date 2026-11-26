@@ -3,6 +3,7 @@
 const {createHash,randomBytes}=require('node:crypto');
 const {signature}=require('../../modules/main-app/bracket-commit.js');
 const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
+const {BXHCourtRetirement:R}=require('../../referee-seats/functions/engine/court-retirement.cjs');
 const {advance:advanceQrCheckinFence}=require('../../qr-checkin/backend/qr-checkin-fence.cjs');
 const {startMs}=require('../../qr-checkin/backend/overlays/lifecycle/operations-core.js');
 const {registrationQueueOwnsRoom}=require('./legacy-writer.cjs');
@@ -190,6 +191,32 @@ function forfeitMatchAvailable(match){
   !match.callPass&&!match.skippedAt);
 }
 
+// Keep legacy scoring untouched; once a retirement command exists, detached or
+// closed-court work must be claimed/reopened before another score can be written.
+function ticketMatchCourtAvailable(state,match){
+ if(!state.courtRetirementPlan&&!state.forcedCourtExits)return true;
+ return !match?.forceDetached&&Number(match?.station)>0&&Number(match.station)<=Number(state.meta?.stations)&&!state.forcedCourtExits?.[match.station]?.closed;
+}
+
+// Shared transaction projection for live retirement and subsequent score/forfeit
+// confirmations that can finish a draining court. Never copy private seat UIDs.
+function projectTicketCourtState(room,state,mirror,ownerUid,previousStations,now){
+ if(!state.courtRetirementPlan&&!state.forcedCourtExits)return {};
+ mirror.meta.stations=state.meta.stations;
+ mirror.courtAssignments=publicCourts(state);
+ const matches=new Map(state.matches.map(m=>[m.id,m]));
+ mirror.matches=mirror.matches.map(m=>{const source=matches.get(m.id);return {...m,station:source.station??null,status:source.status,dispatchRevision:Number(source.dispatchRevision||0),forceDetached:source.forceDetached||null};});
+ mirror.courtRetirementPlan=state.courtRetirementPlan||null;
+ mirror.forcedCourtExits=state.forcedCourtExits||{};
+ const seats=R.reconcileSeatCount(room.refereeSeatsV1,state.meta.stations,now,previousStations);
+ if(seats.model?.version!==1)return {};
+ const projection=R.projectSeats(seats.model,ownerUid,state.meta.stations);
+ Object.assign(state.meta,projection,{refereeSeatsV1:seats.model});
+ Object.assign(mirror.meta,{refereeStationNames:projection.refereeStationNames,refereeSeatNames:projection.refereeSeatNames,refereeStationRestrictionEnabled:true});
+ for(const key of ['refereeSeatsV1','refereeStationUids','refereeStationAssignments','assignedStaffUids'])delete mirror.meta[key];
+ return {...projection,...(seats.changed?{refereeSeatsV1:seats.model}:{})};
+}
+
 // Keep PTN scoring eligibility independent of the referee engine's exported
 // helper list. The closed roster callable can carry an older engine archive.
 function ticketRoundBlocked(match,matches,meta){
@@ -230,7 +257,7 @@ function createTicketForfeitHandler({db,enabled=async()=>false,clock=Date.now}){
    const [actor,roomSnap,publicSnap,gateSnap,prior]=await tx.getAll(db.doc('users/'+uid),roomRef,publicRef,
     db.doc(ticketLifecyclePath(code)),operation);
    const user=actor.data(),room=roomSnap.data(),pub=publicSnap.data(),gate=await resolveTicketGate(db,code,tx,gateSnap.data());
-   await authorizeTicketManager(tx,db,{uid,user,room,gate,code,now});
+   const authority=await authorizeTicketManager(tx,db,{uid,user,room,gate,code,now});
    if(gate.roomId!==roomId||room.ticketAccessV1?.roomId!==roomId||
       pub?.ticketRoomVersion!==1||pub.eventAuthority!=='ticket')throw Error('ticket-binding-invalid');
    const state=JSON.parse(room.data),mirror=JSON.parse(pub.bracketView);
@@ -247,7 +274,7 @@ function createTicketForfeitHandler({db,enabled=async()=>false,clock=Date.now}){
    const match=state.matches.find(candidate=>candidate.id===matchId);
    const publicMatch=mirror.matches.find(candidate=>candidate.id===matchId);
    const playerIds=[match?.a?.playerId,match?.b?.playerId];
-   if(!forfeitMatchAvailable(match)||!playerIds.includes(playerId)||!playerIds.includes(opponentId)||
+   if(!forfeitMatchAvailable(match)||!ticketMatchCourtAvailable(state,match)||!playerIds.includes(playerId)||!playerIds.includes(opponentId)||
       (match.updatedAt||0)!==matchUpdatedAt||publicMatch?.completed||publicMatch?.a?.playerId!==playerIds[0]||
       publicMatch?.b?.playerId!==playerIds[1])throw Error('forfeit-match-stale');
    const actorName=String(user.realName||user.gameId||user.displayName||'合作主辦').slice(0,80);
@@ -263,6 +290,7 @@ function createTicketForfeitHandler({db,enabled=async()=>false,clock=Date.now}){
    match.hunterData={...match.hunterData,reason:'forfeit'};
    match.faultActions=[];
    match.refereeSeatScoreRevision=Number(match.refereeSeatScoreRevision||0)+1;
+   const previousStations=state.meta.stations;
    engine.rebuildPropagationForState(state);
    const updatedAt=Math.max(now,Number(room.updatedAt||0)+1,Number(state.updatedAt||0)+1);
    state.updatedAt=updatedAt;
@@ -276,7 +304,8 @@ function createTicketForfeitHandler({db,enabled=async()=>false,clock=Date.now}){
    Object.assign(mirror,{updatedAt,courtAssignments:publicCourts(state),callRevision:Number(state.callRevision||0)});
    for(const key of ['championId','runnerUpId','thirdId','fourthId'])mirror[key]=state[key]??null;
    const fence=room.qrCheckinManaged===true?advanceQrCheckinFence(room,state):{};
-   tx.update(roomRef,{...fence,updatedAt,data:JSON.stringify(state)});
+   const courtFields=projectTicketCourtState(room,state,mirror,authority.ownerUid,previousStations,now);
+   tx.update(roomRef,{...fence,...courtFields,updatedAt,data:JSON.stringify(state)});
    tx.update(publicRef,{...fence,updatedAt,bracketView:JSON.stringify(mirror)});
    const result={ok:true,matchId,winnerId:decision.winnerId,loserId:decision.loserId};
    tx.create(operation,{requestHash,result,actorUid:uid,at:now,partialScore});
@@ -327,7 +356,7 @@ function createTicketScoreHandler({db,enabled=async()=>false,clock=Date.now}){
       state.meta?.battleMode!=='individual'||!Array.isArray(state.matches)||!Array.isArray(mirror.matches))throw Error('score-room-not-live');
    const match=state.matches.find(item=>item.id===matchId);
    const publicMatch=mirror.matches.find(item=>item.id===matchId);
-   if(!forfeitMatchAvailable(match)||(match.updatedAt||0)!==matchUpdatedAt||
+   if(!forfeitMatchAvailable(match)||!ticketMatchCourtAvailable(state,match)||(match.updatedAt||0)!==matchUpdatedAt||
       publicMatch?.completed||publicMatch?.a?.playerId!==match.a.playerId||
       publicMatch?.b?.playerId!==match.b.playerId||
       Number(publicMatch.scoreA||0)!==Number(match.scoreA||0)||
@@ -359,6 +388,7 @@ function createTicketScoreHandler({db,enabled=async()=>false,clock=Date.now}){
    match.updatedAt=Math.max(now,Number(match.updatedAt||0)+1);
    match.updatedBy=actorName;
    match.refereeSeatScoreRevision=Number(match.refereeSeatScoreRevision||0)+1;
+   const previousStations=state.meta.stations;
    if(command==='confirm')engine.rebuildPropagationForState(state);
    const updatedAt=Math.max(now,Number(room.updatedAt||0)+1,Number(state.updatedAt||0)+1);
    state.updatedAt=updatedAt;
@@ -372,7 +402,8 @@ function createTicketScoreHandler({db,enabled=async()=>false,clock=Date.now}){
    Object.assign(mirror,{updatedAt,courtAssignments:publicCourts(state),callRevision:Number(state.callRevision||0)});
    for(const key of ['championId','runnerUpId','thirdId','fourthId'])mirror[key]=state[key]??null;
    const fence=room.qrCheckinManaged===true?advanceQrCheckinFence(room,state):{};
-   tx.update(roomRef,{...fence,updatedAt,data:JSON.stringify(state)});
+   const courtFields=projectTicketCourtState(room,state,mirror,authority.ownerUid,previousStations,now);
+   tx.update(roomRef,{...fence,...courtFields,updatedAt,data:JSON.stringify(state)});
    tx.update(publicRef,{...fence,updatedAt,bracketView:JSON.stringify(mirror)});
    const result={ok:true,matchId,scoreA:Number(match.scoreA||0),scoreB:Number(match.scoreB||0),
     completed:!!match.completed,winnerId:match.winnerId||null};
@@ -383,4 +414,4 @@ function createTicketScoreHandler({db,enabled=async()=>false,clock=Date.now}){
 }
 
 module.exports={createStartHandler,createDrawHandler,createTicketForfeitHandler,createTicketScoreHandler,
- forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked};
+ forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked,ticketMatchCourtAvailable,projectTicketCourtState};

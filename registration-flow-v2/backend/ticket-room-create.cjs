@@ -1,5 +1,5 @@
 'use strict';
-const {forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked}=require('./lifecycle.cjs');
+const {forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked,ticketMatchCourtAvailable,projectTicketCourtState}=require('./lifecycle.cjs');
 const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
 const {BXHCourtRetirement:R}=require('../../referee-seats/functions/engine/court-retirement.cjs');
 const {signature}=require('../../modules/main-app/bracket-commit.js');
@@ -7,6 +7,8 @@ const {signature}=require('../../modules/main-app/bracket-commit.js');
 const {createHash,randomBytes,randomUUID}=require('node:crypto');
 const {ticketHostGrant,checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,resolveTicketGate,authorizeTicketManager,activeTicketManager}=require('./ticket-host.cjs');
 const {authorizeTicketRemoval}=require('./queue.cjs');
+const {registrationQueueOwnsRoom}=require('./legacy-writer.cjs');
+const {advance:advanceQrCheckinFence}=require('../../qr-checkin/backend/qr-checkin-fence.cjs');
 
 const fields=new Set(['action','code','ticketId','operationId','name','location','stations',
  'registrationOpenAt','registrationCloseAt','startAt']);
@@ -232,7 +234,7 @@ function projectTicketRefereeSeatNames(room,stations){
  }
  return {version:1,courts};
 }
-function createTicketRoomStateHandler({db,clock=Date.now}){
+function createTicketRoomStateHandler({db,enabled=async()=>false,clock=Date.now}){
  return async request=>{
   const uid=request.auth?.uid, data=request.data;
   if(!uid)throw Error('auth-required');
@@ -266,7 +268,7 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
    const bracketVisible=['live','settling','done'].includes(room.tournamentPhase)||
     room.tournamentPhase==='waiting'&&!!state.bracketDraw?.id;
    const matches=room.tournamentPhase==='live'&&!state.championId&&gate.enabled===true
-    ?state.matches.filter(forfeitMatchAvailable).map(match=>({id:match.id,seq:match.seq,round:match.round,
+    ?state.matches.filter(match=>forfeitMatchAvailable(match)&&ticketMatchCourtAvailable(state,match)).map(match=>({id:match.id,seq:match.seq,round:match.round,
      a:{id:match.a.playerId,name:names.get(match.a.playerId)||'選手 A'},
      b:{id:match.b.playerId,name:names.get(match.b.playerId)||'選手 B'},updatedAt:match.updatedAt||0})):[];
    const bracket=bracketVisible&&Array.isArray(state.matches)?state.matches.map(match=>({
@@ -276,11 +278,21 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
     b:match.b?.playerId?{id:match.b.playerId,name:names.get(match.b.playerId)||'選手 B'}:null,
     scoreA:Number(match.scoreA||0),scoreB:Number(match.scoreB||0),winnerId:match.winnerId||null,
     updatedAt:match.updatedAt||0,
-    canScore:room.tournamentPhase==='live'&&gate.enabled===true&&!state.championId&&forfeitMatchAvailable(match)&&
+    canScore:room.tournamentPhase==='live'&&gate.enabled===true&&!state.championId&&forfeitMatchAvailable(match)&&ticketMatchCourtAvailable(state,match)&&
      !['quick'].includes(match.scoringMode)&&!['quick'].includes(state.meta.scoringMode)&&
      !ticketRoundBlocked(match,state.matches,state.meta)&&
      !ticketBronzeBlocked(match,state.matches,state.meta)
    })):null;
+   // A capability advertised only by the matching live backend. Older backend
+   // responses keep the frontend's original read-only live settings.
+   const courtControl=isPartnerRoomCode(code)&&room.tournamentPhase==='live'&&ticketStatus==='consumed'&&gate.enabled===true&&
+    state.startedAt&&state.rosterLocked&&!state.championId&&!state.meta?.eventCancelled&&
+    ![room,state].some(doc=>doc.systemClosed||doc.eventCancelled||doc.deletionStatus||['completed','archived'].includes(doc.archiveStatus)||'scoreStorage' in doc||'scoreBucketProjection' in doc)&&
+    state.meta?.formatType==='single'&&state.meta?.battleMode==='individual'&&Number.isInteger(state.meta.stations)&&state.meta.stations>=1&&state.meta.stations<=12&&await enabled(code,tx)
+    ?{version:1,targetCount:R.target(state),courts:Array.from({length:state.meta.stations},(_,i)=>{
+     const station=i+1,closed=state.forcedCourtExits?.[station]?.closed===true,currentMatchId=state.courtAssignments?.['court'+station]?.currentMatchId||null;
+     return {station,closed,draining:station>R.target(state),currentMatchId};
+    }),detached:state.matches.filter(m=>!m.completed&&m.forceDetached&&Number(m.station)===0).map(m=>m.id)}:null;
    const delegate=room.ptnDelegateUid?(await tx.get(db.doc('users/'+room.ptnDelegateUid))).data():null;
    return {ok:true,code,roomId:state.id,name:room.name,location:room.location,
     ...(isPartnerRoomCode(code)?{delegateUid:room.ptnDelegateUid||null,
@@ -292,7 +304,7 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
     registrationOpenAt:room.registrationOpenAt,registrationCloseAt:room.registrationCloseAt,
     registrationEnabled:room.registrationEnabled,updatedAt:room.updatedAt,
     drawId:state.bracketDraw?.id??null,drawReady:state.bracketDraw?.rosterRevision===rosterRevision,rosterRevision,eligibleCount,
-    ...(ticketStatus?{ticketStatus}:{}),...(bracketVisible?{matches,bracket,
+    ...(ticketStatus?{ticketStatus}:{}),...(courtControl?{courtControl}:{}),...(bracketVisible?{matches,bracket,
      championName:names.get(state.championId)||null}:{}),
     participants:state.players.filter(player=>player.source==='online'&&player.registrationId)
      .map(player=>({name:player.name,...(room.tournamentPhase==='waiting'?{registrationId:player.registrationId}:{})}))};
@@ -349,17 +361,24 @@ function createTicketScheduleHandler({db,clock=Date.now}){
  };
 }
 // Keep the committed draw intact. A pre-start station resize only changes routing.
-function createTicketStationsHandler({db,clock=Date.now}){
+function createTicketStationsHandler({db,enabled=async()=>false,clock=Date.now}){
  return async request=>{
   const uid=request.auth?.uid,data=request.data;
   if(!uid)throw Error('auth-required');
   if(!request.app)throw Error('permission-denied');
-  if(!data||Object.keys(data).some(key=>!['action','code','roomId','operationId','expectedUpdatedAt','stations'].includes(key))||
+  const command=data?.command??'resize';
+  const commandFields={resize:['stations'],exit:['station','matchId'],claim:['station','matchId'],reopen:['station']};
+  const stationValid=n=>Number.isInteger(n)&&n>=1&&n<=12;
+  const matchValid=id=>typeof id==='string'&&id.length>0&&id.length<=128;
+  if(!data||!Object.hasOwn(commandFields,command)||Object.keys(data).some(key=>!['action','code','roomId','operationId','expectedUpdatedAt','command',...commandFields[command]].includes(key))||
      data.action!=='ticket-room-stations'||!isPartnerRoomCode(data.code)||
      typeof data.roomId!=='string'||!roomIdPattern.test(data.roomId)||
      typeof data.operationId!=='string'||!roomIdPattern.test(data.operationId)||
-     !Number.isSafeInteger(data.expectedUpdatedAt)||!Number.isInteger(data.stations)||data.stations<1||data.stations>12)throw Error('invalid-operation');
-  const {code,roomId,operationId,expectedUpdatedAt,stations}=data;
+     !Number.isSafeInteger(data.expectedUpdatedAt)||
+     (command==='resize'?!stationValid(data.stations):!stationValid(data.station))||
+     (command==='exit'&&data.matchId!==null&&!matchValid(data.matchId))||
+     (command==='claim'&&!matchValid(data.matchId)))throw Error('invalid-operation');
+  const {code,roomId,operationId,expectedUpdatedAt,stations,station,matchId}=data;
   const roomRef=db.doc('tournaments/'+code),publicRef=db.doc('publicTournaments/'+code);
   const receipt=roomRef.collection('operationLog').doc('ticket-room-stations-'+digest([uid,operationId]));
   const requestHash=digest(data);
@@ -375,6 +394,41 @@ function createTicketStationsHandler({db,clock=Date.now}){
     if(receiptSnap.data().requestHash!==requestHash)throw Error('operation-conflict');
     return {ok:true,replayed:true};
    }
+   // Live operations reuse the established retirement engine and are committed
+   // atomically with the public routing view. The reserved-ticket path below is unchanged.
+   if(room.tournamentPhase==='live'&&pub.tournamentPhase==='live'){
+    if(!registrationQueueOwnsRoom(room)||!await enabled(code,tx)||!state.startedAt||!mirror.startedAt||!state.rosterLocked||state.championId||
+       [room,pub,state].some(doc=>doc.systemClosed||doc.eventCancelled||doc.deletionStatus||['completed','archived'].includes(doc.archiveStatus)||'scoreStorage' in doc||'scoreBucketProjection' in doc)||
+       state.meta?.eventCancelled||state.meta?.eventAuthority!=='ticket'||pub.eventAuthority!=='ticket'||state.meta?.formatType!=='single'||state.meta?.battleMode!=='individual')throw Error('court-room-not-live');
+    if(room.updatedAt!==expectedUpdatedAt)throw Error('version-conflict');
+    const ticket=(await tx.get(db.doc('commerceTickets/'+room.ticketAccessV1.ticketId))).data();
+    if(ticket?.ownerUid!==authority.ownerUid||ticket.status!=='consumed'||ticket.boundRoomCode!==code||ticket.boundRoomId!==roomId)throw Error('ticket-binding-invalid');
+    if(!Array.isArray(state.matches)||!Array.isArray(mirror.matches)||signature(state)!==signature(mirror)||!stationValid(state.meta.stations)||mirror.meta?.stations!==state.meta.stations)throw Error('bracket-version-conflict');
+    if(command==='resize'&&stations===R.target(state)){
+     tx.create(receipt,{requestHash,updatedAt:room.updatedAt});return {ok:true};
+    }
+    const previousStations=state.meta.stations;
+    const revision=Math.max(now,room.updatedAt+1,Number(state.updatedAt||0)+1);
+    let result;
+    if(command==='resize')result=R.request(state,stations,R.target(state),revision);
+    else if(command==='exit'){
+     const match=state.matches.find(m=>m.id===matchId);
+     result=R.forceExit(state,station,matchId,Number(match?.dispatchRevision||0),Number(state.forcedCourtExits?.[station]?.revision||0),revision);
+    }else if(command==='claim'){
+     const match=state.matches.find(m=>m.id===matchId);
+     result=R.claimDetached(state,matchId,station,Number(match?.dispatchRevision||0),revision);
+    }else result=R.reopen(state,station,Number(state.forcedCourtExits?.[station]?.revision||0),revision);
+    if(!result.ok)throw Error(result.reason);
+    // Rebuild only routing, not settlement or score ledgers.
+    createEngine(state,{uid},revision,operationId).rebuildCourtAssignments();
+    const courtFields=projectTicketCourtState(room,state,mirror,authority.ownerUid,previousStations,revision);
+    const fence=room.qrCheckinManaged===true?advanceQrCheckinFence(room,state):{};
+    tx.update(roomRef,{...fence,...courtFields,updatedAt:revision,data:JSON.stringify({...state,updatedAt:revision})});
+    tx.update(publicRef,{...fence,updatedAt:revision,bracketView:JSON.stringify({...mirror,updatedAt:revision})});
+    tx.create(receipt,{requestHash,updatedAt:revision});
+    return {ok:true};
+   }
+   if(command!=='resize')throw Error('court-room-not-live');
    if([room,pub].some(doc=>doc.tournamentPhase!=='waiting'||doc.startedAt||doc.eventCancelled||doc.systemClosed)||state.startedAt||mirror.startedAt||state.meta?.eventCancelled)throw Error('tournament-started');
    if(room.updatedAt!==expectedUpdatedAt)throw Error('version-conflict');
    const ticket=(await tx.get(db.doc('commerceTickets/'+room.ticketAccessV1.ticketId))).data();

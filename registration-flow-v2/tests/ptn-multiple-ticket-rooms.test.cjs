@@ -120,6 +120,78 @@ test('published vouchers create independent PTN gates for two eligible organizer
    await resize({...resizeRequest,data:{...resizeRequest.data,operationId:'resize-draw-six',expectedUpdatedAt:rows.get('tournaments/'+code).updatedAt,stations:6}});
    assert.equal(rows.get('tournaments/'+code).refereeSeatsV1.courts[6].main,null);
    assert.equal(rows.get('tournaments/'+code).refereeSeatsV1.requests.old.status,'stale');
+   // Live retirement is the same shared plan, but requires a consumed ticket
+   // and the existing PTN manager/room fence. No real room is changed.
+   const liveRoom=rows.get(roomPath),pubPath='publicTournaments/'+code,livePublic=rows.get(pubPath);
+   const live=JSON.parse(liveRoom.data),liveMirror=JSON.parse(livePublic.bracketView);
+   Object.assign(live,{startedAt:now,rosterLocked:true});
+   createEngine(live,{uid},now,'live-fixture').rebuildCourtAssignments();
+   Object.assign(liveMirror,{startedAt:now,matches:JSON.parse(JSON.stringify(live.matches)),courtAssignments:live.courtAssignments});
+   const held=live.matches.find(m=>m.station>1&&live.courtAssignments['court'+m.station]?.currentMatchId===m.id&&!m.completed);
+   assert.ok(held,'fixture has a live assigned court above one');
+   const heldStation=held.station;
+   liveRoom.refereeSeatsV1.courts[heldStation]={revision:1,main:{uid:'live-referee',name:'不必離席'},backup1:null,backup2:null};
+   liveRoom.refereeSeatsV1.requests.live={id:'live',kind:'invite',station:heldStation,status:'pending',expiresAt:now+300000};
+   rows.set(roomPath,{...liveRoom,tournamentPhase:'live',data:JSON.stringify(live)});
+   rows.set(pubPath,{...livePublic,tournamentPhase:'live',bracketView:JSON.stringify(liveMirror)});
+   const liveResize=createTicketStationsHandler({db,enabled:async()=>true,clock:()=>now+2000});
+   const command=(op,fields)=>({auth:{uid},app:{},data:{action:'ticket-room-stations',code,roomId:first.roomId,operationId:op,expectedUpdatedAt:rows.get(roomPath).updatedAt,...fields}});
+   await assert.rejects(liveResize(command('live-reserved',{stations:1})),/ticket-binding-invalid/);
+   rows.set('commerceTickets/'+id,{...rows.get('commerceTickets/'+id),status:'consumed'});
+   await assert.rejects(resize(command('live-disabled',{stations:1})),/court-room-not-live/);
+   rows.set('users/unrelated-player',{active:true,role:'player'});
+   await assert.rejects(liveResize({...command('live-unauthorized',{stations:1}),auth:{uid:'unrelated-player'}}),/permission-denied/);
+   const score=require('../backend/lifecycle.cjs').createTicketScoreHandler({db,enabled:async()=>true,clock:()=>now+2000});
+   const scoreReq=(op,match,kind='score')=>({auth:{uid},app:{},data:{action:'ticket-room-score',code,roomId:first.roomId,operationId:op,matchId:match.id,matchUpdatedAt:match.updatedAt||0,command:kind,...(kind==='score'?{side:'A',finish:'knockout'}:{})}});
+   await score(scoreReq('live-first-score',held));
+   const shrink=command('live-shrink',{stations:1});
+   await liveResize(shrink);assert.equal((await liveResize(shrink)).replayed,true);
+   const getState=()=>JSON.parse(rows.get(roomPath).data);
+   const getMirror=()=>JSON.parse(rows.get(pubPath).bracketView);
+   assert.equal(getState().courtRetirementPlan.targetCount,1);
+   assert.ok(getState().meta.stations>=heldStation);
+   assert.equal(getState().matches.find(m=>m.id===held.id).scoreA,2);
+   assert.equal(rows.get(roomPath).refereeSeatsV1.courts[heldStation].main.uid,'live-referee');
+   await assert.rejects(liveResize({...command('live-stale',{stations:2}),data:{...command('live-stale',{stations:2}).data,expectedUpdatedAt:shrink.data.expectedUpdatedAt}}),/version-conflict/);
+   const readControl=()=>createTicketRoomStateHandler({db,enabled:async()=>true,clock:()=>now})({auth:{uid},app:{},data:{action:'ticket-room-state',code}});
+   const control=await readControl();assert.equal(control.courtControl.targetCount,1);
+   assert.equal(control.courtControl.courts.find(c=>c.station===heldStation).draining,true);
+   assert.equal(control.courtControl.courts.find(c=>c.station===heldStation).currentMatchId,held.id);
+   assert.doesNotMatch(JSON.stringify(control.courtControl),/live-referee|tokenHash/);
+   // Alternate path: natural completion releases draining work with unchanged score rules.
+   const checkpoint=JSON.parse(JSON.stringify([...rows]));
+   await score(scoreReq('live-second-score',getState().matches.find(m=>m.id===held.id)));
+   await score(scoreReq('live-confirm',getState().matches.find(m=>m.id===held.id),'confirm'));
+   assert.equal(getState().matches.find(m=>m.id===held.id).completed,true);
+   assert.equal(getMirror().matches.find(m=>m.id===held.id).scoreA,4);
+   assert.ok(!getState().courtRetirementPlan.courts[heldStation].holdIds.includes(held.id));
+   assert.equal(getState().meta.stations,getMirror().meta.stations);
+   rows.clear();for(const [key,value] of checkpoint)rows.set(key,value);
+   await assert.rejects(liveResize(command('live-wrong-match',{command:'exit',station:heldStation,matchId:'wrong'})),/current-match-changed/);
+   for(const [key,court] of Object.entries(getState().courtAssignments)){
+    const station=Number(key.slice(5));if(station>1&&court.currentMatchId)await liveResize(command('live-exit-'+station,{command:'exit',station,matchId:court.currentMatchId}));
+   }
+   assert.equal(getState().meta.stations,1);assert.equal(getMirror().meta.stations,1);
+   const detached=getState().matches.find(m=>m.id===held.id);
+   assert.equal(detached.station,0);assert.equal(detached.scoreA,2);assert.equal(detached.log.length,1);
+   assert.equal(rows.get(roomPath).refereeSeatsV1.courts[heldStation].main,null);
+   assert.equal(rows.get(roomPath).refereeSeatsV1.requests.live.status,'stale');
+   assert.equal(getMirror().matches.find(m=>m.id===held.id).station,0);
+   await assert.rejects(score(scoreReq('live-detached-score',detached)),/score-match-stale/);
+   const read=await createTicketRoomStateHandler({db,clock:()=>now})({auth:{uid},app:{},data:{action:'ticket-room-state',code}});
+   assert.equal(read.bracket.find(m=>m.id===held.id).canScore,false);
+   assert.ok((await readControl()).courtControl.detached.includes(held.id));
+   await liveResize(command('live-claim',{command:'claim',station:1,matchId:held.id}));
+   const claimed=getState().matches.find(m=>m.id===held.id);
+   assert.equal(claimed.station,1);assert.equal(claimed.scoreA,2);assert.equal(claimed.log.length,1);assert.equal(claimed.forceDetached,undefined);
+   await liveResize(command('live-expand',{stations:6}));
+   assert.equal(getState().meta.stations,6);assert.equal(getMirror().meta.stations,6);
+   assert.equal(rows.get(roomPath).refereeSeatsV1.courts[heldStation].main,null);
+   assert.equal(rows.get(roomPath).refereeSeatsV1.requests.live.status,'stale');
+   assert.equal(rows.get('commerceTickets/'+id).status,'consumed');
+   await liveResize(command('live-reopen',{command:'reopen',station:heldStation}));
+   assert.equal(getState().forcedCourtExits[heldStation].closed,false);
+   assert.doesNotMatch(JSON.stringify(getMirror().meta),/live-referee|refereeSeatsV1/);
    state.players=[{id:'a',name:'甲',source:'online',registrationId:'private-a'},
     {id:'b',name:'乙',source:'online',registrationId:'private-b'}];
    state.startedAt=now;state.championId='a';state.runnerUpId='b';state.archiveStatus='completed';

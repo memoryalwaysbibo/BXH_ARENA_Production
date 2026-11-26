@@ -65,9 +65,9 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
  const ticketRoomActions={
   'create-ticket-room':createTicketRoomHandler({db}),
   'ticket-ptn-status':createPtnStatusHandler({db}),
-  'ticket-room-state':createTicketRoomStateHandler({db}),
+  'ticket-room-state':createTicketRoomStateHandler({db,enabled:startEnabled}),
   'ticket-room-schedule':createTicketScheduleHandler({db}),
-  'ticket-room-stations':createTicketStationsHandler({db}),
+  'ticket-room-stations':createTicketStationsHandler({db,enabled:startEnabled}),
   'ticket-room-delegate':createTicketDelegateHandler({db}),
   'ticket-room-delegate-search':createTicketDelegateSearchHandler({db}),
   'ticket-room-forfeit':createTicketForfeitHandler({db,enabled:startEnabled}),
@@ -83,7 +83,8 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   preconditions:['ticket-lifecycle-disabled','ticket-binding-invalid','ticket-expired','ticket-unavailable','version-conflict',
    'room-code-conflict','room-receipt-inconsistent','ticket-ptn-slot-occupied','bracket-room-changed','bracket-version-conflict',
    'forfeit-room-not-live','forfeit-match-stale','forfeit-round-waiting',
-   'score-room-not-live','score-match-stale','score-round-waiting','score-result-not-ready'],
+   'score-room-not-live','score-match-stale','score-round-waiting','score-result-not-ready',
+   'court-room-not-live','court-plan-stale','invalid-court-count','invalid-court','already-completed','court-exit-stale','current-match-changed','dispatch-stale','not-detached','target-retiring','offline-sync-pending'],
  });
  const lifecycleOptions={
   options:{enforceAppCheck:true},
