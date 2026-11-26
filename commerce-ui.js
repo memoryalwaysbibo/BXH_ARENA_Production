@@ -581,8 +581,7 @@ document.addEventListener('submit',async e=>{
   const code=String(values.code||'').trim().toUpperCase();
   if(!canManagePtn()||!inManagement()||!isPtnCode(code)){c.error='請輸入 PTN-XXXXXX 房號。';render();return;}
   await openPtnManagement(code,true);return;
- }
- if(type==='ticket-delegate-search'){
+ }else if(type==='ticket-delegate-search'){
   const room=c.ticketRoom,query=String(values.query||'').trim();
   if(!ticketManagementView(c)||room?.canAssignDelegate!==true||room.code!==ticketRoomCode(c)||query.length<2||query.length>80)return;
   c.busy=true;c.error='';c.delegateSearch=null;render();
