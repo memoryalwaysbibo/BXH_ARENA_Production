@@ -86,15 +86,29 @@
   }
   if(!scheduled){scheduled=true;setTimeout(checkRequests,0);}
  }
+ // Shared presentation for official, community and ticket rooms. The
+ // receiving context supplies the capabilities; display does not grant them.
+ function renderSeatGrid(station,court={},options={}){
+  const {actorUid,busy=false,canInvite=false,canJoin=false,invitationMode=false,projectionOnly=false}=options;
+  return '<div class="ref-seat-grid">'+slots.map(slot=>{
+   const seat=court[slot],mine=!projectionOnly&&!!actorUid&&seat?.uid===actorUid;
+   const disabled=projectionOnly||busy||(!seat&&invitationMode&&!canInvite&&!canJoin);
+   const caption=projectionOnly?(seat?.name||'尚未啟用'):(seat?.name||(invitationMode?(canInvite?'邀請裁判':canJoin?'點此加入':'空席'):'點此加入'));
+   const attributes=projectionOnly?'aria-disabled="true"':`data-seat-action="seat" data-station="${station}" data-slot="${slot}"`;
+   return `<button type="button" class="ref-seat-button${mine?' mine':''}" ${attributes} ${disabled?'disabled':''}><span>${labels[slot]}</span><strong>${escape(caption)}</strong>${mine?'<small>我的席位 · 點擊退出</small>':''}</button>`;
+  }).join('')+'</div>';
+ }
+ function renderPendingTicketSeats(station){
+  if(!Number.isInteger(station)||station<1||station>12)return '';
+  return '<div class="ref-seat-section">'+renderSeatGrid(station,{}, {projectionOnly:true})+'</div>';
+ }
  function render(st,station){
   if(!enabled(st))return '';
   const court=st.meta.refereeSeatsV1.courts?.[station]||{},readOnly=locked()||st.forcedCourtExits?.[station]?.closed;
-  const buttons=slots.map(slot=>{
-   const seat=court[slot],mine=seat?.uid===uid(),disabled=busy||readOnly||!eligible()||(!seat&&st.meta.eventAuthority==='community'&&!ctx?.inviter?.()&&!ctx?.support?.());
-   return `<button type="button" class="ref-seat-button${mine?' mine':''}" data-seat-action="seat" data-station="${station}" data-slot="${slot}" ${disabled?'disabled':''}><span>${labels[slot]}</span><strong>${escape(seat?.name||(st.meta.eventAuthority==='community'?(ctx?.inviter?.()?'邀請裁判':ctx?.support?.()?'點此加入':'空席'):'點此加入'))}</strong>${mine?'<small>我的席位 · 點擊退出</small>':''}</button>`;
-  }).join('');
+  const buttons=renderSeatGrid(station,court,{actorUid:uid(),busy:busy||readOnly||!eligible(),
+   canInvite:ctx?.inviter?.()===true,canJoin:ctx?.support?.()===true,invitationMode:st.meta.eventAuthority==='community'});
   const pending=Object.values(st.meta.refereeSeatsV1.requests||{}).filter(r=>r.station===station&&r.fromUid===uid()&&r.status==='pending');
-  return `<div class="ref-seat-section"><div class="ref-seat-grid">${buttons}</div>${pending.map(r=>`<div class="ref-seat-wait" role="status">${r.expiresAt>Date.now()?'等待對方確認中':'交接申請已逾時'}<button type="button" class="btn btn-ghost btn-sm" data-seat-action="cancel" data-station="${station}" data-slot="${r.slot}" data-request="${escape(r.id)}" ${busy?'disabled':''}>取消申請</button></div>`).join('')}</div>`;
+  return `<div class="ref-seat-section">${buttons}${pending.map(r=>`<div class="ref-seat-wait" role="status">${r.expiresAt>Date.now()?'等待對方確認中':'交接申請已逾時'}<button type="button" class="btn btn-ghost btn-sm" data-seat-action="cancel" data-station="${station}" data-slot="${r.slot}" data-request="${escape(r.id)}" ${busy?'disabled':''}>取消申請</button></div>`).join('')}</div>`;
  }
  function settings(){
   if(enabled(state())&&state()?.meta?.eventAuthority==='community')return '<div class="panel"><div class="panel-title">三席裁判制</div><p class="hint">房主可點選空席邀請玩家；主裁負責計分，備裁經確認交接後接手。BXH 工作人員可直接協助。</p></div>';
@@ -124,5 +138,5 @@
   click(b.dataset.seatAction,Number(b.dataset.station),b.dataset.slot,b.dataset.request);
  },true);
  if(typeof document!=='undefined')document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkRequests();});
- root.BXHRefereeSeats={bind,render,settings,enabled,canScore,click};
+ root.BXHRefereeSeats={bind,render,settings,enabled,canScore,click,renderPendingTicketSeats};
 })(typeof window!=='undefined'?window:globalThis);

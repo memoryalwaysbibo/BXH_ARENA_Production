@@ -592,6 +592,11 @@ test('PTN live takeover shows bracket and scores only its verified room',async()
  t.sandbox.activeTab='referee';
  const panel=t.ui.ticketManagedTab('referee');
  assert.match(panel,/court-grid court-grid-1 commerce-ptn-courts/);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../modules/main-app/referee-seats.js'),'utf8'),t.sandbox);
+ const withSeats=t.ui.ticketManagedTab('referee');
+ assert.equal((withSeats.match(/class="ref-seat-button" aria-disabled="true" disabled>/g)||[]).length,3);
+ assert.doesNotMatch(withSeats,/data-seat-action=/);
+ assert.match(withSeats,/備用裁判 2/);
  assert.match(panel,/ref-vs-arena standard/);
  assert.match(panel,/旋轉勝利＋1分/);
  assert.match(panel,/擊飛勝利＋2分/);
@@ -738,9 +743,13 @@ test('PTN pre-start configured courts share the official waiting scorer without 
  const extract=(start,end)=>core.slice(core.indexOf(start),core.indexOf(end,core.indexOf(start)));
  Object.assign(t.sandbox,{POINT_LABELS:{spin:'旋轉勝利＋1分',knockout:'擊飛勝利＋2分',burst:'爆裂勝利＋2分',extreme:'極限勝利＋3分'},refereeSwapControl:()=>'<button disabled>⇄</button>'});
  vm.runInContext(extract('function refereeWorkstationHeader(','function renderQuickDecisionPanel(')+extract('function courtAtmosphereStyle(','function renderCourtCard(')+extract('function renderRefereeScorePanel(','function renderSkippedMatches(')+extract('function renderWaitingRefereeCourt(','function canUseRefereeSyncRecovery('),t.sandbox);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../modules/main-app/referee-seats.js'),'utf8'),t.sandbox);
  t.sandbox.activeTab='referee';
  const html=t.ui.ticketManagedTab('referee');
  assert.equal((html.match(/referee-workstation-waiting/g)||[]).length,4);
+ assert.equal((html.match(/class="ref-seat-button" aria-disabled="true" disabled>/g)||[]).length,12);
+ assert.doesNotMatch(html,/data-seat-action=/);
+ assert.match(html,/備用裁判 2/);
  assert.match(html,/台4/);assert.match(html,/等待開賽/);
  assert.doesNotMatch(html,/data-action="(?:score|fault|confirm-result|undo-score|rematch|commerce-ticket-score)"/);
  assert.equal((html.match(/data-type="spin" disabled/g)||[]).length,8);
