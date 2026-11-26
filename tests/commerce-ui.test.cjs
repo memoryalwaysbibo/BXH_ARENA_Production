@@ -853,3 +853,27 @@ test('expansion admin draft uses the dedicated SKU and price; account switch cle
  const c=t.ui.context();assert.equal(c.draft.id,'tournament_expansion_1');assert.equal(c.draft.priceTwd,20);assert.equal(c.draft.status,'draft');
  c.expansionBalance=50;t.setUid('other');assert.equal(t.ui.context().expansionBalance,undefined);
 });
+
+test('expansion UI clamps stale capacity to 192 and rejects oversized or unavailable balance',async()=>{
+ const t=setup({partner:true}),c=t.ui.context(),code='PTN-EXP123';
+ t.sandbox.activeTab='people';c.view='ticket-manage';c.ownedPtn={code};c.roomManageOpen=true;c.ticketRoomOpen=true;
+ c.ticketRoom={ok:true,code,roomId:'room-generation',phase:'waiting',capacity:160,canAssignDelegate:true,expansionEnabled:true,expansionMaxCapacity:320};
+ c.expansionBalance=200;
+ const html=t.ui.ticketManagedTab('people');
+ assert.match(html,/可擴充至 192 人/);
+ assert.match(html,/name="quantity" min="1" max="32"/);
+ const calls=[];
+ t.sandbox.window.engagementService.ticketRoomOperation=async p=>{calls.push(JSON.parse(JSON.stringify(p)));return {ok:true,code,quantity:p.quantity,capacityAfter:192};};
+ t.sandbox.FormData=function(form){return Object.entries(form.values);};
+ const submit=async q=>t.listeners.submit({target:{closest:()=>({dataset:{commerceForm:'ticket-expand'},values:{quantity:String(q)}})},preventDefault(){}});
+ await submit(33);assert.equal(calls.length,0);
+ c.expansionBalance='200';await submit(1);assert.equal(calls.length,0);
+ c.expansionBalance=200;
+ c.ticketRoom.capacity=192;assert.doesNotMatch(t.ui.ticketManagedTab('people'),/使用擴充券/);await submit(1);assert.equal(calls.length,0);
+ c.ticketRoom.capacity=160;c.ticketRoom.expansionMaxCapacity=176;
+ assert.match(t.ui.ticketManagedTab('people'),/name="quantity" min="1" max="16"/);
+ await submit(17);assert.equal(calls.length,0);
+ c.ticketRoom.expansionMaxCapacity=320;
+ await submit(32);
+ assert.deepEqual(calls,[{action:'ticket-room-expand',code,roomId:'room-generation',quantity:32,operationId:'same-operation'}]);
+});
