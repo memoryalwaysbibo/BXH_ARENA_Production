@@ -785,6 +785,34 @@ test('manual room code entry uses the same single verified navigation flow',asyn
  await t.ui.handle('commerce-ticket-back');assert.equal(t.sandbox.activeTab,'management');assert.equal(t.ui.ticketManagementContext(),null);
 });
 
+
+test('PTN settings adjust station count independently of closed registration, then show all waiting courts',async()=>{
+ const t=setup({partner:true}),code='PTN-TST001',calls=[];
+ t.sandbox.activeTab='management';
+ const room={ok:true,code,roomId:'room-generation',name:'測試',phase:'waiting',stations:1,updatedAt:321,registrationCloseAt:1};
+ t.sandbox.window.engagementService.ticketRoomOperation=async request=>{
+  calls.push({...request});if(request.action==='ticket-room-stations'){room.stations=request.stations;room.updatedAt++;return {ok:true};}return {...room};
+ };
+ await t.ui.handle('commerce-open-ticket-room',{dataset:{id:code}});
+ t.sandbox.activeTab='settings';
+ let html=t.ui.ticketManagedTab('settings');
+ assert.match(html,/裁判台設定/);assert.match(html,/name="stations" type="number" value="1" min="1" max="12"/);
+ t.sandbox.FormData=function(form){return Object.entries(form.values);};
+ const form={dataset:{commerceForm:'ticket-stations'},values:{stations:'4'}};
+ await t.listeners.submit({target:{closest:()=>form},preventDefault(){}});
+ assert.deepEqual(calls.at(-1),{action:'ticket-room-stations',code,roomId:'room-generation',expectedUpdatedAt:321,stations:4,operationId:'same-operation'});
+ await t.ui.load('ticket-room-state');
+ assert.match(t.ui.ticketManagedTab('settings'),/目前裁判台：4 台/);
+ const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
+ const extract=(start,end)=>core.slice(core.indexOf(start),core.indexOf(end,core.indexOf(start)));
+ Object.assign(t.sandbox,{POINT_LABELS:{spin:'旋轉勝利＋1分',knockout:'擊飛勝利＋2分',burst:'爆裂勝利＋2分',extreme:'極限勝利＋3分'},refereeSwapControl:()=>'<button disabled>⇄</button>'});
+ vm.runInContext(extract('function refereeWorkstationHeader(','function renderQuickDecisionPanel(')+extract('function courtAtmosphereStyle(','function renderCourtCard(')+extract('function renderRefereeScorePanel(','function renderSkippedMatches(')+extract('function renderWaitingRefereeCourt(','function canUseRefereeSyncRecovery('),t.sandbox);
+ t.sandbox.activeTab='referee';
+ assert.equal((t.ui.ticketManagedTab('referee').match(/referee-workstation-waiting/g)||[]).length,4);
+ room.phase='live';await t.ui.load('ticket-room-state');t.sandbox.activeTab='settings';
+ assert.doesNotMatch(t.ui.ticketManagedTab('settings'),/data-commerce-form="ticket-stations"/);
+});
+
 test('expansion ticket product is partner-only and checkout sends selected prepaid quantity',async()=>{
  const t=setup({partner:true}),c=t.ui.context();
  t.ui.shop();c.storeOpen=true;c.category='all';

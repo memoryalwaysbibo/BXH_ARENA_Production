@@ -4,7 +4,7 @@ const {test,after}=require('node:test');
 const {randomBytes}=require('node:crypto');
 const {db,service,handlers}=require('./harness.cjs');
 const {createApi}=require('../backend/api.cjs');
-const {createTicketRoomHandler,createTicketRoomStateHandler}=require('../backend/ticket-room-create.cjs');
+const {createTicketRoomHandler,createTicketRoomStateHandler,createTicketStationsHandler}=require('../backend/ticket-room-create.cjs');
 const {createStartHandler,createDrawHandler}=require('../backend/lifecycle.cjs');
 after(()=>db.terminate());
 
@@ -69,6 +69,21 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
    assert.equal(pub.data().ticketAccessV1,undefined);
    assert.equal(pub.data().ownerUid,undefined);
   }
+  // The existing station count operation must preserve paid expansion capacity.
+  const priorResize=(await a.room.get()).data();
+  const resize=createTicketStationsHandler({db,clock:()=>now+1500});
+  const resizeRequest={auth:{uid},app:{},data:{action:'ticket-room-stations',code:a.code,roomId:a.roomId,operationId:'expansion-resize',expectedUpdatedAt:priorResize.updatedAt,stations:2}};
+  assert.equal((await resize(resizeRequest)).ok,true);
+  assert.equal((await resize(resizeRequest)).replayed,true);
+  const [resized,resizedPublic,resizedTicket,resizedInventory]=await db.getAll(a.room,a.pub,a.ticket,inventory);
+  assert.equal(resized.data().capacity,40);
+  assert.equal(resizedPublic.data().capacity,40);
+  assert.equal(JSON.parse(resized.data().data).meta.registrationCapacity,40);
+  assert.equal(JSON.parse(resizedPublic.data().bracketView).meta.registrationCapacity,40);
+  assert.equal(JSON.parse(resized.data().data).meta.stations,2);
+  assert.equal(JSON.parse(resizedPublic.data().bracketView).meta.stations,2);
+  assert.equal(resizedTicket.data().addedCapacity,8);
+  assert.equal(resizedInventory.data().quantity,30);
   await assert.rejects(expand(request(a,31,'expansion-insufficient')),/insufficient-expansion-tickets/);
   await config.set({enabled:true,maxCapacity:45});
   await assert.rejects(expand(request(a,6,'expansion-overflow')),/invalid-expansion-capacity/);

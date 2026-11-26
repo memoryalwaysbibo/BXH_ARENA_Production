@@ -1,5 +1,7 @@
 'use strict';
 const {forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked}=require('./lifecycle.cjs');
+const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
+const {signature}=require('../../modules/main-app/bracket-commit.js');
 
 const {createHash,randomBytes,randomUUID}=require('node:crypto');
 const {ticketHostGrant,checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,resolveTicketGate,authorizeTicketManager,activeTicketManager}=require('./ticket-host.cjs');
@@ -333,6 +335,61 @@ function createTicketScheduleHandler({db,clock=Date.now}){
   });
  };
 }
+// Keep the committed draw intact. A pre-start station resize only changes routing.
+function createTicketStationsHandler({db,clock=Date.now}){
+ return async request=>{
+  const uid=request.auth?.uid,data=request.data;
+  if(!uid)throw Error('auth-required');
+  if(!request.app)throw Error('permission-denied');
+  if(!data||Object.keys(data).some(key=>!['action','code','roomId','operationId','expectedUpdatedAt','stations'].includes(key))||
+     data.action!=='ticket-room-stations'||!isPartnerRoomCode(data.code)||
+     typeof data.roomId!=='string'||!roomIdPattern.test(data.roomId)||
+     typeof data.operationId!=='string'||!roomIdPattern.test(data.operationId)||
+     !Number.isSafeInteger(data.expectedUpdatedAt)||!Number.isInteger(data.stations)||data.stations<1||data.stations>12)throw Error('invalid-operation');
+  const {code,roomId,operationId,expectedUpdatedAt,stations}=data;
+  const roomRef=db.doc('tournaments/'+code),publicRef=db.doc('publicTournaments/'+code);
+  const receipt=roomRef.collection('operationLog').doc('ticket-room-stations-'+digest([uid,operationId]));
+  const requestHash=digest(data);
+  return db.runTransaction(async tx=>{
+   const now=clock();
+   const [actorSnap,gateSnap,roomSnap,publicSnap,receiptSnap]=await tx.getAll(db.doc('users/'+uid),db.doc(ticketLifecyclePath(code)),roomRef,publicRef,receipt);
+   const gate=await resolveTicketGate(db,code,tx,gateSnap.data()),room=roomSnap.data(),pub=publicSnap.data();
+   const authority=await authorizeTicketManager(tx,db,{uid,user:actorSnap.data(),room,gate,code,now});
+   if(gate.bindingEnabled!==true||gate.enabled!==true||pub?.ticketRoomVersion!==1)throw Error('permission-denied');
+   const state=JSON.parse(room.data),mirror=JSON.parse(pub.bracketView);
+   if(state.id!==roomId||mirror.id!==roomId||gate.roomId!==roomId)throw Error('ticket-binding-invalid');
+   if(receiptSnap.exists){
+    if(receiptSnap.data().requestHash!==requestHash)throw Error('operation-conflict');
+    return {ok:true,replayed:true};
+   }
+   if([room,pub].some(doc=>doc.tournamentPhase!=='waiting'||doc.startedAt||doc.eventCancelled||doc.systemClosed)||state.startedAt||mirror.startedAt||state.meta?.eventCancelled)throw Error('tournament-started');
+   if(room.updatedAt!==expectedUpdatedAt)throw Error('version-conflict');
+   const ticket=(await tx.get(db.doc('commerceTickets/'+room.ticketAccessV1.ticketId))).data();
+   if(ticket?.ownerUid!==authority.ownerUid||ticket.status!=='reserved'||ticket.boundRoomCode!==code||ticket.boundRoomId!==roomId)throw Error('ticket-binding-invalid');
+   if(!Array.isArray(state.matches)||!Array.isArray(mirror.matches)||signature(state)!==signature(mirror)||
+      state.matches.some(m=>m.startedAt||m.scoreA||m.scoreB||m.log?.length||m.completed&&!m.isBye||['in_progress','paused'].includes(m.status)))throw Error('bracket-version-conflict');
+   if(state.meta.stations!==stations){
+    state.meta.stations=stations;mirror.meta.stations=stations;
+    let index=0;
+    for(const match of [...state.matches].sort((a,b)=>a.seq-b.seq)){
+     if(match.isBye){match.station=null;continue;}
+     match.station=index++%stations+1;
+     if(match.status==='ready')match.status='pending';
+    }
+    state.courtAssignments={};
+    createEngine(state,{uid},now,operationId).rebuildCourtAssignments();
+    const matches=new Map(state.matches.map(m=>[m.id,m]));
+    mirror.matches=mirror.matches.map(m=>({...m,station:matches.get(m.id).station,status:matches.get(m.id).status}));
+    mirror.courtAssignments=Object.fromEntries(Object.entries(state.courtAssignments).map(([key,court])=>[key,{currentMatchId:court.currentMatchId||null,nextMatchId:court.nextMatchId||null,status:court.status||'idle'}]));
+   }
+   const revision=Math.max(now,room.updatedAt+1);
+   tx.update(roomRef,{updatedAt:revision,data:JSON.stringify({...state,updatedAt:revision})});
+   tx.update(publicRef,{updatedAt:revision,bracketView:JSON.stringify({...mirror,updatedAt:revision})});
+   tx.create(receipt,{requestHash,updatedAt:revision});
+   return {ok:true};
+  });
+ };
+}
 function createTicketDelegateSearchHandler({db,clock=Date.now}){
  return async request=>{
   const uid=request.auth?.uid,data=request.data;
@@ -399,4 +456,4 @@ function createTicketRemoveHandler({db,queue,enabled,clock=Date.now}){
    action:'cancel',intent:'ticket-host'}},(tx,user,operation,room)=>authorizeTicketRemoval(tx,db,user,operation,room,clock()));
  };
 }
-module.exports={createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketRemoveHandler,createTicketDelegateHandler,createTicketDelegateSearchHandler};
+module.exports={createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketStationsHandler,createTicketRemoveHandler,createTicketDelegateHandler,createTicketDelegateSearchHandler};

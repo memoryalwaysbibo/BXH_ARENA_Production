@@ -7,7 +7,7 @@ const {createTicketExpansionHandler}=require('./ticket-expansion.cjs');
 const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
 const {createStartHandler,createDrawHandler,createTicketForfeitHandler,createTicketScoreHandler}=require('./lifecycle.cjs');
-const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketRemoveHandler,createTicketDelegateHandler,createTicketDelegateSearchHandler}=require('./ticket-room-create.cjs');
+const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketStationsHandler,createTicketRemoveHandler,createTicketDelegateHandler,createTicketDelegateSearchHandler}=require('./ticket-room-create.cjs');
 const {isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,resolveTicketGate}=require('./ticket-host.cjs');
 function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled,pilotRoom=null,retiredRoom=null,retiredRooms=[],ticketPilot=async()=>null}){
  if(createFamilyRegistration?.v2CapacityAware!==true)throw Error('queue-family-capacity-source-required');
@@ -68,6 +68,7 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   'ticket-ptn-status':createPtnStatusHandler({db}),
   'ticket-room-state':createTicketRoomStateHandler({db}),
   'ticket-room-schedule':createTicketScheduleHandler({db}),
+  'ticket-room-stations':createTicketStationsHandler({db}),
   'ticket-room-delegate':createTicketDelegateHandler({db}),
   'ticket-room-delegate-search':createTicketDelegateSearchHandler({db}),
   'ticket-room-forfeit':createTicketForfeitHandler({db,enabled:startEnabled}),
@@ -82,7 +83,7 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   allowRetired:data=>data.action==='status',
   allowUnassigned:data=>data?.code===undefined&&['create-ticket-room','ticket-ptn-status'].includes(data?.action),
   preconditions:['ticket-lifecycle-disabled','ticket-binding-invalid','ticket-expired','ticket-unavailable','version-conflict',
-   'room-code-conflict','room-receipt-inconsistent','ticket-ptn-slot-occupied','bracket-room-changed',
+   'room-code-conflict','room-receipt-inconsistent','ticket-ptn-slot-occupied','bracket-room-changed','bracket-version-conflict',
    'forfeit-room-not-live','forfeit-match-stale','forfeit-round-waiting',
    'score-room-not-live','score-match-stale','score-round-waiting','score-result-not-ready',
    'expansion-unavailable','expansion-room-unavailable','ticket-capacity-invalid','invalid-expansion-capacity','insufficient-expansion-tickets'],
