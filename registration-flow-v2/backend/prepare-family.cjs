@@ -39,10 +39,13 @@ const admit=createAdmission();
   '  const quick=quickPolicy(t,pub);let mirror;\n  if(quick){',
   `  const quick=quickPolicy(t,pub);
   const anyTicket=t.eventAuthority==='ticket'||pub.eventAuthority==='ticket'||!!t.ticketAccessV1||!!pub.ticketRoomVersion;
+  const ticketBase=t.ticketAccessV1?.baseCapacity,ticketAdded=t.ticketAccessV1?.addedCapacity;
   const ticket=t.eventAuthority==='ticket'&&pub.eventAuthority==='ticket'&&t.ticketAccessV1?.version===1&&
    t.ticketAccessV1.roomId===s.id&&pub.ticketRoomVersion===1&&t.registrationQueueVersion===2&&pub.registrationQueueVersion===2&&
-   [32,64,96,128,160].includes(t.capacity)&&t.capacity===pub.capacity&&t.capacity===s.meta?.registrationCapacity&&
-   t.ticketAccessV1.baseCapacity===t.capacity&&t.ticketAccessV1.addedCapacity===0&&!t.waitlistEnabled&&!pub.waitlistEnabled;
+   [32,64,96,128,160].includes(ticketBase)&&Number.isSafeInteger(ticketAdded)&&ticketAdded>=0&&
+   t.capacity===ticketBase+ticketAdded&&t.capacity<=320&&t.capacity===pub.capacity&&t.capacity===s.meta?.registrationCapacity&&
+   (ticketAdded===0||(/^PTN-[A-Z0-9]{6}$/.test(code)&&t.ptnSettlementVersion===1&&pub.ptnSettlementVersion===1))&&
+   !t.waitlistEnabled&&!pub.waitlistEnabled;
   if(anyTicket&&!ticket)throw Error('registration-state-conflict');
   const projectOnline=!!quick||ticket;
   let mirror;
