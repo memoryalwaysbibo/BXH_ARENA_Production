@@ -126,6 +126,50 @@ function canCancelCommunityRegistration(t,now=Date.now()){
   return deadline==null||now<deadline;
 }
 
+// Actual entrants are the unique player IDs in the archived draw, including
+// bye recipients and quick decisions. The public roster can also contain
+// un-checked-in registrations, and licenseEventParticipants is a different metric.
+function hunterEventParticipantCount(state){
+  if(state?.archiveStatus!=="completed"||!Array.isArray(state.players)||!Array.isArray(state.matches)||!state.matches.length)return null;
+  const validId=id=>typeof id==="string"&&id.trim().length>0;
+  const roster=new Set(state.players.map(p=>p?.id));
+  if(roster.size!==state.players.length||[...roster].some(id=>!validId(id)))return null;
+  const entrants=new Set();
+  if(state.meta?.battleMode==="team"){
+    if(!Array.isArray(state.teams))return null;
+    const teams=new Map(state.teams.map(t=>[t?.id,t?.memberPlayerIds]));
+    if(teams.size!==state.teams.length||[...teams.keys()].some(id=>!validId(id)))return null;
+    const drawnTeams=new Set();
+    for(const m of state.matches){
+      if(!m)return null;
+      for(const id of [...(Array.isArray(m.teamIds)?m.teamIds:[]),m.winnerId,m.loserId]){
+        if(id==null||id==="")continue;
+        if(!teams.has(id))return null;
+        drawnTeams.add(id);
+      }
+    }
+    if(drawnTeams.size<2)return null;
+    for(const id of drawnTeams){
+      const members=teams.get(id);
+      if(!Array.isArray(members)||!members.length)return null;
+      for(const member of members){
+        if(!roster.has(member)||entrants.has(member))return null;
+        entrants.add(member);
+      }
+    }
+  }else{
+    for(const m of state.matches){
+      if(!m)return null;
+      for(const id of [m.a?.playerId,m.b?.playerId,m.winnerId,m.loserId]){
+        if(id==null||id==="")continue;
+        if(!roster.has(id))return null;
+        entrants.add(id);
+      }
+    }
+  }
+  return entrants.size>=2?entrants.size:null;
+}
+
 function hunterRecordEventKey(record){
   return String((record&&record.eventCode)||(record&&record.tournamentId)||(((record&&record.eventName)||"event")+"|"+((record&&record.eventDate)||"")));
 }
@@ -213,6 +257,6 @@ function lobbyNewestFirst(a,b){
   if(aKnown && bKnown && a.startMs!==b.startMs) return b.startMs-a.startMs;
   return String(a&&a.code||"").localeCompare(String(b&&b.code||""));
 }
-Object.assign(window.BXHDomainUtils||(window.BXHDomainUtils={}),{ensureTestName,scheduledTournamentStartMs,canonicalPublicTournamentPhase,publicTournamentRegistrationLocked,hunterRecordEventKey,hunterAchievementMatchKey,hunterAchievementHasExactMatchTime,hunterAchievementAwardLabel,hunterAchievementAwardMeta,operationsDate,snapToHalfHourValue,buildPublicTournamentSnapshot,roomStatusDescriptor,fastLobbyHash,publicationValidationErrors,lobbyNewestFirst,isCommunityQuickRegistration,isUnlimitedCommunityRegistration,parseCommunityRegistrationCapacity,communityRegistrationCapacity,communityRegistrationParticipantCount,communityLocalParticipantCount,communityRegistrationLocked,canCancelCommunityRegistration});
+Object.assign(window.BXHDomainUtils||(window.BXHDomainUtils={}),{ensureTestName,scheduledTournamentStartMs,canonicalPublicTournamentPhase,publicTournamentRegistrationLocked,hunterEventParticipantCount,hunterRecordEventKey,hunterAchievementMatchKey,hunterAchievementHasExactMatchTime,hunterAchievementAwardLabel,hunterAchievementAwardMeta,operationsDate,snapToHalfHourValue,buildPublicTournamentSnapshot,roomStatusDescriptor,fastLobbyHash,publicationValidationErrors,lobbyNewestFirst,isCommunityQuickRegistration,isUnlimitedCommunityRegistration,parseCommunityRegistrationCapacity,communityRegistrationCapacity,communityRegistrationParticipantCount,communityLocalParticipantCount,communityRegistrationLocked,canCancelCommunityRegistration});
 
 })();
