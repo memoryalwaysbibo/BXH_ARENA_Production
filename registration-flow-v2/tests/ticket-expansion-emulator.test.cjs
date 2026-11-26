@@ -131,7 +131,17 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal((await inventory.get()).data().quantity,63);
   // First-stage acceptance target: 160 + 32 = 192, not a claim of live load.
   const c=rooms[2];
+  // A configuration above the first-stage ceiling must fail closed, even for a small request.
+  for(const maxCapacity of [193,320]){
+   await config.set({enabled:true,maxCapacity});
+   assert.equal((await read(c)).expansionEnabled,false);
+   await assert.rejects(expand(request(c,1,'expansion-config-'+maxCapacity)),/expansion-unavailable/);
+   assert.equal((await c.room.get()).data().capacity,160);
+   assert.equal((await c.ticket.get()).data().addedCapacity,0);
+   assert.equal((await inventory.get()).data().quantity,63);
+  }
   await config.set({enabled:true,maxCapacity:192});
+  assert.equal((await read(c)).expansionMaxCapacity,192);
   const patch=request(c,32,'expansion-192');
   const applied=await expand(patch);
   assert.equal(applied.capacityAfter,192);
