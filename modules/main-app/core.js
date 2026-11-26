@@ -19157,7 +19157,11 @@ function playerCenterEventGroups(records){
     group.records.push(r);
     group.timestamp=Math.max(group.timestamp,hunterRecordTimestamp(r));
   });
-  return [...groups.values()].sort((a,b)=>b.timestamp-a.timestamp||a.key.localeCompare(b.key)).map(g=>({...g,summary:hunterCareerSummary(g.records)}));
+  return [...groups.values()].sort((a,b)=>b.timestamp-a.timestamp||a.key.localeCompare(b.key)).map(g=>{
+    // All count-bearing rows must agree. Older rows may omit the new field.
+    const counts=new Set(g.records.map(r=>r.eventParticipantCount).filter(n=>Number.isSafeInteger(n)&&n>=2));
+    return {...g,participantCount:counts.size===1?[...counts][0]:null,summary:hunterCareerSummary(g.records)};
+  });
 }
 // S1 began at midnight in Taiwan on 2026/10/01. Keep earlier and undated
 // matches visible as history without crediting them to official career totals.
@@ -19185,7 +19189,7 @@ function playerCenterDataNotice(){
 function playerCenterEventHtml(group){
   const foldKey='profile-career:'+group.key;
   let open=false;try{open=sessionStorage.getItem('bxh-fold:'+currentAuthUid()+':'+foldKey)==='1';}catch(e){}
-  return '<details class="panel player-center-event" data-personal-event="'+esc(group.code)+'" data-fold-key="'+esc(foldKey)+'" '+(open?'open':'')+'><summary><span><strong>'+esc(group.name)+'</strong><small>'+esc(group.date||'日期未記錄')+' · '+group.summary.wins+' 勝 '+group.summary.losses+' 敗</small></span><span class="hint">展開／收合</span></summary><div class="player-center-event-body">'+playerCenterEventOutcomeHtml(group)+'<p class="hint">已讀取 '+group.summary.matches+' 場對戰</p>'+group.records.slice().sort((a,b)=>hunterRecordTimestamp(a)-hunterRecordTimestamp(b)).map(hunterRecordCardHtml).join('')+'</div></details>';
+  return '<details class="panel player-center-event" data-personal-event="'+esc(group.code)+'" data-fold-key="'+esc(foldKey)+'" '+(open?'open':'')+'><summary><span><strong>'+esc(group.name)+'</strong><small>'+esc(group.date||'日期未記錄')+' · '+group.summary.wins+' 勝 '+group.summary.losses+' 敗 · 參賽人數 '+(Number.isSafeInteger(group.participantCount)&&group.participantCount>=2?group.participantCount+' 人':'—')+'</small></span><span class="hint">展開／收合</span></summary><div class="player-center-event-body">'+playerCenterEventOutcomeHtml(group)+'<p class="hint">已讀取 '+group.summary.matches+' 場對戰</p>'+group.records.slice().sort((a,b)=>hunterRecordTimestamp(a)-hunterRecordTimestamp(b)).map(hunterRecordCardHtml).join('')+'</div></details>';
 }
 document.addEventListener('toggle',e=>{const code=e.target?.dataset?.personalEvent;if(e.target?.open&&code)void loadPlayerCenterEventResult(code);},true);
 function renderPlayerCenterCareer(){
