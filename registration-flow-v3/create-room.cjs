@@ -21,11 +21,11 @@ function documents({input,code,owner,roomId,now}){
  registrationVisibility:'private',publishedAt:null,registrationEnabled:false,registrationStatus:'draft',
  registrationOpenAt:input.registrationOpenAt,registrationCloseAt:input.registrationCloseAt,cancellationDeadline:input.cancellationDeadline,
  waitlistEnabled:false,waitlistCapacity:0,waitlistCount:0,createdAt:now,updatedAt:now};
- const meta={name:input.name,location:input.location,stations:input.stations,eventAuthority:'official',formatType:'single',
+ const meta={registrationFlowVersion:3,name:input.name,location:input.location,stations:input.stations,eventAuthority:'official',formatType:'single',
  battleMode:'individual',ladderMode:'general',registrationCapacity:input.capacity,registrationEnabled:false,
  registrationStatus:'draft',registrationOpenAt:input.registrationOpenAt,registrationCloseAt:input.registrationCloseAt,
  cancellationDeadline:input.cancellationDeadline,registrationVisibility:'private',checkinRequired:true};
- const state={id:roomId,cloudCode:code,meta,archiveStatus:'ongoing',players:[],waitlistPlayers:[],matches:[],teams:[],
+ const state={registrationFlowVersion:3,id:roomId,cloudCode:code,meta,archiveStatus:'ongoing',players:[],waitlistPlayers:[],matches:[],teams:[],
  bracketSize:0,registrationRosterRevision:0,updatedAt:now};
  return {ledger,privateRoom:{...common,ownerUid:owner,createdBy:owner,createdByRole:'super_admin',assignedStaffUids:[],
   data:JSON.stringify({...state,ownerUid:owner,createdBy:owner})},publicRoom:{...common,bracketView:JSON.stringify(state)}};

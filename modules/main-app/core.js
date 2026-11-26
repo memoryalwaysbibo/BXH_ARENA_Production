@@ -13140,7 +13140,23 @@ function renderTeamAdminRegistrations(list,registrationLocked){
     section('已取消隊伍',cancelled,false,'','目前沒有取消紀錄');
 }
 
+let v3ReviewPage=null,v3ReviewBusy=false,v3ReviewError="";
+function isV3ManagementRoom(){return state.registrationFlowVersion===3||state.meta?.registrationFlowVersion===3;}
+function v3ReviewKey(){return [state.cloudCode,currentAuthUid(),engagementSessionEpoch].join("|");}
+function renderV3ReviewPanel(){
+  const page=v3ReviewPage?.key===v3ReviewKey()?v3ReviewPage:null;
+  const rows=page?.rows||[],summary=page?.summary;
+  return `<div class="panel"><div class="panel-title">V3 待審核名單</div>
+    <p class="hint">先保留名額，通過後正式入列；駁回立即釋位。每頁最多 20 筆。</p>
+    ${summary?`<div class="grid"><div>待審核 ${Number(summary.pendingReviewCount)}</div><div>正式正取 ${Number(summary.confirmedCount)}</div><div>剩餘 ${Number(summary.availableCount)}</div></div>`:''}
+    ${v3ReviewError?`<p role="alert">${esc(v3ReviewError)}</p>`:''}
+    <div class="btn-row"><button class="btn btn-primary" data-action="v3-review-refresh" ${v3ReviewBusy?'disabled':''}>讀取待審核</button><button class="btn btn-ghost" data-action="v3-review-sync" ${v3ReviewBusy?'disabled':''}>同步正式名單與摘要</button></div>
+    ${page&&!rows.length?'<p class="hint">目前沒有待審核名單。</p>':''}
+    ${rows.map(r=>`<div class="registration-mobile-card"><div class="registration-mobile-main"><strong>#${Number(r.sequence)} ${esc(r.displayName||r.uid)}</strong><small>待審核</small></div><div class="btn-row"><button class="btn btn-primary btn-sm" data-action="v3-review-approve" data-uid="${esc(r.uid)}" data-attempt="${esc(r.attemptId)}" ${v3ReviewBusy?'disabled':''}>通過</button><button class="btn btn-danger btn-sm" data-action="v3-review-reject" data-uid="${esc(r.uid)}" data-attempt="${esc(r.attemptId)}" ${v3ReviewBusy?'disabled':''}>不通過</button></div></div>`).join('')}
+    ${page?.nextSequence?`<button class="btn btn-ghost" data-action="v3-review-next" ${v3ReviewBusy?'disabled':''}>下一頁</button>`:''}</div>`;
+}
 function renderAdminRegistrationsTab(){
+  if(isV3ManagementRoom()&&!staffRosterReadOnly())return renderV3ReviewPanel();
   if(staffRosterReadOnly())return renderStaffRegistrationRoster();
   const registrationLocked=currentTournamentRegistrationLocked();
   if(!state.meta || !state.meta.registrationEnabled){
@@ -22533,6 +22549,32 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     dutyLogsLoading=true; dutyLogsError=""; render();
     (async()=>{try{if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();if(!cloudAvailable()||!window.cloudSync.queryMyDutyLogs) throw new Error("network");dutyLogsCache=await window.cloudSync.queryMyDutyLogs();}catch(e){console.warn("[duty logs]",e);dutyLogsCache=[];dutyLogsError="讀取執勤紀錄失敗，請確認網路與 Firestore Rules。";}finally{dutyLogsLoading=false;render();}})();
     return;
+  }
+  if(["v3-review-refresh","v3-review-next","v3-review-approve","v3-review-reject","v3-review-sync"].includes(action)){
+    if(!isV3ManagementRoom()||staffRosterReadOnly()||v3ReviewBusy)return;
+    const code=state.cloudCode,key=v3ReviewKey(),op=window.engagementService?.registrationV3Operation;
+    if(!code||!op)return;
+    const page=v3ReviewPage?.key===key?v3ReviewPage:null;
+    const registrationId=target.getAttribute("data-uid"),expectedAttemptId=target.getAttribute("data-attempt");
+    if((action==="v3-review-approve"||action==="v3-review-reject")&&!page?.rows.some(r=>r.uid===registrationId&&r.attemptId===expectedAttemptId))return;
+    v3ReviewBusy=true;v3ReviewError="";render();
+    (async()=>{
+      try{
+        if(action==="v3-review-approve"||action==="v3-review-reject"){
+          const result=await op({code,action:action==="v3-review-approve"?"approve":"reject",registrationId,expectedAttemptId});
+          if(!result?.ok)throw Error("registration-operation-unconfirmed");
+          if(key!==v3ReviewKey())return;
+          showToast(action==="v3-review-approve"?"審核通過":"已駁回並釋位");
+        }else if(action==="v3-review-sync"){
+          await op({code,action:"syncSummary"});
+          if(key!==v3ReviewKey())return;
+          showToast("正式名單與摘要已同步");
+        }
+        const result=await op({code,action:"reviewPage",limit:20,afterSequence:action==="v3-review-next"?page?.nextSequence||0:0});
+        if(key===v3ReviewKey())v3ReviewPage={...result,key};
+      }catch(e){if(key===v3ReviewKey())v3ReviewError=mapRegistrationError(e);}
+      finally{v3ReviewBusy=false;render();}
+    })();return;
   }
   if(action==="load-admin-registrations"){
     loadAdminRegistrationRows();
