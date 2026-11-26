@@ -1,0 +1,27 @@
+name: PTN expansion isolated transaction
+on:
+  pull_request:
+    paths:
+      - 'registration-flow-v2/**'
+      - '.github/workflows/ptn-expansion-emulator.yml'
+permissions:
+  contents: read
+jobs:
+  expansion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: node --check registration-flow-v2/backend/ticket-expansion.cjs
+      - run: npm install --prefix /tmp/registration-v2-deps --no-save --ignore-scripts firebase-tools@13.35.1 firebase-admin@14.4.0 firebase-functions@7.3.2
+      - run: /tmp/registration-v2-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-registration-v2 --config registration-flow-v2/emulator.json 'node --test registration-flow-v2/tests/ticket-expansion-emulator.test.cjs'
+        env:
+          NODE_PATH: /tmp/registration-v2-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-registration-v2
