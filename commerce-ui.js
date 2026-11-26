@@ -550,7 +550,7 @@ async function handle(action,target){
  if(action==='commerce-buy'){
   if(c.view!=='shop'||c.ticketsOpen||c.pending)return;
   const p=visibleProducts(c).find(p=>p.id===id);
-  if(!purchasable(p))return;
+  if(!purchasable(p)||p.delivery.kind==='room_expansion'&&c.storeOpen!==true)return;
   if(!document.querySelector('[data-commerce-consent]')?.checked){c.error='請先閱讀並勾選購買說明。';render();return;}
   const quantity=p.delivery.kind==='room_expansion'?Number(document.querySelector('[data-expansion-quantity]')?.value):null;
   if(p.delivery.kind==='room_expansion'&&(!Number.isSafeInteger(quantity)||quantity<1||quantity>10000)){c.error='請輸入有效購買張數。';render();return;}

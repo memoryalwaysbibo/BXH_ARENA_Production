@@ -794,7 +794,8 @@ test('expansion ticket product is partner-only and checkout sends selected prepa
  t.setPartner(true);await t.ui.handle('commerce-product',{dataset:{id:'tournament_expansion_1'}});
  assert.match(t.ui.shop(),/data-expansion-quantity/);
  t.sandbox.document.querySelector=s=>s==='[data-expansion-quantity]'?{value:'5'}:{checked:true};
- await t.ui.handle('commerce-buy',{dataset:{id:'tournament_expansion_1'}});
+ c.storeOpen=false;await t.ui.handle('commerce-buy',{dataset:{id:'tournament_expansion_1'}});assert.equal(t.calls.length,0);
+ c.storeOpen=true;await t.ui.handle('commerce-buy',{dataset:{id:'tournament_expansion_1'}});
  assert.equal(t.calls[0].quantity,5);assert.equal(t.calls[0].expectedVersion,2);
  assert.equal(t.calls[0].productId,'tournament_expansion_1');
  assert.equal(t.calls[0].roomCode,undefined);
