@@ -19535,9 +19535,9 @@ function renderNewTournamentRegistrationVersion(){
     <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px" aria-label="報名流程版本">
       <button type="button" class="btn btn-primary" aria-pressed="true" style="min-width:0;min-height:44px;padding:5px 2px;white-space:normal;display:block;line-height:1.22"><strong>V1</strong><br>標準報名</button>
       <button type="button" class="btn btn-ghost" disabled aria-pressed="false" style="min-width:0;min-height:44px;padding:5px 2px;white-space:normal;display:block;line-height:1.22"><strong>V2</strong><br>排隊報名</button>
-      <button type="button" class="btn btn-ghost" disabled aria-pressed="false" style="min-width:0;min-height:44px;padding:5px 2px;white-space:normal;display:block;line-height:1.22"><strong>V3</strong><br>先保留名額</button>
+      <button type="button" class="btn btn-ghost" data-action="v3-create-open" ${isSuperAdmin()?'':'disabled'} aria-pressed="false" style="min-width:0;min-height:44px;padding:5px 2px;white-space:normal;display:block;line-height:1.22"><strong>V3</strong><br>先保留名額</button>
     </div>
-    <p class="hint" style="margin:6px 0 0">目前僅開放 V1。V2 和 V3 不可選擇。</p>
+    <p class="hint" style="margin:6px 0 0">${isSuperAdmin()?'V3 由最高管理員建立獨立草稿；V1 不變。':'目前僅開放 V1。'}</p>
   </fieldset>`;
 }
 
@@ -24920,13 +24920,46 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(code) copyTextToClipboard(code, "已複製賽事代碼："+code);
     return;
   }
+  if(action==="v3-create-open"){
+    if(!isSuperAdmin()||!canCreateOfficialTournament())return;
+    const fields=`<div class="field"><label>賽事名稱</label><input id="v3-create-name" maxlength="80"></div>
+      <div class="field"><label>地點</label><input id="v3-create-location" maxlength="160"></div>
+      <div class="field"><label>名額（最多 192）</label><input id="v3-create-capacity" type="number" min="1" max="192" value="128"></div>
+      <div class="field"><label>裁判台數</label><input id="v3-create-stations" type="number" min="1" max="12" value="4"></div>
+      <div class="field"><label>報名開放（台灣時間）</label><input id="v3-create-open-at" type="datetime-local"></div>
+      <div class="field"><label>報名截止（台灣時間）</label><input id="v3-create-close-at" type="datetime-local"></div>
+      <div class="field"><label>取消截止（台灣時間）</label><input id="v3-create-cancel-at" type="datetime-local"></div>
+      <p class="hint">建立未發布草稿，不影響現有房間。</p>`;
+    openModal({type:"generic",title:"建立 V3 新賽事",messageIsHtml:true,message:fields,confirmLabel:"建立 V3 草稿",onConfirm:()=>{
+      if(!isSuperAdmin())return;
+      const val=id=>document.getElementById("v3-create-"+id)?.value||"";
+      const at=id=>Date.parse(val(id)+"+08:00");
+      const payload={name:val("name"),location:val("location"),capacity:Number(val("capacity")),stations:Number(val("stations")),registrationOpenAt:at("open-at"),registrationCloseAt:at("close-at"),cancellationDeadline:at("cancel-at")};
+      if(!payload.name.trim()||!payload.location.trim()||!Number.isSafeInteger(payload.capacity)||payload.capacity<1||payload.capacity>192||
+        !Number.isSafeInteger(payload.stations)||payload.stations<1||payload.stations>12||![payload.registrationOpenAt,payload.registrationCloseAt,payload.cancellationDeadline].every(Number.isFinite)||payload.registrationOpenAt>=payload.registrationCloseAt){
+        showToast("請填寫完整賽事及正確報名時間",true);return;
+      }
+      const actor=currentAuthUid();
+      (async()=>{
+        try{
+          const result=await window.engagementService.createRegistrationRoomV3(payload);
+          if(result?.ok!==true||!result.code)throw Error("registration-operation-unconfirmed");
+          if(actor!==currentAuthUid())return;
+          showToast("V3 草稿已建立："+result.code);
+          const joined=await resolveAndJoinTournamentByCode(result.code,{forcePrivate:true});
+          if(joined.ok){appPhase="app";activeTab="settings";render();}
+          else{adminTournamentListOpen=true;await loadAdminTournamentList();}
+        }catch(e){showToast(mapRegistrationError(e),true);}
+      })();
+    }});return;
+  }
   if(action==="cloud-admin-new-tournament"){
     if(!hasAdminAccess()){ showToast("目前身分沒有此操作權限。", true); return; }
     if(!canCreateOfficialTournament()){ showToast("目前帳號無法建立新的賽事。", true); return; }
     adminTournamentListOpen = false;
     render();
     const hasData = state.players.length>0 || state.matches.length>0 || (state.meta && (state.meta.name || state.meta.date || state.meta.location));
-    if(hasData){
+    if(hasData||isSuperAdmin()){
       openModal({ type:"generic", title:isTester()?"建立測試賽事":"建立新賽事", message:`目前賽事會保留，不會被刪除。確定建立一場新的空白${isTester()?"測試":""}賽事？`, confirmLabel:isTester()?"新增測試賽事":"新增賽事", showNewTournamentRegistrationVersion:!isTester(), onConfirm:()=>doNewTournament(false) });
     } else { doNewTournament(false); }
     return;

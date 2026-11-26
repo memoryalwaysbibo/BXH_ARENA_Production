@@ -1081,6 +1081,16 @@
   }
   window.engagementService={
     registrationV3Operation,
+    async createRegistrationRoomV3(payload){
+      const uid=authHandle?.currentUser?.uid;
+      if(!authReady||!uid)throw Error('auth-required');
+      const key='bxh.registrationV3Create.'+uid+'.'+JSON.stringify(payload);
+      let operationId;
+      try{operationId=sessionStorage.getItem(key)||crypto.randomUUID();sessionStorage.setItem(key,operationId);}catch{throw Error('storage-unavailable');}
+      const result=await callEngagementFunction('createRegistrationRoomV3',{...payload,operationId},60000);
+      if(result?.ok===true)sessionStorage.removeItem(key);
+      return result;
+    },
     registrationFlowV2Enabled,
     // Pure presentation hint for existing ordinary routes; never used for dispatch.
     knownRegistrationV2DisplayRoute(code){
