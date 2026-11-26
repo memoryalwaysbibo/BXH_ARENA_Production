@@ -43,7 +43,7 @@ const admit=createAdmission();
   const ticket=t.eventAuthority==='ticket'&&pub.eventAuthority==='ticket'&&t.ticketAccessV1?.version===1&&
    t.ticketAccessV1.roomId===s.id&&pub.ticketRoomVersion===1&&t.registrationQueueVersion===2&&pub.registrationQueueVersion===2&&
    [32,64,96,128,160].includes(ticketBase)&&Number.isSafeInteger(ticketAdded)&&ticketAdded>=0&&
-   t.capacity===ticketBase+ticketAdded&&t.capacity<=320&&t.capacity===pub.capacity&&t.capacity===s.meta?.registrationCapacity&&
+   t.capacity===ticketBase+ticketAdded&&t.capacity<=192&&t.capacity===pub.capacity&&t.capacity===s.meta?.registrationCapacity&&
    (ticketAdded===0||(/^PTN-[A-Z0-9]{6}$/.test(code)&&t.ptnSettlementVersion===1&&pub.ptnSettlementVersion===1))&&
    !t.waitlistEnabled&&!pub.waitlistEnabled;
   if(anyTicket&&!ticket)throw Error('registration-state-conflict');
