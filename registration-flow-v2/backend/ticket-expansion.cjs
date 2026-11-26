@@ -11,8 +11,8 @@ const parse=value=>{try{return JSON.parse(value);}catch{throw Error('ticket-capa
 function capacityMatches({code,room,pub,state,mirror,ticket,maxCapacity}){
  const access=room?.ticketAccessV1,base=access?.baseCapacity,added=access?.addedCapacity;
  const total=base+added;
- requireThat([32,64,96,128,160].includes(base)&&integer(maxCapacity,1,320)&&
-  integer(added,0,320-base)&&total<=maxCapacity&&
+ requireThat([32,64,96,128,160].includes(base)&&integer(maxCapacity,1,192)&&
+  integer(added,0,192-base)&&total<=maxCapacity&&
   (!added||isPartnerRoomCode(code)&&room.ptnSettlementVersion===1)&&
   (!ticket||ticket.capacity===base&&ticket.addedCapacity===added)&&
   room.capacity===total&&pub?.capacity===total&&state?.meta?.registrationCapacity===total&&
@@ -48,7 +48,7 @@ function createTicketExpansionHandler({db,clock=Date.now}){
     requireThat(prior.actorUid===uid&&prior.action==='ticket-room-expand'&&prior.requestHash===hash&&prior.result?.roomId===roomId,'operation-conflict');
     return {...prior.result,replayed:true};
    }
-   requireThat(config?.enabled===true&&integer(config.maxCapacity,1,320),'expansion-unavailable');
+   requireThat(config?.enabled===true&&integer(config.maxCapacity,1,192),'expansion-unavailable');
    requireThat(room.eventAuthority==='ticket'&&pub?.eventAuthority==='ticket'&&room.ptnSettlementVersion===1&&pub.ptnSettlementVersion===1&&
     pub.ticketRoomVersion===1&&room.registrationQueueVersion===2&&pub.registrationQueueVersion===2&&
     room.tournamentPhase==='waiting'&&pub.tournamentPhase==='waiting'&&
