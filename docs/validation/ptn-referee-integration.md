@@ -11,7 +11,25 @@ Scope: PR #894. Official, general/community, and partner ticket rooms share the 
 
 ## Acceptance not yet complete
 
-- Full official/live PTN score-panel parity: current PTN implementation still lacks the common PASS/pause/resume, fault, rematch, previous-result correction and equivalent swap/next-match workflow. Do not call it identical or expose unconnected controls. Review these against existing dispatch and scoring semantics, then implement/test compatible operations without changing settlement rules.
+- Standard individual controls: fault (including pending fault undo), rematch, pause/resume, score log, left/right view swap and authoritative next-match preview are now wired. PASS defer now uses the existing single-elimination engine and preserves score; automatic return, explicit reassignment, physical court swap and previous-result correction still need routing and downstream-result validation; do not expose unconnected controls. Do not import a different dispatch policy or change settlement rules.
 - Current candidate must pass all required GitHub CI, including actual Firestore and browser validation. Earlier green results are not a substitute for the current head.
 - Production packaging: compare the live `registrationRosterQueueV2` archive (last operator-reported generation 1795672892869015) against the candidate and preserve every unrelated writer/binding; include the new ticket referee adapter and its shared service/core dependencies, retirement engine, and applicable lifecycle/mirror code. Official/general referee runtime must be independently compared with its live archive before applying shared retirement changes. Preserve the historical community-release bundle; it is not the new production package.
 - No formal room mutations or production release flag changes during candidate validation. Verify matching frontend/backend publication and explicitly authorized activation before a real PTN room acceptance; test invitation, staff seat, handoff, score, exit, resize, re-expand, completion and unchanged ladder settlement.
+
+## 賽事功能邊界（對焦表）
+
+| 分類 | 官方賽 | 玩家一般賽 | 合作主辦 PTN |
+|---|---|---|---|
+| 標準個人賽：四分制、失誤、撤銷、重賽、暫停／恢復 | 共用 | 共用 | 候選版補齊，共用標準控制及失誤核心 |
+| 三席裁判、退場、縮台、接管 | 共用核心 | 共用核心 | 共用核心，保留 PTN 房間權限 |
+| 玩家邀請（名稱／信件／QR） | 不新增 | 既有 | 沿用一般賽邀請 |
+| 工作人員直接入席 | 既有 | 既有 | 既有共用席位流程接線；不需邀請 |
+| 左右選手顯示互換、比分紀錄、下一場預覽 | 共用 UI | 共用 UI | 候選版補齊；不變更真正派場 |
+| PASS 跳過 | 既有依賽制和權限 | 既有依賽制和權限 | 候選版接通共用單淘汰引擎，比分保留；回補完整驗證待完成 |
+| 實際跨台換場／派場、上一場修正 | 既有依賽制和權限 | 既有依賽制和權限 | 待以 PTN 派場規則與賽果保護接通 |
+| 快速判定 | 僅已啟用的快速模式 | 僅已啟用的快速模式 | 標準 PTN 不開放 |
+| 團體、附魔、分組／多階段等賽制 | 僅現有適用賽制 | 依已支援賽制 | 本次單淘汰個人 PTN 不導入 |
+| 票券、扣券、主辦資格及代理權 | 不套用 | 不套用 | PTN 專屬，既有流程保留 |
+| 排名結算／天梯資格 | 依官方規則 | 一般賽不套用排名賽資格 | 既有已驗證規則保留 |
+
+「左右互換」是本機畫面顯示，不等於真正跨台換場。上一場修正須沿用既有下游賽果保護，不得跨越已進行的對戰或已結算賽事。未確認的賽制專屬功能不因 UI 共用而啟用。

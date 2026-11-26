@@ -4,6 +4,7 @@
 // owner UID or ticket state is accepted as authority.
 const {createHandler}=require('../../referee-seats/functions/service.cjs');
 const C=require('../../referee-seats/functions/core.cjs');
+const Fault=require('../../referee-seats/functions/engine/fault.cjs');
 const {isPartnerRoomCode,resolveTicketGate,authorizeTicketManager,activeTicketManager,checkTicketContract}=require('./ticket-host.cjs');
 const {registrationQueueOwnsRoom}=require('./legacy-writer.cjs');
 const actions=new Set(['view','enable','find-invite-player','invite','create-qr','inspect-qr','accept-qr','accept-invite','claim','leave','revoke','request','respond','cancel']);
@@ -33,7 +34,7 @@ async function resolveTicketRefereeAuthority({db,enabled,tx,room,publicRoom,stat
 // Scoped session: non-managers never receive the roster, delegate details,
 // vouchers, full match history or other courts' player data.
 function projectTicketRefereeView({room,state,user,uid,code,now,authority}){
- const {forfeitMatchAvailable,ticketMatchCourtAvailable,ticketRoundBlocked,ticketBronzeBlocked}=require('./lifecycle.cjs');
+ const {forfeitMatchAvailable,ticketMatchCourtAvailable,ticketRoundBlocked,ticketBronzeBlocked,ticketCourtSummary,ticketCanSkip}=require('./lifecycle.cjs');
  const full=C.manager(room,user,uid,authority),support=['staff','admin','super_admin'].includes(user.role);
  const model=room.refereeSeatsV1?.version===1?room.refereeSeatsV1:null;
  const occupied=n=>C.SLOTS.some(slot=>model?.courts?.[n]?.[slot]?.uid===uid);
@@ -41,7 +42,7 @@ function projectTicketRefereeView({room,state,user,uid,code,now,authority}){
  for(let n=1;n<=state.meta.stations;n++){
   const source=model?.courts?.[n]||{},closed=state.forcedCourtExits?.[n]?.closed===true||source.retired===true;
   if(!full&&!support&&(!occupied(n)||closed))continue;
-  courts[n]={revision:Number(source.revision||0),closed,...Object.fromEntries(C.SLOTS.map(slot=>[slot,source[slot]?{uid:source[slot].uid,name:String(source[slot].name||'裁判').slice(0,80)}:null]))};
+  courts[n]={revision:Number(source.revision||0),closed,...ticketCourtSummary(state,n),...Object.fromEntries(C.SLOTS.map(slot=>[slot,source[slot]?{uid:source[slot].uid,name:String(source[slot].name||'裁判').slice(0,80)}:null]))};
  }
  if(!Object.keys(courts).length)throw Error('not-event-staff');
  const names=new Map((state.players||[]).map(p=>[p.id,p.name]));
@@ -50,6 +51,7 @@ function projectTicketRefereeView({room,state,user,uid,code,now,authority}){
   const m=(state.matches||[]).find(x=>x.id===id&&Number(x.station)===n&&!x.completed&&!x.isBye&&x.a?.playerId&&x.b?.playerId&&!x.forceDetached);
   if(!m||court.closed)return null;
   return {id:m.id,seq:m.seq,round:m.round,station:n,status:m.status,scoreA:Number(m.scoreA||0),scoreB:Number(m.scoreB||0),
+   faultActions:Fault.snapshot(m),standardControls:true,canSkip:ticketCanSkip(state,m),scoreLog:(m.log||[]).map(l=>({side:l.side,type:l.type,points:l.points})),
    a:{name:names.get(m.a.playerId)||'選手 A'},b:{name:names.get(m.b.playerId)||'選手 B'},updatedAt:Number(m.updatedAt||0),
    canScore:room.tournamentPhase==='live'&&court.main?.uid===uid&&forfeitMatchAvailable(m)&&ticketMatchCourtAvailable(state,m)&&!ticketRoundBlocked(m,state.matches,state.meta)&&!ticketBronzeBlocked(m,state.matches,state.meta)&&
     !['quick'].includes(m.scoringMode)&&!['quick'].includes(state.meta.scoringMode)};

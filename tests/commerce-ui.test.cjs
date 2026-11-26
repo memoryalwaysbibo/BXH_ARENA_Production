@@ -925,3 +925,23 @@ test('PTN referee session drains a newer public revision received during an auth
  assert.equal(reads,3);assert.equal(t.ui.context().refereeSession.room.updatedAt,3);
  notify({},3);assert.equal(reads,3);
 });
+
+
+test('PTN standard controls expose fault, undo, pause/resume and rematch only with the matching backend capability',async()=>{
+ const t=setup(),code='PTN-TST001',calls=[];
+ const match={id:'m',station:1,round:0,seq:0,status:'in_progress',updatedAt:12,scoreA:0,scoreB:0,a:{name:'甲'},b:{name:'乙'},canScore:true,standardControls:true,faultActions:[{side:'A'}]};
+ const room={ok:true,code,roomId:'room-generation',phase:'live',stations:1,updatedAt:321,bracket:[match],refereeSeatControl:{version:1,canInvite:false,canJoin:false,courts:{1:{revision:1,main:{uid:'buyer',name:'主裁'}}},requests:[]}};
+ t.sandbox.window.engagementService.ticketRoomOperation=async p=>{calls.push({...p});if(p.action==='ticket-room-score'){if(p.command==='pause')match.status='paused';if(p.command==='resume')match.status='in_progress';match.updatedAt++;return {ok:true};}return JSON.parse(JSON.stringify(room));};
+ await t.ui.openTicketRefereeSession(code,1);let html=t.ui.ticketRefereeSessionView();
+ assert.match(html,/失誤 1\/2/);assert.match(html,/撤銷上一筆失誤/);assert.match(html,/本局重賽/);assert.match(html,/暫停比賽/);
+ match.canSkip=true;await t.ui.handle('commerce-ticket-referee-refresh',{});assert.match(t.ui.ticketRefereeSessionView(),/跳過（PASS）/);await t.ui.handle('commerce-ticket-score',{dataset:{id:'m',command:'skip'}});assert.ok(calls.some(p=>p.command==='skip'));
+ match.canSkip=false;await t.ui.handle('commerce-ticket-referee-refresh',{});assert.doesNotMatch(t.ui.ticketRefereeSessionView(),/跳過（PASS）/);
+ const beforeSwap=calls.length;await t.ui.handle('commerce-ticket-swap-view',{dataset:{id:'m'}});assert.match(t.ui.ticketRefereeSessionView(),/ref-vs-arena standard swapped/);assert.equal(calls.length,beforeSwap);
+ room.refereeSeatControl.courts[1].nextMatch={id:'next',seq:2,a:{name:'下一位甲'},b:{name:'下一位乙'}};await t.ui.handle('commerce-ticket-referee-refresh',{});assert.match(t.ui.ticketRefereeSessionView(),/下一場・第 3 場/);assert.match(t.ui.ticketRefereeSessionView(),/下一位甲 vs 下一位乙/);assert.doesNotMatch(t.ui.ticketRefereeSessionView(),/data-id="next"/);
+ await t.ui.handle('commerce-ticket-score',{dataset:{id:'m',command:'fault',side:'A'}});assert.equal(calls.find(p=>p.command==='fault').side,'A');
+ await t.ui.handle('commerce-ticket-score',{dataset:{id:'m',command:'pause'}});assert.match(t.ui.ticketRefereeSessionView(),/恢復比賽/);
+ await t.ui.handle('commerce-ticket-score',{dataset:{id:'m',command:'resume'}});assert.match(t.ui.ticketRefereeSessionView(),/暫停比賽/);
+ await t.ui.handle('commerce-ticket-score',{dataset:{id:'m',command:'rematch'}});assert.ok(calls.some(p=>p.command==='rematch'));
+ match.standardControls=false;await t.ui.handle('commerce-ticket-referee-refresh',{});html=t.ui.ticketRefereeSessionView();assert.doesNotMatch(html,/data-command="(?:fault|rematch|pause|resume)"/);
+ const count=calls.length;await t.ui.handle('commerce-ticket-score',{dataset:{id:'m',command:'rematch'}});assert.equal(calls.length,count);
+});

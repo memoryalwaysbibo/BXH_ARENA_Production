@@ -150,6 +150,35 @@ test('published vouchers create independent PTN gates for two eligible organizer
    await assert.rejects(score({...scopedScore,auth:{uid:'live-backup'}}),/permission-denied/);
    await assert.rejects(score({...scopedScore,data:{...scopedScore.data,expectedCourtRevision:0}}),/seat-stale/);
    assert.equal((await score(scopedScore)).scoreA,2);assert.equal((await score(scopedScore)).replayed,true);
+   // Exercise the same standard individual controls as official/general rooms
+   // without changing the baseline score/retirement fixture below.
+   const standardCheckpoint=JSON.parse(JSON.stringify([...rows]));
+   const currentMatch=()=>JSON.parse(rows.get(roomPath).data).matches.find(m=>m.id===held.id);
+   const standardReq=(op,kind,extra={})=>({auth:{uid:'live-referee'},app:{},data:{...scoreReq(op,currentMatch(),kind).data,station:heldStation,expectedCourtRevision:1,...extra}});
+   const fault=standardReq('live-fault-one','fault',{side:'A'});
+   assert.equal((await score(fault)).scoreB,0);assert.equal((await score(fault)).replayed,true);
+   assert.equal(currentMatch().faultActions.length,1);
+   assert.equal((await score(standardReq('live-fault-two','fault',{side:'A'}))).scoreB,1);
+   assert.equal(currentMatch().log.at(-1).type,'fault');
+   await score(standardReq('live-fault-undo','undo'));assert.equal(currentMatch().scoreB,0);assert.equal(currentMatch().faultActions.length,1);
+   await score(standardReq('live-pending-undo','undo'));assert.equal(currentMatch().faultActions.length,0);assert.equal(currentMatch().scoreA,2);
+   await score(standardReq('live-pause','pause'));assert.equal(currentMatch().status,'paused');
+   await assert.rejects(score(standardReq('live-pause-repeat','pause')),/invalid-status/);
+   await score(standardReq('live-resume','resume'));assert.equal(currentMatch().status,'in_progress');
+   await score(standardReq('live-rematch','rematch'));assert.equal(currentMatch().scoreA,0);assert.equal(currentMatch().log.length,0);assert.equal(currentMatch().faultActions.length,0);
+   assert.equal(JSON.parse(rows.get(pubPath).bracketView).matches.find(m=>m.id===held.id).scoreA,0);
+   assert.equal(rows.get('commerceTickets/'+id).status,'consumed');
+   rows.clear();for(const [key,value] of standardCheckpoint)rows.set(key,value);
+   const passCheckpoint=JSON.parse(JSON.stringify([...rows]));
+   assert.equal(require('../backend/lifecycle.cjs').ticketCanSkip(JSON.parse(rows.get(roomPath).data),currentMatch()),true);
+   await score(standardReq('live-pass-skip','skip'));
+   assert.equal(currentMatch().scoreA,2);assert.equal(currentMatch().log.length,1);assert.ok(currentMatch().skippedAt);
+   assert.ok(currentMatch().passReturn.waitFor.length>0);
+   assert.equal(JSON.parse(rows.get(pubPath).bracketView).matches.find(m=>m.id===held.id).skippedAt,currentMatch().skippedAt);
+   await assert.rejects(score(standardReq('live-pass-score','score',{side:'A',finish:'spin'})),/score-match-stale/);
+   rows.clear();for(const [key,value] of passCheckpoint)rows.set(key,value);
+
+
    const shrink=command('live-shrink',{stations:1});
    await liveResize(shrink);assert.equal((await liveResize(shrink)).replayed,true);
    const getState=()=>JSON.parse(rows.get(roomPath).data);

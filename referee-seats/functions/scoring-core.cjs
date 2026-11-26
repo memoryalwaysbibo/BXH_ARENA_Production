@@ -22,6 +22,15 @@ function allowed(room,user,uid,station,authority={}){
  return C.SLOTS.some(slot=>room.refereeSeatsV1?.courts?.[station]?.[slot]?.uid===uid);
 }
 function passProtected(state,m){return !!m.callPass||(state.matches||[]).some(x=>x.callPass?.waitFor?.includes(m.id)&&!x.completed);}
+// Pure standard-individual controls; callers retain their own room, seat,
+// lifecycle and routing checks. No score settlement or dispatch mutation here.
+function applyStandardControl(m,action,side,now){
+ if(action==='fault'){const r=Fault.applyFault(m,side,now);if(!r.ok)fail(r.reason);}
+ else if(action==='rematch')Object.assign(m,{scoreA:0,scoreB:0,log:[],faultActions:[],hunterData:null,winnerId:null,loserId:null,completed:false,status:'in_progress'});
+ else if(action==='pause'){if(m.status!=='in_progress')fail('invalid-status');m.status='paused';}
+ else if(action==='resume'){if(m.status!=='paused')fail('invalid-status');m.status='in_progress';}
+ else fail('invalid-action');
+}
 function perform({room,state,user,uid,d,now,authority={}},propagate){
  if(room.refereeSeatsV1?.version!==1)fail('not-enabled');
  if((room.eventAuthority!==state.meta?.eventAuthority||(room.eventAuthority!=='official'&&!communitySupport(room,user,uid,authority)&&!communitySeatedPlayer(room,user,uid,Number(d.station),authority)))||state.meta?.battleMode==='team'||state.meta?.playMode==='enchantment')fail('unsupported-mode');
@@ -51,7 +60,7 @@ function perform({room,state,user,uid,d,now,authority={}},propagate){
    if(engine.checkWinnerSide(m))fail('no-more-score');
    if(m.scoringMode==='quick')fail('quick-mode');
    if(!['A','B'].includes(d.side))fail('invalid-side');
-   if(action==='fault'){const r=Fault.applyFault(m,d.side,now);if(!r.ok)fail(r.reason);}
+   if(action==='fault')applyStandardControl(m,action,d.side,now);
    else{
     if(typeof d.finish!=='string'||!Object.hasOwn(POINTS,d.finish))fail('invalid-finish');const points=POINTS[d.finish];
     const key=d.side==='A'?'scoreA':'scoreB',current=Number(m[key]||0);if(!Number.isInteger(current)||current<0||current+points>6)fail('invalid-score');
@@ -61,16 +70,14 @@ function perform({room,state,user,uid,d,now,authority={}},propagate){
    if(Fault.hasPending(m))Fault.popPending(m);
    else{const last=m.log?.pop();if(!last)fail('nothing-to-undo');const key=last.side==='A'?'scoreA':'scoreB';m[key]=Math.max(0,Number(m[key]||0)-Number(last.points||0));Fault.restoreFromEvent(m,last);}
   }else if(action==='rematch'){
-   Object.assign(m,{scoreA:0,scoreB:0,log:[],faultActions:[],hunterData:null,winnerId:null,loserId:null,completed:false,status:'in_progress'});
+   applyStandardControl(m,action,null,now);
   }else if(action==='confirm'||action==='quick'){
    if(action==='quick'&&m.scoringMode!=='quick')fail('standard-mode');
    if(action==='confirm'&&m.scoringMode==='quick')fail('quick-mode');
    const ev=action==='quick'?engine.evaluateQuickDecision(m,d.winnerId):engine.evaluateMatchCompletion(m);if(!ev.ok)fail(ev.reason);
    if(action==='quick')engine.applyQuickDecisionFields(m,ev,identity.name);else engine.applyMatchCompletionFields(m,ev,identity.name);
-  }else if(action==='pause'){
-   if(m.status!=='in_progress')fail('invalid-status');m.status='paused';
-  }else if(action==='resume'){
-   if(m.status!=='paused')fail('invalid-status');m.status='in_progress';
+  }else if(action==='pause'||action==='resume'){
+   applyStandardControl(m,action,null,now);
   }else if(action==='start'||action==='ready'){
    for(const other of state.matches)if(other.id!==m.id&&!other.completed&&other.station===station&&other.status===(action==='start'?'in_progress':'ready')){other.status=action==='start'?'ready':'pending';other.updatedAt=now;}
    m.status=action==='start'?'in_progress':'ready';if(action==='start')m.startedAt=m.startedAt||now;
@@ -103,6 +110,6 @@ function transitionLocal(context){
  if(!['score','fault','undo','rematch','pause','resume'].includes(context?.d?.action))fail('structural-command-required');
  return perform(context,false);
 }
-module.exports={communitySeatedPlayer,communitySupport,transition,transitionLocal,allowed,publicProjection};
+module.exports={communitySeatedPlayer,communitySupport,transition,transitionLocal,allowed,publicProjection,applyStandardControl};
 
 

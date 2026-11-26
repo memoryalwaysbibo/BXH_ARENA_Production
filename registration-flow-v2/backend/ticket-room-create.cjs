@@ -1,6 +1,7 @@
 'use strict';
-const {forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked,ticketMatchCourtAvailable,projectTicketCourtState}=require('./lifecycle.cjs');
+const {forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked,ticketMatchCourtAvailable,projectTicketCourtState,ticketCourtSummary,ticketCanSkip}=require('./lifecycle.cjs');
 const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
+const Fault=require('../../referee-seats/functions/engine/fault.cjs');
 const {BXHCourtRetirement:R}=require('../../referee-seats/functions/engine/court-retirement.cjs');
 const {signature}=require('../../modules/main-app/bracket-commit.js');
 
@@ -278,6 +279,7 @@ function createTicketRoomStateHandler({db,enabled=async()=>false,clock=Date.now}
     a:match.a?.playerId?{id:match.a.playerId,name:names.get(match.a.playerId)||'選手 A'}:null,
     b:match.b?.playerId?{id:match.b.playerId,name:names.get(match.b.playerId)||'選手 B'}:null,
     scoreA:Number(match.scoreA||0),scoreB:Number(match.scoreB||0),winnerId:match.winnerId||null,
+    faultActions:Fault.snapshot(match),standardControls:true,canSkip:ticketCanSkip(state,match),scoreLog:(match.log||[]).map(l=>({side:l.side,type:l.type,points:l.points})),
     updatedAt:match.updatedAt||0,
     canScore:room.tournamentPhase==='live'&&gate.enabled===true&&!state.championId&&forfeitMatchAvailable(match)&&ticketMatchCourtAvailable(state,match)&&
      !['quick'].includes(match.scoringMode)&&!['quick'].includes(state.meta.scoringMode)&&
@@ -292,7 +294,7 @@ function createTicketRoomStateHandler({db,enabled=async()=>false,clock=Date.now}
     state.meta?.formatType==='single'&&state.meta?.battleMode==='individual'&&Number.isInteger(state.meta.stations)&&state.meta.stations>=1&&state.meta.stations<=12&&await enabled(code,tx)
     ?{version:1,targetCount:R.target(state),courts:Array.from({length:state.meta.stations},(_,i)=>{
      const station=i+1,closed=state.forcedCourtExits?.[station]?.closed===true,currentMatchId=state.courtAssignments?.['court'+station]?.currentMatchId||null;
-     return {station,closed,draining:station>R.target(state),currentMatchId};
+     return {station,closed,draining:station>R.target(state),currentMatchId,...ticketCourtSummary(state,station)};
     }),detached:state.matches.filter(m=>!m.completed&&m.forceDetached&&Number(m.station)===0).map(m=>m.id)}:null;
    let refereeSeatControl=null;
    if(isPartnerRoomCode(code)&&['waiting','live'].includes(room.tournamentPhase)&&!state.championId&&gate.enabled===true&&await enabled(code,tx)&&
