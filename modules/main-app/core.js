@@ -16333,6 +16333,7 @@ function lobbySummary(raw){
        raw.ticketRoomVersion||raw.registrationSelection||
        raw.battleMode==="team"||raw.parsedData?.meta?.battleMode==="team"||
        !/^BXH-[A-Z0-9]{4,16}$/.test(raw.code||""))return "";
+    if(raw.registrationFlowVersion===3)return "V3 先卡位後審核";
     const version=raw.registrationQueueVersion;
     const route=window.engagementService?.knownRegistrationV2DisplayRoute?.(raw.code);
     if(version===2)return route===true?"V2 排隊報名":"";
@@ -17194,7 +17195,12 @@ async function loadTournamentDetail(code){
     if(uid){
       const detailBattleMode=(data.battleMode||(data.parsedData&&data.parsedData.meta&&data.parsedData.meta.battleMode))==="team"?"team":"individual";
       let registrationLoaded=false;
-      if(detailBattleMode==="team"&&window.engagementService?.teamRegistration){
+      if(data.registrationFlowVersion===3){
+        const mine=await window.engagementService.registrationV3Operation({action:'mine',code});
+        tournamentDetailMyReg=mine.hold||null;
+        tournamentDetailMyRegs=mine.hold?[mine.hold]:[];
+        registrationLoaded=true;
+      }else if(detailBattleMode==="team"&&window.engagementService?.teamRegistration){
         try{
           const mine=await window.engagementService.teamRegistration({action:'mine',code});
           tournamentDetailMyRegs=(mine?.rows||[]).filter(row=>row&&['confirmed','waitlist'].includes(row.status));
@@ -17372,6 +17378,20 @@ function renderTournamentDetailScreen(){
         ${childRegistrationAllowed?`<button class="btn btn-ghost" data-action="submit-tournament-registration" data-participant-mode="children" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>${willBeWaitlist?'兒童加入備取':'兒童報名'}</button>`:''}
       </div>`;
     }
+  }
+  if(t.registrationFlowVersion===3&&!isGuestMode&&!publicTournamentRegistrationLocked(t)){
+    const mine=tournamentDetailMyReg;
+    const active=mine&&['pending_review','confirmed'].includes(mine.status);
+    const status=({pending_review:'卡位成功・待審核',confirmed:'審核通過・正式正取',rejected:'審核未通過・名額已釋放',cancelled:'已取消報名'})[mine?.status];
+    const canJoin=!active&&isLoggedIn&&!profileIncomplete&&effStatus==='open'&&t.availableCount!==0&&!tournamentDetailError;
+    const canCancel=active&&t.cancellationDeadline&&now<t.cancellationDeadline;
+    actionHtml=`<div class="registration-result-panel" id="registration-result-panel"><div class="registration-result-title">${esc(status||'V3 先卡位後審核')}</div>
+      <p class="hint">${active?(mine.status==='pending_review'?'已為您保留名額，等待主辦方審核。':'已取得正式參賽資格。'):'送出報名後先保留名額，經審核通過才成為正式正取。'}</p>
+      ${status&&mine.sequence?'<p>卡位序號：'+esc(String(mine.sequence))+'</p>':''}
+      ${tournamentDetailError?'<p role="alert">'+esc(tournamentDetailError)+'</p>':''}
+      ${canJoin?`<button class="btn btn-primary" data-action="v3-join" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>立即卡位</button>`:''}
+      ${canCancel?`<button class="btn btn-ghost" data-action="v3-cancel" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>取消報名</button>`:''}
+      <button class="btn btn-ghost" data-action="reload-tournament-detail" data-code="${esc(code)}">重新整理狀態</button></div>`;
   }
   if(isTeamBattle){
     actionHtml=renderTeamRegistrationAction(t,code,effStatus,now,isGuestMode,isLoggedIn,profileIncomplete,activeMyRegs,confirmedRemaining,waitlistRemaining);
@@ -23742,6 +23762,25 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     render();
     return;
   }
+  if(action==="v3-join"||action==="v3-cancel"){
+    const code=target.getAttribute("data-code");
+    if(isGuestReadOnlyContext()||tournamentDetailBusy||tournamentDetailData?.registrationFlowVersion!==3||code!==tournamentDetailCode)return;
+    const mine=tournamentDetailMyReg;
+    tournamentDetailBusy=true;render();
+    (async()=>{
+      try{
+        if(action==="v3-join"&&tournamentDetailData?.roomAccessMode==="password"){
+          const access=await window.engagementService.roomAccess({action:"status",code});
+          if(!access?.hasAccess){tournamentDetailBusy=false;render();openRoomPasswordGate(code,()=>handleAction(action,target));return;}
+        }
+        const result=await window.engagementService.registrationV3Operation({action:action==="v3-join"?"join":"cancel",code,...(action==="v3-cancel"?{expectedAttemptId:mine?.attemptId}:{})});
+        if(result?.ok!==true)throw Error("registration-operation-unconfirmed");
+        showToast(result.status==="pending_review"?"卡位成功・待審核":"已取消報名");
+        publicTournamentsCache=null;invalidateMyRegistrationsCache();tournamentDetailBusy=false;
+        await loadTournamentDetail(code);
+      }catch(e){tournamentDetailBusy=false;showToast(mapRegistrationError(e),true);await loadTournamentDetail(code);}
+    })();return;
+  }
   if(action==="lobby-register"){
     if(isGuestReadOnlyContext()){ showToast("遊客模式不可報名，請切換至玩家模式", true); return; }
     const lobbyTarget=(publicTournamentsCache||[]).map(lobbySummary).find(x=>x.code===target.getAttribute("data-code"));
@@ -23750,7 +23789,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const code=target.getAttribute("data-code");
     const targetGroup=target.getAttribute("data-target-group")||"open";
     if(!code) return;
-    if(targetGroup==="children" || (lobbyTarget&&lobbyTarget.battleMode==="team")){
+    if(targetGroup==="children" || (lobbyTarget&&(lobbyTarget.battleMode==="team"||lobbyTarget.raw?.registrationFlowVersion===3))){
       resetTournamentDetailState(); tournamentDetailCode=code; tournamentDetailLoading=true; appPhase="tournament-detail"; render(); loadTournamentDetail(code); return;
     }
     target.disabled=true;
@@ -23758,7 +23797,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       try{
         if(!window.cloudSync || !window.cloudSync.joinTournamentAsPlayer) throw {code:"network"};
         const result=await window.cloudSync.joinTournamentAsPlayer(code,true);
-        showToast(result.status==="pending_draw"?"報名成功，等待抽籤":result.status==="confirmed"?"報名成功（正取）":"報名成功（備取）");
+        showToast(result.status==="pending_review"?"卡位成功・待審核":result.status==="pending_draw"?"報名成功，等待抽籤":result.status==="confirmed"?"報名成功（正取）":"報名成功（備取）");
         publicTournamentsCache=null; invalidateMyRegistrationsCache(result); render();
       }catch(e){ const raw=String(e?.message||e||""); if(raw.includes("room-password-required")){openRoomPasswordGate(code,()=>handleAction("lobby-register",target));return;} showToast(mapRegistrationError(e),true); }finally{target.disabled=false;}
     })();
