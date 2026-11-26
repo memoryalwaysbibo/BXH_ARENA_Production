@@ -784,3 +784,18 @@ test('manual room code entry uses the same single verified navigation flow',asyn
  assert.equal(t.sandbox.activeTab,'registrations');assert.equal(t.ui.ticketManagementContext().code,code);
  await t.ui.handle('commerce-ticket-back');assert.equal(t.sandbox.activeTab,'management');assert.equal(t.ui.ticketManagementContext(),null);
 });
+
+test('expansion ticket product is partner-only and checkout sends selected prepaid quantity',async()=>{
+ const t=setup({partner:true}),c=t.ui.context();
+ t.ui.shop();c.storeOpen=true;c.category='all';
+ c.products=[{id:'tournament_expansion_1',name:'賽事擴充券',version:2,priceTwd:25,status:'published',audience:'partner_organizer',purchasable:true,delivery:{kind:'room_expansion',assetId:'tournament_expansion_1',quantity:1,durationDays:0}}];
+ assert.match(t.ui.shop(),/tournament-expansion-1\.png/);
+ t.setPartner(false);assert.doesNotMatch(t.ui.shop(),/tournament-expansion-1\.png/);
+ t.setPartner(true);await t.ui.handle('commerce-product',{dataset:{id:'tournament_expansion_1'}});
+ assert.match(t.ui.shop(),/data-expansion-quantity/);
+ t.sandbox.document.querySelector=s=>s==='[data-expansion-quantity]'?{value:'5'}:{checked:true};
+ await t.ui.handle('commerce-buy',{dataset:{id:'tournament_expansion_1'}});
+ assert.equal(t.calls[0].quantity,5);assert.equal(t.calls[0].expectedVersion,2);
+ assert.equal(t.calls[0].productId,'tournament_expansion_1');
+ assert.equal(t.calls[0].roomCode,undefined);
+});
