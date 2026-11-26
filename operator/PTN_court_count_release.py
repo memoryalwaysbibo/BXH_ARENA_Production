@@ -21,8 +21,8 @@ GENERATION = '1795621630984551'
 REF = 'fd80f49bd90f36d550ca3ff1c7dfa9de0d896c1d'
 SOURCES = {
     'registration-flow-v2/backend/bindings.cjs': (
-        '8a7009bc5e1d2d2b5c9e7c011f7769748dd5b965abc5ee2f1fa1df973c8ad8c7',
-        'b2276675b5ce28580b756664eed470defe0fa39c83efc16b1df1fe7a143b7a0c'),
+        '69d9d0dfb017fd3638bda2c00a32219240c0cc3634810483d29e7a0f19e9126e',
+        'b419e3bee47b0c2dfab95c39920c72923c777c7e5720b927a213eb0b1dd3f908'),
     'registration-flow-v2/backend/ticket-room-create.cjs': (
         '37c1e510011dae90261760cbeac8a333fd3b8e7282f6f7317dcb517147ee2b68',
         '17ef25eab37804885e0f186d7331e89e2cb9bf66198101266beb2d54fb056223'),
@@ -65,13 +65,38 @@ def fingerprint(info):
             info.get('eventTrigger'))
 
 
+BINDINGS = 'registration-flow-v2/backend/bindings.cjs'
+BINDINGS_REF = '035f5c4d979d1e9ec8202c0081d9a2dc48feab5c'
+
+
+def patch_bindings(content):
+    if digest(content) != SOURCES[BINDINGS][0]:
+        raise ValueError('unexpected bindings base')
+    changes = (
+        (b'createTicketScheduleHandler,createTicketRemoveHandler',
+         b'createTicketScheduleHandler,createTicketStationsHandler,createTicketRemoveHandler'),
+        (b"  'ticket-room-schedule':createTicketScheduleHandler({db}),",
+         b"  'ticket-room-schedule':createTicketScheduleHandler({db}),\n  'ticket-room-stations':createTicketStationsHandler({db}),"),
+        (b"'room-code-conflict','room-receipt-inconsistent','ticket-ptn-slot-occupied','bracket-room-changed',",
+         b"'room-code-conflict','room-receipt-inconsistent','ticket-ptn-slot-occupied','bracket-room-changed','bracket-version-conflict',"),
+    )
+    for old, new in changes:
+        if content.count(old) != 1:
+            raise ValueError('unexpected bindings patch context')
+        content = content.replace(old, new)
+    return content
+
+
 def candidate():
     replacements = {}
     for source, (_, expected) in SOURCES.items():
-        raw = f'https://raw.githubusercontent.com/memoryalwaysbibo/BXH_ARENA_Production/{REF}/{source}'
+        source_ref = BINDINGS_REF if source == BINDINGS else REF
+        raw = f'https://raw.githubusercontent.com/memoryalwaysbibo/BXH_ARENA_Production/{source_ref}/{source}'
         request = urllib.request.Request(raw, headers={'User-Agent': 'BXH-PTN-court-count'})
         with urllib.request.urlopen(request, timeout=30) as response:
             content = response.read()
+        if source == BINDINGS:
+            content = patch_bindings(content)
         if digest(content) != expected:
             raise ValueError('candidate source differs from reviewed commit: ' + source)
         replacements[source] = content
