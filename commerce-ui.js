@@ -158,7 +158,7 @@ async function mutate(payload){
     c.ticketRoomOpen=true;
    }
   }
-  c.success=({ 'create-ticket-room':'已建房並綁定啟動券。','ticket-room-schedule':'報名與開賽時間已更新。','ticket-room-stations':({exit:'裁判台已退場，比分保留。',claim:'已接管對戰。',reopen:'裁判台已重新開放。'})[payload.command]||'裁判台數量已更新。','ticket-room-delegate':'代理權已更新。','ticket-room-draw':'抽籤完成。','ticket-room-start':'正式開賽，啟動券已扣用。','ticket-room-remove':'已移除選手。請重新抽籤。','ticket-room-forfeit':'已登記棄權，對手晉級。','ticket-room-score':r.completed?'賽果已確認，選手已晉級。':'分數已儲存。'})[action]||'操作已確認完成。';
+  c.success=({ 'create-ticket-room':'已建房並綁定啟動券。','ticket-room-schedule':'報名與開賽時間已更新。','ticket-room-stations':({exit:'裁判台已退場，比分保留。',claim:'已接管對戰。','claim-skipped':'已安排 PASS 回補。',reopen:'裁判台已重新開放。'})[payload.command]||'裁判台數量已更新。','ticket-room-delegate':'代理權已更新。','ticket-room-draw':'抽籤完成。','ticket-room-start':'正式開賽，啟動券已扣用。','ticket-room-remove':'已移除選手。請重新抽籤。','ticket-room-forfeit':'已登記棄權，對手晉級。','ticket-room-score':r.completed?'賽果已確認，選手已晉級。':'分數已儲存。'})[action]||'操作已確認完成。';
  }catch(e){if(c===context()){
   const failedAction=c.pending?.payload?.action||payload.action;
   c.error=failedAction?.startsWith('ticket-room-')?ticketRoomMutationError(e):errorMessage(e);
@@ -214,7 +214,8 @@ function ticketCourtMaintenance(room,pending){
  const enabledCourts=control.courts.filter(c=>!c.closed&&!c.draining);
  const courts=control.courts.map(c=>`<div class="btn-row"><strong>${Number(c.station)} 號台</strong><span>${c.closed?'已退場':c.draining?'退場中':c.currentMatchId?'已指派賽事':'未指派賽事'}</span>${c.closed&&!c.draining?`<button type="button" class="btn btn-ghost" data-action="commerce-ticket-court" data-command="reopen" data-id="${Number(c.station)}" ${pending?'disabled':''}>重新開台</button>`:!c.closed&&c.currentMatchId?`<button type="button" class="btn btn-ghost" data-action="commerce-ticket-court" data-command="exit" data-id="${Number(c.station)}" ${pending?'disabled':''}>退場</button>`:''}</div>`).join('');
  const detached=control.detached.map(id=>{const m=room.bracket?.find(x=>x.id===id);if(!m)return '';return `<form data-commerce-form="ticket-court-claim" data-match-id="${esc(id)}"><p>${esc(m.a?.name||'選手 A')} ${Number(m.scoreA||0)} : ${Number(m.scoreB||0)} ${esc(m.b?.name||'選手 B')}</p><select name="station" aria-label="接管裁判台" required>${enabledCourts.map(c=>`<option value="${Number(c.station)}">${Number(c.station)} 號台</option>`).join('')}</select><button class="btn btn-primary" ${pending||!enabledCourts.length?'disabled':''}>接管對戰</button></form>`;}).join('');
- return `<section class="panel ref-court-maintenance"><details ${control.detached.length||room.stations!==control.targetCount?'open':''}><summary>更多操作・裁判台退場</summary><p class="hint">目標 ${Number(control.targetCount)} 台，目前 ${Number(room.stations)} 台；已指派的對戰保留到完成或退場。</p>${courts}${detached?'<h3>待接管對戰</h3>'+detached:''}</details></section>`;
+ const deferred=(control.deferred||[]).map(id=>{const m=room.bracket?.find(x=>x.id===id);if(!m)return '';return `<form data-commerce-form="ticket-court-pass-claim" data-match-id="${esc(id)}"><p>${esc(m.a?.name||'選手 A')} ${Number(m.scoreA||0)} : ${Number(m.scoreB||0)} ${esc(m.b?.name||'選手 B')}</p><select name="station" aria-label="PASS 回補台" required>${enabledCourts.map(c=>`<option value="${Number(c.station)}">${Number(c.station)} 號台</option>`).join('')}</select><button class="btn btn-primary" ${pending||!enabledCourts.length?'disabled':''}>安排 PASS 回補</button></form>`;}).join('');
+ return `<section class="panel ref-court-maintenance"><details ${control.detached.length||deferred||room.stations!==control.targetCount?'open':''}><summary>更多操作・裁判台退場</summary><p class="hint">目標 ${Number(control.targetCount)} 台，目前 ${Number(room.stations)} 台；已指派的對戰保留到完成或退場。</p>${courts}${detached?'<h3>待接管對戰</h3>'+detached:''}${deferred?'<h3>PASS 待回補對戰</h3>'+deferred:''}</details></section>`;
 }
 function verifiedTicketRoom(){const c=context();return ticketManagementView(c)&&c.ticketRoom?.ok&&c.ticketRoom.code===ticketRoomCode(c)?c.ticketRoom:null;}
 function ticketInviteHostRoom(){const r=currentTicketSeatRoom();return r?.refereeSeatControl?.canInvite===true?r:null;}
@@ -746,10 +747,10 @@ document.addEventListener('submit',async e=>{
   const control=ticketCourtControl(room||{});
   if(!ticketManagementView(c)||!room||(room.phase!=='waiting'&&!control)||room.code!==ticketRoomCode(c)||!Number.isInteger(stations)||stations<1||stations>12||stations===(control?.targetCount??room.stations))return;
   payload={action:'ticket-room-stations',code:room.code,roomId:room.roomId,expectedUpdatedAt:room.updatedAt,stations};
- }else if(type==='ticket-court-claim'){
+ }else if(type==='ticket-court-claim'||type==='ticket-court-pass-claim'){
   const room=c.ticketRoom,control=ticketCourtControl(room||{}),station=Number(values.station),matchId=form.dataset.matchId;
-  if(!ticketManagementView(c)||!control||room.code!==ticketRoomCode(c)||!control.detached.includes(matchId)||!control.courts.some(x=>x.station===station&&!x.closed&&!x.draining))return;
-  payload={action:'ticket-room-stations',code:room.code,roomId:room.roomId,expectedUpdatedAt:room.updatedAt,command:'claim',station,matchId};
+  if(!ticketManagementView(c)||!control||room.code!==ticketRoomCode(c)||!(type==='ticket-court-pass-claim'?control.deferred||[]:control.detached).includes(matchId)||!control.courts.some(x=>x.station===station&&!x.closed&&!x.draining))return;
+  payload={action:'ticket-room-stations',code:room.code,roomId:room.roomId,expectedUpdatedAt:room.updatedAt,command:type==='ticket-court-pass-claim'?'claim-skipped':'claim',station,matchId};
  }else if(type==='ticket-schedule'){
   const room=c.ticketRoom;
   if(!ticketManagementView(c)||room?.phase!=='waiting'||room.code!==ticketRoomCode(c))return;

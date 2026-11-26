@@ -213,12 +213,12 @@ function ticketMatchCourtAvailable(state,match){
 
 // Shared transaction projection for live retirement and subsequent score/forfeit
 // confirmations that can finish a draining court. Never copy private seat UIDs.
-function projectTicketCourtState(room,state,mirror,ownerUid,previousStations,now){
- if(!state.courtRetirementPlan&&!state.forcedCourtExits)return {};
+function projectTicketCourtState(room,state,mirror,ownerUid,previousStations,now,forceRouting=false){
+ if(!forceRouting&&!state.courtRetirementPlan&&!state.forcedCourtExits)return {};
  mirror.meta.stations=state.meta.stations;
  mirror.courtAssignments=publicCourts(state);
  const matches=new Map(state.matches.map(m=>[m.id,m]));
- mirror.matches=mirror.matches.map(m=>{const source=matches.get(m.id);return {...m,station:source.station??null,status:source.status,dispatchRevision:Number(source.dispatchRevision||0),forceDetached:source.forceDetached||null};});
+ mirror.matches=mirror.matches.map(m=>{const source=matches.get(m.id);return {...m,station:source.station??null,status:source.status,dispatchRevision:Number(source.dispatchRevision||0),forceDetached:source.forceDetached||null,skippedAt:source.skippedAt||null,skipWaitFor:source.skipWaitFor||[],resumeQueuedAt:source.resumeQueuedAt||null,passReturn:source.passReturn||null};});
  mirror.courtRetirementPlan=state.courtRetirementPlan||null;
  mirror.forcedCourtExits=state.forcedCourtExits||{};
  const seats=R.reconcileSeatCount(room.refereeSeatsV1,state.meta.stations,now,previousStations);

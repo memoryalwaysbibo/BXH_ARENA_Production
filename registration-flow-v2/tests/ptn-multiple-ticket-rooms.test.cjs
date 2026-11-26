@@ -176,6 +176,27 @@ test('published vouchers create independent PTN gates for two eligible organizer
    assert.ok(currentMatch().passReturn.waitFor.length>0);
    assert.equal(JSON.parse(rows.get(pubPath).bracketView).matches.find(m=>m.id===held.id).skippedAt,currentMatch().skippedAt);
    await assert.rejects(score(standardReq('live-pass-score','score',{side:'A',finish:'spin'})),/score-match-stale/);
+   const deferredCheckpoint=JSON.parse(JSON.stringify([...rows]));
+   const readPass=()=>createTicketRoomStateHandler({db,enabled:async()=>true,clock:()=>now})({auth:{uid},app:{},data:{action:'ticket-room-state',code}});
+   assert.ok((await readPass()).courtControl.deferred.includes(held.id));
+   // Natural dependency completion must return the same match and ledger via
+   // the existing PTN confirm path, not a synthetic engine-only completion.
+   for(const dep of currentMatch().passReturn.waitFor.slice()){
+    const lookup=()=>JSON.parse(rows.get(roomPath).data).matches.find(m=>m.id===dep);
+    await score(scoreReq('pass-dep-first-'+dep,lookup()));
+    await score(scoreReq('pass-dep-second-'+dep,lookup()));
+    await score(scoreReq('pass-dep-confirm-'+dep,lookup(),'confirm'));
+   }
+   assert.equal(currentMatch().skippedAt,null);assert.equal(currentMatch().passReturn.status,'playing');
+   assert.equal(currentMatch().scoreA,2);assert.equal(currentMatch().log.length,1);
+   assert.equal(JSON.parse(rows.get(pubPath).bracketView).matches.find(m=>m.id===held.id).skippedAt,null);
+   rows.clear();for(const [key,value] of deferredCheckpoint)rows.set(key,value);
+   const manual=command('live-pass-manual',{command:'claim-skipped',station:6,matchId:held.id});
+   await liveResize(manual);assert.equal((await liveResize(manual)).replayed,true);
+   assert.equal(currentMatch().station,6);assert.equal(currentMatch().skippedAt,null);assert.equal(currentMatch().scoreA,2);assert.equal(currentMatch().log.length,1);
+   assert.equal(JSON.parse(rows.get(pubPath).bracketView).matches.find(m=>m.id===held.id).station,6);
+   assert.equal(JSON.parse(rows.get(pubPath).bracketView).matches.find(m=>m.id===held.id).skippedAt,null);
+   assert.ok(!((await readPass()).courtControl.deferred.includes(held.id)));
    rows.clear();for(const [key,value] of passCheckpoint)rows.set(key,value);
 
 

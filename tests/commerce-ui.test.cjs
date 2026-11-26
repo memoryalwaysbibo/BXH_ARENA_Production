@@ -858,6 +858,12 @@ test('PTN live court controls require backend capability and use room-scoped res
  await submit({dataset:{commerceForm:'ticket-court-claim',matchId:'detached'},values:{station:'1'}});
  assert.deepEqual(calls.at(-1),{action:'ticket-room-stations',code,roomId:room.roomId,expectedUpdatedAt:321,command:'claim',station:1,matchId:'detached',operationId:'same-operation'});
  await t.ui.load('ticket-room-state');
+ room.courtControl.deferred=['deferred'];room.bracket.push({id:'deferred',station:3,scoreA:2,scoreB:1,a:{name:'回補甲'},b:{name:'回補乙'},canScore:false});
+ await t.ui.load('ticket-room-state');
+ const passHtml=t.ui.ticketManagedTab('referee');assert.match(passHtml,/PASS 待回補對戰/);assert.match(passHtml,/回補甲 2 : 1 回補乙/);
+ await submit({dataset:{commerceForm:'ticket-court-pass-claim',matchId:'deferred'},values:{station:'1'}});
+ assert.deepEqual(calls.at(-1),{action:'ticket-room-stations',code,roomId:room.roomId,expectedUpdatedAt:321,command:'claim-skipped',station:1,matchId:'deferred',operationId:'same-operation'});
+ await t.ui.load('ticket-room-state');
  await t.ui.handle('commerce-ticket-court',{dataset:{id:'2',command:'reopen'}});
  assert.equal(calls.at(-1).command,'reopen');
  await t.ui.load('ticket-room-state');t.sandbox.activeTab='live';assert.doesNotMatch(t.ui.ticketManagedTab('live'),/丙<\/span>/);
