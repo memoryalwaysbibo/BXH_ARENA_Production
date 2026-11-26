@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');
 const {test,after}=require('node:test');
 const {randomBytes}=require('node:crypto');
-const {db,service,handlers}=require('./harness.cjs');
+const {db,service,handlers,audit,drainAll}=require('./harness.cjs');
 const {createApi}=require('../backend/api.cjs');
 const {createTicketRoomHandler,createTicketRoomStateHandler,createTicketStationsHandler}=require('../backend/ticket-room-create.cjs');
 const {createStartHandler,createDrawHandler}=require('../backend/lifecycle.cjs');
@@ -31,7 +31,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
     productSnapshot:{id:'expansion-fixture-'+base,delivery:{kind:'ticket',assetId:String(base),quantity:1,durationDays:0}}});
    const create=createTicketRoomHandler({db,clock:()=>now,newPartnerCode:()=>code});
    const {roomId}=await create({auth:{uid},app:{},data:{action:'create-ticket-room',ticketId,operationId:'create-'+base,name:'Expansion fixture',
-    location:'test',stations:1,registrationOpenAt:now-1000,registrationCloseAt:now+300000,startAt:now+600000}});
+    location:'test',stations:base===160?6:1,registrationOpenAt:now-1000,registrationCloseAt:now+1800000,startAt:now+3600000}});
    rooms.push({code,roomId,ticket,base,room:db.doc('tournaments/'+code),pub:db.doc('publicTournaments/'+code)});
   }
   const expand=createTicketExpansionHandler({db,clock:()=>now+1000});
@@ -146,6 +146,56 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(cTicket.data().capacity,160);
   assert.equal(cTicket.data().addedCapacity,32);
   assert.equal(cInventory.data().quantity,31);
+  // Exercise 193 simultaneous intake calls with a 192-place patched PTN.
+  // Intake acceptance is distinct from final registration confirmation.
+  const entrants=Array.from({length:193},(_,i)=>uid+'-large-'+i);
+  const users=db.batch();
+  for(const player of entrants)users.set(db.doc('users/'+player),{active:true,role:'player',realName:'Fixture '+player,phone:'0000000000',profileCompleted:true});
+  await users.commit();
+  const worker=service({requireRoomOwnership:true});
+  const largeApi=createApi({queue:worker,family:handlers.family(db),enabled:async code=>code===c.code});
+  const started=Date.now();
+  const intake=await Promise.all(entrants.map((player,i)=>{
+   const operationId='large-join-'+i;
+   return largeApi({auth:{uid:player},data:{action:'submit',code:c.code,operation:{route:'family',code:c.code,operationId,payload:{action:'join',code:c.code,operationId,childIds:[null],childEligibilityConfirmed:true}}}});
+  }));
+  const intakeMs=Date.now()-started;
+  assert.equal(intake.filter(x=>x.operation.state==='queued').length,193);
+  const drainStarted=Date.now();
+  await drainAll([worker],c.code);
+  const drainMs=Date.now()-drainStarted;
+  const {summary,rows,jobs}=await audit(c.code,192);
+  assert.equal(summary.confirmed,192);
+  assert.equal(summary.waitlist,0);
+  assert.equal(summary.completed,192);
+  assert.equal(summary.rejected,1);
+  assert.equal(jobs.filter(j=>j.state==='rejected'&&j.reason==='full').length,1);
+  assert.equal(new Set(rows.filter(r=>r.status==='confirmed').map(r=>r.id)).size,192);
+  const largePrivate=JSON.parse((await c.room.get()).data().data);
+  assert.equal(largePrivate.players.length,192);
+  assert.equal(new Set(largePrivate.players.map(p=>p.id)).size,192);
+  assert.equal(largePrivate.meta.checkinRequired,false); // No check-in coverage in this case.
+  const largeOptions={db,clock:()=>now+3000,enabled:async code=>code===c.code};
+  const largeLifecycle={code:c.code,roomId:c.roomId,rosterRevision:largePrivate.registrationRosterRevision};
+  const drawStarted=Date.now();
+  const largeDraw=await createDrawHandler(largeOptions)({auth:{uid},data:{...largeLifecycle,baseDrawId:null,operationId:'large-draw-192'}});
+  const drawMs=Date.now()-drawStarted;
+  const drawnState=JSON.parse((await c.room.get()).data().data);
+  assert.equal(drawnState.bracketSize,256);
+  assert.equal(new Set(drawnState.matches.flatMap(m=>[m.a?.playerId,m.b?.playerId,m.winnerId]).filter(Boolean)).size,192);
+  const startStarted=Date.now();
+  await createStartHandler(largeOptions)({auth:{uid},data:{...largeLifecycle,drawId:largeDraw.drawId,confirmEarlyStart:true,operationId:'large-start-192'}});
+  const startMs=Date.now()-startStarted;
+  const [live,livePub,used,remaining]=await db.getAll(c.room,c.pub,c.ticket,inventory);
+  assert.equal(live.data().tournamentPhase,'live');
+  assert.equal(livePub.data().tournamentPhase,'live');
+  assert.equal(live.data().capacity,192);
+  assert.equal(livePub.data().capacity,192);
+  assert.equal(used.data().status,'consumed');
+  assert.equal(used.data().capacity,160);
+  assert.equal(used.data().addedCapacity,32);
+  assert.equal(remaining.data().quantity,31);
+  console.info('PTN192 emulator metrics',JSON.stringify({intakeCount:193,confirmed:192,full:1,intakeMs,drainMs,drawMs,startMs,privateStateBytes:Buffer.byteLength(live.data().data),publicStateBytes:Buffer.byteLength(livePub.data().bracketView)}));
  }finally{
   if(previousSale.exists)await sale.set(previousSale.data());else await sale.delete();
   if(previousConfig.exists)await config.set(previousConfig.data());else await config.delete();
