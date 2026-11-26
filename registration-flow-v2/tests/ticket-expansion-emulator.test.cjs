@@ -5,7 +5,7 @@ const {randomBytes}=require('node:crypto');
 const {db,service,handlers,audit,drainAll}=require('./harness.cjs');
 const {createApi}=require('../backend/api.cjs');
 const {createTicketRoomHandler,createTicketRoomStateHandler,createTicketStationsHandler}=require('../backend/ticket-room-create.cjs');
-const {createStartHandler,createDrawHandler}=require('../backend/lifecycle.cjs');
+const {createStartHandler,createDrawHandler,createTicketScoreHandler,forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked}=require('../backend/lifecycle.cjs');
 after(()=>db.terminate());
 
 test('PTN prepaid expansion atomically updates canonical room, public mirror, ticket and inventory',async()=>{
@@ -195,6 +195,48 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(used.data().capacity,160);
   assert.equal(used.data().addedCapacity,32);
   assert.equal(remaining.data().quantity,31);
+  // Concurrent writes on six distinct assigned courts through the existing PTN
+  // score handler; one authorized manager, not a multi-account seat test.
+  const liveState=JSON.parse(live.data().data);
+  const assigned=new Map();
+  for(const m of liveState.matches){
+   if(m.station!=null&&forfeitMatchAvailable(m)&&!ticketRoundBlocked(m,liveState.matches,liveState.meta)&&!ticketBronzeBlocked(m,liveState.matches,liveState.meta)){
+    if(!assigned.has(m.station))assigned.set(m.station,m);
+   }
+  }
+  assert.equal(assigned.size,6,'six distinct eligible court assignments');
+  const targets=[...assigned.values()];
+  const score=createTicketScoreHandler(largeOptions);
+  const readMatches=async()=>new Map(JSON.parse((await c.room.get()).data().data).matches.map(m=>[m.id,m]));
+  const wave=async(label,command,extra={})=>{
+   const current=await readMatches();
+   const requests=targets.map((m,i)=>({auth:{uid},app:{},data:{action:'ticket-room-score',code:c.code,roomId:c.roomId,matchId:m.id,
+    matchUpdatedAt:current.get(m.id).updatedAt||0,operationId:'large-score-'+label+'-'+i,command,...extra}}));
+   const t=Date.now();
+   const results=await Promise.all(requests.map(r=>score(r)));
+   return {requests,results,ms:Date.now()-t};
+  };
+  const firstWave=await wave('first','score',{side:'A',finish:'knockout'});
+  assert.ok(firstWave.results.every(r=>r.scoreA===2&&r.completed===false));
+  assert.equal((await score(firstWave.requests[0])).replayed,true);
+  const secondWave=await wave('second','score',{side:'A',finish:'burst'});
+  assert.ok(secondWave.results.every(r=>r.scoreA===4&&r.completed===false));
+  const decisions=await wave('confirm','confirm');
+  assert.ok(decisions.results.every(r=>r.completed&&r.scoreA===4));
+  const [scoredRoom,scoredPublic]=await db.getAll(c.room,c.pub);
+  const scored=JSON.parse(scoredRoom.data().data),scoredMirror=JSON.parse(scoredPublic.data().bracketView);
+  for(const m of targets){
+   const priv=scored.matches.find(x=>x.id===m.id),pubMatch=scoredMirror.matches.find(x=>x.id===m.id);
+   assert.equal(priv.winnerId,m.a.playerId);
+   assert.equal(pubMatch.winnerId,priv.winnerId);
+   assert.equal(pubMatch.scoreA,4);
+   assert.equal(pubMatch.completed,true);
+   assert.equal(priv.log.length,2);
+  }
+  assert.equal(scoredRoom.data().capacity,192);
+  assert.equal(scoredPublic.data().capacity,192);
+  assert.equal((await inventory.get()).data().quantity,31);
+  console.info('PTN192 six-court emulator metrics',JSON.stringify({courts:6,scoreCommands:12,confirmCommands:6,firstWaveMs:firstWave.ms,secondWaveMs:secondWave.ms,confirmWaveMs:decisions.ms,privateStateBytes:Buffer.byteLength(scoredRoom.data().data),publicStateBytes:Buffer.byteLength(scoredPublic.data().bracketView)}));
   console.info('PTN192 emulator metrics',JSON.stringify({intakeCount:193,confirmed:192,full:1,intakeMs,drainMs,drawMs,startMs,privateStateBytes:Buffer.byteLength(live.data().data),publicStateBytes:Buffer.byteLength(livePub.data().bracketView)}));
  }finally{
   if(previousSale.exists)await sale.set(previousSale.data());else await sale.delete();
