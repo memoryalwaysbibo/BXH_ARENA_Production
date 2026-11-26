@@ -9,6 +9,7 @@
  // A ticket-room integration must provide its own verified room context,
  // server transport and entry handler. Never fall back to the community room.
  const isTicketCode=code=>/^PTN-[A-Z0-9]{6}$/.test(code||'');
+ const hintFor=code=>isTicketCode(code)?'<p class="hint">裁判邀請對象為一般玩家。BXH 工作人員與管理員請從管理模式的「PTN 合作賽事裁判協助」直接入席。</p>':managementHint;
  function ticketAdapter(){
   const adapter=ctx?.ticketInvite;
   return adapter?.enabled?.()===true&&typeof adapter.command==='function'&&typeof adapter.open==='function'?adapter:null;
@@ -55,8 +56,8 @@
   panel.addEventListener('keydown',e=>{const items=[...panel.querySelectorAll('button:not(:disabled),input')];if(e.key==='Escape'){e.preventDefault();close();}if(e.key==='Tab'&&items.length){e.preventDefault();items[(items.indexOf(document.activeElement)+(e.shiftKey?-1:1)+items.length)%items.length].focus();}});
   document.body.append(panel);panel.querySelector('input,button')?.focus();
  }
- function options(h){showHost(h,'<button type="button" class="btn btn-primary" data-ref-invite="name">名字邀請</button><button type="button" class="btn btn-primary" data-ref-invite="qr">顯示 QR 邀請</button>'+managementHint);}
- function nameForm(h,message=''){showHost(h,'<label for="ref-invite-name">玩家名字或遊戲 ID</label><input id="ref-invite-name" type="text" maxlength="80" autocomplete="off" placeholder="輸入完整名字或遊戲 ID"><p class="hint">同名玩家請核對遊戲 ID 後再選擇。</p>'+(message?'<p role="status">'+esc(message)+'</p>':'')+'<button type="button" class="btn btn-primary" data-ref-invite="search">搜尋玩家</button>'+managementHint);}
+ function options(h){showHost(h,'<button type="button" class="btn btn-primary" data-ref-invite="name">名字邀請</button><button type="button" class="btn btn-primary" data-ref-invite="qr">顯示 QR 邀請</button>'+hintFor(h.code));}
+ function nameForm(h,message=''){showHost(h,'<label for="ref-invite-name">玩家名字或遊戲 ID</label><input id="ref-invite-name" type="text" maxlength="80" autocomplete="off" placeholder="輸入完整名字或遊戲 ID"><p class="hint">同名玩家請核對遊戲 ID 後再選擇。</p>'+(message?'<p role="status">'+esc(message)+'</p>':'')+'<button type="button" class="btn btn-primary" data-ref-invite="search">搜尋玩家</button>'+hintFor(h.code));}
  async function search(h){const query=panel?.querySelector('input')?.value.trim();if(!query||query.length<1)return;
   const n=++epoch;showHost(h,'<p role="status">正在搜尋玩家…</p>');
   try{const r=await call({...h.base,code:h.code,action:'find-invite-player',query});if(n!==epoch||!hostCurrent(h))return;
@@ -100,7 +101,7 @@
   finally{if(ctx.uid()===actor&&generation===actorGeneration){entryBusy=false;ctx.render();}}
  }
  function renderEntry(){if(!entry||!ctx?.uid())return '';
-  return '<section class="panel" aria-live="polite"><h2>裁判邀請</h2>'+(entryError?'<p role="alert">'+esc(entryError)+'</p>':'')+(entryError===permissionDenied?managementHint:'')+(entryBusy?'<p>正在確認邀請…</p>':preview?'<p>'+esc(entry.code)+'｜'+esc(preview.station)+' 號台｜'+esc(labels[preview.slot]||'裁判席')+'</p><p>確認以目前登入帳號加入裁判？</p><button class="btn btn-primary" data-ref-invite="accept">'+(accepted?'進入裁判台':'確認加入')+'</button>':entryError==='比賽已有結果'?'':'<p>先確認邀請的台號與席位，再決定是否加入。</p><button class="btn btn-primary" data-ref-invite="inspect">讀取邀請</button>')+'<button class="btn btn-ghost" data-ref-invite="dismiss" '+(entryBusy?'disabled':'')+'>'+(entryError==='比賽已有結果'?'確認':'取消')+'</button></section>';
+  return '<section class="panel" aria-live="polite"><h2>裁判邀請</h2>'+(entryError?'<p role="alert">'+esc(entryError)+'</p>':'')+(entryError===permissionDenied?hintFor(entry.code):'')+(entryBusy?'<p>正在確認邀請…</p>':preview?'<p>'+esc(entry.code)+'｜'+esc(preview.station)+' 號台｜'+esc(labels[preview.slot]||'裁判席')+'</p><p>確認以目前登入帳號加入裁判？</p><button class="btn btn-primary" data-ref-invite="accept">'+(accepted?'進入裁判台':'確認加入')+'</button>':entryError==='比賽已有結果'?'':'<p>先確認邀請的台號與席位，再決定是否加入。</p><button class="btn btn-primary" data-ref-invite="inspect">讀取邀請</button>')+'<button class="btn btn-ghost" data-ref-invite="dismiss" '+(entryBusy?'disabled':'')+'>'+(entryError==='比賽已有結果'?'確認':'取消')+'</button></section>';
  }
  document.addEventListener('click',event=>{const b=event.target.closest?.('[data-ref-invite]');if(!b||b.disabled)return;event.preventDefault();event.stopImmediatePropagation();const action=b.dataset.refInvite,h=host;
   if(action==='dismiss'){clearEntry();ctx.render();return;}

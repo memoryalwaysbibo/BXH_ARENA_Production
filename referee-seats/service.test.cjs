@@ -188,12 +188,18 @@ test('PTN uses the same invitation, three-seat and handoff transactions under a 
  await assert.rejects(run('unseated','claim',{station:1,slot:'main',expectedCourtRevision:0}),/room-read-only|not-event-staff|invitation-required/);
  const search=await run('host','find-invite-player',{station:1,slot:'main',expectedCourtRevision:0,query:'GAME-main'});
  assert.deepEqual(search.players,[{uid:'main',name:'main',gameId:'GAME-main'}]);assert.equal(getRoom().refereeSeatsV1,undefined);
+ assert.equal((await run('host','view')).refereeSeatControl.canInvite,true);
+ assert.equal((await run('support','view')).refereeSeatControl.canJoin,true);
+ await assert.rejects(run('unseated','view'),/not-event-staff/);
  const staffResult=await run('host','find-invite-player',{station:1,slot:'main',expectedCourtRevision:0,query:'GAME-support'});assert.deepEqual(staffResult.players,[]);
  await assert.rejects(run('host','invite',{station:1,slot:'main',targetUid:'support',expectedCourtRevision:0}),/target-ineligible/);
  const invite=await run('host','invite',{station:1,slot:'main',targetUid:'main',expectedCourtRevision:0});
  assert.equal(h.docs.get('users/main/communityRefereeInbox/ref-invite-'+invite.requestId).eventCode,code);
  await run('main','accept-invite',{station:1,slot:'main',requestId:invite.requestId});
  assert.equal(court(1).main.uid,'main');assert.equal(h.docs.get('users/main/communityRefereeInbox/ref-invite-'+invite.requestId).refereeInviteStatus,'accepted');
+ const scoped=await run('main','view');assert.deepEqual(Object.keys(scoped.refereeSeatControl.courts),['1']);
+ assert.equal(scoped.refereeSeatControl.canInvite,false);assert.equal(scoped.refereeSeatControl.canJoin,false);
+ assert.equal(scoped.participants,undefined);assert.equal(scoped.ticketStatus,undefined);
  const qr=await run('host','create-qr',{station:1,slot:'backup1',expectedCourtRevision:court(1).revision});
  const preview=await run('backup','inspect-qr',{requestId:qr.requestId,qrToken:qr.qrToken});assert.equal(preview.station,1);assert.equal(preview.slot,'backup1');
  await run('backup','accept-qr',{requestId:qr.requestId,qrToken:qr.qrToken});assert.equal(court(1).backup1.uid,'backup');

@@ -7,6 +7,7 @@ const {BXHCourtRetirement:R}=require('../../referee-seats/functions/engine/court
 const {advance:advanceQrCheckinFence}=require('../../qr-checkin/backend/qr-checkin-fence.cjs');
 const {startMs}=require('../../qr-checkin/backend/overlays/lifecycle/operations-core.js');
 const {registrationQueueOwnsRoom}=require('./legacy-writer.cjs');
+const {resolveTicketRefereeAuthority,ticketSeatReleaseEnabled}=require('./ticket-referee-seat.cjs');
 const {checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,resolveTicketGate,authorizeTicketManager}=require('./ticket-host.cjs');
 
 const digest=value=>createHash('sha256').update(value).digest('hex');
@@ -314,32 +315,43 @@ function createTicketForfeitHandler({db,enabled=async()=>false,clock=Date.now}){
  };
 }
 
-const ticketScoreFields=new Set(['action','code','roomId','matchId','matchUpdatedAt','operationId','command','side','finish']);
+const ticketScoreFields=new Set(['action','code','roomId','matchId','matchUpdatedAt','operationId','command','side','finish','station','expectedCourtRevision']);
 const ticketPoints=Object.freeze({spin:1,knockout:2,burst:2,extreme:3});
 function createTicketScoreHandler({db,enabled=async()=>false,clock=Date.now}){
  return async request=>{
   const uid=request.auth?.uid,input=request.data||{};
   if(!uid)throw Error('auth-required');
   if(!request.app)throw Error('permission-denied');
-  const {action,code,roomId,matchId,matchUpdatedAt,operationId,command,side,finish}=input;
+  const {action,code,roomId,matchId,matchUpdatedAt,operationId,command,side,finish,station,expectedCourtRevision}=input;
+  const scoped=station!==undefined||expectedCourtRevision!==undefined;
   if(action!=='ticket-room-score'||Object.keys(input).some(key=>!ticketScoreFields.has(key))||
      !isPartnerRoomCode(code)||![roomId,matchId].every(validId)||
      !Number.isSafeInteger(matchUpdatedAt)||matchUpdatedAt<0||
+     (scoped&&(!Number.isInteger(station)||station<1||station>12||!Number.isSafeInteger(expectedCourtRevision)||expectedCourtRevision<0))||
      typeof operationId!=='string'||!/^[A-Za-z0-9_-]{8,100}$/.test(operationId)||
      !['score','undo','confirm'].includes(command)||
      (command==='score'?(!['A','B'].includes(side)||!Object.hasOwn(ticketPoints,finish)):(side!==undefined||finish!==undefined)))throw Error('invalid-operation');
   const roomRef=db.doc('tournaments/'+code),publicRef=db.doc('publicTournaments/'+code);
   const operation=roomRef.collection('operationLog').doc('ticket-room-score-'+digest(JSON.stringify([uid,operationId])));
-  const requestHash=digest(JSON.stringify([roomId,matchId,matchUpdatedAt,command,side,finish]));
+  const requestHash=digest(JSON.stringify([roomId,matchId,matchUpdatedAt,command,side,finish,...(scoped?[station,expectedCourtRevision]:[])]));
   const now=clock();
   return db.runTransaction(async tx=>{
    const [actor,roomSnap,publicSnap,gateSnap,prior]=await tx.getAll(db.doc('users/'+uid),roomRef,publicRef,
     db.doc(ticketLifecyclePath(code)),operation);
    const user=actor.data(),room=roomSnap.data(),pub=publicSnap.data(),gate=await resolveTicketGate(db,code,tx,gateSnap.data());
-   const authority=await authorizeTicketManager(tx,db,{uid,user,room,gate,code,now});
+   let authority;
+   if(!scoped)authority=await authorizeTicketManager(tx,db,{uid,user,room,gate,code,now});
+   if(!room||!pub||!gate)throw Error('ticket-binding-invalid');
+   const state=JSON.parse(room.data),mirror=JSON.parse(pub.bracketView);
+   if(scoped){
+    if(!ticketSeatReleaseEnabled((await tx.get(db.doc('systemConfig/refereeSeatsV1'))).data()))throw Error('ticket-invite-unavailable');
+    authority=await resolveTicketRefereeAuthority({db,enabled,tx,room,publicRoom:pub,state,user,code,now});
+    const court=room.refereeSeatsV1?.version===1&&room.refereeSeatsV1.courts?.[station];
+    if(!court||station>state.meta.stations||court.retired||state.forcedCourtExits?.[station]?.closed||court.main?.uid!==uid)throw Error('permission-denied');
+    if(court.revision!==expectedCourtRevision)throw Error('seat-stale');
+   }
    if(gate.roomId!==roomId||room.ticketAccessV1?.roomId!==roomId||
       pub?.ticketRoomVersion!==1||pub.eventAuthority!=='ticket')throw Error('ticket-binding-invalid');
-   const state=JSON.parse(room.data),mirror=JSON.parse(pub.bracketView);
    if(state.id!==roomId||mirror.id!==roomId)throw Error('bracket-room-changed');
    if(prior.exists){
     if(prior.data().requestHash!==requestHash)throw Error('operation-conflict');
@@ -356,6 +368,7 @@ function createTicketScoreHandler({db,enabled=async()=>false,clock=Date.now}){
       state.meta?.battleMode!=='individual'||!Array.isArray(state.matches)||!Array.isArray(mirror.matches))throw Error('score-room-not-live');
    const match=state.matches.find(item=>item.id===matchId);
    const publicMatch=mirror.matches.find(item=>item.id===matchId);
+   if(scoped&&(state.courtAssignments?.['court'+station]?.currentMatchId!==matchId||Number(match?.station)!==station))throw Error('score-match-stale');
    if(!forfeitMatchAvailable(match)||!ticketMatchCourtAvailable(state,match)||(match.updatedAt||0)!==matchUpdatedAt||
       publicMatch?.completed||publicMatch?.a?.playerId!==match.a.playerId||
       publicMatch?.b?.playerId!==match.b.playerId||

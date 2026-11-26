@@ -7,6 +7,7 @@ const {signature}=require('../../modules/main-app/bracket-commit.js');
 const {createHash,randomBytes,randomUUID}=require('node:crypto');
 const {ticketHostGrant,checkTicketContract,isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,resolveTicketGate,authorizeTicketManager,activeTicketManager}=require('./ticket-host.cjs');
 const {authorizeTicketRemoval}=require('./queue.cjs');
+const {resolveTicketRefereeAuthority,ticketSeatReleaseEnabled,projectTicketRefereeView}=require('./ticket-referee-seat.cjs');
 const {registrationQueueOwnsRoom}=require('./legacy-writer.cjs');
 const {advance:advanceQrCheckinFence}=require('../../qr-checkin/backend/qr-checkin-fence.cjs');
 
@@ -219,8 +220,8 @@ function createPtnStatusHandler({db,clock=Date.now}){
  };
 }
 // A display-only projection from the same authoritative seat model used by
-// the shared referee service. No account identifiers, requests or tokens leave
-// the manager read endpoint, and a missing model never creates seats.
+// the shared referee service. This label-only view contains no account
+// identifiers, requests or tokens. Interactive controls are independently authorized.
 function projectTicketRefereeSeatNames(room,stations){
  const model=room.refereeSeatsV1;
  if(model?.version!==1||!model.courts||!Number.isInteger(stations)||stations<1||stations>12)return null;
@@ -293,6 +294,15 @@ function createTicketRoomStateHandler({db,enabled=async()=>false,clock=Date.now}
      const station=i+1,closed=state.forcedCourtExits?.[station]?.closed===true,currentMatchId=state.courtAssignments?.['court'+station]?.currentMatchId||null;
      return {station,closed,draining:station>R.target(state),currentMatchId};
     }),detached:state.matches.filter(m=>!m.completed&&m.forceDetached&&Number(m.station)===0).map(m=>m.id)}:null;
+   let refereeSeatControl=null;
+   if(isPartnerRoomCode(code)&&['waiting','live'].includes(room.tournamentPhase)&&!state.championId&&gate.enabled===true&&await enabled(code,tx)&&
+    ticketSeatReleaseEnabled((await tx.get(db.doc('systemConfig/refereeSeatsV1'))).data())){
+    const publicRoom=(await tx.get(db.doc('publicTournaments/'+code))).data();
+    try{
+     const ticket=await resolveTicketRefereeAuthority({db,enabled,tx,room,publicRoom,state,user:actor.data(),code,now:clock()});
+     refereeSeatControl=projectTicketRefereeView({room,state,user:actor.data(),uid,code,now:clock(),authority:{ticket}}).refereeSeatControl;
+    }catch(error){if(!['room-read-only','permission-denied','ticket-binding-invalid'].includes(error.message))throw error;}
+   }
    const delegate=room.ptnDelegateUid?(await tx.get(db.doc('users/'+room.ptnDelegateUid))).data():null;
    return {ok:true,code,roomId:state.id,name:room.name,location:room.location,
     ...(isPartnerRoomCode(code)?{delegateUid:room.ptnDelegateUid||null,
@@ -304,7 +314,7 @@ function createTicketRoomStateHandler({db,enabled=async()=>false,clock=Date.now}
     registrationOpenAt:room.registrationOpenAt,registrationCloseAt:room.registrationCloseAt,
     registrationEnabled:room.registrationEnabled,updatedAt:room.updatedAt,
     drawId:state.bracketDraw?.id??null,drawReady:state.bracketDraw?.rosterRevision===rosterRevision,rosterRevision,eligibleCount,
-    ...(ticketStatus?{ticketStatus}:{}),...(courtControl?{courtControl}:{}),...(bracketVisible?{matches,bracket,
+    ...(ticketStatus?{ticketStatus}:{}),...(refereeSeatControl?{refereeSeatControl}:{}),...(courtControl?{courtControl}:{}),...(bracketVisible?{matches,bracket,
      championName:names.get(state.championId)||null}:{}),
     participants:state.players.filter(player=>player.source==='online'&&player.registrationId)
      .map(player=>({name:player.name,...(room.tournamentPhase==='waiting'?{registrationId:player.registrationId}:{})}))};

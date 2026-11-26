@@ -3620,6 +3620,12 @@ async function ensureRoomAccessGrant(code){
 async function openCommunityRefereeRoom(code,station){
   const actor=currentAuthUid();
   if(!actor)throw Error('auth-required');
+  if(/^PTN-[A-Z0-9]{6}$/.test(code||'')){
+    if(!window.BXHCommerce?.openTicketRefereeSession)throw Error('ticket-invite-unavailable');
+    await window.BXHCommerce.openTicketRefereeSession(code,station);
+    if(currentAuthUid()===actor){mailboxContext().open=false;render();}
+    return;
+  }
   const result=await window.cloudSync?.joinRoom?.(code);
   if(currentAuthUid()!==actor)return;
   if(!result?.ok)throw Error('referee-room-unavailable');
@@ -12799,8 +12805,9 @@ function renderWaitingRefereeCourt(stationNum,ticketView=null){
 window.BXHSharedTicketWaitingCourts={render(room){
   const n=room?.stations;
   if(room?.phase!=="waiting"||!Number.isInteger(n)||n<1||n>12)return "";
-  const grid=n===1?"court-grid court-grid-1":n===2?"court-grid court-grid-2":n===4?"court-grid court-grid-many court-grid-4fit":"court-grid court-grid-many";
-  return '<div class="'+grid+'">'+Array.from({length:n},(_,i)=>renderWaitingRefereeCourt(i+1,room)).join("")+'</div>';
+  const courts=room.scoped?Object.keys(room.refereeSeatControl?.courts||{}).map(Number).filter(i=>Number.isInteger(i)&&i>=1&&i<=n):Array.from({length:n},(_,i)=>i+1);
+  const count=courts.length,grid=count===1?"court-grid court-grid-1":count===2?"court-grid court-grid-2":count===4?"court-grid court-grid-many court-grid-4fit":"court-grid court-grid-many";
+  return '<div class="'+grid+'">'+courts.map(i=>renderWaitingRefereeCourt(i,room)).join("")+'</div>';
 }};
 function canUseRefereeSyncRecovery(){
   return !!(state?.cloudCode&&state.id&&state.startedAt&&state.meta?.battleMode!=="team"&&currentAuthUid()&&canOperateCurrentTournament());
@@ -20100,7 +20107,9 @@ function render(){
     roomMissing:({code,roomId})=>{const selected=state;if(selected.id===roomId)void detachConfirmedDeletedRoom(code,selected);}});
   window.BXHQrCheckin?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,render,qr:renderQrCodeInto,applyRemote:data=>applyRemoteState(data,true),toast:showToast});
   window.BXHCommunityRefereeInvite?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,
-    inviter:()=>isCommunityRoomOwner()&&!isTester(),render,qr:renderQrCodeInto,toast:showToast,open:openCommunityRefereeRoom});
+    inviter:()=>isCommunityRoomOwner()&&!isTester(),render,qr:renderQrCodeInto,toast:showToast,open:openCommunityRefereeRoom,
+    ticketInvite:{enabled:()=>window.BXH_PTN_TICKET_SALE===true,hostRoom:()=>window.BXHCommerce?.ticketInviteHostRoom?.(),
+      command:data=>window.BXHCommerce.ticketInviteCommand(data),open:openCommunityRefereeRoom}});
   reconcileLobbyContext();
   if(appPhase!=="player-login"&&appPhase!=="player-apply")authFormRenderContext=null;
   hunterClashEntry?.session(firebaseUser,userProfile);
@@ -20132,6 +20141,8 @@ function render(){
   const refereeInviteEntry=window.BXHCommunityRefereeInvite?.renderEntry();
   if(firebaseUser&&userProfile?.active===true&&refereeInviteEntry){app.innerHTML=refereeInviteEntry;return;}
   if(firebaseUser&&userProfile?.active===true&&qrCheckinEntry){app.innerHTML=qrCheckinEntry;return;}
+  const ptnRefereeSession=window.BXHCommerce?.ticketRefereeSessionView?.();
+  if(firebaseUser&&userProfile?.active===true&&ptnRefereeSession){app.innerHTML=ptnRefereeSession;return;}
   if(appPhase==='raffle-public'){app.innerHTML=authShellOpen()+authBrandHeader()+'<button class="btn btn-ghost" data-action="raffle-home">返回首頁</button>'+renderRafflePage()+authShellClose();return;}
   if(appPhase==="partner-organizer"){ if(!roleAllowsMode(userProfile?.role,"partner_organizer",userProfile)){appPhase="landing";currentRole=null;} else {currentRole="admin";appPhase="app";activeTab="management";} }
   if(appPhase==="landing"){ app.innerHTML = renderLandingScreen(); bindAuthInputs(); return; }
@@ -20903,6 +20914,7 @@ function renderTournamentManagementTab(){
     ${adminTournamentListError && adminTournamentListItems.length?`<div class="auth-error" role="status">${esc(adminTournamentListError)}；保留已載入的清單，可重試本次讀取。</div>`:""}
   </div>
   ${window.BXHCommerce?.ownedTicketRoomCard?.()||''}
+  ${window.BXHCommerce?.ticketRefereeSupportPanel?.(userProfile?.active===true&&!isTester()&&['staff','admin','super_admin'].includes(userProfile?.role))||''}
   ${body}
   ${adminTournamentListPaginationHtml()}
   ${canCreateOfficialTournament()?`<div class="panel" style="margin-top:12px;border-style:dashed;text-align:center;"><div style="font-family:var(--font-d);font-weight:700;font-size:16px;margin-bottom:8px;">建立下一場賽事</div><button class="btn btn-primary" data-action="cloud-admin-new-tournament">＋ 新增賽事</button></div>`:""}`;

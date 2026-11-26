@@ -859,3 +859,41 @@ test('PTN live court controls require backend capability and use room-scoped res
  assert.equal(calls.at(-1).command,'reopen');
  await t.ui.load('ticket-room-state');t.sandbox.activeTab='live';assert.doesNotMatch(t.ui.ticketManagedTab('live'),/丙<\/span>/);
 });
+
+test('PTN accepted referee opens a scoped session and scoring uses the exact current court revision',async()=>{
+ const t=setup(),code='PTN-TST001',calls=[];let onPublic,unsub=0;
+ const room={ok:true,code,roomId:'room-generation',name:'Scoped',phase:'live',stations:4,updatedAt:321,
+  bracket:[{id:'m2',station:2,round:0,seq:1,updatedAt:12,scoreA:1,scoreB:0,a:{name:'甲'},b:{name:'乙'},canScore:true}],
+  refereeSeatControl:{version:1,canInvite:false,canJoin:false,canManage:false,courts:{2:{revision:7,main:{uid:'buyer',name:'我的席位'},backup1:null,backup2:null}},requests:[]}};
+ t.sandbox.window.cloudSync={subscribePublic(c,fn){assert.equal(c,code);onPublic=fn;return()=>{unsub++;};}};
+ t.sandbox.window.engagementService.ticketRoomOperation=async p=>{calls.push({...p});if(p.action==='ticket-room-score'){room.bracket[0].scoreA+=1;room.bracket[0].updatedAt++;room.updatedAt++;return {ok:true};}return JSON.parse(JSON.stringify(room));};
+ await t.ui.openTicketRefereeSession(code,2);
+ assert.equal(calls[0].seatAction,'view');assert.match(t.ui.ticketRefereeSessionView(),/2 號台/);assert.doesNotMatch(t.ui.ticketRefereeSessionView(),/管理房間|調整台數|1 號台/);
+ assert.equal(t.ui.verifiedBracketRoom(),null);
+ await t.ui.handle('commerce-ticket-score',{dataset:{id:'m2',command:'score',side:'A',finish:'spin'}});
+ assert.deepEqual(calls.find(x=>x.action==='ticket-room-score'),{action:'ticket-room-score',code,roomId:room.roomId,matchId:'m2',matchUpdatedAt:12,station:2,expectedCourtRevision:7,command:'score',side:'A',finish:'spin',operationId:'same-operation'});
+ let count=calls.length;onPublic({},room.updatedAt);assert.equal(calls.length,count);
+ room.updatedAt++;room.bracket[0].canScore=false;room.refereeSeatControl.courts[2].main={uid:'another',name:'接任主裁'};room.refereeSeatControl.courts[2].backup1={uid:'buyer',name:'備裁'};
+ onPublic({},room.updatedAt);for(let n=0;n<5;n++)await new Promise(resolve=>setImmediate(resolve));
+ assert.equal((t.ui.ticketRefereeSessionView().match(/data-command="score"[^>]*disabled/g)||[]).length,8);
+ count=calls.length;await t.ui.handle('commerce-ticket-score',{dataset:{id:'m2',command:'score',side:'A',finish:'spin'}});assert.equal(calls.length,count);
+ t.setUid('other');assert.equal(t.ui.ticketRefereeSessionView(),'');assert.equal(unsub,1);onPublic({},999);assert.equal(calls.length,count);
+});
+
+test('PTN host seat grid reuses the existing invitation dialog and room-specific transport',async()=>{
+ const t=setup({partner:true}),code='PTN-TST001',calls=[],opened=[];t.sandbox.activeTab='management';
+ const room={ok:true,code,roomId:'room-generation',name:'Host room',phase:'waiting',stations:1,updatedAt:321,
+  refereeSeatControl:{version:1,canInvite:true,canJoin:false,canManage:true,courts:{1:{revision:0,main:null,backup1:null,backup2:null}},requests:[]}};
+ t.sandbox.window.engagementService.ticketRoomOperation=async p=>{calls.push({...p});return p.action==='ticket-room-referee'?{ok:true,requestId:'request-id'}:room;};
+ t.sandbox.window.BXHCommunityRefereeInvite={open:(base,c)=>opened.push({base,c})};
+ await t.ui.handle('commerce-open-ticket-room',{dataset:{id:code}});t.sandbox.activeTab='referee';
+ assert.equal(t.ui.ticketInviteHostRoom().code,code);
+ const click=t.listeners.click;vm.runInContext(fs.readFileSync(path.join(__dirname,'../modules/main-app/referee-seats.js'),'utf8'),t.sandbox);
+ assert.match(t.ui.renderTicketSeatGrid(1,room),/data-ptn-seat-action="seat"/);
+ assert.match(t.ui.renderTicketSeatGrid(1,room),/邀請裁判/);
+ click({target:{closest:()=>({dataset:{ptnSeatAction:'seat',station:'1',slot:'main'}})},preventDefault(){},stopImmediatePropagation(){}});
+ assert.equal(opened[0].c,code);assert.equal(opened[0].base.expectedCourtRevision,0);
+ await t.ui.ticketInviteCommand({code,action:'invite',operationId:'room-unique-operation',station:1,slot:'main',targetUid:'fixture-player',expectedCourtRevision:0});
+ assert.deepEqual(calls.find(x=>x.seatAction==='invite'),{code,action:'ticket-room-referee',seatAction:'invite',operationId:'room-unique-operation',station:1,slot:'main',targetUid:'fixture-player',expectedCourtRevision:0});
+ assert.match(t.ui.ticketRefereeSupportPanel(true),/PTN 合作賽事裁判協助/);assert.equal(t.ui.ticketRefereeSupportPanel(false),'');
+});

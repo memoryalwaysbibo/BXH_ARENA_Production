@@ -3,7 +3,7 @@ const {createHash,randomUUID,randomBytes}=require('node:crypto');
 const C=require('./core.cjs');
 const {activeAccount}=require('./event-staff-core.cjs');
 const {assertLegacyScoringWritable}=require('./bucket-legacy-fence.cjs');
-function createHandler(db,{clock=Date.now,uuid=randomUUID,resolveTicketAuthority=null}={}){return async request=>{
+function createHandler(db,{clock=Date.now,uuid=randomUUID,resolveTicketAuthority=null,projectTicketView=null}={}){return async request=>{
  const uid=request.auth?.uid,d={...request.data},code=String(d.code||'').trim().toUpperCase();
  if(!uid)throw new Error('unauthenticated');
  if(['invite-mail-list','invite-mail-read'].includes(d.action)){
@@ -41,6 +41,7 @@ function createHandler(db,{clock=Date.now,uuid=randomUUID,resolveTicketAuthority
   if(ticketCode){
    if(releaseSnap.data()?.ticketSeatsEnabled!==true)throw Error('ticket-invite-unavailable');
    authority.ticket=await resolveTicketAuthority({tx,room,publicRoom:publicSnap.data(),state,user,uid,code,now,request});
+   if(d.action==='view'&&typeof projectTicketView==='function')return projectTicketView({room,state,user,uid,code,now,authority});
   }
   const qrAction=['inspect-qr','accept-qr'].includes(d.action);
   if(['accept-invite','create-qr','find-invite-player', 'inspect-qr','accept-qr'].includes(d.action)&&(room.eventAuthority==='community'||ticketCode)

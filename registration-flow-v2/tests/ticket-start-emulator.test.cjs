@@ -311,7 +311,14 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  let scoredMatch={id:'not-scored'};
  if(ptn){
  const score=createTicketScoreHandler(options);
- scoredMatch=live.bracket.find(item=>item.round===0&&item.canScore);
+ const {createTicketRefereeHandler}=require('../backend/ticket-referee-seat.cjs');
+ const referee=createTicketRefereeHandler(options);
+ const scopedView=await referee({auth:{uid:other},app:creation.app,data:{action:'ticket-room-referee',code,seatAction:'view',operationId:'fixture-seat-view'}});
+ assert.deepEqual(Object.keys(scopedView.refereeSeatControl.courts),['1']);
+ assert.equal(scopedView.participants,undefined);
+ assert.equal(scopedView.bracket.length,1);assert.equal(scopedView.bracket[0].canScore,true);
+ scoredMatch=live.bracket.find(item=>item.id===scopedView.bracket[0].id);
+ assert.ok(scoredMatch?.canScore);
  let scoreUpdatedAt=scoredMatch.updatedAt;
  const scoreRequest=(command,suffix,extra={})=>({auth:creation.auth,app:creation.app,
   data:{action:'ticket-room-score',code,roomId,matchId:scoredMatch.id,matchUpdatedAt:scoreUpdatedAt,
@@ -320,6 +327,10 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  await assert.rejects(score({...scoreRequest('score','other',{side:'A',finish:'spin'}),auth:{uid:other}}),/permission-denied/);
  for(let i=0;i<4;i++){
   const request=scoreRequest('score','point-'+i,{side:'A',finish:'spin'});
+  if(i===0){
+   request.auth={uid:other};Object.assign(request.data,{station:1,expectedCourtRevision:scopedView.refereeSeatControl.courts[1].revision});
+   await assert.rejects(score({...request,auth:{uid:'qr-ref-'+code}}),/permission-denied/);
+  }
   const saved=await score(request);
   assert.equal(saved.scoreA,i+1);
   assert.equal((await score(request)).replayed,true);

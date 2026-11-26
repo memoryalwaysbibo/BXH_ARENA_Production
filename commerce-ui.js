@@ -39,9 +39,11 @@ const storageKey=()=> 'bxh.commerce.pending.v1:'+currentAuthUid();
 function context(){
  const session=currentAuthUid()+':'+engagementSessionEpoch;
  if(!state||state.session!==session){
+  state?.refereeSession?.unsubscribe?.();state?.refereeHostListener?.unsubscribe?.();
   let pending=null;try{pending=JSON.parse(sessionStorage.getItem(storageKey())||'null');if(pending?.uid!==currentAuthUid())pending=null;}catch{}
   state={session,products:null,productsCursor:null,tickets:null,ticketsOpen:false,ticketRoomOpen:false,ticketRoom:null,ticketDraft:null,peopleSection:'confirmed',ptnRoomCards:{},ptnRoomCardScheduled:false,ptnRoomCardLoading:false,ptnRoomLimit:5,orders:null,ordersCursor:null,config:null,capabilities:{},loading:false,busy:false,error:'',success:'',category:'',productId:'',order:null,adminZone:'orders',status:'reported',draft:null,configDraft:null,pending,formDrafts:{},generation:0,storeOpen:null};
  }
+ if(state.refereeHostListener&&(state.refereeSession||state.view!=='ticket-manage'||typeof activeTab!=='undefined'&&activeTab!=='referee')){state.refereeHostListener.unsubscribe?.();state.refereeHostListener=null;}
  return state;
 }
 function errorMessage(e){
@@ -65,6 +67,8 @@ function ticketRoomMutationError(e){
  if(message.includes('app-check-unavailable')||message.includes('網站驗證未完成'))return '網站驗證未完成，請重新載入頁面後再操作。';
  if(message.includes('permission-denied')||message.includes('unauthenticated')||message.includes('auth-required'))return '賽事管理權限驗證失敗。請重新整理房間，並確認目前登入的是這間房的主辦、代理人或最高管理員。';
  if(/score-match-stale/.test(message))return '對戰狀態已變更，請重新整理後確認比分或接管狀態。';
+ if(/seat-stale|seat-occupied|request-unavailable|request-stale|already-seated/.test(message))return '裁判席位或交接狀態已變更，請重新整理後操作。';
+ if(/ticket-invite-unavailable|release-not-ready/.test(message))return '目前合作賽事裁判邀請尚未開放。';
  if(/court-room-not-live|already-completed/.test(message))return '賽事已停止裁判台調整，請重新整理房間。';
  if(/court-plan-stale|court-exit-stale|current-match-changed|dispatch-stale|not-detached|target-retiring|offline-sync-pending/.test(message))return '裁判台或對戰狀態已變更，請重新整理再操作。';
  const known=errorMessage(e);
@@ -78,7 +82,7 @@ const date=n=>n?new Date(n).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour1
 function image(url){if(/^assets\/commerce\/tickets\/tournament-activation-(32-green|64-blue|96-purple|128-orange|160-red)\.png$/.test(url))return url;try{const u=new URL(url);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch{return '';}}
 function notices(c){return `${c.error?`<p class="commerce-error" role="alert">${esc(c.error)}</p>`:''}${c.success?`<p class="commerce-success" role="status">${esc(c.success)}</p>`:''}${c.pending?`<div class="banner"><span>有一筆操作尚待確認。</span><button class="btn btn-primary" data-action="commerce-retry" ${c.busy?'disabled':''}>確認原操作結果</button></div>`:''}`;}
 const pilotCode=()=>window.BXH_TICKET_ROOM_PILOT_CODE;
-const ticketActions=new Set(['create-ticket-room','ticket-ptn-status','ticket-room-state','ticket-room-schedule','ticket-room-stations','ticket-room-delegate','ticket-room-delegate-search','ticket-room-draw','ticket-room-start','ticket-room-remove','ticket-room-forfeit','ticket-room-score']);
+const ticketActions=new Set(['create-ticket-room','ticket-ptn-status','ticket-room-state','ticket-room-schedule','ticket-room-stations','ticket-room-delegate','ticket-room-delegate-search','ticket-room-draw','ticket-room-start','ticket-room-remove','ticket-room-forfeit','ticket-room-score','ticket-room-referee']);
 const ticketSaleMode=()=>canSeeTickets()&&window.BXH_PTN_TICKET_SALE===true;
 const ticketPilot=()=>canSeeTickets()&&(ticketSaleMode()||typeof pilotCode()==='string'&&/^BXH-[A-Z0-9]{4,16}$/.test(pilotCode()));
 const ticketCreationView=c=>c.view==='ticket-create'&&typeof activeTab!=='undefined'&&activeTab==='management';
@@ -211,20 +215,104 @@ function ticketCourtMaintenance(room,pending){
  const detached=control.detached.map(id=>{const m=room.bracket?.find(x=>x.id===id);if(!m)return '';return `<form data-commerce-form="ticket-court-claim" data-match-id="${esc(id)}"><p>${esc(m.a?.name||'選手 A')} ${Number(m.scoreA||0)} : ${Number(m.scoreB||0)} ${esc(m.b?.name||'選手 B')}</p><select name="station" aria-label="接管裁判台" required>${enabledCourts.map(c=>`<option value="${Number(c.station)}">${Number(c.station)} 號台</option>`).join('')}</select><button class="btn btn-primary" ${pending||!enabledCourts.length?'disabled':''}>接管對戰</button></form>`;}).join('');
  return `<section class="panel ref-court-maintenance"><details ${control.detached.length||room.stations!==control.targetCount?'open':''}><summary>更多操作・裁判台退場</summary><p class="hint">目標 ${Number(control.targetCount)} 台，目前 ${Number(room.stations)} 台；已指派的對戰保留到完成或退場。</p>${courts}${detached?'<h3>待接管對戰</h3>'+detached:''}</details></section>`;
 }
+function verifiedTicketRoom(){const c=context();return ticketManagementView(c)&&c.ticketRoom?.ok&&c.ticketRoom.code===ticketRoomCode(c)?c.ticketRoom:null;}
+function ticketInviteHostRoom(){const r=currentTicketSeatRoom();return r?.refereeSeatControl?.canInvite===true?r:null;}
+function currentTicketSeatRoom(){const c=context();return c.refereeSession?c.refereeSession.room:verifiedTicketRoom();}
+async function ticketInviteCommand(data){
+ const c=context(),{action,...fields}=data;
+ if(!isPtnCode(fields.code))throw Error('invalid-operation');
+ const result=await call({...fields,action:'ticket-room-referee',seatAction:action});
+ if(c!==context())throw Error('permission-denied');
+ if(!['view','find-invite-player','inspect-qr'].includes(action)){if(c.refereeSession?.code===fields.code)await refreshTicketRefereeSession(c.refereeSession);else if(verifiedTicketRoom()?.code===fields.code)await load('ticket-room-state',false,true);}
+ return result;
+}
+async function openTicketRefereeSession(code,station){
+ const c=context(),actor=currentAuthUid(),attempt={};
+ if(!actor||!isPtnCode(code))throw Error('permission-denied');
+ c.refereeOpenAttempt=attempt;
+ const room=await ticketInviteCommand({action:'view',code,operationId:crypto.randomUUID()});
+ if(c!==context()||c.refereeOpenAttempt!==attempt||actor!==currentAuthUid())throw Error('permission-denied');
+ if(room.code!==code||!room.roomId||room.refereeSeatControl?.version!==1||!Object.keys(room.refereeSeatControl.courts||{}).length||station&&!room.refereeSeatControl.courts[station])throw Error('referee-room-unavailable');
+ c.refereeSession?.unsubscribe?.();c.refereeHostListener?.unsubscribe?.();c.refereeHostListener=null;
+ const session=c.refereeSession={code,actor,roomId:room.roomId,room:{...room,scoped:true},busy:false,error:'',pending:null,lastVersion:Number(room.updatedAt||0)};
+ session.unsubscribe=window.cloudSync?.subscribePublic?.(code,(_public,version)=>{
+  if(c!==context()||c.refereeSession!==session||session.busy||Number(version)<=session.lastVersion)return;
+  session.busy=true;void refreshTicketRefereeSession(session).finally(()=>{if(c===context()&&c.refereeSession===session){session.busy=false;render();}});
+ });render();
+}
+async function refreshTicketRefereeSession(session){
+ const c=context();if(c.refereeSession!==session||session.actor!==currentAuthUid())return;
+ try{
+  const room=await ticketInviteCommand({action:'view',code:session.code,operationId:crypto.randomUUID()});
+  if(c===context()&&c.refereeSession===session){if(room.code!==session.code||room.roomId!==session.roomId||room.refereeSeatControl?.version!==1)throw Error('ticket-binding-invalid');session.room={...room,scoped:true};session.lastVersion=Math.max(session.lastVersion,Number(room.updatedAt||0));session.error='';}
+ }catch(e){if(c===context()&&c.refereeSession===session){session.room=null;session.error='裁判台讀取失敗，請重新整理或返回。';if(/permission-denied|not-event-staff|room-read-only|ticket-binding-invalid/.test(String(e?.message||e)))session.unsubscribe?.();}}
+}
+async function scopedTicketMutation(data){
+ const c=context(),session=c.refereeSession;if(!session||session.actor!==currentAuthUid()||session.busy)return;
+ session.busy=true;session.error='';
+ if(!session.pending)session.pending={...data,operationId:crypto.randomUUID()};
+ render();
+ try{await call(session.pending);if(c!==context()||c.refereeSession!==session)return;session.pending=null;await refreshTicketRefereeSession(session);}
+ catch(error){if(c===context()&&c.refereeSession===session){const message=String(error?.message||error);session.error=ticketRoomMutationError(error);if(permanentErrors.test(message)||/seat-stale|ticket-invite-unavailable|request-unavailable|not-event-staff|invitation-required|seat-occupied|already-seated|request-stale/.test(message)){session.pending=null;await refreshTicketRefereeSession(session);if(session.room)session.error=ticketRoomMutationError(error);}}}
+ finally{if(c===context()&&c.refereeSession===session){session.busy=false;render();}}
+}
+function renderTicketSeatGrid(station,room){
+ const control=room?.refereeSeatControl,court=control?.courts?.[station],c=context(),actor=currentAuthUid();
+ if(control?.version!==1||!court||!window.BXHRefereeSeats?.renderSeatGrid)return '';
+ const pending=(room.scoped?c.refereeSession?.busy||!!c.refereeSession?.pending:c.busy||c.loading||!!c.pending)||court.closed;
+ const base=window.BXHRefereeSeats.renderSeatGrid(station,court,{actorUid:actor,busy:pending,canInvite:control.canInvite,canJoin:control.canJoin,invitationMode:true,ticket:true});
+ const requests=(control.requests||[]).filter(r=>r.station===station).map(r=>{
+  const attrs=`data-ptn-seat-action="respond" data-station="${station}" data-request="${esc(r.id)}" data-slot="${esc(r.slot)}"`;
+  if(r.kind==='handoff'&&r.toUid===actor)return `<div class="ref-seat-wait">${esc(r.fromName||'裁判')} 申請交接 <button type="button" class="btn btn-ghost" ${attrs} data-response="accept" ${pending?'disabled':''}>同意</button><button type="button" class="btn btn-ghost" ${attrs} data-response="reject" ${pending?'disabled':''}>拒絕</button></div>`;
+  if(r.fromUid===actor)return `<div class="ref-seat-wait">等待對方確認中 <button type="button" class="btn btn-ghost btn-sm" data-ptn-seat-action="cancel" data-station="${station}" data-slot="${esc(r.slot)}" data-request="${esc(r.id)}" ${pending?'disabled':''}>取消申請</button></div>`;
+  return '';
+ }).join('');
+ return '<div class="ref-seat-section">'+base+requests+'</div>';
+}
+async function ticketSeatClick(target){
+ const room=currentTicketSeatRoom(),c=context(),control=room?.refereeSeatControl,station=Number(target.dataset.station),slot=target.dataset.slot,action=target.dataset.ptnSeatAction,court=control?.courts?.[station],actor=currentAuthUid();
+ if(!room||control?.version!==1||!court||court.closed||target.disabled||(room.scoped?c.refereeSession?.busy||c.refereeSession?.pending:c.busy||c.loading||c.pending)||!['main','backup1','backup2'].includes(slot))return;
+ const seat=court[slot],base={code:room.code,station,slot,expectedCourtRevision:court.revision,expectedUid:seat?.uid||null};
+ const send=async(action,extra={})=>{
+  if(c!==context()||currentTicketSeatRoom()!==room||actor!==currentAuthUid())return;
+  if(c.refereeSession)return scopedTicketMutation({...base,...extra,action:'ticket-room-referee',seatAction:action});
+  let error='';c.busy=true;render();try{await call({...base,...extra,action:'ticket-room-referee',seatAction:action,operationId:crypto.randomUUID()});}catch(e){error=ticketRoomMutationError(e);}finally{if(c===context()){c.busy=false;await load('ticket-room-state',false,true);if(c===context()&&error)c.error=error;render();}}
+ };
+ if(action==='respond'||action==='cancel'){
+  const request=control.requests?.find(r=>r.id===target.dataset.request&&r.station===station&&r.slot===slot);
+  if(!request)return;
+  if(action==='respond'&&request.kind==='handoff'&&request.toUid===actor&&['accept','reject'].includes(target.dataset.response))return send(action,{requestId:request.id,response:target.dataset.response});
+  if(action==='cancel'&&request.fromUid===actor)return send(action,{requestId:request.id});return;
+ }
+ if(action!=='seat')return;
+ if(!seat){if(control.canInvite)return window.BXHCommunityRefereeInvite?.open(base,room.code);if(control.canJoin)return send('claim');return;}
+ const modal=window.BXHRefereeSeats?.modal;
+ if(seat.uid===actor)return modal?.(`是否退出 ${station} 號台裁判席？`,[{label:'確定',run:()=>send('leave')},{label:'取消'}]);
+ const choices=[{label:'提出權限交接',run:()=>send('request')}];
+ if(control.canManage||slot!=='main'&&court.main?.uid===actor)choices.push({label:'撤銷此席位',danger:true,run:()=>send('revoke')});
+ choices.push({label:'取消'});return modal?.(`${station} 號台：${seat.name}`,choices);
+}
+function ticketRefereeSessionView(){
+ const session=context().refereeSession;if(!session||session.actor!==currentAuthUid())return '';
+ const room=session.room;
+ return `<section class="commerce commerce-ptn-management"><div class="panel-title"><button class="btn btn-ghost" data-action="commerce-ticket-referee-back">← 返回</button><strong>${esc(room?.name||session.code)}｜${esc(session.code)}</strong><button class="btn btn-ghost" data-action="commerce-ticket-referee-refresh" ${session.busy?'disabled':''}>重新整理</button></div>${session.error?`<p role="alert" class="commerce-error">${esc(session.error)}</p>`:''}${session.pending?`<button class="btn btn-primary" data-action="commerce-ticket-referee-retry" ${session.busy?'disabled':''}>確認原操作結果</button>`:''}${room?ticketRefereePanel(room,session.busy||!!session.pending):''}</section>`;
+}
+function ticketRefereeSupportPanel(allowed){const c=context();return !allowed?'':`<details class="panel"><summary>PTN 合作賽事裁判協助</summary><form data-commerce-form="ticket-referee-open">${input('code','合作賽事房號','','text','placeholder="PTN-XXXXXX" maxlength="10" required')}<button class="btn btn-primary">進入裁判台</button></form>${c.refereeSupportError?`<p role="alert">${esc(c.refereeSupportError)}</p>`:''}</details>`;}
 function ticketRefereePanel(room,pending){
  if(room.phase==='waiting')return window.BXHSharedTicketWaitingCourts?.render(room)||'<p>賽事尚未開賽；尚未取得裁判台配置，請重新整理房間。</p>';
  if(room.phase!=='live')return '<p>賽事已停止計分。</p>';
- const matches=(room.bracket||[]).filter(match=>match.canScore&&match.a&&match.b);
+ const matches=(room.bracket||[]).filter(match=>(room.scoped||match.canScore)&&match.a&&match.b);
  const finishes=[['spin','旋轉勝利＋1分'],['knockout','擊飛勝利＋2分'],['burst','爆裂勝利＋2分'],['extreme','極限勝利＋3分']];
  const card=match=>{
-  const scoreA=Number(match.scoreA),scoreB=Number(match.scoreB),ready=Math.max(scoreA,scoreB)>=4;
+  const scoreA=Number(match.scoreA),scoreB=Number(match.scoreB),ready=Math.max(scoreA,scoreB)>=4,readOnly=room.scoped&&!match.canScore;
   const sidePanel=side=>{
    const player=match[side.toLowerCase()],score=side==='A'?scoreA:scoreB;
-   return `<div class="side-panel ${ready&&score>=(side==='A'?scoreB:scoreA)?'leading':''}"><div class="side-name">${esc(player.name)}</div><div class="side-score">${score}</div><div class="score-btns">${finishes.map(([finish,label])=>`<button type="button" data-action="commerce-ticket-score" data-id="${esc(match.id)}" data-command="score" data-side="${side}" data-finish="${finish}" data-type="${finish}" ${pending||ready?'disabled':''}>${label}</button>`).join('')}</div></div>`;
+   return `<div class="side-panel ${ready&&score>=(side==='A'?scoreB:scoreA)?'leading':''}"><div class="side-name">${esc(player.name)}</div><div class="side-score">${score}</div><div class="score-btns">${finishes.map(([finish,label])=>`<button type="button" data-action="commerce-ticket-score" data-id="${esc(match.id)}" data-command="score" data-side="${side}" data-finish="${finish}" data-type="${finish}" ${pending||ready||readOnly?'disabled':''}>${label}</button>`).join('')}</div></div>`;
   };
-  return `<article class="panel court-card referee-workstation commerce-ptn-court"><div class="commerce-ptn-court-header"><strong>${match.station?Number(match.station)+' 號台｜':''}第 ${Number(match.round)+1} 輪・第 ${Number(match.seq)+1} 場</strong><span>${ready?'待確認賽果':scoreA+scoreB?'進行中':'等待記分'}</span></div>${window.BXHRefereeSeats?.renderPendingTicketSeats?.(match.station,room)||''}<div class="ref-vs-arena standard">${sidePanel('A')}<div class="ref-vs-mark" aria-hidden="true">VS</div>${sidePanel('B')}</div><div class="btn-row ref-result-actions"><button type="button" class="btn btn-ghost ref-undo-score" data-action="commerce-ticket-score" data-id="${esc(match.id)}" data-command="undo" ${pending||scoreA+scoreB===0?'disabled':''}>撤回上一筆得分</button><button type="button" class="btn btn-primary ref-confirm-result" data-action="commerce-ticket-score" data-id="${esc(match.id)}" data-command="confirm" ${pending||!ready?'disabled':''}>確認比賽結果${ready?`（建議：${esc(scoreA>scoreB?match.a.name:match.b.name)} 勝）`:''}</button></div></article>`;
+  return `<article class="panel court-card referee-workstation commerce-ptn-court"><div class="commerce-ptn-court-header"><strong>${match.station?Number(match.station)+' 號台｜':''}第 ${Number(match.round)+1} 輪・第 ${Number(match.seq)+1} 場</strong><span>${ready?'待確認賽果':scoreA+scoreB?'進行中':'等待記分'}</span></div>${window.BXHRefereeSeats?.renderPendingTicketSeats?.(match.station,room)||''}<div class="ref-vs-arena standard">${sidePanel('A')}<div class="ref-vs-mark" aria-hidden="true">VS</div>${sidePanel('B')}</div><div class="btn-row ref-result-actions"><button type="button" class="btn btn-ghost ref-undo-score" data-action="commerce-ticket-score" data-id="${esc(match.id)}" data-command="undo" ${pending||readOnly||scoreA+scoreB===0?'disabled':''}>撤回上一筆得分</button><button type="button" class="btn btn-primary ref-confirm-result" data-action="commerce-ticket-score" data-id="${esc(match.id)}" data-command="confirm" ${pending||readOnly||!ready?'disabled':''}>確認比賽結果${ready?`（建議：${esc(scoreA>scoreB?match.a.name:match.b.name)} 勝）`:''}</button></div></article>`;
  };
- return `<h3>合作賽事裁判台</h3>${ticketCourtMaintenance(room,pending)}<p>房主、房間代理人或最高管理員可記分；每場確認賽果後自動晉級。</p>${room.championName?`<p role="status">賽事已決出冠軍：${esc(room.championName)}</p>`:''}${matches.length?`<div class="court-grid court-grid-1 commerce-ptn-courts">${matches.map(card).join('')}</div>`:'<p>目前沒有可記分的對戰；可至對戰表查看進度。</p>'}`;
+ const emptyCourts=Object.keys(room.refereeSeatControl?.courts||{}).map(Number).filter(n=>!matches.some(m=>Number(m.station)===n)).map(n=>`<article class="panel court-card referee-workstation"><h3>${n} 號台｜等待安排場次</h3>${window.BXHRefereeSeats?.renderPendingTicketSeats?.(n,room)||''}</article>`).join('');
+ return `<h3>合作賽事裁判台</h3>${ticketCourtMaintenance(room,pending)}<p>${room.scoped?'主裁可計分；備裁經交接後接手。':'房主、房間代理人或最高管理員可記分；每場確認賽果後自動晉級。'}</p>${room.championName?`<p role="status">賽事已決出冠軍：${esc(room.championName)}</p>`:''}${matches.length||emptyCourts?`<div class="court-grid court-grid-1 commerce-ptn-courts">${matches.map(card).join('')}${emptyCourts}</div>`:'<p>目前沒有可記分的對戰；可至對戰表查看進度。</p>'}`;
 }
 function ticketPeoplePanel(c,room,pending,drawPanel,delegate){
  const roster=room.participants||[],capacity=Number(room.capacity||0);
@@ -253,12 +341,24 @@ function ticketHostManagementPanel(c,room,pending,scheduleForm,tab){
  const content=tab==='settings'?settings:tab==='people'?ticketPeoplePanel(c,room,pending,drawPanel,delegate):tab==='registrations'?`${registrationPanel}${rosterPanel}${drawPanel}`:tab==='bracket'?ticketBracketPanel(room):tab==='live'?ticketLivePanel(room):tab==='referee'?ticketRefereePanel(room,pending):operations;
  return `<section class="commerce commerce-ptn-management"><div class="panel-title"><button type="button" class="btn btn-ghost" data-action="commerce-ticket-back">← 返回賽事管理／切換房間</button><button class="btn btn-ghost btn-sm" data-action="commerce-ticket-refresh" ${c.loading?'disabled':''}>重新整理房間</button></div>${notices(c)}${c.loading?'<p role="status">正在讀取房間資料……</p>':''}${content}</section>`;
 }
+function syncTicketHostSeatListener(c,room,tab){
+ const key=tab==='referee'&&room?.refereeSeatControl?.version===1&&!c.refereeSession?room.code+':'+room.roomId:null;
+ if(c.refereeHostListener?.key===key)return;
+ c.refereeHostListener?.unsubscribe?.();c.refereeHostListener=null;
+ if(!key||!window.cloudSync?.subscribePublic)return;
+ const listener={key};c.refereeHostListener=listener;
+ listener.unsubscribe=window.cloudSync.subscribePublic(room.code,(_public,version)=>{
+  if(c!==context()||c.refereeHostListener!==listener||c.busy||c.loading||c.ticketRoom?.code!==room.code||c.ticketRoom?.roomId!==room.roomId||Number(version)<=Number(c.ticketRoom?.updatedAt||0))return;
+  void load('ticket-room-state',false,true);
+ });
+}
 function ticketManagedTab(tab){
  const c=context();
  if(!c.roomManageOpen||!ticketManagementView(c)||!['registrations','settings','people','live','bracket','referee','operations'].includes(tab))return null;
  schedule('ticket-room-state',c.ticketRoom===null);
  const room=c.ticketRoom;
   if(room?.ok!==true||room.code!==c.ownedPtn.code)return `<section class="panel commerce"><button type="button" class="btn btn-ghost" data-action="commerce-ticket-back">← 返回賽事管理／切換房間</button><h2>管理房間</h2>${notices(c)}<p role="status">${c.loading?'正在驗證票券房管理權限並讀取賽事……':'房間尚未通過管理權限驗證，請重新整理或返回賽事管理。'}</p><button type="button" class="btn btn-ghost" data-action="commerce-ticket-refresh" ${c.loading?'disabled':''}>重新整理房間</button></section>`;
+ syncTicketHostSeatListener(c,room,tab);
  const pending=c.loading||c.busy||!!c.pending;
  const scheduleForm=room.phase==='waiting'&&['registrationOpenAt','registrationCloseAt','startAt'].every(key=>Number.isSafeInteger(room[key]))?`<details open><summary>調整報名與開賽時間</summary><form data-commerce-form="ticket-schedule"><p>時間以台灣時間填寫；報名截止與預定開賽必須在未來。</p>${['registrationOpenAt','registrationCloseAt','startAt'].map((key,i)=>input(key,['報名開放','報名截止','預定開賽'][i]+'（台灣時間）',c.scheduleDraft?.[key]||new Date(room[key]+8*3600000).toISOString().slice(0,16),'datetime-local','required')).join('')}<button class="btn btn-primary" ${pending?'disabled':''}>儲存賽事時間</button></form></details>`:'';
  return ticketHostManagementPanel(c,room,pending,scheduleForm,tab);
@@ -526,6 +626,16 @@ async function handle(action,target){
   else if(command==='reopen'){if(!court.closed||court.draining)return;}else return;
   return mutate({action:'ticket-room-stations',code:room.code,roomId:room.roomId,expectedUpdatedAt:room.updatedAt,command,station,...(command==='exit'?{matchId:court.currentMatchId}:{})});
  }
+ if(action==='commerce-ticket-referee-back'){if(c.refereeSession&&!c.refereeSession.busy){c.refereeSession.unsubscribe?.();c.refereeSession=null;c.refereeOpenAttempt=null;render();}return;}
+ if(action==='commerce-ticket-referee-refresh'&&c.refereeSession&&!c.refereeSession.busy){const session=c.refereeSession;session.busy=true;render();await refreshTicketRefereeSession(session);if(c.refereeSession===session){session.busy=false;render();}return;}
+ if(action==='commerce-ticket-referee-retry'&&c.refereeSession?.pending)return scopedTicketMutation(c.refereeSession.pending);
+ if(action==='commerce-ticket-score'&&c.refereeSession){
+  const session=c.refereeSession,room=session.room,match=room?.bracket?.find(m=>m.id===id),command=target?.dataset?.command,side=target?.dataset?.side,finish=target?.dataset?.finish,court=room?.refereeSeatControl?.courts?.[match?.station];
+  if(session.busy||session.pending||room?.phase!=='live'||!match?.canScore||court?.main?.uid!==currentAuthUid()||!['score','undo','confirm'].includes(command))return;
+  if(command==='score'&&(!['A','B'].includes(side)||!['spin','knockout','burst','extreme'].includes(finish)))return;
+  if(command==='confirm'&&!confirm(`確認 ${match.a.name} ${match.scoreA}：${match.scoreB} ${match.b.name} 的賽果並讓勝者晉級？`))return;
+  return scopedTicketMutation({action:'ticket-room-score',code:room.code,roomId:room.roomId,matchId:match.id,matchUpdatedAt:match.updatedAt,station:match.station,expectedCourtRevision:court.revision,command,...(command==='score'?{side,finish}:{})});
+ }
  if(action==='commerce-ticket-score'&&ticketManagementView(c)&&c.ticketRoomOpen&&!c.pending){
   const room=c.ticketRoom,match=room?.bracket?.find(item=>item.id===id),command=target?.dataset?.command;
   if(!match?.canScore||room.code!==ticketRoomCode(c)||room.phase!=='live'||!['score','undo','confirm'].includes(command))return;
@@ -573,6 +683,10 @@ document.addEventListener('submit',async e=>{
  const c=context();if(c.busy||c.loading||c.pending)return;
  const values=Object.fromEntries(new FormData(form)),type=form.dataset.commerceForm;
  let payload;
+ if(type==='ticket-referee-open'){
+  const code=String(values.code||'').trim().toUpperCase();c.refereeSupportError='';
+  try{await openTicketRefereeSession(code);}catch(e){if(c===context()){c.refereeSupportError='無法進入裁判台，請核對房號及入席資格。';render();}}return;
+ }
  if(type==='ticket-open-code'){
   const code=String(values.code||'').trim().toUpperCase();
   if(!canManagePtn()||!inManagement()||!isPtnCode(code)){c.error='請輸入 PTN-XXXXXX 房號。';render();return;}
@@ -629,5 +743,6 @@ document.addEventListener('input',e=>{
  if(form.dataset.commerceForm==='config')c.configDraft={...v,enabled:v.enabled==='on'};
 });
 document.addEventListener('change',e=>{if(!e.target.matches?.('[data-commerce-status]'))return;const c=context();if(c.loading||c.busy)return;c.status=e.target.value;c.orders=null;void load('admin-orders');});
-window.BXHCommerce={shop,orders,adminPage,handle,context,load,loadPtnRoomCards,ticketPilot,ticketCreationPage,ownedTicketRoomCard,ticketManagementContext,ticketManagedTab,verifiedBracketRoom(){const c=context();return ticketManagementView(c)&&c.ticketRoom?.ok&&c.ticketRoom.code===ticketRoomCode(c)?c.ticketRoom:null;}};
+document.addEventListener('click',event=>{const target=event.target.closest?.('[data-ptn-seat-action]');if(!target)return;event.preventDefault();event.stopImmediatePropagation();void ticketSeatClick(target);},true);
+window.BXHCommerce={ticketInviteHostRoom,ticketInviteCommand,openTicketRefereeSession,ticketRefereeSessionView,ticketRefereeSupportPanel,renderTicketSeatGrid,shop,orders,adminPage,handle,context,load,loadPtnRoomCards,ticketPilot,ticketCreationPage,ownedTicketRoomCard,ticketManagementContext,ticketManagedTab,verifiedBracketRoom(){const c=context();return ticketManagementView(c)&&c.ticketRoom?.ok&&c.ticketRoom.code===ticketRoomCode(c)?c.ticketRoom:null;}};
 })();

@@ -130,7 +130,7 @@ test('published vouchers create independent PTN gates for two eligible organizer
    const held=live.matches.find(m=>m.station>1&&live.courtAssignments['court'+m.station]?.currentMatchId===m.id&&!m.completed);
    assert.ok(held,'fixture has a live assigned court above one');
    const heldStation=held.station;
-   liveRoom.refereeSeatsV1.courts[heldStation]={revision:1,main:{uid:'live-referee',name:'不必離席'},backup1:null,backup2:null};
+   liveRoom.refereeSeatsV1.courts[heldStation]={revision:1,main:{uid:'live-referee',name:'不必離席'},backup1:{uid:'live-backup',name:'備裁'},backup2:null};
    liveRoom.refereeSeatsV1.requests.live={id:'live',kind:'invite',station:heldStation,status:'pending',expiresAt:now+300000};
    rows.set(roomPath,{...liveRoom,tournamentPhase:'live',data:JSON.stringify(live)});
    rows.set(pubPath,{...livePublic,tournamentPhase:'live',bracketView:JSON.stringify(liveMirror)});
@@ -143,7 +143,13 @@ test('published vouchers create independent PTN gates for two eligible organizer
    await assert.rejects(liveResize({...command('live-unauthorized',{stations:1}),auth:{uid:'unrelated-player'}}),/permission-denied/);
    const score=require('../backend/lifecycle.cjs').createTicketScoreHandler({db,enabled:async()=>true,clock:()=>now+2000});
    const scoreReq=(op,match,kind='score')=>({auth:{uid},app:{},data:{action:'ticket-room-score',code,roomId:first.roomId,operationId:op,matchId:match.id,matchUpdatedAt:match.updatedAt||0,command:kind,...(kind==='score'?{side:'A',finish:'knockout'}:{})}});
-   await score(scoreReq('live-first-score',held));
+   rows.set('systemConfig/refereeSeatsV1',{enabled:true,perCourtScoringVerified:true,ticketSeatsEnabled:true});
+   rows.set('users/live-referee',{active:true,role:'player'});rows.set('users/live-backup',{active:true,role:'player'});
+   const scopedScore={...scoreReq('live-scoped-first',held),auth:{uid:'live-referee'}};
+   Object.assign(scopedScore.data,{station:heldStation,expectedCourtRevision:1});
+   await assert.rejects(score({...scopedScore,auth:{uid:'live-backup'}}),/permission-denied/);
+   await assert.rejects(score({...scopedScore,data:{...scopedScore.data,expectedCourtRevision:0}}),/seat-stale/);
+   assert.equal((await score(scopedScore)).scoreA,2);assert.equal((await score(scopedScore)).replayed,true);
    const shrink=command('live-shrink',{stations:1});
    await liveResize(shrink);assert.equal((await liveResize(shrink)).replayed,true);
    const getState=()=>JSON.parse(rows.get(roomPath).data);
