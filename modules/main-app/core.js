@@ -7157,7 +7157,7 @@ async function performAutoArchiveState(state){
       state.ladderAwardedAt=settled.awardedAt||Date.now();
       state.ladderSkippedPlayers=Array.isArray(settled.skippedPlayers)?settled.skippedPlayers:[];
       state.ladderResults=Array.isArray(settled.results)?settled.results:[];
-      ladderPublicLoaded=false; ladderAdminLogsLoaded=false; myLadderProfileCache=null;
+      ladderPublicLoaded=false; ladderAdminLogsLoaded=false; myLadderProfileCache=null;clearNarrowPlayerCenter();
       if(settled.alreadyAwarded){
         showToast("本場天梯積分先前已完成結算，不會重複加分");
       }else if(state.ladderSkippedPlayers.length){
@@ -15871,6 +15871,61 @@ async function loadLadderPublic(force=false){
   ladderPublicLoading=false;
   render();
 }
+function sessionIo(uid, owns, readPlayer, readControl) {
+  const slots={};
+  async function read(key,req,validate,retry=false){
+    if(!owns()) return null;
+    if(retry && slots[key] && slots[key].state!=="loading") delete slots[key];
+    if(slots[key])return slots[key].promise;
+    const task={state:"loading"};
+    slots[key]=task;
+    task.promise=Promise.resolve().then(()=>{if(!owns()||slots[key]!==task)throw Error('stale');return req();}).then(value=>{
+      if(!owns()||slots[key]!==task)return {state:"stale"};
+      validate(value);
+      return {state:task.state="ready",value};
+    }).catch(()=>{
+      if(!owns()||slots[key]!==task)return {state:"stale"};
+      return {state:task.state="error"};
+    });
+    return task.promise;
+  }
+  const self=(retry=false)=>read("player",()=>readPlayer(uid),p=>{if(p&&p.uid!==uid)throw Error("identity mismatch");},retry);
+  const control=(retry=false)=>read("control",readControl,()=>{},retry);
+  async function view(kind,retry=false){
+    if(kind==="prelaunch"||!owns())return [];
+    const player=self(retry);
+    if(kind==="season")return Promise.all([player,control(retry)]);
+    const p=await player;
+    return kind==="basic" && p?.state==="ready" && !p.value && owns() ? [p, await control(retry)] : [p];
+  }
+  return {view};
+}
+let narrowPlayerCenterState=null;
+function clearNarrowPlayerCenter(){narrowPlayerCenterState=null;}
+function narrowPlayerCenterView(){
+  const uid=currentAuthUid(), epoch=engagementSessionEpoch;
+  if(narrowPlayerCenterState?.uid===uid&&narrowPlayerCenterState?.epoch===epoch) return narrowPlayerCenterState;
+  const v={uid,epoch,requested:new Set(),results:{}};
+  narrowPlayerCenterState=v;
+  v.owns=()=>narrowPlayerCenterState===v&&currentAuthUid()===uid&&engagementSessionEpoch===epoch;
+  v.io=sessionIo(uid,v.owns,playerUid=>ladderReadWithTimeout(window.cloudSync.getLadderOwnPlayer(playerUid),5000,"profile-own"),
+    ()=>ladderReadWithTimeout(window.cloudSync.getLadderControl(),5000,"profile-season"));
+  return v;
+}
+function requestNarrowPlayerCenter(v,kind,retry=false){
+  const visible=()=>appPhase==="player-center"&&playerActiveTab==="profile"&&(kind==="basic"?playerProfileSection==="basic":playerProfileSection==="overview"&&playerCenterPeriod===kind);
+  if(!v.uid||!v.owns()||!visible()||kind==="prelaunch"||v.requested.has(kind)||(!retry&&v.results[kind]))return;
+  if(retry){v.results={};}
+  v.requested.add(kind);
+  void v.io.view(kind,retry).then(result=>{
+    if(!v.owns())return;
+    v.results[kind]=result;v.requested.delete(kind);
+    if(visible())renderPreservingScroll();
+  });
+}
+function retryNarrowPlayerCenter(kind){
+  const v=narrowPlayerCenterView();requestNarrowPlayerCenter(v,kind,true);
+}
 async function loadMyLadderProfile(force=false){
   if(myLadderProfileLoading) return;
   if(myLadderProfileCache && !force) return;
@@ -19233,14 +19288,18 @@ function renderPlayerCenterOverview(p){
   const partitions=playerCenterRecordPartition(all);
   const standard=hunterFilterByMode(partitions.official,'standard');
   const prelaunch=hunterFilterByMode(partitions.prelaunch,'standard');
-  const seasonStart=hunterSeasonStartMs();
+  const ov=narrowPlayerCenterView(), kind=playerCenterPeriod;
+  const [own,sz]=ov.results[kind]||[];
+  if(kind!=="prelaunch")setTimeout(()=>requestNarrowPlayerCenter(ov,kind),0);
+  const control=sz?.value||{};
+  const seasonStart=normalizeDateTime(control.seasonStartAt||control.startAt||control.currentSeasonStartAt||null)||0;
   const periodReady=playerCenterPeriod!=='season'||seasonStart>0;
   const rows=playerCenterPeriod==='prelaunch'?prelaunch:playerCenterPeriod==='career'?standard:standard.filter(r=>hunterRecordTimestamp(r)>=seasonStart);
   const summary=hunterCareerSummary(rows);
   const groups=playerCenterEventGroups(partitions.official);
   const eventCount=playerCenterEventGroups(rows).length;
   const value=v=>ready&&periodReady?String(v):'—';
-  const ladder=myLadderProfileCache;
+  const ladder=own?.state==="ready" ? own.value||{} : null;
   const titleHtml=accountEquippedTitleHtml();
   const titleStatus=p.equippedTitleId?(!engagementSnapshot?"稱號讀取中":"稱號未展示"):"尚未佩戴稱號";
   const metrics=[['有完成對戰的賽事',value(eventCount)],['對戰勝–敗',value(summary.wins+'–'+summary.losses)],['對戰勝率',ready&&periodReady?value(summary.winRate)+'%':'—']];
@@ -19258,7 +19317,7 @@ function renderPlayerCenterOverview(p){
     hunterSummary+
     '<div class="panel"><div class="hunter-section-head"><h2>我的戰績</h2><div class="btn-row"><button class="btn '+(playerCenterPeriod==='season'?'btn-primary':'btn-ghost')+' btn-sm" data-action="player-center-period" data-period="season" aria-pressed="'+(playerCenterPeriod==='season')+'">本季</button><button class="btn '+(playerCenterPeriod==='career'?'btn-primary':'btn-ghost')+' btn-sm" data-action="player-center-period" data-period="career" aria-pressed="'+(playerCenterPeriod==='career')+'">正式生涯</button><button class="btn '+(playerCenterPeriod==='prelaunch'?'btn-primary':'btn-ghost')+' btn-sm" data-action="player-center-period" data-period="prelaunch" aria-pressed="'+(playerCenterPeriod==='prelaunch')+'">S1 前</button><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">重新整理</button></div></div>'+playerCenterDataNotice()+'<div class="player-center-metrics">'+metrics.map(([label,v])=>'<div class="stat-box"><div class="value small">'+esc(v)+'</div><div class="label">'+esc(label)+'</div></div>').join('')+'</div><p class="hint">正式生涯從 2026/10/1 起算；S1 前紀錄另列。正規賽包含一般與積分賽，輪空不計勝敗。'+(playerCenterPeriod==='season'&&!seasonStart?'賽季起始時間尚未載入。':'')+(partitions.undated.length?'日期待核對 '+partitions.undated.length+' 場對戰，暫不計正式生涯。':'')+'</p>'+
     (ready&&recent.length?'<div class="player-center-recent">近 5 場（新→舊）'+recent.map(r=>'<span class="badge badge-metal">'+(r.isWin?'勝':'敗')+'</span>').join('')+'</div>':'')+
-    (playerCenterPeriod==='prelaunch'?'<p class="hint">S1 前對戰不計入正式天梯積分。</p>':'<div class="player-center-ladder"><span>天梯'+(playerCenterPeriod==='career'?'生涯累積':'本季')+'積分</span><strong>'+(ladder?esc(playerCenterPeriod==='career'?ladder.careerPoints??0:ladder.seasonPoints??0)+' PT':'尚未讀取')+'</strong><button class="btn btn-ghost btn-sm" data-action="player-switch-tab" data-tab="ladder">查看天梯</button></div>')+'</div>'+
+    (playerCenterPeriod==='prelaunch'?'<p class="hint">S1 前對戰不計入正式天梯積分。</p>':'<div class="player-center-ladder"><span>天梯'+(playerCenterPeriod==='career'?'生涯累積':'本季')+'積分</span><strong>'+(ladder?esc(playerCenterPeriod==='career'?ladder.careerPoints??0:ladder.seasonPoints??0)+' PT':own?.state==='error'?'讀取失敗，請重新整理':'尚未讀取')+'</strong><button class="btn btn-ghost btn-sm" data-action="player-switch-tab" data-tab="ladder">查看天梯</button></div>')+'</div>'+
     '<div class="hunter-section-head"><h2>近期賽事</h2><button class="btn btn-ghost btn-sm" data-action="profile-section" data-section="career">全部紀錄</button></div>'+(ready?(groups.length?groups.slice(0,3).map(playerCenterEventHtml).join(''):'<div class="panel empty-state">尚無已完成對戰</div>'):'<p class="hint">戰績尚未完成讀取。</p>')+'</section>';
 }
 function renderPlayerProfileTab(p){
@@ -19268,7 +19327,6 @@ function renderPlayerProfileTab(p){
   if(!refereeEnabled&&['duty','achievements'].includes(playerProfileSection))playerProfileSection='overview';
   if(['overview','career'].includes(playerProfileSection)){
     if(!hunterProfileCache&&!hunterProfileLoading&&!hunterProfileError)setTimeout(()=>loadHunterProfile(false),0);
-    if(playerProfileSection==='overview'&&!myLadderProfileCache&&!myLadderProfileLoading&&playerCenterLadderRequestedUid!==profileUid){playerCenterLadderRequestedUid=profileUid;setTimeout(()=>loadMyLadderProfile(false),0);}
   }
   const sectionNav=`<div class="profile-primary-tabs" role="tablist" aria-label="我的資料分類">
     <button class="btn ${playerProfileSection==='overview'?'btn-primary':'btn-ghost'}" role="tab" aria-selected="${playerProfileSection==='overview'}" data-action="profile-section" data-section="overview">個人總覽</button>
@@ -19331,10 +19389,11 @@ function renderPlayerProfileTab(p){
     </div>
     ${playerPrivacyPanel()}
     ${(()=>{
-      if(!myLadderProfileCache && !myLadderProfileLoading) setTimeout(()=>loadMyLadderProfile(false),0);
-      const l=myLadderProfileCache || defaultLadderProfile((firebaseUser&&firebaseUser.uid)||"",p.displayName||p.realName||"",(ladderPublicData.control&&ladderPublicData.control.currentSeason)||"S1");
+      const v=narrowPlayerCenterView(), [own,sz]=v.results.basic||[];
+      setTimeout(()=>requestNarrowPlayerCenter(v,"basic"),0);
+      const l=own?.state==="ready" ? own.value || (sz?.state==="ready" ? defaultLadderProfile(v.uid,p.displayName||p.realName||"",sz.value?.currentSeason||"S1") : null) : null;
       return `<div class="panel"><div class="panel-title">BXH 天梯</div>
-        ${myLadderProfileLoading?'<div class="empty-state">正在讀取天梯資料…</div>':`<div class="grid grid-2">
+        ${own?.state==="error"||sz?.state==="error"?'<div class="empty-state">暫時無法讀取天梯資料。<button class="btn" data-action="narrow-profile-retry">重試</button></div>':!l?'<div class="empty-state">正在讀取天梯資料…</div>':`<div class="grid grid-2">
           <div class="stat-box"><div class="label">目前賽季</div><div class="value small">${esc(l.currentSeason||"S1")}</div></div>
           <div class="stat-box"><div class="label">目前階級</div><div class="value small profile-tier-badge">${ladderBadgeHtml(l)}</div></div>
           <div class="stat-box"><div class="label">賽季積分</div><div class="value small">${Number(l.seasonPoints||0)} PT</div></div>
@@ -22909,7 +22968,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="ladder-refresh"){
-    ladderPublicLoaded=false; ladderAdminLogsLoaded=false; myLadderProfileCache=null;
+    ladderPublicLoaded=false; ladderAdminLogsLoaded=false; myLadderProfileCache=null;clearNarrowPlayerCenter();
     loadLadderPublic(true); if(isAdminTierOrAbove()) loadLadderAdminLogs(true); return;
   }
   if(action==="ladder-player-history"){
@@ -22930,7 +22989,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       try{
         const r=await window.cloudSync.adjustLadderPoints(uid,pts,reason,adminDisplayName||userProfile?.displayName||"");
         if(!r||!r.ok) throw new Error((r&&r.reason)||"adjust-failed");
-        ladderAdjustmentUid=null; ladderPublicLoaded=false; ladderAdminLogsLoaded=false; myLadderProfileCache=null;
+        ladderAdjustmentUid=null; ladderPublicLoaded=false; ladderAdminLogsLoaded=false; myLadderProfileCache=null;clearNarrowPlayerCenter();
         await loadLadderPublic(true); await loadLadderAdminLogs(true);
         showToast("積分更正完成，已留下稽核紀錄");
       }catch(e){ console.warn(e); showToast("積分更正失敗，資料未修改",true); }
@@ -22944,7 +23003,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       try{
         const r=await window.cloudSync.openNewLadderSeason(adminDisplayName||userProfile?.displayName||"");
         if(!r||!r.ok) throw new Error((r&&r.reason)||"rollover-failed");
-        ladderPublicLoaded=false; ladderAdminLogsLoaded=false; myLadderProfileCache=null;
+        ladderPublicLoaded=false; ladderAdminLogsLoaded=false; myLadderProfileCache=null;clearNarrowPlayerCenter();
         await loadLadderPublic(true); await loadLadderAdminLogs(true);
         showToast("新賽季 "+r.newSeason+" 已開啟");
       }catch(e){
@@ -23434,7 +23493,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     }
     return;
   }
+  if(action==="narrow-profile-retry"&&playerProfileSection==="basic"){retryNarrowPlayerCenter("basic");return;}
   if(action==="hunter-refresh"){
+    if(playerProfileSection==="overview")retryNarrowPlayerCenter(playerCenterPeriod);
     if(hunterBattleFilter==="all")void window.BXHArenaPK?.load(true);
     hunterProfileCache=null; hunterProfileError=null;
     hunterOpponentIdentityGeneration++;
@@ -24039,7 +24100,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       // Drop the old location snapshot even if its request is still in flight.
       ladderPublicData={...ladderPublicData};
       ladderPublicLoaded=false;
-      myLadderProfileCache=null;
+      myLadderProfileCache=null;clearNarrowPlayerCenter();
       publicTournamentsCache=null; invalidateMyRegistrationsCache();
       engagementRequestGeneration++;engagementLoading=false;engagementSnapshot=null;requestEngagementSnapshot(true);
       showToast(oldRealName!==realName?"資料已更新；本名修改後需重新由後台確認":"會員資料已更新");

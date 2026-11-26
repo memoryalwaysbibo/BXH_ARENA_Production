@@ -2141,6 +2141,16 @@
       return {control,season,players};
     },
 
+    async getLadderControl(){
+      if(!cloudEnabled)throw new Error("cloud-unavailable");
+      const s=await fx.getDoc(fx.doc(dbHandle,"ladderSystem","current"));
+      return s.exists()?s.data():null;
+    },
+    async getLadderOwnPlayer(uid){
+      if(!cloudEnabled)throw new Error("cloud-unavailable");
+      if(!uid||authHandle?.currentUser?.uid!==uid)throw new Error("auth-required");
+      return this.getLadderPlayer(uid);
+    },
     async getLadderPlayer(uid){
       if(!cloudEnabled||!uid) return null;
       const s=await fx.getDoc(fx.doc(dbHandle,"ladderPlayers",uid));
