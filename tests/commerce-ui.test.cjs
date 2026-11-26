@@ -761,6 +761,9 @@ test('PTN pre-start configured courts share the official waiting scorer without 
  assert.match(filled,/主裁 &lt;測試&gt;/);assert.match(filled,/備裁甲/);assert.match(filled,/空席/);
  assert.doesNotMatch(filled,/data-seat-action=|主裁 <測試>/);
  assert.equal((filled.match(/class="ref-seat-button" aria-disabled="true" disabled>/g)||[]).length,12);
+ c.ticketRoom.refereeSeatControl={version:1,canInvite:true,canJoin:false,canManage:true,courts:{1:{revision:1,main:{uid:'buyer',name:'已入席主裁'},backup1:null,backup2:null}},requests:[]};
+ const enabled=t.ui.ticketManagedTab('referee');assert.match(enabled,/已入席主裁/);assert.doesNotMatch(enabled,/裁判邀請及入席尚未啟用/);
+ assert.match(enabled,/等待開賽/);assert.doesNotMatch(enabled,/data-action="commerce-ticket-score"/);
  c.ticketRoom.stations=null;
  assert.doesNotMatch(t.ui.ticketManagedTab('referee'),/referee-workstation-waiting/);
 });
@@ -896,4 +899,29 @@ test('PTN host seat grid reuses the existing invitation dialog and room-specific
  await t.ui.ticketInviteCommand({code,action:'invite',operationId:'room-unique-operation',station:1,slot:'main',targetUid:'fixture-player',expectedCourtRevision:0});
  assert.deepEqual(calls.find(x=>x.seatAction==='invite'),{code,action:'ticket-room-referee',seatAction:'invite',operationId:'room-unique-operation',station:1,slot:'main',targetUid:'fixture-player',expectedCourtRevision:0});
  assert.match(t.ui.ticketRefereeSupportPanel(true),/PTN 合作賽事裁判協助/);assert.equal(t.ui.ticketRefereeSupportPanel(false),'');
+});
+
+
+test('PTN live manager renders exactly one workstation per configured court; queued match is not a second scorecard',()=>{
+ const t=setup({partner:true}),code='PTN-TST001',c=t.ui.context();t.sandbox.activeTab='referee';
+ c.view='ticket-manage';c.ownedPtn={code};c.ticketRoomOpen=true;c.roomManageOpen=true;
+ const match=(id,station,name)=>({id,station,round:0,seq:0,canScore:true,scoreA:0,scoreB:0,a:{name},b:{name:'乙'}});
+ c.ticketRoom={ok:true,code,roomId:'fixture',phase:'live',stations:3,bracket:[match('current',1,'執行中'),match('queued',1,'下一場'),match('closed',2,'已退場')],courtControl:{version:1,targetCount:3,courts:[{station:1,currentMatchId:'current',closed:false},{station:2,currentMatchId:'closed',closed:true},{station:3,currentMatchId:null,closed:false}],detached:[]}};
+ const html=t.ui.ticketManagedTab('referee');
+ for(const n of [1,2,3])assert.equal((html.match(new RegExp('data-ptn-station="'+n+'"','g'))||[]).length,1);
+ assert.match(html,/執行中/);assert.doesNotMatch(html,/data-id="queued"|data-id="closed"|下一場/);
+ assert.equal((html.match(/data-command="score"/g)||[]).length,8);
+});
+
+test('PTN referee session drains a newer public revision received during an authoritative read',async()=>{
+ const t=setup(),code='PTN-TST001';let notify,release,reads=0;
+ const snapshot=version=>({ok:true,code,roomId:'stable',phase:'live',stations:1,updatedAt:version,bracket:[],refereeSeatControl:{version:1,canInvite:false,canJoin:false,courts:{1:{revision:version,main:{uid:'buyer',name:'裁判'+version}}},requests:[]}});
+ t.sandbox.window.cloudSync={subscribePublic(_code,callback){notify=callback;return()=>{};}};
+ t.sandbox.window.engagementService.ticketRoomOperation=async()=>{reads++;if(reads===1)return snapshot(1);if(reads===2)return new Promise(resolve=>{release=resolve;});return snapshot(3);};
+ await t.ui.openTicketRefereeSession(code,1);
+ notify({},2);assert.equal(reads,2);
+ notify({},3);assert.equal(reads,2);release(snapshot(2));
+ for(let n=0;n<8;n++)await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(reads,3);assert.equal(t.ui.context().refereeSession.room.updatedAt,3);
+ notify({},3);assert.equal(reads,3);
 });

@@ -12534,9 +12534,9 @@ function previousMatchCorrectionHtml(stationNum,currentId){
 function refereeWorkstationHeader(m, stationNum, ticketView=null){
   const closed=!ticketView&&state.forcedCourtExits?.[stationNum]?.closed;
   const exitButton=!ticketView&&state.bracketSize&&(closed?canManageCourtRetirement():canForceExitCourt(stationNum))&&state.archiveStatus!=="completed"?`<details class="ref-court-maintenance"><summary>更多操作</summary><div><p>整台管理操作，與裁判入席／退出無關。</p><button type="button" class="btn btn-sm ref-court-exit-btn" data-action="${closed?'court-force-reopen':'court-force-exit'}" data-station="${stationNum}" ${courtRetirementBusy?'disabled':''}>${closed?'重新啟用本台':'裁判台強制退場'}</button></div></details>`:"";
-  const assigned=ticketView?(ticketView.refereeSeatView?.version===1&&ticketView.refereeSeatView.courts?.[stationNum]?.main?.name||"尚未入席"):refereeDisplayForStation(stationNum);
-  const status=ticketView?{label:"等待開賽",cls:"waiting"}:refereeStationStatus(m);
-  const matchMeta=m?`${esc(refereeStageLabel(m))} · 第 ${m.indexInRound+1} 場`:"等待安排場次";
+  const assigned=ticketView?(ticketView.refereeSeatControl?.courts?.[stationNum]?.main?.name||ticketView.refereeSeatView?.courts?.[stationNum]?.main?.name||"尚未入席"):refereeDisplayForStation(stationNum);
+  const status=ticketView?(ticketView.phase==="waiting"?{label:"等待開賽",cls:"waiting"}:ticketView.courtControl?.courts?.find(c=>c.station===stationNum)?.closed||ticketView.refereeSeatControl?.courts?.[stationNum]?.closed?{label:"已退場",cls:"waiting"}:m?{label:Math.max(Number(m.scoreA||0),Number(m.scoreB||0))>=4?"待確認賽果":"進行中",cls:"live"}:{label:"等待安排場次",cls:"waiting"}):refereeStationStatus(m);
+  const matchMeta=m?(ticketView?`第 ${Number(m.round||0)+1} 輪 · 第 ${Number(m.seq||0)+1} 場`:`${esc(refereeStageLabel(m))} · 第 ${m.indexInRound+1} 場`):"等待安排場次";
   return `<div class="ref-workstation-head"><div class="ref-workstation-identity"><span class="court-badge">台${stationNum}</span><div><span>責任裁判</span><b title="${esc(assigned)}">${esc(assigned)}</b></div></div><div class="ref-workstation-meta"><span class="ref-station-status ${status.cls}">${status.label}</span><small>${matchMeta}｜已完成 ${ticketView?0:stationCompletedCount(stationNum)} 場${!ticketView&&refereeStationRestrictionEnabled()?"｜桌次限制":""}</small>${exitButton}</div></div>${ticketView?(window.BXHRefereeSeats?.renderPendingTicketSeats?.(stationNum,ticketView)||""):window.BXHRefereeSeats?.render(state,stationNum)||""}`;
 }
 function renderQuickDecisionPanel(m, court, stationNum){
@@ -12797,12 +12797,12 @@ function renderWaitingRefereeCourt(stationNum,ticketView=null){
   const seatsEnabled=!ticketView&&state.meta?.refereeSeatsV1?.version===1;
   return `<div class="panel court-card referee-workstation referee-workstation-waiting" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum,ticketView?ticketView.roomId:state.id)}">
     ${refereeWorkstationHeader(null,stationNum,ticketView)}
-    ${ticketView?'<div class="hint" role="status">裁判邀請及入席尚未啟用。</div>':seatsEnabled?"":'<div class="hint" role="status">本場尚未啟用三席裁判制。</div>'}
+    ${ticketView?(ticketView.refereeSeatControl?.version===1?'':'<div class="hint" role="status">裁判邀請及入席尚未啟用。</div>'):seatsEnabled?"":'<div class="hint" role="status">本場尚未啟用三席裁判制。</div>'}
     ${ticketView?renderRefereeScorePanel(null,stationNum,true):refereeWaitingControls(stationNum)}
   </div>`;
 }
 // Only render authoritative, configured courts; no seat or scoring writes here.
-window.BXHSharedTicketWaitingCourts={render(room){
+window.BXHSharedTicketWaitingCourts={header:(match,station,room)=>refereeWorkstationHeader(match,station,room),render(room){
   const n=room?.stations;
   if(room?.phase!=="waiting"||!Number.isInteger(n)||n<1||n>12)return "";
   const courts=room.scoped?Object.keys(room.refereeSeatControl?.courts||{}).map(Number).filter(i=>Number.isInteger(i)&&i>=1&&i<=n):Array.from({length:n},(_,i)=>i+1);

@@ -236,9 +236,15 @@ async function openTicketRefereeSession(code,station){
  c.refereeSession?.unsubscribe?.();c.refereeHostListener?.unsubscribe?.();c.refereeHostListener=null;
  const session=c.refereeSession={code,actor,roomId:room.roomId,room:{...room,scoped:true},busy:false,error:'',pending:null,lastVersion:Number(room.updatedAt||0)};
  session.unsubscribe=window.cloudSync?.subscribePublic?.(code,(_public,version)=>{
-  if(c!==context()||c.refereeSession!==session||session.busy||Number(version)<=session.lastVersion)return;
-  session.busy=true;void refreshTicketRefereeSession(session).finally(()=>{if(c===context()&&c.refereeSession===session){session.busy=false;render();}});
+  if(c!==context()||c.refereeSession!==session||!Number.isFinite(Number(version))||Number(version)<=session.lastVersion)return;
+  session.pendingVersion=Math.max(session.pendingVersion||0,Number(version));
+  drainTicketRefereeRefresh(session);
  });render();
+}
+function drainTicketRefereeRefresh(session){
+ const c=context();if(c.refereeSession!==session||session.busy||!(session.pendingVersion>session.lastVersion))return;
+ session.pendingVersion=0;session.busy=true;
+ void refreshTicketRefereeSession(session).finally(()=>{if(c===context()&&c.refereeSession===session){session.busy=false;render();drainTicketRefereeRefresh(session);}});
 }
 async function refreshTicketRefereeSession(session){
  const c=context();if(c.refereeSession!==session||session.actor!==currentAuthUid())return;
@@ -254,7 +260,7 @@ async function scopedTicketMutation(data){
  render();
  try{await call(session.pending);if(c!==context()||c.refereeSession!==session)return;session.pending=null;await refreshTicketRefereeSession(session);}
  catch(error){if(c===context()&&c.refereeSession===session){const message=String(error?.message||error);session.error=ticketRoomMutationError(error);if(permanentErrors.test(message)||/seat-stale|ticket-invite-unavailable|request-unavailable|not-event-staff|invitation-required|seat-occupied|already-seated|request-stale/.test(message)){session.pending=null;await refreshTicketRefereeSession(session);if(session.room)session.error=ticketRoomMutationError(error);}}}
- finally{if(c===context()&&c.refereeSession===session){session.busy=false;render();}}
+ finally{if(c===context()&&c.refereeSession===session){session.busy=false;render();drainTicketRefereeRefresh(session);}}
 }
 function renderTicketSeatGrid(station,room){
  const control=room?.refereeSeatControl,court=control?.courts?.[station],c=context(),actor=currentAuthUid();
@@ -301,17 +307,23 @@ function ticketRefereeSupportPanel(allowed){const c=context();return !allowed?''
 function ticketRefereePanel(room,pending){
  if(room.phase==='waiting')return window.BXHSharedTicketWaitingCourts?.render(room)||'<p>賽事尚未開賽；尚未取得裁判台配置，請重新整理房間。</p>';
  if(room.phase!=='live')return '<p>賽事已停止計分。</p>';
- const matches=(room.bracket||[]).filter(match=>(room.scoped||match.canScore)&&match.a&&match.b);
+ const control=ticketCourtControl(room);
+ // A court is a workstation, not a list of scoreable bracket nodes. Only
+ // the authoritative current assignment is displayed when that readback exists.
+ const matches=(room.bracket||[]).filter(match=>match.a&&match.b&&!match.completed&&(room.scoped||control?true:match.canScore)&&
+  (!control||control.courts.some(c=>!c.closed&&c.station===Number(match.station)&&c.currentMatchId===match.id)));
+ const header=(match,station)=>window.BXHSharedTicketWaitingCourts?.header?.(match,station,room)||`<div class="commerce-ptn-court-header"><strong>${station} 號台${match?'｜第 '+(Number(match.round||0)+1)+' 輪・第 '+(Number(match.seq||0)+1)+' 場':''}</strong><span>${match?(Math.max(Number(match.scoreA||0),Number(match.scoreB||0))>=4?'待確認賽果':'進行中'):'等待安排場次'}</span></div>${window.BXHRefereeSeats?.renderPendingTicketSeats?.(station,room)||''}`;
  const finishes=[['spin','旋轉勝利＋1分'],['knockout','擊飛勝利＋2分'],['burst','爆裂勝利＋2分'],['extreme','極限勝利＋3分']];
  const card=match=>{
-  const scoreA=Number(match.scoreA),scoreB=Number(match.scoreB),ready=Math.max(scoreA,scoreB)>=4,readOnly=room.scoped&&!match.canScore;
+  const scoreA=Number(match.scoreA),scoreB=Number(match.scoreB),ready=Math.max(scoreA,scoreB)>=4,readOnly=!match.canScore;
   const sidePanel=side=>{
    const player=match[side.toLowerCase()],score=side==='A'?scoreA:scoreB;
    return `<div class="side-panel ${ready&&score>=(side==='A'?scoreB:scoreA)?'leading':''}"><div class="side-name">${esc(player.name)}</div><div class="side-score">${score}</div><div class="score-btns">${finishes.map(([finish,label])=>`<button type="button" data-action="commerce-ticket-score" data-id="${esc(match.id)}" data-command="score" data-side="${side}" data-finish="${finish}" data-type="${finish}" ${pending||ready||readOnly?'disabled':''}>${label}</button>`).join('')}</div></div>`;
   };
-  return `<article class="panel court-card referee-workstation commerce-ptn-court"><div class="commerce-ptn-court-header"><strong>${match.station?Number(match.station)+' 號台｜':''}第 ${Number(match.round)+1} 輪・第 ${Number(match.seq)+1} 場</strong><span>${ready?'待確認賽果':scoreA+scoreB?'進行中':'等待記分'}</span></div>${window.BXHRefereeSeats?.renderPendingTicketSeats?.(match.station,room)||''}<div class="ref-vs-arena standard">${sidePanel('A')}<div class="ref-vs-mark" aria-hidden="true">VS</div>${sidePanel('B')}</div><div class="btn-row ref-result-actions"><button type="button" class="btn btn-ghost ref-undo-score" data-action="commerce-ticket-score" data-id="${esc(match.id)}" data-command="undo" ${pending||readOnly||scoreA+scoreB===0?'disabled':''}>撤回上一筆得分</button><button type="button" class="btn btn-primary ref-confirm-result" data-action="commerce-ticket-score" data-id="${esc(match.id)}" data-command="confirm" ${pending||readOnly||!ready?'disabled':''}>確認比賽結果${ready?`（建議：${esc(scoreA>scoreB?match.a.name:match.b.name)} 勝）`:''}</button></div></article>`;
+  return `<article class="panel court-card referee-workstation commerce-ptn-court" data-ptn-station="${Number(match.station)}">${header(match,Number(match.station))}<div class="ref-vs-arena standard">${sidePanel('A')}<div class="ref-vs-mark" aria-hidden="true">VS</div>${sidePanel('B')}</div><div class="btn-row ref-result-actions"><button type="button" class="btn btn-ghost ref-undo-score" data-action="commerce-ticket-score" data-id="${esc(match.id)}" data-command="undo" ${pending||readOnly||scoreA+scoreB===0?'disabled':''}>撤回上一筆得分</button><button type="button" class="btn btn-primary ref-confirm-result" data-action="commerce-ticket-score" data-id="${esc(match.id)}" data-command="confirm" ${pending||readOnly||!ready?'disabled':''}>確認比賽結果${ready?`（建議：${esc(scoreA>scoreB?match.a.name:match.b.name)} 勝）`:''}</button></div></article>`;
  };
- const emptyCourts=Object.keys(room.refereeSeatControl?.courts||{}).map(Number).filter(n=>!matches.some(m=>Number(m.station)===n)).map(n=>`<article class="panel court-card referee-workstation"><h3>${n} 號台｜等待安排場次</h3>${window.BXHRefereeSeats?.renderPendingTicketSeats?.(n,room)||''}</article>`).join('');
+ const configured=room.scoped?Object.keys(room.refereeSeatControl?.courts||{}).map(Number):control?control.courts.map(c=>c.station):Object.keys(room.refereeSeatControl?.courts||{}).map(Number);
+ const emptyCourts=configured.filter(n=>!matches.some(m=>Number(m.station)===n)).map(n=>`<article class="panel court-card referee-workstation" data-ptn-station="${n}">${header(null,n)}</article>`).join('');
  return `<h3>合作賽事裁判台</h3>${ticketCourtMaintenance(room,pending)}<p>${room.scoped?'主裁可計分；備裁經交接後接手。':'房主、房間代理人或最高管理員可記分；每場確認賽果後自動晉級。'}</p>${room.championName?`<p role="status">賽事已決出冠軍：${esc(room.championName)}</p>`:''}${matches.length||emptyCourts?`<div class="court-grid court-grid-1 commerce-ptn-courts">${matches.map(card).join('')}${emptyCourts}</div>`:'<p>目前沒有可記分的對戰；可至對戰表查看進度。</p>'}`;
 }
 function ticketPeoplePanel(c,room,pending,drawPanel,delegate){
@@ -627,7 +639,7 @@ async function handle(action,target){
   return mutate({action:'ticket-room-stations',code:room.code,roomId:room.roomId,expectedUpdatedAt:room.updatedAt,command,station,...(command==='exit'?{matchId:court.currentMatchId}:{})});
  }
  if(action==='commerce-ticket-referee-back'){if(c.refereeSession&&!c.refereeSession.busy){c.refereeSession.unsubscribe?.();c.refereeSession=null;c.refereeOpenAttempt=null;render();}return;}
- if(action==='commerce-ticket-referee-refresh'&&c.refereeSession&&!c.refereeSession.busy){const session=c.refereeSession;session.busy=true;render();await refreshTicketRefereeSession(session);if(c.refereeSession===session){session.busy=false;render();}return;}
+ if(action==='commerce-ticket-referee-refresh'&&c.refereeSession&&!c.refereeSession.busy){const session=c.refereeSession;session.busy=true;render();await refreshTicketRefereeSession(session);if(c.refereeSession===session){session.busy=false;render();drainTicketRefereeRefresh(session);}return;}
  if(action==='commerce-ticket-referee-retry'&&c.refereeSession?.pending)return scopedTicketMutation(c.refereeSession.pending);
  if(action==='commerce-ticket-score'&&c.refereeSession){
   const session=c.refereeSession,room=session.room,match=room?.bracket?.find(m=>m.id===id),command=target?.dataset?.command,side=target?.dataset?.side,finish=target?.dataset?.finish,court=room?.refereeSeatControl?.courts?.[match?.station];
@@ -639,6 +651,7 @@ async function handle(action,target){
  if(action==='commerce-ticket-score'&&ticketManagementView(c)&&c.ticketRoomOpen&&!c.pending){
   const room=c.ticketRoom,match=room?.bracket?.find(item=>item.id===id),command=target?.dataset?.command;
   if(!match?.canScore||room.code!==ticketRoomCode(c)||room.phase!=='live'||!['score','undo','confirm'].includes(command))return;
+  const control=ticketCourtControl(room);if(control&&!control.courts.some(court=>!court.closed&&court.station===Number(match.station)&&court.currentMatchId===match.id))return;
   const side=target?.dataset?.side,finish=target?.dataset?.finish;
   if(command==='score'&&(!['A','B'].includes(side)||!['spin','knockout','burst','extreme'].includes(finish)))return;
   if(command==='confirm'&&!confirm(`確認 ${match.a.name} ${match.scoreA}：${match.scoreB} ${match.b.name} 的賽果並讓勝者晉級？`))return;
