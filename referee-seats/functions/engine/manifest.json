@@ -55,7 +55,7 @@
   "modules": {
     "double-elimination-core.js": "db9a6b0d815a10c2853c2d48794f297385b23798ce441e904c24246ddf32ab1c",
     "referee-fault-core.js": "26da0500abd88622bf9f49555287dd5ed7a7e311f232dc5adae027fce6e25266",
-    "modules/main-app/court-retirement.js": "f9741846c5e7b2ffab2be2ae0857597a92c4b3eac32d8d35971ed995397c9e57",
+    "modules/main-app/court-retirement.js": "df4abf0548740058019da607bd1b49036baaaf2e22ecf4f5eab16e5e5a40ee3d",
     "modules/main-app/match-utils.js": "5229ce9c6fc4cbc3196886e3780721694675c533c94cc9b79defa62a8a30dda1",
     "modules/main-app/pass-return.js": "1adb7624bfac9aa9e4b6448e52eda091dddb24fbb459938e8a2051a71e125e59"
   }

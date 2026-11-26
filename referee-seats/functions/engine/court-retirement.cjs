@@ -2,7 +2,11 @@
   'use strict';
   const count=n=>Math.max(1,Math.min(32,Number(n)||1));
   const pending=m=>m&&!m.isBye&&!m.completed;
-  const held=m=>pending(m)&&(m.offlinePendingSync||!m.skippedAt&&(m.status==='in_progress'||m.status==='paused'||Number(m.scoreA)>0||Number(m.scoreB)>0||(m.log||[]).length>0));
+  // A live current assignment is authoritative even before the first score.
+  // Pre-start draw previews and next-match forecasts are not active assignments.
+  const held=(st,m)=>pending(m)&&(m.offlinePendingSync||
+    Boolean(st.startedAt&&Number(m.station)>0&&st.courtAssignments?.['court'+m.station]?.currentMatchId===m.id)||
+    !m.skippedAt&&(m.status==='in_progress'||m.status==='paused'||Number(m.scoreA)>0||Number(m.scoreB)>0||(m.log||[]).length>0));
   function target(st){return count(st.courtRetirementPlan?.targetCount||st.meta?.stations);}
   function accepts(st,n){return Number.isInteger(Number(n))&&Number(n)>0&&Number(n)<=target(st)&&!st.forcedCourtExits?.[n]?.closed;}
   // Without authoritative call records, every displayed next is reserved too.
@@ -42,9 +46,9 @@
     const p=st.courtRetirementPlan;if(!p)return;
     let changed=false;
     const load=Array(p.targetCount).fill(0);
-    for(const m of st.matches||[])if(pending(m)&&Number(m.station)<=p.targetCount)load[Number(m.station)-1]++;
+    for(const m of st.matches||[])if(pending(m)&&Number(m.station)>0&&Number(m.station)<=p.targetCount)load[Number(m.station)-1]++;
     for(const m of st.matches||[]){
-      if(!pending(m)||Number(m.station)<=p.targetCount||held(m)||(p.expansionHeldIds||[]).includes(m.id))continue;
+      if(!pending(m)||Number(m.station)<=p.targetCount||held(st,m)||(p.expansionHeldIds||[]).includes(m.id))continue;
       const to=load.indexOf(Math.min(...load))+1;load[to-1]++;move(st,m,to,now);changed=true;
     }
     for(const [key,c] of Object.entries(p.courts||{})){
@@ -79,9 +83,9 @@
       p.expansionHeldIds=(st.matches||[]).filter(m=>pending(m)&&Number(m.station)>n&&!movable.has(m.id)).map(m=>m.id);
       expandQueuedMatches(st,n,now);
     }
-    const load=Array(n).fill(0);for(const m of st.matches||[])if(pending(m)&&Number(m.station)<=n)load[Number(m.station)-1]++;
+    const load=Array(n).fill(0);for(const m of st.matches||[])if(pending(m)&&Number(m.station)>0&&Number(m.station)<=n)load[Number(m.station)-1]++;
     for(const m of (st.matches||[]).slice().sort((a,b)=>Number(a.seq||0)-Number(b.seq||0))){
-      if(!pending(m)||Number(m.station)<=n||held(m)||(p.expansionHeldIds||[]).includes(m.id))continue;
+      if(!pending(m)||Number(m.station)<=n||held(st,m)||(p.expansionHeldIds||[]).includes(m.id))continue;
       const to=load.indexOf(Math.min(...load))+1;load[to-1]++;
       move(st,m,to,now); // PASS dependencies and score ledgers remain attached to the match.
     }

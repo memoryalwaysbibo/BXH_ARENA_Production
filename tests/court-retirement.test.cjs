@@ -63,3 +63,21 @@ for(const eventAuthority of ['official','community','ticket']){
  assert.equal(api.reconcileSeatCount(model,4,40).model.courts[5].main,null);
 }
 console.log('PASS shared official/community/PTN physical removal: draining preserves seats, empty occupied court clears, old invites stay stale on re-expansion');
+
+// A first-score-free current assignment is still work on a live court.
+for(const eventAuthority of ['official','community','ticket']){
+ const make=startedAt=>({startedAt,meta:{stations:3,eventAuthority},
+  matches:[{id:'current',seq:1,station:3,status:'ready',scoreA:0,scoreB:0,log:[],completed:false},
+   {id:'next',seq:2,station:3,status:'ready',scoreA:0,scoreB:0,log:[],completed:false}],
+  courtAssignments:{court3:{currentMatchId:'current',nextMatchId:'next'}}});
+ const live=make(1);
+ assert(api.request(live,2,3,10).ok);
+ assert.equal(live.meta.stations,3);assert.equal(live.matches[0].station,3);
+ assert(live.matches[1].station<=2);assert.equal(live.courtRetirementPlan.courts[3].status,'draining');
+ assert(api.forceExit(live,3,'current',0,0,20).ok);
+ assert.equal(live.meta.stations,2);assert.equal(live.matches[0].station,0);
+ assert(api.claimDetached(live,'current',1,1,30).ok);assert.equal(live.matches[0].station,1);
+ const waiting=make(null);assert(api.request(waiting,2,3,10).ok);assert.equal(waiting.meta.stations,2);
+ assert(waiting.matches.every(m=>m.station<=2));
+}
+console.log('PASS all three modes: assigned zero-score live court stays until exit; pre-start preview does not pin a court');
