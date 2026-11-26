@@ -799,3 +799,28 @@ test('expansion ticket product is partner-only and checkout sends selected prepa
  assert.equal(t.calls[0].productId,'tournament_expansion_1');
  assert.equal(t.calls[0].roomCode,undefined);
 });
+
+test('owner sees room expansion balance and sends only chosen room generation and quantity',async()=>{
+ const t=setup({partner:true}),c=t.ui.context(),code='PTN-EXP123';
+ t.sandbox.activeTab='people';c.view='ticket-manage';c.ownedPtn={code};c.roomManageOpen=true;c.ticketRoomOpen=true;
+ c.ticketRoom={ok:true,code,roomId:'room-generation',phase:'waiting',capacity:32,canAssignDelegate:true,expansionEnabled:true,expansionMaxCapacity:160};
+ t.sandbox.window.engagementService.commerce=async p=>({ok:true,quantity:50});
+ await t.ui.load('my-expansion-balance');
+ assert.match(t.ui.ticketManagedTab('people'),/我的擴充券：50 張/);
+ assert.match(t.ui.ticketManagedTab('people'),/擴充後正取上限：33 人/);
+ const operations=[];
+ t.sandbox.window.engagementService.ticketRoomOperation=async p=>{operations.push(JSON.parse(JSON.stringify(p)));return {ok:true,code,quantity:p.quantity,capacityAfter:40};};
+ t.sandbox.FormData=function(form){return Object.entries(form.values);};
+ const submit=async q=>t.listeners.submit({target:{closest:()=>({dataset:{commerceForm:'ticket-expand'},values:{quantity:String(q)}})},preventDefault(){}});
+ await submit(51);assert.equal(operations.length,0);
+ c.ticketRoom.canAssignDelegate=false;assert.doesNotMatch(t.ui.ticketManagedTab('people'),/使用擴充券/);await submit(8);assert.equal(operations.length,0);
+ c.ticketRoom.canAssignDelegate=true;await submit(8);
+ assert.deepEqual(operations,[{action:'ticket-room-expand',code,roomId:'room-generation',quantity:8,operationId:'same-operation'}]);
+ assert.equal(c.expansionBalance,null);assert.equal(c.ticketRoom,null);
+});
+test('expansion admin draft uses the dedicated SKU and price; account switch clears balance',async()=>{
+ const t=setup({partner:true});t.setAdmin(true);t.sandbox.activeTab='commerce-admin';t.ui.adminPage();
+ await t.ui.handle('commerce-expansion-product',{});
+ const c=t.ui.context();assert.equal(c.draft.id,'tournament_expansion_1');assert.equal(c.draft.priceTwd,20);assert.equal(c.draft.status,'draft');
+ c.expansionBalance=50;t.setUid('other');assert.equal(t.ui.context().expansionBalance,undefined);
+});

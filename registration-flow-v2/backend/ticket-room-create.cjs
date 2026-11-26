@@ -230,7 +230,7 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
    const authority=await authorizeTicketManager(tx,db,{uid,user:actor.data(),room,gate,code,now:clock()});
    const state=JSON.parse(room.data);
    if(state.id!==gate.roomId)throw Error('ticket-binding-invalid');
-   let ticketStatus;
+   let ticketStatus,expansionEnabled=false,expansionMaxCapacity=null;
    if(isPartnerRoomCode(code)){
     const ticketId=room.ticketAccessV1.ticketId;
     if(!/^BXH-SO-[A-Z0-9]{24}$/.test(ticketId))throw Error('ticket-binding-invalid');
@@ -238,6 +238,10 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
     if(ticket?.ownerUid!==authority.ownerUid||ticket.boundRoomCode!==code||ticket.boundRoomId!==state.id||
        !['reserved','consumed'].includes(ticket.status))throw Error('ticket-binding-invalid');
     ticketStatus=ticket.status;
+    if(authority.owner&&ticket.version===2&&ticket.status==='reserved'&&room.tournamentPhase==='waiting'&&room.ptnSettlementVersion===1&&!state.rosterLocked){
+     const settings=(await tx.get(db.doc('systemSettings/commerceRoomExpansionV1'))).data();
+     if(settings?.enabled===true&&Number.isSafeInteger(settings.maxCapacity)&&settings.maxCapacity>room.capacity&&settings.maxCapacity<=320){expansionEnabled=true;expansionMaxCapacity=settings.maxCapacity;}
+    }
    }
    const rosterRevision=state.registrationRosterRevision??0;
    if(!Array.isArray(state.players)||!Number.isSafeInteger(rosterRevision)||rosterRevision<0)throw Error('ticket-binding-invalid');
@@ -267,7 +271,7 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
     ...(isPartnerRoomCode(code)?{delegateUid:room.ptnDelegateUid||null,
      delegateName:delegate?String(delegate.realName||delegate.displayName||'未設定姓名').slice(0,80):null,
      delegateGameId:delegate?String(delegate.gameId||'').slice(0,80):null,
-     canAssignDelegate:authority.owner}:{}),
+     canAssignDelegate:authority.owner,expansionEnabled,expansionMaxCapacity}:{}),
     capacity:room.capacity,confirmedCount:room.confirmedCount,phase:room.tournamentPhase,startAt:room.startAt,
     stations:Number.isInteger(state.meta?.stations)&&state.meta.stations>=1&&state.meta.stations<=12?state.meta.stations:null,
     registrationOpenAt:room.registrationOpenAt,registrationCloseAt:room.registrationCloseAt,
