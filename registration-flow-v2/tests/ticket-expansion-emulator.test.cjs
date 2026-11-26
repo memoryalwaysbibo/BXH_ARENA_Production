@@ -277,6 +277,27 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(finalRoom.data().capacity,192);
   assert.equal(finalPublic.data().capacity,192);
   assert.equal((await inventory.get()).data().quantity,31);
+  // Export the actual isolated lifecycle result for the separate scoring candidate.
+  // Only this demo fixture is exported; no production document is read or logged.
+  assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-registration-v2');
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST||'',/^(127\\.0\\.0\\.1|localhost):\\d+$/);
+  const {data:stateJson,...top}=finalRoom.data();
+  const pub=finalPublic.data();
+  const ticketId=top.ticketAccessV1.ticketId;
+  const [proofGate,proofTicket,proofOrder]=await db.getAll(
+   db.doc('commerceTicketRoomGates/'+c.code),c.ticket,db.doc('commerceOrders/'+ticketId));
+  assert.ok(proofGate.exists&&proofTicket.exists&&proofOrder.exists);
+  const proof={version:1,code:c.code,top,state:JSON.parse(stateJson),pub,
+   gate:proofGate.data(),ticket:proofTicket.data(),order:proofOrder.data(),
+   checkedInCount:finalState.players.filter(p=>p.checkedIn===true).length,
+   checkinRequired:finalState.meta.checkinRequired};
+  const encoded=JSON.stringify(proof);
+  const compressed=require('node:zlib').gzipSync(encoded).toString('base64');
+  const chunks=compressed.match(/.{1,1500}/g);
+  console.info('PTN192-SETTLEMENT-PROOF manifest',JSON.stringify({
+   schema:1,encoding:'gzip+base64',chunks:chunks.length,sha256:createHash('sha256').update(encoded).digest('hex'),
+   players:finalState.players.length,checkedInCount:proof.checkedInCount,checkinRequired:proof.checkinRequired}));
+  for(const [index,chunk] of chunks.entries())console.info('PTN192-SETTLEMENT-PROOF chunk '+index+' '+chunk);
   console.info('PTN192 full bracket emulator metrics',JSON.stringify({completedByCommands,waves,scoreAndConfirmCommands:completedByCommands*3,remainingBracketMs:Date.now()-fullStarted,privateStateBytes:Buffer.byteLength(finalRoom.data().data),publicStateBytes:Buffer.byteLength(finalPublic.data().bracketView)}));
   console.info('PTN192 emulator metrics',JSON.stringify({intakeCount:193,confirmed:192,full:1,intakeMs,drainMs,drawMs,startMs,privateStateBytes:Buffer.byteLength(live.data().data),publicStateBytes:Buffer.byteLength(livePub.data().bracketView)}));
  }finally{
