@@ -96,6 +96,13 @@ test('four-player community event reaches first confirmed referee result', async
 
   await expect(page.getByRole('region', { name: '房間總覽' })).toBeVisible();
   await page.getByRole('navigation', { name: '房間管理' }).getByRole('button', { name: '人員管理', exact: true }).click();
+  // The chain is initially Promise.resolve() before the first roster snapshot.
+  // Wait for that snapshot before draining the chain, as the multi-court test
+  // already does. Otherwise the editor may be replaced or the roster guard
+  // may reject the quick-add before the initial read has finished.
+  await page.waitForFunction(() =>
+    adminRosterCode === state.cloudCode && typeof adminRosterUnsub === 'function' &&
+    Array.isArray(adminRegistrationsCache), null, {timeout:30000});
   await page.evaluate(async () => {
     const roomId=state.id, code=state.cloudCode, generation=adminRosterGeneration;
     let timer;

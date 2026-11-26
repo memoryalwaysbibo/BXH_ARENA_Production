@@ -394,7 +394,39 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
   assert.equal(JSON.parse((await pub.get()).data().bracketView).meta.stations,2);
   assert.equal(expandedState.matches.find(m=>m.id===scoredMatch.id).scoreA,4);
   assert.equal(expandedState.matches.find(m=>m.id===match.id).winnerId,match.b.id);
-  await resize(command('ticket-live-shrink',expanded.updatedAt,{stations:1}));
+  // Exercise the manager routing and correction handlers against real emulator
+  // documents after expansion; the existing score/forfeit must stay intact.
+  const routeStatus=createTicketRoomStateHandler(options);
+  const readRoute=()=>routeStatus(statusRequest);
+  const route=await readRoute(),court=route.courtControl.courts.find(c=>c.swapTargets.length);
+  assert.ok(court,'expanded field has an eligible cross-court swap');
+  const targetId=court.swapTargets[0],sourceId=court.currentMatchId;
+  const targetStation=expandedState.matches.find(m=>m.id===targetId).station;
+  const swap=command('ticket-emulator-swap',route.updatedAt,{command:'swap',station:court.station,matchId:sourceId,targetMatchId:targetId});
+  await resize(swap);assert.equal((await resize(swap)).replayed,true);
+  const readPair=async()=>{const [r,p]=await db.getAll(room,pub);return [JSON.parse(r.data().data),JSON.parse(p.data().bracketView)];};
+  for(const document of await readPair()){
+   assert.equal(document.courtAssignments['court'+court.station].currentMatchId,targetId);
+   assert.equal(document.matches.find(m=>m.id===sourceId).station,targetStation);
+  }
+  const score=createTicketScoreHandler(options);
+  const scoreRoute=async(suffix,kind='score')=>{
+   const latest=(await readRoute()).bracket.find(m=>m.id===targetId);
+   return score({auth:creation.auth,app:creation.app,data:{action:'ticket-room-score',code,roomId,matchId:targetId,
+    matchUpdatedAt:latest.updatedAt,operationId:'ticket-emulator-route-'+suffix,command:kind,...(kind==='score'?{side:'A',finish:'knockout'}:{})}});
+  };
+  await scoreRoute('first');await scoreRoute('second');await scoreRoute('confirm','confirm');
+  const previous=await readRoute();
+  assert.equal(previous.courtControl.courts.find(c=>c.station===court.station).previousMatchId,targetId);
+  const correction=command('ticket-emulator-correct',previous.updatedAt,{command:'correct',station:court.station,matchId:targetId,mode:'edit'});
+  await resize(correction);assert.equal((await resize(correction)).replayed,true);
+  for(const document of await readPair()){
+   const corrected=document.matches.find(m=>m.id===targetId);
+   assert.equal(corrected.completed,false);assert.equal(corrected.scoreA,4);assert.equal(corrected.winnerId,null);assert.equal(corrected.log.length,2);
+  }
+  await scoreRoute('reconfirm','confirm');
+  const afterRouting=(await room.get()).data();
+  await resize(command('ticket-live-shrink',afterRouting.updatedAt,{stations:1}));
   const shrinking=(await room.get()).data(),shrinkingState=JSON.parse(shrinking.data);
   const currentMatchId=shrinkingState.courtAssignments?.court2?.currentMatchId;
   if(currentMatchId)await resize(command('ticket-live-exit',shrinking.updatedAt,{command:'exit',station:2,matchId:currentMatchId}));
