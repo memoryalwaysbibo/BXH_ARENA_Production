@@ -1,6 +1,7 @@
 'use strict';
 const {forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked}=require('./lifecycle.cjs');
 const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
+const {BXHCourtRetirement:R}=require('../../referee-seats/functions/engine/court-retirement.cjs');
 const {signature}=require('../../modules/main-app/bracket-commit.js');
 
 const {createHash,randomBytes,randomUUID}=require('node:crypto');
@@ -380,6 +381,7 @@ function createTicketStationsHandler({db,clock=Date.now}){
    if(ticket?.ownerUid!==authority.ownerUid||ticket.status!=='reserved'||ticket.boundRoomCode!==code||ticket.boundRoomId!==roomId)throw Error('ticket-binding-invalid');
    if(!Array.isArray(state.matches)||!Array.isArray(mirror.matches)||signature(state)!==signature(mirror)||
       state.matches.some(m=>m.startedAt||m.scoreA||m.scoreB||m.log?.length||m.completed&&!m.isBye||['in_progress','paused'].includes(m.status)))throw Error('bracket-version-conflict');
+   const previousStations=state.meta.stations;
    if(state.meta.stations!==stations){
     state.meta.stations=stations;mirror.meta.stations=stations;
     let index=0;
@@ -394,8 +396,15 @@ function createTicketStationsHandler({db,clock=Date.now}){
     mirror.matches=mirror.matches.map(m=>({...m,station:matches.get(m.id).station,status:matches.get(m.id).status}));
     mirror.courtAssignments=Object.fromEntries(Object.entries(state.courtAssignments).map(([key,court])=>[key,{currentMatchId:court.currentMatchId||null,nextMatchId:court.nextMatchId||null,status:court.status||'idle'}]));
    }
+   const seats=R.reconcileSeatCount(room.refereeSeatsV1,stations,now,previousStations);
+   const projection=seats.model?.version===1?R.projectSeats(seats.model,authority.ownerUid,stations):null;
+   if(projection){
+    Object.assign(state.meta,projection,{refereeSeatsV1:seats.model});
+    Object.assign(mirror.meta,{refereeStationNames:projection.refereeStationNames,refereeSeatNames:projection.refereeSeatNames,refereeStationRestrictionEnabled:true});
+    delete mirror.meta.refereeSeatsV1;delete mirror.meta.refereeStationUids;delete mirror.meta.refereeStationAssignments;delete mirror.meta.assignedStaffUids;
+   }
    const revision=Math.max(now,room.updatedAt+1);
-   tx.update(roomRef,{updatedAt:revision,data:JSON.stringify({...state,updatedAt:revision})});
+   tx.update(roomRef,{...(projection||{}),...(seats.changed?{refereeSeatsV1:seats.model}:{}),updatedAt:revision,data:JSON.stringify({...state,updatedAt:revision})});
    tx.update(publicRef,{updatedAt:revision,bracketView:JSON.stringify({...mirror,updatedAt:revision})});
    tx.create(receipt,{requestHash,updatedAt:revision});
    return {ok:true};

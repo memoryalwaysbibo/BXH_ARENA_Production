@@ -4,6 +4,7 @@ const LABELS=Object.freeze({main:'主裁判',backup1:'備用裁判 1',backup2:'�
 const clone=value=>JSON.parse(JSON.stringify(value));
 function fail(code){throw Object.assign(new Error(code),{seatCode:code});}
 const EventStaff=require('./event-staff-core.cjs');
+const {BXHCourtRetirement:R}=require('./engine/court-retirement.cjs');
 function admin(user){return EventStaff.activeAccount(user)&&['admin','super_admin'].includes(user.role);}
 function partnerRoom(room){return room?.createdByRole==='partner_organizer';}
 function ownsPartnerEvent(room,user,uid,now){
@@ -59,16 +60,8 @@ function invalidate(model,station,now){for(const req of Object.values(model.requ
  }
  if(req.station===station||req.expiresAt<=now){req.status=req.expiresAt<=now?'expired':'stale';req.resolvedAt=now;}
 }}
-function project(model,ownerUid=null,stations=0){
- const assignments={},names={},publicSeats={},uids=new Set();
- const courts={...model.courts};for(let n=1;n<=Math.min(32,Number(stations)||0);n++)courts[n]=courts[n]||{main:null,backup1:null,backup2:null};
- for(const [station,court] of Object.entries(courts)){
-  assignments[station]=[];names[station]=[];publicSeats[station]={};
-  if(ownerUid)assignments[station].push(ownerUid);
-  for(const slot of SLOTS){const seat=court[slot];publicSeats[station][slot]=seat?{name:seat.name}:null;if(seat){if(!assignments[station].includes(seat.uid))assignments[station].push(seat.uid);names[station].push(seat.name);uids.add(seat.uid);}}
- }
- return {refereeStationAssignments:assignments,refereeStationNames:names,refereeStationUids:[...uids],refereeStationRestrictionEnabled:true,refereeSeatNames:publicSeats};
-}
+function project(model,ownerUid=null,stations=0){return R.projectSeats(model,ownerUid,stations);}
+function reconcileSeatCount(model,stations,now,previousStations){return R.reconcileSeatCount(model,stations,now,previousStations);}
 function canEnableCommunity(room,state,user,uid,d,authority){
  return d.action==='enable'&&authority.communitySeatsEnabled===true
   &&room.eventAuthority==='community'&&state.meta?.eventAuthority==='community'
@@ -172,4 +165,4 @@ function transition({room,state,user,uid,d,now,id,targetUser,requesterUser,autho
  model.requests=Object.fromEntries(recent.filter((r,i)=>r.status==='pending'&&r.expiresAt>now||i<50).map(r=>[r.id,r]));
  return {model,projection:project(model),result:{ok:true,revision:model.revision,...(['request','invite','create-qr'].includes(action)?{requestId:id}:{}),...(action==='respond'?{status:model.requests[d.requestId]?.status}:{})}};
 }
-module.exports={communityRoom,communityOwner,canEnableCommunity,SLOTS,LABELS,admin,manager,eligible,partnerRoom,transition,project};
+module.exports={communityRoom,communityOwner,canEnableCommunity,SLOTS,LABELS,admin,manager,eligible,partnerRoom,transition,project,reconcileSeatCount};

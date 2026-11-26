@@ -141,5 +141,51 @@
     if(m.offlinePendingSync)return {ok:false,reason:'offline-sync-pending'};
     move(st,m,to,now);delete m.forceDetached;return {ok:true,state:st};
   }
-  root.BXHCourtRetirement={target,accepts,request,reconcile,transfer,forceExit,reopen,claimDetached,movableQueuedMatches};
+  // Physical removal is independent of referee occupancy. A draining court
+  // retains its seats until the shared match retirement plan actually removes it.
+  const seatSlots=['main','backup1','backup2'];
+  function reconcileSeatCount(model,physicalCount,now=Date.now(),previousPhysicalCount=physicalCount){
+    if(model?.version!==1)return {model,changed:false};
+    if(!Number.isSafeInteger(physicalCount)||physicalCount<1||physicalCount>64)throw Error('invalid-court-count');
+    // Older rooms may still contain seats above their current capacity. Clear
+    // them before expansion so a removed assignment can never reappear.
+    if(Number.isSafeInteger(previousPhysicalCount)&&previousPhysicalCount>=1&&previousPhysicalCount<physicalCount){
+      const prior=reconcileSeatCount(model,previousPhysicalCount,now);
+      const expanded=reconcileSeatCount(prior.model,physicalCount,now);
+      return {model:expanded.model,changed:prior.changed||expanded.changed};
+    }
+    const needsCourtChange=Object.entries(model.courts||{}).some(([key,court])=>{
+      const station=Number(key);return Number.isSafeInteger(station)&&station>0&&court&&(station>physicalCount?(court.retired!==true||seatSlots.some(slot=>court[slot])):court.retired===true);
+    });
+    const needsRequestChange=Object.values(model.requests||{}).some(req=>req?.status==='pending'&&Number(req.station)>physicalCount);
+    if(!needsCourtChange&&!needsRequestChange)return {model,changed:false};
+    const next=JSON.parse(JSON.stringify(model));next.courts||={};next.requests||={};let changed=false;
+    for(const [key,court] of Object.entries(next.courts)){
+      const station=Number(key);if(!Number.isSafeInteger(station)||station<1||!court)continue;
+      if(station>physicalCount){
+        if(court.retired!==true||seatSlots.some(slot=>court[slot])){
+          next.courts[key]={revision:Number(court.revision||0)+1,main:null,backup1:null,backup2:null,retired:true};changed=true;
+        }
+      }else if(court.retired===true){
+        next.courts[key]={revision:Number(court.revision||0)+1,main:null,backup1:null,backup2:null};changed=true;
+      }
+    }
+    for(const req of Object.values(next.requests)){
+      if(req?.status==='pending'&&Number(req.station)>physicalCount){req.status=req.expiresAt<=now?'expired':'stale';req.resolvedAt=now;changed=true;}
+    }
+    if(changed)next.revision=Number(next.revision||0)+1;
+    return {model:changed?next:model,changed};
+  }
+  function projectSeats(model,ownerUid=null,stations=0){
+    const assignments={},names={},publicSeats={},uids=new Set();
+    const courts={...model.courts};for(let n=1;n<=Math.min(32,Number(stations)||0);n++)courts[n]=courts[n]||{main:null,backup1:null,backup2:null};
+    for(const [station,court] of Object.entries(courts)){
+      if(!court||court.retired===true||(stations>0&&Number(station)>stations))continue;
+      assignments[station]=[];names[station]=[];publicSeats[station]={};
+      if(ownerUid)assignments[station].push(ownerUid);
+      for(const slot of seatSlots){const seat=court[slot];publicSeats[station][slot]=seat?{name:seat.name}:null;if(seat){if(!assignments[station].includes(seat.uid))assignments[station].push(seat.uid);names[station].push(seat.name);uids.add(seat.uid);}}
+    }
+    return {refereeStationAssignments:assignments,refereeStationNames:names,refereeStationUids:[...uids],refereeStationRestrictionEnabled:true,refereeSeatNames:publicSeats};
+  }
+  root.BXHCourtRetirement={target,accepts,request,reconcile,transfer,forceExit,reopen,claimDetached,movableQueuedMatches,reconcileSeatCount,projectSeats};
 })(typeof window==='undefined'?globalThis:window);

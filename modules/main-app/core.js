@@ -26435,7 +26435,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
 
     const stationsChanged=requestedStations!==previousCourtTarget;
     const physicalCourtCount=state.meta.stations;
-    if(stationsChanged&&state.bracketSize>0){
+    if(stationsChanged&&(state.bracketSize>0||state.meta?.refereeSeatsV1?.version===1)){
       if(!canManageCourtRetirement()){showToast("目前身分無法調整退場台",true);return;}
       // Apply other draft fields only after the cloud retirement transaction succeeds.
       const draftBefore=cloneStateForSave(state);applyMeta();const nextMeta=JSON.parse(JSON.stringify(state.meta));state=draftBefore;state.meta.stations=physicalCourtCount;

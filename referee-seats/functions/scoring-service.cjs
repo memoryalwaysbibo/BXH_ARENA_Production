@@ -34,15 +34,17 @@ function createScoringHandler(db,{clock=Date.now}={}){return async request=>{
   // Deduplicate before score-version validation; retries return current authoritative state.
   if(receipt.exists){if(receipt.data().hash!==hash)throw Error('operation-conflict');diagnostic.phase('commit-replay');return {...receipt.data().result,state};}
   diagnostic.phase('transition');
+  const previousStations=state.meta.stations;
   const result=(dispatch?D:S).transition({room,state,user,uid,d,now,authority});
   state.updatedAt=Math.max(now,Number(room.updatedAt||0)+1,Number(state.updatedAt||0)+1);
-  const projection=C.project(room.refereeSeatsV1,room.createdBy,state.meta.stations);
-  state.meta={...state.meta,refereeSeatsV1:room.refereeSeatsV1,...projection,assignedStaffUids:room.assignedStaffUids||[]};
+  const seats=C.reconcileSeatCount(room.refereeSeatsV1,state.meta.stations,now,previousStations);
+  const projection=C.project(seats.model,room.createdBy,state.meta.stations);
+  state.meta={...state.meta,refereeSeatsV1:seats.model,...projection,assignedStaffUids:room.assignedStaffUids||[]};
   const response={ok:true,matchId:result.matchId,scoreRevision:result.scoreRevision};
   const changed=state.matches.find(m=>m.id===result.matchId);
   diagnostic.phase('queue-writes');
   const lifecycle=dispatch?{courtLifecycleWriteSeq:Number(room.courtLifecycleWriteSeq||0)+1}:{};
-  tx.update(ref,{...lifecycle,...projection,data:JSON.stringify(state),updatedAt:state.updatedAt});
+  tx.update(ref,{...lifecycle,...projection,...(seats.changed?{refereeSeatsV1:seats.model}:{}),data:JSON.stringify(state),updatedAt:state.updatedAt});
   tx.update(pub,{bracketView:JSON.stringify(S.publicProjection(state,previous)),updatedAt:state.updatedAt});
   tx.create(receiptRef,{uid,hash,at:now,result:response});
   tx.create(ref.collection('refereeScoreAudit').doc(opKey),{uid,at:now,action:d.action,station:result.station,matchId:result.matchId,scoreRevision:result.scoreRevision,scoreA:changed?.scoreA??null,scoreB:changed?.scoreB??null});

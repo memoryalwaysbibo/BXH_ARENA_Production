@@ -103,7 +103,14 @@ test('published vouchers create independent PTN gates for two eligible organizer
    Object.assign(mirror,{bracketSize:state.bracketSize,drawnAt:state.drawnAt,matches:state.matches,courtAssignments:state.courtAssignments});
    rows.set('publicTournaments/'+code,{...beforePublic,bracketView:JSON.stringify(mirror)});
    const beforeSignature=signature(state);
+   const seatModel={version:1,revision:3,courts:{1:{revision:1,main:{uid:'keep',name:'保留'},backup1:null,backup2:null},6:{revision:2,main:{uid:'remove',name:'移除'},backup1:null,backup2:null}},requests:{old:{id:'old',kind:'qr',station:6,status:'pending',expiresAt:now+300000}}};
+   rows.set('tournaments/'+code,{...rows.get('tournaments/'+code),refereeSeatsV1:seatModel});
    await resize({...resizeRequest,data:{...resizeRequest.data,operationId:'resize-draw-two',expectedUpdatedAt:current.updatedAt,stations:2}});
+   const resizedRoom=rows.get('tournaments/'+code);
+   assert.equal(resizedRoom.refereeSeatsV1.courts[6].main,null);assert.equal(resizedRoom.refereeSeatsV1.requests.old.status,'stale');
+   assert.equal(resizedRoom.refereeSeatsV1.courts[1].main.uid,'keep');
+   assert.deepEqual(Object.keys(JSON.parse(rows.get('publicTournaments/'+code).bracketView).meta.refereeSeatNames),['1','2']);
+   assert.doesNotMatch(JSON.stringify(JSON.parse(rows.get('publicTournaments/'+code).bracketView).meta),/"uid"|"tokenHash"|"refereeSeatsV1"/);
    const after=JSON.parse(rows.get('tournaments/'+code).data),afterPublic=JSON.parse(rows.get('publicTournaments/'+code).bracketView);
    assert.equal(signature(after),beforeSignature);assert.equal(signature(afterPublic),beforeSignature);
    assert.equal(after.bracketDraw.id,'draw-fixed');assert.equal(after.meta.stations,2);
@@ -111,6 +118,8 @@ test('published vouchers create independent PTN gates for two eligible organizer
    assert.ok(after.matches.filter(m=>!m.isBye).every(m=>m.station>=1&&m.station<=2));
    assert.equal(rows.get('commerceTickets/'+id).status,'reserved');
    await resize({...resizeRequest,data:{...resizeRequest.data,operationId:'resize-draw-six',expectedUpdatedAt:rows.get('tournaments/'+code).updatedAt,stations:6}});
+   assert.equal(rows.get('tournaments/'+code).refereeSeatsV1.courts[6].main,null);
+   assert.equal(rows.get('tournaments/'+code).refereeSeatsV1.requests.old.status,'stale');
    state.players=[{id:'a',name:'甲',source:'online',registrationId:'private-a'},
     {id:'b',name:'乙',source:'online',registrationId:'private-b'}];
    state.startedAt=now;state.championId='a';state.runnerUpId='b';state.archiveStatus='completed';

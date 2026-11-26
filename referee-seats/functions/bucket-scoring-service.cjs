@@ -65,9 +65,10 @@ function createBucketScoringHandler(db,{clock=Date.now,runtime='emulator'}={}){
    for(let i=nextManifest.bucketCount+1;i<=m.bucketCount;i++)tx.delete(root.collection('matchBuckets').doc('court-'+i));
    if(!local){
     state.updatedAt=Math.max(now,Number(room.updatedAt||0)+1,Number(state.updatedAt||0)+1);
-    const projection=C.project(room.refereeSeatsV1,room.createdBy,nextCount);
-    state.meta={...state.meta,refereeSeatsV1:room.refereeSeatsV1,...projection,assignedStaffUids:room.assignedStaffUids||[]};
-    tx.update(root,{...(dispatch?{courtLifecycleWriteSeq:Number(room.courtLifecycleWriteSeq||0)+1}:{}),...projection,...closure?.document,scoreStorage:nextManifest,data:JSON.stringify(state),updatedAt:state.updatedAt});
+    const seats=C.reconcileSeatCount(room.refereeSeatsV1,nextCount,now,m.courtCount);
+    const projection=C.project(seats.model,room.createdBy,nextCount);
+    state.meta={...state.meta,refereeSeatsV1:seats.model,...projection,assignedStaffUids:room.assignedStaffUids||[]};
+    tx.update(root,{...(dispatch?{courtLifecycleWriteSeq:Number(room.courtLifecycleWriteSeq||0)+1}:{}),...projection,...(seats.changed?{refereeSeatsV1:seats.model}:{}),...closure?.document,scoreStorage:nextManifest,data:JSON.stringify(state),updatedAt:state.updatedAt});
     const mirror=S.publicProjection(state,previous);if(closure)Object.assign(mirror,closure.runtime);
     tx.update(publicRef,{...closure?.document,bracketView:JSON.stringify(mirror),scoreBucketProjection:{epoch:m.epoch,versions:Object.fromEntries(encoded.map(b=>[b.bucketId,b.revision]))},updatedAt:state.updatedAt});
    }
