@@ -1,0 +1,6 @@
+{
+ "scope":"local Firestore emulator 1.19.8, synthetic accounts, not production billing or latency",
+ "baseline":{"capacity":192,"concurrency":193,"submitted":193,"success":2,"errors":{"ABORTED_10":191},"elapsedMs":21370.89,"reads":4810,"committedWrites":6,"attempts":962,"p50Ms":18632,"p95Ms":20952},
+ "serializedControl":{"capacity":192,"concurrency":1,"submitted":193,"success":192,"errors":{"full":1},"elapsedMs":1569.51,"reads":965,"committedWrites":576,"attempts":193,"p50Ms":7,"p95Ms":14},
+ "conclusion":"Strict capacity and persisted holds remained consistent; unbounded simultaneous admission failed throughput acceptance. Serialized control is not a concurrent-load pass."
+}
