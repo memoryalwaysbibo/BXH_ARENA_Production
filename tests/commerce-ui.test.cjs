@@ -877,3 +877,73 @@ test('expansion UI clamps stale capacity to 192 and rejects oversized or unavail
  await submit(32);
  assert.deepEqual(calls,[{action:'ticket-room-expand',code,roomId:'room-generation',quantity:32,operationId:'same-operation'}]);
 });
+
+test('expansion UI walks prepaid purchase, bank report, admin receipt and owner consumption across sessions',async()=>{
+ const t=setup({partner:true}),code='PTN-EXP123',sku='tournament_expansion_1';
+ const product={id:sku,name:'賽事擴充券',version:2,priceTwd:20,status:'published',audience:'partner_organizer',purchasable:true,delivery:{kind:'room_expansion',assetId:sku,quantity:1,durationDays:0}};
+ let balance=0,capacity=160,order=null,sequence=0;
+ const calls=[];
+ t.sandbox.crypto.randomUUID=()=> 'expansion-flow-'+(++sequence);
+ t.sandbox.FormData=function(form){return Object.entries(form.values);};
+ const submit=(type,values)=>t.listeners.submit({target:{closest:()=>({dataset:{commerceForm:type},values})},preventDefault(){}});
+ const response=()=>({ok:true,order:JSON.parse(JSON.stringify(order))});
+ // Stateful service doubles test the real UI event routing only; backend
+ // authorization, money and atomic inventory are covered by emulator tests.
+ t.sandbox.window.engagementService.commerce=async p=>{
+  calls.push(JSON.parse(JSON.stringify(p)));
+  switch(p.action){
+   case 'catalog':return {ok:true,storeOpen:true,products:[product]};
+   case 'my-expansion-balance':return {ok:true,quantity:balance};
+   case 'create-order':
+    assert.equal(p.productId,sku);assert.equal(p.expectedVersion,2);assert.equal(p.quantity,40);
+    assert.equal(p.roomCode,undefined);assert.equal(p.roomId,undefined);
+    order={id:'EXP-ORDER',ownerUid:'buyer',buyerName:'Fixture',productSnapshot:{...product},
+     expansionPurchase:{quantity:40,unitPriceTwd:20},amountTwd:800,paymentStatus:'pending',
+     deliveryStatus:'not_started',createdAt:Date.now(),expiresAt:Date.now()+3600000,
+     bankSnapshot:{bankName:'Fixture bank',bankCode:'000',branch:'Fixture',accountName:'Fixture',accountNumber:'000'}};
+    return response();
+   case 'report-payment':
+    assert.equal(p.orderId,order.id);assert.equal(p.report.lastFive,'12345');
+    order={...order,paymentStatus:'reported',report:p.report};return response();
+   case 'order-detail':assert.equal(p.orderId,order.id);return response();
+   case 'admin-confirm-payment':
+    assert.equal(p.orderId,order.id);assert.equal(p.receivedAmountTwd,800);assert.equal(p.confirmed,true);
+    assert.equal(p.paymentReference,'fixture-receipt');balance+=40;
+    order={...order,paymentStatus:'paid',deliveryStatus:'delivered'};return response();
+   default:throw Error('unexpected commerce action '+p.action);
+  }
+ };
+ t.sandbox.window.engagementService.ticketRoomOperation=async p=>{
+  calls.push(JSON.parse(JSON.stringify(p)));
+  if(p.action==='ticket-room-state')return {ok:true,code,roomId:'room-generation',phase:'waiting',capacity,canAssignDelegate:true,expansionEnabled:true,expansionMaxCapacity:192};
+  assert.equal(p.action,'ticket-room-expand');assert.equal(p.code,code);assert.equal(p.roomId,'room-generation');assert.equal(p.quantity,32);
+  balance-=32;capacity+=32;return {ok:true,code,quantity:32,capacityAfter:capacity};
+ };
+ t.sandbox.activeTab='commerce-shop';t.ui.shop();await t.ui.load('catalog');
+ await t.ui.handle('commerce-product',{dataset:{id:sku}});
+ t.sandbox.document.querySelector=s=>s==='[data-expansion-quantity]'?{value:'40'}:{checked:true};
+ await t.ui.handle('commerce-buy',{dataset:{id:sku}});
+ assert.match(t.ui.shop(),/40 張/);assert.match(t.ui.shop(),/NT\$ 800/);assert.match(t.ui.shop(),/回報付款/);
+ await submit('report',{lastFive:'12345',transferredAt:'2026-11-27T09:00',note:'fixture'});
+ assert.match(t.ui.shop(),/等待 BXH 核對/);assert.equal(balance,0);
+ // Separate super-admin session confirms the existing bank remittance.
+ t.setUid('admin');t.setAdmin(true);t.setPartner(false);t.sandbox.activeTab='commerce-admin';t.ui.adminPage();
+ await t.ui.handle('commerce-order',{dataset:{id:order.id}});
+ assert.match(t.ui.adminPage(),/確認收款並交付/);
+ await submit('confirm',{receivedAmountTwd:'800',paymentReference:'fixture-receipt'});
+ assert.match(t.ui.adminPage(),/已交付/);assert.equal(balance,40);
+ // Return to buyer, read server balance, then manage their own PTN.
+ t.setUid('buyer');t.setAdmin(false);t.setPartner(true);t.sandbox.activeTab='people';
+ const c=t.ui.context();c.view='ticket-manage';c.ownedPtn={code};c.roomManageOpen=true;c.ticketRoomOpen=true;
+ await t.ui.load('my-expansion-balance');await t.ui.load('ticket-room-state');
+ assert.match(t.ui.ticketManagedTab('people'),/我的擴充券：40 張/);
+ await submit('ticket-expand',{quantity:'33'});
+ assert.equal(calls.filter(p=>p.action==='ticket-room-expand').length,0);
+ await submit('ticket-expand',{quantity:'32'});
+ assert.equal(c.expansionBalance,null);assert.equal(c.ticketRoom,null);
+ await t.ui.load('my-expansion-balance');await t.ui.load('ticket-room-state');
+ assert.equal(c.expansionBalance,8);assert.equal(c.ticketRoom.capacity,192);
+ assert.doesNotMatch(t.ui.ticketManagedTab('people'),/使用擴充券/);
+ assert.equal(calls.filter(p=>p.action==='ticket-room-expand').length,1);
+ assert.equal(new Set(calls.filter(p=>p.operationId).map(p=>p.operationId)).size,4);
+});
