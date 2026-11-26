@@ -32,7 +32,9 @@ function visibleProducts(c){
  return [...ticketCards,...otherProducts];
 }
 function purchasable(p){return p?.purchasable===true&&!p.previewOnly;}
-const expansionAvailable=room=>canSeeTickets()&&room?.expansionEnabled===true&&room.phase==='waiting'&&room.canAssignDelegate===true&&Number.isSafeInteger(room.expansionMaxCapacity)&&room.expansionMaxCapacity>room.capacity;
+const expansionCapacityLimit=room=>Number.isSafeInteger(room?.expansionMaxCapacity)?Math.min(192,room.expansionMaxCapacity):0;
+const expansionAvailable=room=>canSeeTickets()&&room?.expansionEnabled===true&&room.phase==='waiting'&&room.canAssignDelegate===true&&Number.isSafeInteger(room.capacity)&&room.capacity>0&&expansionCapacityLimit(room)>room.capacity;
+const expansionUseLimit=(c,room)=>Math.max(0,Math.min(Number.isSafeInteger(c.expansionBalance)?c.expansionBalance:0,expansionCapacityLimit(room)-room.capacity));
 function expansionBalancePanel(c){return `<p class="hint">我的擴充券：${Number.isSafeInteger(c.expansionBalance)?c.expansionBalance+' 張':'尚未確認'}｜無使用期限</p><button type="button" class="btn btn-ghost btn-sm" data-action="commerce-expansion-refresh" ${c.loading||c.busy?'disabled':''}>更新擴充券庫存</button>`;}
 function audienceLabel(audience){
  return ({signed_organizer:'有效簽約活動主辦',partner_organizer:'有效合作主辦'})[audience]||'符合資格的會員';
@@ -224,9 +226,9 @@ function ticketRefereePanel(room,pending){
 }
 function roomExpansionPanel(c,room,pending){
  if(!expansionAvailable(room))return '';
- const balance=c.expansionBalance,limit=Math.min(Number.isSafeInteger(balance)?balance:0,room.expansionMaxCapacity-room.capacity);
+ const limit=expansionUseLimit(c,room);
  const qty=limit>0?1:0;
- return `<section class="panel"><div class="panel-title">賽事擴充券</div>${expansionBalancePanel(c)}<p>目前正取上限 ${room.capacity} 人｜可擴充至 ${room.expansionMaxCapacity} 人</p><form data-commerce-form="ticket-expand"><label>使用張數<input type="number" name="quantity" min="1" max="${Math.max(1,limit)}" step="1" value="${qty}" required ${pending||!limit?'disabled':''}></label><p data-room-expansion-total>擴充後正取上限：${room.capacity+qty} 人</p><button class="btn btn-primary" ${pending||!limit?'disabled':''}>使用擴充券</button></form><button type="button" class="btn btn-ghost" data-action="switch-tab" data-tab="commerce-shop">前往商城購買擴充券</button></section>`;
+ return `<section class="panel"><div class="panel-title">賽事擴充券</div>${expansionBalancePanel(c)}<p>目前正取上限 ${room.capacity} 人｜可擴充至 ${expansionCapacityLimit(room)} 人</p><form data-commerce-form="ticket-expand"><label>使用張數<input type="number" name="quantity" min="1" max="${Math.max(1,limit)}" step="1" value="${qty}" required ${pending||!limit?'disabled':''}></label><p data-room-expansion-total>擴充後正取上限：${room.capacity+qty} 人</p><button class="btn btn-primary" ${pending||!limit?'disabled':''}>使用擴充券</button></form><button type="button" class="btn btn-ghost" data-action="switch-tab" data-tab="commerce-shop">前往商城購買擴充券</button></section>`;
 }
 function ticketPeoplePanel(c,room,pending,drawPanel,delegate){
  const roster=room.participants||[],capacity=Number(room.capacity||0);
@@ -574,7 +576,7 @@ document.addEventListener('submit',async e=>{
  let payload;
  if(type==='ticket-expand'){
   const room=c.ticketRoom,quantity=Number(values.quantity);
-  if(!ticketManagementView(c)||room?.code!==ticketRoomCode(c)||!expansionAvailable(room)||!Number.isSafeInteger(quantity)||quantity<1||quantity>Math.min(c.expansionBalance??0,room.expansionMaxCapacity-room.capacity))return;
+  if(!ticketManagementView(c)||room?.code!==ticketRoomCode(c)||!expansionAvailable(room)||!Number.isSafeInteger(quantity)||quantity<1||quantity>expansionUseLimit(c,room))return;
   if(!confirm(`確定使用 ${quantity} 張擴充券？${room.code} 正取上限將由 ${room.capacity} 增為 ${room.capacity+quantity} 人。`))return;
   payload={action:'ticket-room-expand',code:room.code,roomId:room.roomId,quantity};
  }else if(type==='ticket-open-code'){
@@ -618,7 +620,7 @@ document.addEventListener('submit',async e=>{
  if(payload)await mutate(payload);
 });
 document.addEventListener('input',e=>{
- if(e.target.closest?.('[data-commerce-form="ticket-expand"]')&&e.target.name==='quantity'){const c=context(),room=c.ticketRoom,q=Number(e.target.value),total=document.querySelector('[data-room-expansion-total]');if(total&&expansionAvailable(room))total.textContent=Number.isSafeInteger(q)&&q>=1&&q<=Math.min(c.expansionBalance??0,room.expansionMaxCapacity-room.capacity)?'擴充後正取上限：'+(room.capacity+q)+' 人':'請輸入有效使用張數。';return;}
+ if(e.target.closest?.('[data-commerce-form="ticket-expand"]')&&e.target.name==='quantity'){const c=context(),room=c.ticketRoom,q=Number(e.target.value),total=document.querySelector('[data-room-expansion-total]');if(total&&expansionAvailable(room))total.textContent=Number.isSafeInteger(q)&&q>=1&&q<=expansionUseLimit(c,room)?'擴充後正取上限：'+(room.capacity+q)+' 人':'請輸入有效使用張數。';return;}
  if(e.target.matches?.('[data-expansion-quantity]')){const c=context(),p=visibleProducts(c).find(p=>p.id===c.productId),q=Number(e.target.value),total=document.querySelector('[data-expansion-total]');if(p?.delivery.kind==='room_expansion'&&total){const valid=Number.isSafeInteger(q)&&q>=1&&q<=10000;if(valid)c.expansionQty=q;total.textContent=valid?'合計 '+money(p.priceTwd*q):'請輸入有效購買張數。';}return;}
  const form=e.target.closest?.('[data-commerce-form]');if(!form)return;const c=context(),v=Object.fromEntries(new FormData(form));
  if(form.dataset.commerceForm==='ticket-schedule'&&ticketManagementView(c))c.scheduleDraft=v;
