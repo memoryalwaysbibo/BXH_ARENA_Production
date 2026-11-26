@@ -242,7 +242,7 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
     ticketStatus=ticket.status;
     if(authority.owner&&ticket.version===2&&ticket.status==='reserved'&&room.tournamentPhase==='waiting'&&room.ptnSettlementVersion===1&&!state.rosterLocked){
      const settings=(await tx.get(db.doc('systemSettings/commerceRoomExpansionV1'))).data();
-     if(settings?.enabled===true&&Number.isSafeInteger(settings.maxCapacity)&&settings.maxCapacity>room.capacity&&settings.maxCapacity<=320){expansionEnabled=true;expansionMaxCapacity=settings.maxCapacity;}
+     if(settings?.enabled===true&&Number.isSafeInteger(settings.maxCapacity)&&settings.maxCapacity>room.capacity&&settings.maxCapacity<=192){expansionEnabled=true;expansionMaxCapacity=settings.maxCapacity;}
     }
    }
    const rosterRevision=state.registrationRosterRevision??0;
