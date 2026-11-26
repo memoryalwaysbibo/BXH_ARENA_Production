@@ -412,6 +412,37 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal((await inventory.get()).data().quantity,30);
   assert.equal((await a.room.get()).data().capacity,40);
   assert.equal((await a.ticket.get()).data().addedCapacity,8);
+  await a.room.update({tournamentPhase:'waiting'});
+  // The original ticket was 32; the expanded capacity must admit 40,
+  // refuse the 41st, and use the same lifecycle/consumption as ordinary PTN.
+  const players=Array.from({length:41},(_,i)=>uid+'-player-'+i);
+  const batch=db.batch();
+  for(const player of players)batch.set(db.doc('users/'+player),{active:true,role:'player',realName:'Fixture '+player,phone:'0000000000',profileCompleted:true});
+  await batch.commit();
+  const queue=service({requireRoomOwnership:true});
+  const api=createApi({queue,family:handlers.family(db),enabled:async candidate=>candidate===a.code});
+  for(const [i,player] of players.entries()){
+   const operationId='expansion-join-'+i;
+   const result=await api({auth:{uid:player},data:{action:'submit',code:a.code,operation:{route:'family',code:a.code,operationId,payload:{action:'join',code:a.code,operationId,childIds:[null],childEligibilityConfirmed:true}}}});
+   assert.equal(result.operation.state,'queued');
+  }
+  await queue.drain(a.code,{limit:50,budgetMs:45000});
+  const results=await Promise.all(players.map((player,i)=>queue.status(player,a.code,'expansion-join-'+i)));
+  assert.equal(results.filter(x=>x.operation.state==='completed').length,40);
+  assert.equal(results.filter(x=>x.operation.state==='rejected'&&x.operation.reason==='full').length,1);
+  const privateState=JSON.parse((await a.room.get()).data().data);
+  assert.equal(privateState.players.length,40);
+  const options={db,clock:()=>now+2000,enabled:async candidate=>candidate===a.code};
+  const draw=createDrawHandler(options),start=createStartHandler(options);
+  const lifecycle={code:a.code,roomId:a.roomId,rosterRevision:privateState.registrationRosterRevision};
+  const drawn=await draw({auth:{uid},data:{...lifecycle,baseDrawId:null,operationId:'expansion-draw'}});
+  assert.equal((await a.ticket.get()).data().status,'reserved');
+  await start({auth:{uid},data:{...lifecycle,drawId:drawn.drawId,confirmEarlyStart:true,operationId:'expansion-start'}});
+  const startedTicket=(await a.ticket.get()).data();
+  assert.equal(startedTicket.status,'consumed');assert.equal(startedTicket.capacity,32);assert.equal(startedTicket.addedCapacity,8);
+  assert.equal((await a.room.get()).data().tournamentPhase,'live');
+  assert.equal((await a.pub.get()).data().capacity,40);
+  assert.equal((await inventory.get()).data().quantity,30);
  }finally{
   if(previousSale.exists)await sale.set(previousSale.data());else await sale.delete();
   if(previousConfig.exists)await config.set(previousConfig.data());else await config.delete();
