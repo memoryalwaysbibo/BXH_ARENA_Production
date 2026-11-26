@@ -2707,6 +2707,7 @@
           }
 
           const built=buildHunterTournamentMatchRecords(runtime);
+          const eventParticipantCount=window.BXHDomainUtils.hunterEventParticipantCount(runtime);
           // Count actual played participants from completed canonical matches, never capacity.
           const licenseParticipants=new Set();
           built.forEach(r=>{if(r.analyzable===true&&Array.isArray(r.rounds)&&r.rounds.length>0&&r.resultMethod!=="quick_decision"){
@@ -2720,6 +2721,8 @@
             const scoreFor=side==="A"?rec.scoreA:rec.scoreB;
             const scoreAgainst=side==="A"?rec.scoreB:rec.scoreA;
             records.push(Object.assign({},rec,{
+              eventParticipantCount,
+              eventParticipantSource:eventParticipantCount==null?null:"archived-draw-v1",
               licenseEventParticipants:licenseParticipants.size,
               licenseParticipantSource:"completed-match-roster-v1",
               eventAuthority:d.eventAuthority||runtime.meta.eventAuthority||rec.eventAuthority||"unknown",

@@ -137,3 +137,21 @@ test('failed registration reads for the removed room do not block unrelated offi
  api.queryMyRegistrations=async()=>Object.assign([],{partial:true,failedReads:[{code:'BXH-OTHER',reason:'unavailable'}]});
  assert.equal((await api.queryMyHunterMatches()).skipped[0].code,'BXH-OTHER');
 });
+
+test('archived draw backfills actual entrants, including byes and quick decisions, with no additional reads',async()=>{
+ const players=['self','op','bye','no-show'].map(id=>({id}));
+ const matches=[{a:{playerId:'self'},b:{playerId:'op'},completed:true,winnerId:'self',loserId:'op'}, {isBye:true,completed:true,winnerId:'bye'}, {a:{playerId:'self'},b:{playerId:'bye'},completed:true,winnerId:'self',loserId:'bye'}];
+ const {api,publicReads}=setup({players,matches,publicFields:{capacity:320,confirmedCount:4}});
+ const r=await api.queryMyHunterMatches();
+ assert.equal(r.records[0].eventParticipantCount,3);
+ assert.equal(r.records[0].eventParticipantSource,'archived-draw-v1');
+ assert.equal(r.records[0].licenseEventParticipants,0);
+ assert.equal(publicReads(),0);
+});
+test('missing or inconsistent draw leaves participant count unknown instead of using roster or capacity',async()=>{
+ for(const matches of [[],[{a:{playerId:'self'},b:{playerId:'not-on-roster'},completed:true}]]){
+  const {api}=setup({players:[{id:'self'},{id:'op'}],matches,publicFields:{capacity:64}});
+  const r=await api.queryMyHunterMatches();
+  assert.equal(r.records[0].eventParticipantCount,null);
+ }
+});
