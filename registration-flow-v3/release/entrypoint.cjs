@@ -9,7 +9,7 @@ const db=getFirestore();
 const settings={region:'asia-east1',timeoutSeconds:60,maxInstances:10,enforceAppCheck:true,invoker:'public'};
 const invalid=new Set(['invalid-code','invalid-operation','invalid-cursor','invalid-limit','invalid-room-settings','invalid-participant']);
 const denied=new Set(['permission-denied','super-admin-required','app-check-required']);
-const expected=new Set(['registration-v3-required','registration-state-conflict','already-registered','full','not-pending-review','not-active-registration','registration-attempt-changed','operation-conflict','room-code-conflict','registration-name-missing','tournament-started','registration-mode-not-supported']);
+const expected=new Set(['registration-busy','registration-v3-required','registration-state-conflict','already-registered','full','not-pending-review','not-active-registration','registration-attempt-changed','operation-conflict','room-code-conflict','registration-name-missing','tournament-started','registration-mode-not-supported']);
 function wrap(handler){
  return onCall(settings,async request=>{
   // Deployment alone does not enable the candidate. Never accept a client flag.

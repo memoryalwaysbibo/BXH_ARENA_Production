@@ -1,13 +1,14 @@
 'use strict';
 const {createHash}=require('node:crypto');
 const {applyHold,summary}=require('./hold-core.cjs');
+const {sharedAdmission}=require('./admission.cjs');
 const hash=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const active=u=>u?.active===true&&!u.deleted&&!['deleted','disabled','frozen'].includes(u.accountStatus);
 const id=/^[A-Za-z0-9_-]{1,128}$/;
 
 // Persistent Firestore candidate. No new service or schedule is required.
 // The per-room ledger provides a single serialization point for exact capacity.
-function createHoldService({db,authorizeJoin,authorizeReview,authorizeCancel,clock=Date.now,observe=()=>{}}) {
+function createHoldService({db,authorizeJoin,authorizeReview,authorizeCancel,clock=Date.now,observe=()=>{},admit=sharedAdmission}) {
  for(const fn of [authorizeJoin,authorizeReview,authorizeCancel]) if(typeof fn!=='function') throw Error('registration-authorizers-required');
  return async request=>{
   const actor=request.auth?.uid,d=request.data||{},uid=d.registrationId??actor;
@@ -22,7 +23,7 @@ function createHoldService({db,authorizeJoin,authorizeReview,authorizeCancel,clo
   const fingerprint=hash([d.action,uid,d.expectedAttemptId??null]);
   const begin=clock();let attempts=0,reads=0,writes=0,committedWrites=0;
   try {
-   const result=await db.runTransaction(async tx=>{
+   const result=await admit(d.code,()=>db.runTransaction(async tx=>{
     attempts++;let currentWrites=0;
     const get=async(...refs)=>{reads+=refs.length;return tx.getAll(...refs);};
     const [rs,ls,hs,os,us]=await get(room,ledger,hold,receipt,account);
@@ -57,7 +58,7 @@ function createHoldService({db,authorizeJoin,authorizeReview,authorizeCancel,clo
     if(formal){tx.set(row,formal);currentWrites++;}
     writes+=currentWrites;committedWrites=currentWrites;
     return result;
-   });
+   }));
    try{observe({action:d.action,attempts,reads,writesAttempted:writes,committedWrites,elapsedMs:clock()-begin,ok:true});}catch{}
    return result;
   }catch(error){
