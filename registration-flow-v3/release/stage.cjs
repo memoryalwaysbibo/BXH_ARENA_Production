@@ -4,7 +4,8 @@ const path=require('node:path');
 const root=path.resolve(__dirname,'../..');
 const sourceFiles=[
  'registration-flow-v3/admission.cjs','registration-flow-v3/api.cjs','registration-flow-v3/hold-core.cjs','registration-flow-v3/hold-service.cjs',
- 'registration-flow-v3/permissions.cjs','registration-flow-v3/create-room.cjs','registration-flow-v3/summary-sync.cjs',
+ 'registration-flow-v3/permissions.cjs','registration-flow-v3/create-room.cjs','registration-flow-v3/summary-sync.cjs','registration-flow-v3/roster.cjs',
+ 'qr-checkin/backend/overlays/registration-roster-core.js',
  'qr-checkin/backend/overlays/room-access-core.js','management-summary/functions/event-staff-core.cjs'
 ];
 function stage(output){

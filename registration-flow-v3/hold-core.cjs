@@ -5,6 +5,7 @@ const active = row => ['pending_review','confirmed'].includes(row?.status);
 function validateLedger(l) {
   for (const key of ['capacity','occupiedCount','pendingReviewCount','confirmedCount','sequence','revision'])
     if (!Number.isSafeInteger(l?.[key]) || l[key] < 0) throw Error('registration-state-conflict');
+  if (l.formalRevision!==undefined&&(!Number.isSafeInteger(l.formalRevision)||l.formalRevision<0||l.formalRevision>l.revision)) throw Error('registration-state-conflict');
   if (!l.capacity || l.occupiedCount !== l.pendingReviewCount + l.confirmedCount ||
       l.occupiedCount > l.capacity || l.sequence < l.occupiedCount) throw Error('registration-state-conflict');
 }
@@ -36,6 +37,7 @@ function applyHold(ledger, previous, {action, uid, operationId, expectedAttemptI
       hold = {...previous,status:'cancelled',updatedAt:now};
     } else throw Error('invalid-operation');
   }
+  if (next.confirmedCount!==ledger.confirmedCount) next.formalRevision=(ledger.formalRevision||0)+1;
   next.revision++;
   validateLedger(next);
   return {ledger:next,hold};
