@@ -293,11 +293,17 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
    checkinRequired:finalState.meta.checkinRequired};
   const encoded=JSON.stringify(proof);
   const compressed=require('node:zlib').gzipSync(encoded).toString('base64');
-  const chunks=compressed.match(/.{1,1500}/g);
+  // Keep each log record short and independently verifiable. A prior
+  // transport silently lost bytes in a 1500-character record.
+  const chunkSize=480;
+  const chunks=compressed.match(/.{1,480}/g);
+  assert.equal(chunks.join(''),compressed);
   console.info('PTN192-SETTLEMENT-PROOF manifest',JSON.stringify({
-   schema:1,encoding:'gzip+base64',chunks:chunks.length,sha256:createHash('sha256').update(encoded).digest('hex'),
+   schema:2,encoding:'gzip+base64',chunks:chunks.length,chunkSize,encodedLength:compressed.length,
+   compressedSha256:createHash('sha256').update(compressed).digest('hex'),
+   sha256:createHash('sha256').update(encoded).digest('hex'),
    players:finalState.players.length,checkedInCount:proof.checkedInCount,checkinRequired:proof.checkinRequired}));
-  for(const [index,chunk] of chunks.entries())console.info('PTN192-SETTLEMENT-PROOF chunk '+index+' '+chunk);
+  for(const [index,chunk] of chunks.entries())console.info('PTN192-SETTLEMENT-PROOF chunk '+index+' '+chunk+' '+createHash('sha256').update(chunk).digest('hex'));
   console.info('PTN192 full bracket emulator metrics',JSON.stringify({completedByCommands,waves,scoreAndConfirmCommands:completedByCommands*3,remainingBracketMs:Date.now()-fullStarted,privateStateBytes:Buffer.byteLength(finalRoom.data().data),publicStateBytes:Buffer.byteLength(finalPublic.data().bracketView)}));
   console.info('PTN192 emulator metrics',JSON.stringify({intakeCount:193,confirmed:192,full:1,intakeMs,drainMs,drawMs,startMs,privateStateBytes:Buffer.byteLength(live.data().data),publicStateBytes:Buffer.byteLength(livePub.data().bracketView)}));
  }finally{
