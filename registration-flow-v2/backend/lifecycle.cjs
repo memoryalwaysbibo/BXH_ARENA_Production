@@ -48,7 +48,7 @@ async function readReservedTicket({db,tx,room,pub,state,roomId,code,uid,grant,no
  // bound, permanent PTN ticket may carry an additional capacity balance.
  const base=ticket.capacity,added=ticket.addedCapacity,capacity=base+added;
  if(![32,64,96,128,160].includes(base)||access.baseCapacity!==base||
-    !Number.isSafeInteger(added)||added<0||capacity>320||access.addedCapacity!==added||
+    !Number.isSafeInteger(added)||added<0||capacity>192||access.addedCapacity!==added||
     (added!==0&&(!isPartnerRoomCode(code)||ticket.version!==2||room.ptnSettlementVersion!==1||pub.ptnSettlementVersion!==1))||
     room.capacity!==capacity||pub.capacity!==capacity||
     state.meta.registrationCapacity!==capacity||state.players.length>capacity)throw Error('ticket-capacity-invalid');
