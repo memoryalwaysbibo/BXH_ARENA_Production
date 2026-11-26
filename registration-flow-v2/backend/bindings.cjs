@@ -7,6 +7,7 @@ const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
 const {createStartHandler,createDrawHandler,createTicketForfeitHandler,createTicketScoreHandler}=require('./lifecycle.cjs');
 const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketStationsHandler,createTicketRemoveHandler,createTicketDelegateHandler,createTicketDelegateSearchHandler}=require('./ticket-room-create.cjs');
+const {createTicketRefereeHandler}=require('./ticket-referee-seat.cjs');
 const {isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,resolveTicketGate}=require('./ticket-host.cjs');
 function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled,pilotRoom=null,retiredRoom=null,retiredRooms=[],ticketPilot=async()=>null}){
  if(createFamilyRegistration?.v2CapacityAware!==true)throw Error('queue-family-capacity-source-required');
@@ -68,6 +69,7 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   'ticket-room-state':createTicketRoomStateHandler({db,enabled:startEnabled}),
   'ticket-room-schedule':createTicketScheduleHandler({db}),
   'ticket-room-stations':createTicketStationsHandler({db,enabled:startEnabled}),
+  'ticket-room-referee':createTicketRefereeHandler({db,enabled:startEnabled}),
   'ticket-room-delegate':createTicketDelegateHandler({db}),
   'ticket-room-delegate-search':createTicketDelegateSearchHandler({db}),
   'ticket-room-forfeit':createTicketForfeitHandler({db,enabled:startEnabled}),
@@ -84,7 +86,7 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
    'room-code-conflict','room-receipt-inconsistent','ticket-ptn-slot-occupied','bracket-room-changed','bracket-version-conflict',
    'forfeit-room-not-live','forfeit-match-stale','forfeit-round-waiting',
    'score-room-not-live','score-match-stale','score-round-waiting','score-result-not-ready',
-   'court-room-not-live','court-plan-stale','invalid-court-count','invalid-court','already-completed','court-exit-stale','current-match-changed','dispatch-stale','not-detached','target-retiring','offline-sync-pending'],
+   'ticket-invite-unavailable','release-not-ready','not-event-staff','room-read-only','invalid-request','invalid-qr','qr-expired','seat-stale','seat-occupied','already-seated','not-enabled','already-enabled','invalid-seat','target-ineligible','requester-ineligible','request-pending','request-stale','request-unavailable','invitation-required','legacy-assignments-exist','invalid-stations','community-result-available','court-room-not-live','court-plan-stale','invalid-court-count','invalid-court','already-completed','court-exit-stale','current-match-changed','dispatch-stale','not-detached','target-retiring','offline-sync-pending'],
  });
  const lifecycleOptions={
   options:{enforceAppCheck:true},

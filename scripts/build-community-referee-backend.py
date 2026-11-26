@@ -14,10 +14,10 @@ REFERENCE = ROOT / 'referee-seats/reference/community-referee.production-2026110
 MANIFEST = ROOT / 'release/community-referee/backend-manifest.json'
 OVERLAYS = ('core.cjs', 'dispatch-core.cjs', 'scoring-service.cjs', 'service.cjs')
 ADDITIONS = ('score-diagnostics.cjs',)
-# The November 4 capture deliberately preserves its old engine. These two
+# The November 4 capture deliberately preserves its old engine. These
 # overlays have since evolved with the shared retirement engine; freeze their
 # original reviewed bytes rather than implying the old archive can run them.
-FROZEN_OVERLAYS = frozenset(('core.cjs', 'scoring-service.cjs'))
+FROZEN_OVERLAYS = frozenset(('core.cjs', 'scoring-service.cjs', 'service.cjs'))
 
 
 def sha(data):
