@@ -280,7 +280,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   // Export the actual isolated lifecycle result for the separate scoring candidate.
   // Only this demo fixture is exported; no production document is read or logged.
   assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-registration-v2');
-  assert.match(process.env.FIRESTORE_EMULATOR_HOST||'',/^(127\\.0\\.0\\.1|localhost):\\d+$/);
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST||'',/^(127\.0\.0\.1|localhost):\d+$/);
   const {data:stateJson,...top}=finalRoom.data();
   const pub=finalPublic.data();
   const ticketId=top.ticketAccessV1.ticketId;
