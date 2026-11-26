@@ -72,6 +72,14 @@ test('published vouchers create independent PTN gates for two eligible organizer
   if(capacity==='32'){
    const waiting=await createTicketRoomStateHandler({db,clock:()=>now})({auth:{uid},app:{},data:{action:'ticket-room-state',code}});
    assert.equal(waiting.phase,'waiting');assert.equal(waiting.stations,4);assert.equal(waiting.bracket,undefined);
+   assert.equal(waiting.refereeSeatView,null);
+   const roomPath='tournaments/'+code, original=rows.get(roomPath);
+   rows.set(roomPath,{...original,refereeSeatsV1:{version:1,revision:3,courts:{1:{main:{name:'測試主裁',uid:'private-seat-uid'},backup1:{name:'  測試備裁  ',uid:'private-backup-uid'}},5:{main:{name:'超出台數'}}},requests:{pending:{tokenHash:'private-qr-token'}}}});
+   const projected=await createTicketRoomStateHandler({db,clock:()=>now})({auth:{uid},app:{},data:{action:'ticket-room-state',code}});
+   assert.deepEqual(projected.refereeSeatView.courts[1],{main:{name:'測試主裁'},backup1:{name:'測試備裁'},backup2:null});
+   assert.equal(Object.keys(projected.refereeSeatView.courts).length,4);
+   assert.doesNotMatch(JSON.stringify(projected.refereeSeatView),/private-seat-uid|private-backup-uid|private-qr-token|超出台數/);
+   rows.set(roomPath,original);
    const resize=createTicketStationsHandler({db,clock:()=>now+1000});
    const resizeRequest={auth:{uid},app:{},data:{action:'ticket-room-stations',code,roomId:first.roomId,operationId:'resize-to-six',expectedUpdatedAt:waiting.updatedAt,stations:6}};
    await assert.rejects(resize({...resizeRequest,data:{...resizeRequest.data,stations:13}}),/invalid-operation/);

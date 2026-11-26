@@ -215,6 +215,22 @@ function createPtnStatusHandler({db,clock=Date.now}){
   return {ok:true,code:latest,canCreate:Object.keys(gate.rooms||{}).length<8};
  };
 }
+// A display-only projection from the same authoritative seat model used by
+// the shared referee service. No account identifiers, requests or tokens leave
+// the manager read endpoint, and a missing model never creates seats.
+function projectTicketRefereeSeatNames(room,stations){
+ const model=room.refereeSeatsV1;
+ if(model?.version!==1||!model.courts||!Number.isInteger(stations)||stations<1||stations>12)return null;
+ const courts={};
+ for(let station=1;station<=stations;station++){
+  const court=model.courts[station]||{};
+  courts[station]=Object.fromEntries(['main','backup1','backup2'].map(slot=>{
+   const name=court[slot]?.name;
+   return [slot,typeof name==='string'&&name.trim()?{name:name.trim().slice(0,80)}:null];
+  }));
+ }
+ return {version:1,courts};
+}
 function createTicketRoomStateHandler({db,clock=Date.now}){
  return async request=>{
   const uid=request.auth?.uid, data=request.data;
@@ -269,7 +285,7 @@ function createTicketRoomStateHandler({db,clock=Date.now}){
     ...(isPartnerRoomCode(code)?{delegateUid:room.ptnDelegateUid||null,
      delegateName:delegate?String(delegate.realName||delegate.displayName||'未設定姓名').slice(0,80):null,
      delegateGameId:delegate?String(delegate.gameId||'').slice(0,80):null,
-     canAssignDelegate:authority.owner}:{}),
+     canAssignDelegate:authority.owner,refereeSeatView:projectTicketRefereeSeatNames(room,state.meta?.stations)}:{}),
     capacity:room.capacity,confirmedCount:room.confirmedCount,phase:room.tournamentPhase,startAt:room.startAt,
     stations:Number.isInteger(state.meta?.stations)&&state.meta.stations>=1&&state.meta.stations<=12?state.meta.stations:null,
     registrationOpenAt:room.registrationOpenAt,registrationCloseAt:room.registrationCloseAt,

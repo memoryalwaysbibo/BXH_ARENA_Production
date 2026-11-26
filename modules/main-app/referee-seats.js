@@ -89,18 +89,19 @@
  // Shared presentation for official, community and ticket rooms. The
  // receiving context supplies the capabilities; display does not grant them.
  function renderSeatGrid(station,court={},options={}){
-  const {actorUid,busy=false,canInvite=false,canJoin=false,invitationMode=false,projectionOnly=false}=options;
+  const {actorUid,busy=false,canInvite=false,canJoin=false,invitationMode=false,projectionOnly=false,emptyCaption='尚未啟用'}=options;
   return '<div class="ref-seat-grid">'+slots.map(slot=>{
    const seat=court[slot],mine=!projectionOnly&&!!actorUid&&seat?.uid===actorUid;
    const disabled=projectionOnly||busy||(!seat&&invitationMode&&!canInvite&&!canJoin);
-   const caption=projectionOnly?(seat?.name||'尚未啟用'):(seat?.name||(invitationMode?(canInvite?'邀請裁判':canJoin?'點此加入':'空席'):'點此加入'));
+   const caption=projectionOnly?(seat?.name||emptyCaption):(seat?.name||(invitationMode?(canInvite?'邀請裁判':canJoin?'點此加入':'空席'):'點此加入'));
    const attributes=projectionOnly?'aria-disabled="true"':`data-seat-action="seat" data-station="${station}" data-slot="${slot}"`;
    return `<button type="button" class="ref-seat-button${mine?' mine':''}" ${attributes} ${disabled?'disabled':''}><span>${labels[slot]}</span><strong>${escape(caption)}</strong>${mine?'<small>我的席位 · 點擊退出</small>':''}</button>`;
   }).join('')+'</div>';
  }
- function renderPendingTicketSeats(station){
+ function renderPendingTicketSeats(station,room){
   if(!Number.isInteger(station)||station<1||station>12)return '';
-  return '<div class="ref-seat-section">'+renderSeatGrid(station,{}, {projectionOnly:true})+'</div>';
+  const projected=room?.refereeSeatView?.version===1&&room.refereeSeatView.courts?.[station];
+  return '<div class="ref-seat-section">'+renderSeatGrid(station,projected||{}, {projectionOnly:true,emptyCaption:projected?'空席':'尚未啟用'})+'</div>';
  }
  function render(st,station){
   if(!enabled(st))return '';

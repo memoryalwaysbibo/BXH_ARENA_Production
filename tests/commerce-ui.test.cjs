@@ -597,6 +597,9 @@ test('PTN live takeover shows bracket and scores only its verified room',async()
  assert.equal((withSeats.match(/class="ref-seat-button" aria-disabled="true" disabled>/g)||[]).length,3);
  assert.doesNotMatch(withSeats,/data-seat-action=/);
  assert.match(withSeats,/備用裁判 2/);
+ t.ui.context().ticketRoom.refereeSeatView={version:1,courts:{1:{main:{name:'主裁甲'},backup1:null,backup2:null}}};
+ assert.match(t.ui.ticketManagedTab('referee'),/主裁甲/);
+ assert.doesNotMatch(t.ui.ticketManagedTab('referee'),/data-seat-action=/);
  assert.match(panel,/ref-vs-arena standard/);
  assert.match(panel,/旋轉勝利＋1分/);
  assert.match(panel,/擊飛勝利＋2分/);
@@ -753,6 +756,11 @@ test('PTN pre-start configured courts share the official waiting scorer without 
  assert.match(html,/台4/);assert.match(html,/等待開賽/);
  assert.doesNotMatch(html,/data-action="(?:score|fault|confirm-result|undo-score|rematch|commerce-ticket-score)"/);
  assert.equal((html.match(/data-type="spin" disabled/g)||[]).length,8);
+ c.ticketRoom.refereeSeatView={version:1,courts:{1:{main:{name:'主裁 <測試>'},backup1:{name:'備裁甲'},backup2:null}}};
+ const filled=t.ui.ticketManagedTab('referee');
+ assert.match(filled,/主裁 &lt;測試&gt;/);assert.match(filled,/備裁甲/);assert.match(filled,/空席/);
+ assert.doesNotMatch(filled,/data-seat-action=|主裁 <測試>/);
+ assert.equal((filled.match(/class="ref-seat-button" aria-disabled="true" disabled>/g)||[]).length,12);
  c.ticketRoom.stations=null;
  assert.doesNotMatch(t.ui.ticketManagedTab('referee'),/referee-workstation-waiting/);
 });
