@@ -78,6 +78,18 @@
       '"><div class="group-history-board-heading"><span>對戰表</span><h3>' + esc(stageLabel(data, selected)) + '</h3></div>' + tree(data, selected) + '</section>' +
       '<details class="group-history-disclaimer"><summary>比分資料說明</summary><p>舊版回收紀錄未保存比分快照，本頁比分為目前伺服器資料；回收結果不一致時暫停顯示並標示待核對。</p></details>';
   }
+  // Only initial groups count; finalists already appear in those rosters.
+  function eventParticipantCount(data) {
+    if (data?.parent?.archiveStatus !== 'completed' || data.needsReview) return null;
+    const groups = keys.slice(0, 4).map(key => stageFor(data, key));
+    if (groups.some(stage => !stage || (stage.status !== 'not-applicable' &&
+      (stage.status !== 'completed' || !verifiedStage(stage) || !list(stage.players).length)))) return null;
+    const active = groups.filter(stage => stage.status === 'completed');
+    if (active.length < 2) return null;
+    const ids = active.flatMap(stage => stage.players.map(player => player?.id));
+    return ids.length >= 2 && ids.every(id => typeof id === 'string' && id) &&
+      new Set(ids).size === ids.length ? ids.length : null;
+  }
   function ownHistory(data) {
     const ids = new Set(list(data?.ownPlayerIds).filter(id => typeof id === 'string' && id));
     if (!ids.size) return '<p class="hint">沒有可核對的本人參賽紀錄。請確認使用報名時的帳號及主房代碼。</p>';
@@ -119,7 +131,9 @@
     const loading = model.busy ? '<p role="status">正在讀取分組賽紀錄…</p>' : '';
     const refresh = codeValid(model.code) ? '<button type="button" class="btn btn-ghost" data-group-history-action="refresh"' + disabled + '>' +
       (model.data ? '更新紀錄' : '查看分組賽紀錄') + '</button>' : '';
+    const count = eventParticipantCount(model.data);
     const title = model.data ? '<h3>' + esc(model.data.parent?.name || model.code) + '</h3>' +
+      (own ? '<p class="hint">參賽人數 ' + (count == null ? '—' : count + ' 人') + '</p>' : '') +
       (model.data.needsReview ? '<p class="hint" role="status">部分資料待核對，名次尚未確認。</p>' : '') : '';
     return header + form + discovery + notice + loading + title +
       (model.data ? (own ? ownHistory(model.data) : previews(model.data, model.selected)) : !own && model.started ? previews(null, model.selected) : '') + refresh;

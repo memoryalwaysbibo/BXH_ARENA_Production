@@ -168,3 +168,29 @@ test('authentication, event identity, test isolation and session epoch guard eve
  const previous=c.fx.getDocs;c.fx.getDocs=async q=>{const data=await previous(q);c.engagementSessionEpoch++;return data;};await assert.rejects(()=>c.api.getMyLadderEventResult('BXH-E1'),/stale-session/);
 });
 module.exports={setup,extract,record};
+
+test('career and recent event cards display verified participant count before expansion; unknown or conflicting counts stay unknown',()=>{
+ const c=setup();
+ c.hunterProfileCache.records=[record({eventParticipantCount:285}),record({matchId:'m2',eventParticipantCount:285})];
+ assert.match(c.renderPlayerCenterCareer(),/參賽人數 285 人/);
+ assert.match(c.renderPlayerCenterOverview({}),/參賽人數 285 人/);
+ c.hunterProfileCache.records[1].eventParticipantCount=64;
+ assert.match(c.renderPlayerCenterCareer(),/參賽人數 —/);
+ c.hunterProfileCache.records=[record({eventParticipantCount:null,licenseEventParticipants:7,capacity:320})];
+ assert.match(c.renderPlayerCenterCareer(),/參賽人數 —/);
+});
+
+test('archived team draw counts unique members of entered teams, not team slots or registration capacity',()=>{
+ const c=setup(),count=c.window.BXHDomainUtils.hunterEventParticipantCount;
+ const state={archiveStatus:'completed',meta:{battleMode:'team'},players:['a','b','c','d','e','f','spare'].map(id=>({id})),teams:[{id:'T1',memberPlayerIds:['a','b','c']},{id:'T2',memberPlayerIds:['d','e','f']},{id:'T3',memberPlayerIds:['spare']}],matches:[{teamIds:['T1','T2'],winnerId:'T1',loserId:'T2'}]};
+ assert.equal(count(state),6);
+ state.teams[1].memberPlayerIds.push('a');assert.equal(count(state),null);
+});
+test('grouped event counts all initial group entrants once, never adds finalist rosters or partial groups',()=>{
+ const view=require('../group-history/view.js');
+ const stages=['A','B','C','D'].map((key,i)=>({key,status:'completed',players:Array.from({length:[71,71,71,72][i]},(_,j)=>({id:key+j}))}));
+ stages.push({key:'final-eight',status:'completed',players:stages.flatMap(g=>g.players.slice(0,2))});
+ const model={mode:'own',data:{parent:{archiveStatus:'completed',name:'分組賽'},stages,ownPlayerIds:['A0']}};
+ assert.match(view.content(model),/參賽人數 285 人/);
+ stages[0].status='needs-review';assert.match(view.content(model),/參賽人數 —/);
+});
