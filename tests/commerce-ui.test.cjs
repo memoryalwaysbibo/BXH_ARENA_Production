@@ -951,3 +951,22 @@ test('PTN standard controls expose fault, undo, pause/resume and rematch only wi
  match.standardControls=false;await t.ui.handle('commerce-ticket-referee-refresh',{});html=t.ui.ticketRefereeSessionView();assert.doesNotMatch(html,/data-command="(?:fault|rematch|pause|resume)"/);
  const count=calls.length;await t.ui.handle('commerce-ticket-score',{dataset:{id:'m',command:'rematch'}});assert.equal(calls.length,count);
 });
+
+
+test('PTN manager routes only server-listed cross-court and previous-result operations',async()=>{
+ const t=setup({partner:true}),code='PTN-TST001',calls=[];t.sandbox.activeTab='management';
+ const match=(id,station,completed=false)=>({id,station,completed,scoreA:completed?4:0,scoreB:0,a:{name:'甲'+id},b:{name:'乙'+id},canScore:!completed});
+ const room={ok:true,code,roomId:'routing-fixture',phase:'live',stations:2,updatedAt:321,bracket:[match('active',1),match('waiting',2),match('previous',1,true)],courtControl:{version:1,targetCount:2,courts:[{station:1,currentMatchId:'active',swapTargets:['waiting'],previousMatchId:'previous',closed:false,draining:false},{station:2,closed:false,draining:false}],detached:[]}};
+ t.sandbox.FormData=function(form){return Object.entries(form.values);};
+ t.sandbox.window.engagementService.ticketRoomOperation=async data=>{calls.push({...data});return data.action==='ticket-room-stations'?{ok:true}:JSON.parse(JSON.stringify(room));};
+ await t.ui.handle('commerce-open-ticket-room',{dataset:{id:code}});t.sandbox.activeTab='referee';
+ const html=t.ui.ticketManagedTab('referee');assert.match(html,/跨台換場/);assert.match(html,/修正上一場/);
+ const submit=async form=>t.listeners.submit({target:{closest:()=>form},preventDefault(){}});
+ await submit({dataset:{commerceForm:'ticket-court-swap',station:'1',matchId:'active'},values:{targetMatchId:'waiting'}});
+ assert.deepEqual(calls.at(-1),{action:'ticket-room-stations',code,roomId:room.roomId,expectedUpdatedAt:321,command:'swap',station:1,matchId:'active',targetMatchId:'waiting',operationId:'same-operation'});
+ await t.ui.load('ticket-room-state');
+ await submit({dataset:{commerceForm:'ticket-court-correct',station:'1',matchId:'previous'},values:{mode:'reset'}});
+ assert.deepEqual(calls.at(-1),{action:'ticket-room-stations',code,roomId:room.roomId,expectedUpdatedAt:321,command:'correct',station:1,matchId:'previous',mode:'reset',operationId:'same-operation'});
+ await t.ui.load('ticket-room-state');room.courtControl.courts[0].swapTargets=[];room.courtControl.courts[0].previousMatchId=null;await t.ui.load('ticket-room-state');
+ assert.doesNotMatch(t.ui.ticketManagedTab('referee'),/data-commerce-form="ticket-court-(?:swap|correct)"/);
+});

@@ -85,7 +85,7 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   preconditions:['ticket-lifecycle-disabled','ticket-binding-invalid','ticket-expired','ticket-unavailable','version-conflict',
    'room-code-conflict','room-receipt-inconsistent','ticket-ptn-slot-occupied','bracket-room-changed','bracket-version-conflict',
    'forfeit-room-not-live','forfeit-match-stale','forfeit-round-waiting',
-   'score-room-not-live','score-match-stale','score-round-waiting','score-result-not-ready','invalid-status','invalid-score','invalid-side','no-pass-alternative',
+   'score-room-not-live','score-match-stale','score-round-waiting','score-result-not-ready','invalid-status','invalid-score','invalid-side','no-pass-alternative','correction-unavailable','court-already-started','downstream-started','source-no-longer-swappable','target-no-longer-swappable','station-mismatch',
    'ticket-invite-unavailable','release-not-ready','not-event-staff','room-read-only','invalid-request','invalid-qr','qr-expired','seat-stale','seat-occupied','already-seated','not-enabled','already-enabled','invalid-seat','target-ineligible','requester-ineligible','request-pending','request-stale','request-unavailable','invitation-required','legacy-assignments-exist','invalid-stations','community-result-available','court-room-not-live','court-plan-stale','invalid-court-count','invalid-court','already-completed','court-exit-stale','current-match-changed','dispatch-stale','not-detached','target-retiring','offline-sync-pending'],
  });
  const lifecycleOptions={

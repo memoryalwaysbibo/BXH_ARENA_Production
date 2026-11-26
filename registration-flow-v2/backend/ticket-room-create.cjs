@@ -1,5 +1,5 @@
 'use strict';
-const {forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked,ticketMatchCourtAvailable,projectTicketCourtState,ticketCourtSummary,ticketCanSkip}=require('./lifecycle.cjs');
+const {forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked,ticketMatchCourtAvailable,projectTicketCourtState,ticketCourtSummary,ticketCanSkip,ticketSwapTargets,ticketPreviousMatch,projectTicketMatchChanges}=require('./lifecycle.cjs');
 const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
 const Fault=require('../../referee-seats/functions/engine/fault.cjs');
 const PassReturn=require('../../referee-seats/functions/engine/pass-return.cjs').BXHPassReturn;
@@ -295,7 +295,7 @@ function createTicketRoomStateHandler({db,enabled=async()=>false,clock=Date.now}
     state.meta?.formatType==='single'&&state.meta?.battleMode==='individual'&&Number.isInteger(state.meta.stations)&&state.meta.stations>=1&&state.meta.stations<=12&&await enabled(code,tx)
     ?{version:1,targetCount:R.target(state),courts:Array.from({length:state.meta.stations},(_,i)=>{
      const station=i+1,closed=state.forcedCourtExits?.[station]?.closed===true,currentMatchId=state.courtAssignments?.['court'+station]?.currentMatchId||null;
-     return {station,closed,draining:station>R.target(state),currentMatchId,...ticketCourtSummary(state,station)};
+     return {station,closed,draining:station>R.target(state),currentMatchId,...ticketCourtSummary(state,station),swapTargets:ticketSwapTargets(state,station),previousMatchId:ticketPreviousMatch(state,station)};
     }),detached:state.matches.filter(m=>!m.completed&&m.forceDetached&&Number(m.station)===0).map(m=>m.id),
     deferred:state.matches.filter(m=>PassReturn.supported(state)&&PassReturn.readiness(state,m,{manual:true}).ok&&!m.resumeQueuedAt&&!ticketRoundBlocked(m,state.matches,state.meta)&&!ticketBronzeBlocked(m,state.matches,state.meta)).map(m=>m.id)}:null;
    let refereeSeatControl=null;
@@ -381,7 +381,7 @@ function createTicketStationsHandler({db,enabled=async()=>false,clock=Date.now})
   if(!uid)throw Error('auth-required');
   if(!request.app)throw Error('permission-denied');
   const command=data?.command??'resize';
-  const commandFields={resize:['stations'],exit:['station','matchId'],claim:['station','matchId'],'claim-skipped':['station','matchId'],reopen:['station']};
+  const commandFields={resize:['stations'],exit:['station','matchId'],claim:['station','matchId'],'claim-skipped':['station','matchId'],swap:['station','matchId','targetMatchId'],correct:['station','matchId','mode'],reopen:['station']};
   const stationValid=n=>Number.isInteger(n)&&n>=1&&n<=12;
   const matchValid=id=>typeof id==='string'&&id.length>0&&id.length<=128;
   if(!data||!Object.hasOwn(commandFields,command)||Object.keys(data).some(key=>!['action','code','roomId','operationId','expectedUpdatedAt','command',...commandFields[command]].includes(key))||
@@ -391,8 +391,9 @@ function createTicketStationsHandler({db,enabled=async()=>false,clock=Date.now})
      !Number.isSafeInteger(data.expectedUpdatedAt)||
      (command==='resize'?!stationValid(data.stations):!stationValid(data.station))||
      (command==='exit'&&data.matchId!==null&&!matchValid(data.matchId))||
-     (['claim','claim-skipped'].includes(command)&&!matchValid(data.matchId)))throw Error('invalid-operation');
-  const {code,roomId,operationId,expectedUpdatedAt,stations,station,matchId}=data;
+     (['claim','claim-skipped','swap','correct'].includes(command)&&!matchValid(data.matchId))||
+     (command==='swap'&&!matchValid(data.targetMatchId))||(command==='correct'&&!['edit','reset'].includes(data.mode)))throw Error('invalid-operation');
+  const {code,roomId,operationId,expectedUpdatedAt,stations,station,matchId,targetMatchId,mode}=data;
   const roomRef=db.doc('tournaments/'+code),publicRef=db.doc('publicTournaments/'+code);
   const receipt=roomRef.collection('operationLog').doc('ticket-room-stations-'+digest([uid,operationId]));
   const requestHash=digest(data);
@@ -437,11 +438,22 @@ function createTicketStationsHandler({db,enabled=async()=>false,clock=Date.now})
      if(ticketRoundBlocked(match,state.matches,state.meta)||ticketBronzeBlocked(match,state.matches,state.meta))throw Error('score-round-waiting');
      if(!R.accepts(state,station))throw Error('target-retiring');
      result=createEngine(state,{uid},revision,operationId).applySkippedDispatch(state,match,station,Number(match.dispatchRevision||0));
+    }else if(command==='swap'){
+     if(state.courtAssignments?.['court'+station]?.currentMatchId!==matchId||!ticketSwapTargets(state,station).includes(targetMatchId))throw Error('dispatch-stale');
+     result=createEngine(state,{uid},revision,operationId).applyCourtSwapMutation(state,matchId,targetMatchId);
+    }else if(command==='correct'){
+     if(ticketPreviousMatch(state,station)!==matchId)throw Error('correction-unavailable');
+     result=createEngine(state,{uid},revision,operationId).applyCompletedMatchCorrection(state,matchId,mode,actorSnap.data()?.realName||'主辦');
     }else result=R.reopen(state,station,Number(state.forcedCourtExits?.[station]?.revision||0),revision);
     if(!result.ok)throw Error(result.reason);
     // Rebuild only routing, not settlement or score ledgers.
-    createEngine(state,{uid},revision,operationId).rebuildCourtAssignments();
-    const courtFields=projectTicketCourtState(room,state,mirror,authority.ownerUid,previousStations,revision,command==='claim-skipped');
+    const engine=createEngine(state,{uid},revision,operationId);
+    if(command==='swap')engine.rebuildPropagationForState(state);else if(command!=='correct')engine.rebuildCourtAssignments();
+    if(command==='correct'||command==='swap'){
+     for(const id of new Set([matchId,targetMatchId].filter(Boolean))){const changed=state.matches.find(m=>m.id===id);changed.refereeSeatScoreRevision=Number(changed.refereeSeatScoreRevision||0)+1;}
+     projectTicketMatchChanges(state,mirror,revision);
+    }
+    const courtFields=projectTicketCourtState(room,state,mirror,authority.ownerUid,previousStations,revision,['claim-skipped','swap','correct'].includes(command));
     const fence=room.qrCheckinManaged===true?advanceQrCheckinFence(room,state):{};
     tx.update(roomRef,{...fence,...courtFields,updatedAt:revision,data:JSON.stringify({...state,updatedAt:revision})});
     tx.update(publicRef,{...fence,updatedAt:revision,bracketView:JSON.stringify({...mirror,updatedAt:revision})});

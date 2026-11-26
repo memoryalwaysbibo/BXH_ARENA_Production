@@ -200,6 +200,50 @@ test('published vouchers create independent PTN gates for two eligible organizer
    rows.clear();for(const [key,value] of passCheckpoint)rows.set(key,value);
 
 
+   // Isolated alternate routing fixture: two stations, sixteen entrants,
+   // populated active and waiting matches; no production or other rooms touched.
+   const routeCheckpoint=JSON.parse(JSON.stringify([...rows]));
+   const routing=JSON.parse(rows.get(roomPath).data);routing.players=Array.from({length:16},(_,i)=>({id:'swap-player-'+i,name:'選手 '+i}));routing.meta.stations=2;routing.matches=[];routing.courtAssignments={};routing.startedAt=null;
+   const routingEngine=createEngine(routing,{uid},now+2500,'routing-test','routing-draw-seed');assert(routingEngine.generateSingleElim());routing.startedAt=now;routingEngine.rebuildPropagationForState(routing);
+   rows.set(roomPath,{...rows.get(roomPath),data:JSON.stringify(routing)});rows.set(pubPath,{...rows.get(pubPath),bracketView:JSON.stringify(routing)});
+   const readRoute=()=>createTicketRoomStateHandler({db,enabled:async()=>true,clock:()=>now})({auth:{uid},app:{},data:{action:'ticket-room-state',code}});
+   const initialRoute=await readRoute(),swapCourt=initialRoute.courtControl.courts.find(c=>c.swapTargets.length);
+   assert.ok(swapCourt,'a current zero-score match can swap with another court waiting match');
+   const sourceId=swapCourt.currentMatchId,targetId=swapCourt.swapTargets[0],targetStation=routing.matches.find(m=>m.id===targetId).station;
+   const routeRead=()=>JSON.parse(rows.get(roomPath).data);const routeMirror=()=>JSON.parse(rows.get(pubPath).bracketView);
+   const swap=command('live-route-swap',{command:'swap',station:swapCourt.station,matchId:sourceId,targetMatchId:targetId});
+   await liveResize(swap);assert.equal((await liveResize(swap)).replayed,true);
+   assert.equal(routeRead().matches.find(m=>m.id===sourceId).station,targetStation);assert.equal(routeRead().courtAssignments['court'+swapCourt.station].currentMatchId,targetId);
+   assert.equal(routeMirror().courtAssignments['court'+swapCourt.station].currentMatchId,targetId);
+   // Complete the swapped-in match, then safely reopen it with original score.
+   const active=()=>routeRead().matches.find(m=>m.id===targetId);
+   await score(scoreReq('route-first-score',active()));await score(scoreReq('route-second-score',active()));await score(scoreReq('route-confirm',active(),'confirm'));
+   const corrCourt=(await readRoute()).courtControl.courts.find(c=>c.station===swapCourt.station);assert.equal(corrCourt.previousMatchId,targetId);
+   const correction=command('live-route-correct',{command:'correct',station:swapCourt.station,matchId:targetId,mode:'edit'});
+   await liveResize(correction);assert.equal((await liveResize(correction)).replayed,true);
+   assert.equal(active().completed,false);assert.equal(active().scoreA,4);assert.equal(active().log.length,2);assert.equal(active().winnerId,null);
+   assert.equal(routeMirror().matches.find(m=>m.id===targetId).completed,false);assert.equal(routeMirror().matches.find(m=>m.id===targetId).winnerId,null);
+   await score(scoreReq('route-reconfirm',active(),'confirm'));
+   await liveResize(command('route-reset',{command:'correct',station:swapCourt.station,matchId:targetId,mode:'reset'}));
+   assert.equal(active().completed,false);assert.equal(active().scoreA,0);assert.equal(active().log.length,0);
+   await score(scoreReq('route-replay-first',active()));await score(scoreReq('route-replay-second',active()));await score(scoreReq('route-replay-confirm',active(),'confirm'));
+   const nextId=routeRead().courtAssignments['court'+swapCourt.station].currentMatchId;assert.ok(nextId&&nextId!==targetId);
+   await score(scoreReq('route-next-start',routeRead().matches.find(m=>m.id===nextId)));
+   await assert.rejects(liveResize(command('route-correction-blocked',{command:'correct',station:swapCourt.station,matchId:targetId,mode:'reset'})),/correction-unavailable|court-already-started|downstream-started/);
+   assert.equal(active().completed,true);assert.equal(active().scoreA,4);
+   // A completed feeder on a different court cannot be reopened once its
+   // downstream final has actual play, even if the original court is idle.
+   const downstream=routeRead();downstream.players=Array.from({length:4},(_,i)=>({id:'downstream-'+i,name:'參賽者 '+i}));downstream.matches=[];downstream.courtAssignments={};downstream.startedAt=null;downstream.championId=null;downstream.runnerUpId=null;
+   const downEngine=createEngine(downstream,{uid},now+3000,'downstream-fixture','downstream-seed');assert(downEngine.generateSingleElim());downstream.startedAt=now;downEngine.rebuildPropagationForState(downstream);
+   rows.set(roomPath,{...rows.get(roomPath),data:JSON.stringify(downstream)});rows.set(pubPath,{...rows.get(pubPath),bracketView:JSON.stringify(downstream)});
+   const semis=downstream.matches.filter(m=>m.round===0&&!m.isBye);
+   for(const semi of semis){const read=()=>routeRead().matches.find(m=>m.id===semi.id);await score(scoreReq('down-one-'+semi.id,read()));await score(scoreReq('down-two-'+semi.id,read()));await score(scoreReq('down-confirm-'+semi.id,read(),'confirm'));}
+   const final=routeRead().matches.find(m=>m.round===1&&!m.completed);assert.ok(final?.a?.playerId&&final?.b?.playerId);
+   await score(scoreReq('down-final-start',final));
+   const feeder=routeRead().matches.find(m=>m.round===0&&m.completed&&m.station!==final.station);assert.ok(feeder);
+   await assert.rejects(liveResize(command('route-downstream-guard',{command:'correct',station:feeder.station,matchId:feeder.id,mode:'edit'})),/downstream-started/);
+   assert.equal(routeRead().matches.find(m=>m.id===feeder.id).completed,true);assert.equal(routeRead().matches.find(m=>m.id===final.id).scoreA,2);
+   rows.clear();for(const [key,value] of routeCheckpoint)rows.set(key,value);
    const shrink=command('live-shrink',{stations:1});
    await liveResize(shrink);assert.equal((await liveResize(shrink)).replayed,true);
    const getState=()=>JSON.parse(rows.get(roomPath).data);

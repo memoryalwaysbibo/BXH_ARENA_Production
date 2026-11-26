@@ -199,6 +199,37 @@ function forfeitMatchAvailable(match){
 // Keep legacy scoring untouched; once a retirement command exists, detached or
 // closed-court work must be claimed/reopened before another score can be written.
 function ticketCanSkip(state,match){return !!match&&!match.skippedAt&&!protectedPass(state,match)&&PassReturn.supported(state)&&PassReturn.predecessors(state,match).length>0;}
+// Route candidates are narrowed to standard PTN single-elimination work.
+// The existing engine rechecks the actual swap and downstream correction.
+const {matchHasDecisionData,correctionMatchHasActualPlay}=require('../../referee-seats/functions/engine/match-utils.cjs');
+function ticketSwapTargets(state,station){
+ const id=state.courtAssignments?.['court'+station]?.currentMatchId;
+ const source=(state.matches||[]).find(m=>m.id===id&&Number(m.station)===station);
+ const eligible=m=>m&&!m.isBye&&!m.completed&&m.a?.playerId&&m.b?.playerId&&!m.skippedAt&&!m.callPass&&!m.forceDetached&&!m.offlinePendingSync&&!protectedPass(state,m)&&!matchHasDecisionData(m)&&m.status!=='paused'&&R.accepts(state,Number(m.station));
+ if(!eligible(source))return [];
+ return state.matches.filter(m=>eligible(m)&&m.id!==id&&Number(m.station)!==station&&m.status!=='in_progress'&&!ticketRoundBlocked(m,state.matches,state.meta)&&!ticketBronzeBlocked(m,state.matches,state.meta)).map(m=>m.id);
+}
+function ticketPreviousMatch(state,station){
+ if(!R.accepts(state,station))return null;
+ const court=state.courtAssignments?.['court'+station];
+ if(!court)return null;
+ const active=state.matches.find(m=>m.id===court.currentMatchId);
+ if(correctionMatchHasActualPlay(active)||active?.offlinePendingSync||active?.forceDetached||active?.skippedAt||active?.callPass||active&&protectedPass(state,active))return null;
+ const previous=state.matches.filter(m=>m.completed&&!m.isBye&&Number(m.station)===station).sort((a,b)=>Number(b.completedAt||b.confirmedAt||b.updatedAt||0)-Number(a.completedAt||a.confirmedAt||a.updatedAt||0)||Number(b.seq||0)-Number(a.seq||0))[0];
+ return previous&&!previous.forfeit&&!protectedPass(state,previous)&&!state.matches.some(m=>!m.completed&&m.skippedAt&&m.passReturn?.waitFor?.includes(previous.id))&&previous.resultMethod==='score'&&!previous.offlinePendingSync&&(!previous.scoringMode||previous.scoringMode==='standard')?previous.id:null;
+}
+function projectTicketMatchChanges(state,mirror,updatedAt){
+ const priorMatches=new Map(mirror.matches.map(item=>[item.id,item]));
+   mirror.matches=state.matches.map(item=>({...priorMatches.get(item.id),
+    a:item.a?.playerId?{playerId:item.a.playerId}:null,b:item.b?.playerId?{playerId:item.b.playerId}:null,
+    station:item.station??null,status:item.status,isBye:!!item.isBye,completed:!!item.completed,
+    scoreA:item.scoreA??null,scoreB:item.scoreB??null,log:item.log||[],faultActions:Fault.snapshot(item),
+    skippedAt:item.skippedAt||null,skipWaitFor:item.skipWaitFor||[],resumeQueuedAt:item.resumeQueuedAt||null,passReturn:item.passReturn||null,
+    winnerId:item.winnerId||null,loserId:item.loserId||null,completedAt:item.completedAt||null,
+    confirmedAt:item.confirmedAt||null,resultMethod:item.resultMethod||null,forfeit:item.forfeit===true}));
+   Object.assign(mirror,{updatedAt,courtAssignments:publicCourts(state),callRevision:Number(state.callRevision||0)});
+   for(const key of ['championId','runnerUpId','thirdId','fourthId'])mirror[key]=state[key]??null;
+}
 function ticketCourtSummary(state,station){
  const names=new Map((state.players||[]).map(p=>[p.id,p.name]));
  const id=state.courtAssignments?.['court'+station]?.nextMatchId;
@@ -307,16 +338,7 @@ function createTicketForfeitHandler({db,enabled=async()=>false,clock=Date.now}){
    engine.rebuildPropagationForState(state);
    const updatedAt=Math.max(now,Number(room.updatedAt||0)+1,Number(state.updatedAt||0)+1);
    state.updatedAt=updatedAt;
-   const priorMatches=new Map(mirror.matches.map(item=>[item.id,item]));
-   mirror.matches=state.matches.map(item=>({...priorMatches.get(item.id),
-    a:item.a?.playerId?{playerId:item.a.playerId}:null,b:item.b?.playerId?{playerId:item.b.playerId}:null,
-    station:item.station??null,status:item.status,isBye:!!item.isBye,completed:!!item.completed,
-    scoreA:item.scoreA??null,scoreB:item.scoreB??null,log:item.log||[],faultActions:Fault.snapshot(item),
-    skippedAt:item.skippedAt||null,skipWaitFor:item.skipWaitFor||[],resumeQueuedAt:item.resumeQueuedAt||null,passReturn:item.passReturn||null,
-    winnerId:item.winnerId||null,loserId:item.loserId||null,completedAt:item.completedAt||null,
-    confirmedAt:item.confirmedAt||null,resultMethod:item.resultMethod||null,forfeit:item.forfeit===true}));
-   Object.assign(mirror,{updatedAt,courtAssignments:publicCourts(state),callRevision:Number(state.callRevision||0)});
-   for(const key of ['championId','runnerUpId','thirdId','fourthId'])mirror[key]=state[key]??null;
+   projectTicketMatchChanges(state,mirror,updatedAt);
    const fence=room.qrCheckinManaged===true?advanceQrCheckinFence(room,state):{};
    const courtFields=projectTicketCourtState(room,state,mirror,authority.ownerUid,previousStations,now);
    tx.update(roomRef,{...fence,...courtFields,updatedAt,data:JSON.stringify(state)});
@@ -430,16 +452,7 @@ function createTicketScoreHandler({db,enabled=async()=>false,clock=Date.now}){
    if(command==='confirm'||command==='skip')engine.rebuildPropagationForState(state);
    const updatedAt=Math.max(now,Number(room.updatedAt||0)+1,Number(state.updatedAt||0)+1);
    state.updatedAt=updatedAt;
-   const priorMatches=new Map(mirror.matches.map(item=>[item.id,item]));
-   mirror.matches=state.matches.map(item=>({...priorMatches.get(item.id),
-    a:item.a?.playerId?{playerId:item.a.playerId}:null,b:item.b?.playerId?{playerId:item.b.playerId}:null,
-    station:item.station??null,status:item.status,isBye:!!item.isBye,completed:!!item.completed,
-    scoreA:item.scoreA??null,scoreB:item.scoreB??null,log:item.log||[],faultActions:Fault.snapshot(item),
-    skippedAt:item.skippedAt||null,skipWaitFor:item.skipWaitFor||[],resumeQueuedAt:item.resumeQueuedAt||null,passReturn:item.passReturn||null,
-    winnerId:item.winnerId||null,loserId:item.loserId||null,completedAt:item.completedAt||null,
-    confirmedAt:item.confirmedAt||null,resultMethod:item.resultMethod||null,forfeit:item.forfeit===true}));
-   Object.assign(mirror,{updatedAt,courtAssignments:publicCourts(state),callRevision:Number(state.callRevision||0)});
-   for(const key of ['championId','runnerUpId','thirdId','fourthId'])mirror[key]=state[key]??null;
+   projectTicketMatchChanges(state,mirror,updatedAt);
    const fence=room.qrCheckinManaged===true?advanceQrCheckinFence(room,state):{};
    const courtFields=projectTicketCourtState(room,state,mirror,authority.ownerUid,previousStations,now);
    tx.update(roomRef,{...fence,...courtFields,updatedAt,data:JSON.stringify(state)});
@@ -453,4 +466,4 @@ function createTicketScoreHandler({db,enabled=async()=>false,clock=Date.now}){
 }
 
 module.exports={createStartHandler,createDrawHandler,createTicketForfeitHandler,createTicketScoreHandler,
- forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked,ticketMatchCourtAvailable,projectTicketCourtState,ticketCourtSummary,ticketCanSkip};
+ forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked,ticketMatchCourtAvailable,projectTicketCourtState,ticketCourtSummary,ticketCanSkip,ticketSwapTargets,ticketPreviousMatch,projectTicketMatchChanges};
