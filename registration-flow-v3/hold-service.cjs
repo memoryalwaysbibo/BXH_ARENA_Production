@@ -34,7 +34,7 @@ function createHoldService({db,authorizeJoin,authorizeReview,authorizeCancel,clo
      committedWrites=0;return {...os.data().result,replayed:true};
     }
     if(t.tournamentPhase!=='waiting'||t.systemClosed||t.eventCancelled||t.capacity!==l.capacity)throw Error('registration-state-conflict');
-    const now=clock(),context={tx,uid:actor,user,room:t,registrationId:uid,previous,now,action:d.action};
+    const now=clock(),context={tx:{getAll:get},uid:actor,user,room:t,registrationId:uid,previous,now,action:d.action,code:d.code};
     const authorize=d.action==='join'?authorizeJoin:d.action==='cancel'?authorizeCancel:authorizeReview;
     if(await authorize(context)!==true)throw Error('permission-denied');
     const next=applyHold(l,previous,{action:d.action,uid,operationId:d.operationId,expectedAttemptId:d.expectedAttemptId,now});
