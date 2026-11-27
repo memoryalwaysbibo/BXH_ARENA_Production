@@ -92,6 +92,27 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   await a.pub.update({capacity:41});
   await assert.rejects(expand(request(a,1,'expansion-stale')),/ticket-capacity-invalid/);
   await a.pub.update({capacity:40});
+  // V3 is official-room-only. Even a malformed mixed-version PTN must not
+  // debit expansion inventory or write V2 capacity into a V3-owned projection.
+  for(const [label,doc,field] of [['private',a.room,null],['public',a.pub,null],
+    ['private-state',a.room,'data'],['public-state',a.pub,'bracketView'],
+    ['private-meta',a.room,'data'],['public-meta',a.pub,'bracketView']]){
+   const original=(await doc.get()).data();
+   try{
+    if(field){
+     const state=JSON.parse(original[field]);
+     if(label.endsWith('meta'))state.meta.registrationFlowVersion=3;
+     else state.registrationFlowVersion=3;
+     await doc.update({[field]:JSON.stringify(state)});
+    }else await doc.update({registrationFlowVersion:3});
+    const tracked=[a.room,a.pub,a.ticket,inventory];
+    const before=await db.getAll(...tracked);
+    if(label.startsWith('private'))assert.equal((await read(a)).expansionEnabled,false);
+    await assert.rejects(expand(request(a,1,'expansion-v3-'+label)),/expansion-room-unavailable/);
+    const after=await db.getAll(...tracked);
+    assert.deepEqual(after.map(x=>x.data()),before.map(x=>x.data()));
+   }finally{await doc.set(original);}
+  }
   await a.room.update({tournamentPhase:'live'});
   await assert.rejects(expand(request(a,1,'expansion-live')),/expansion-room-unavailable/);
   assert.equal((await inventory.get()).data().quantity,63);

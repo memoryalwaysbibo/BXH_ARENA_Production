@@ -49,6 +49,8 @@ function createTicketExpansionHandler({db,clock=Date.now}){
     return {...prior.result,replayed:true};
    }
    requireThat(config?.enabled===true&&integer(config.maxCapacity,1,192),'expansion-unavailable');
+   // PTN expansion belongs to V2 only. Never patch a V3-owned or mixed-version room.
+   requireThat(room.registrationFlowVersion!==3&&pub?.registrationFlowVersion!==3,'expansion-room-unavailable');
    requireThat(room.eventAuthority==='ticket'&&pub?.eventAuthority==='ticket'&&room.ptnSettlementVersion===1&&pub.ptnSettlementVersion===1&&
     pub.ticketRoomVersion===1&&room.registrationQueueVersion===2&&pub.registrationQueueVersion===2&&
     room.tournamentPhase==='waiting'&&pub.tournamentPhase==='waiting'&&
@@ -56,6 +58,7 @@ function createTicketExpansionHandler({db,clock=Date.now}){
     !room.startedAt&&!pub.startedAt&&!room.eventCancelled&&!pub.eventCancelled&&!room.systemClosed&&!pub.systemClosed&&
     !room.deletionStatus&&!pub.deletionStatus&&!room.testMode&&!pub.testMode,'expansion-room-unavailable');
    const state=parse(room.data),mirror=parse(pub.bracketView);
+   requireThat([state,mirror,state?.meta,mirror?.meta].every(part=>part?.registrationFlowVersion!==3),'expansion-room-unavailable');
    requireThat(state?.id===roomId&&mirror?.id===roomId&&state.cloudCode===code&&mirror.cloudCode===code&&
     state.meta?.eventAuthority==='ticket'&&mirror.meta?.eventAuthority==='ticket'&&
     !state.startedAt&&!mirror.startedAt&&!state.rosterLocked&&!state.meta.eventCancelled&&!mirror.meta.eventCancelled&&

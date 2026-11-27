@@ -262,7 +262,7 @@ function createTicketRoomStateHandler({db,enabled=async()=>false,clock=Date.now}
     if(ticket?.ownerUid!==authority.ownerUid||ticket.boundRoomCode!==code||ticket.boundRoomId!==state.id||
        !['reserved','consumed'].includes(ticket.status))throw Error('ticket-binding-invalid');
     ticketStatus=ticket.status;
-    if(authority.owner&&ticket.version===2&&ticket.status==='reserved'&&room.tournamentPhase==='waiting'&&room.ptnSettlementVersion===1&&!state.rosterLocked){
+    if(authority.owner&&ticket.version===2&&ticket.status==='reserved'&&room.tournamentPhase==='waiting'&&room.ptnSettlementVersion===1&&!state.rosterLocked&&room.registrationQueueVersion===2&&[room,state,state.meta].every(part=>part?.registrationFlowVersion!==3)){
      const settings=(await tx.get(db.doc('systemSettings/commerceRoomExpansionV1'))).data();
      if(settings?.enabled===true&&Number.isSafeInteger(settings.maxCapacity)&&settings.maxCapacity>room.capacity&&settings.maxCapacity<=192){expansionEnabled=true;expansionMaxCapacity=settings.maxCapacity;}
     }
