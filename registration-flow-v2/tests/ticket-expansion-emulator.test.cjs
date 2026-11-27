@@ -254,7 +254,8 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   const largePrivate=JSON.parse((await c.room.get()).data().data);
   assert.equal(largePrivate.players.length,192);
   assert.equal(new Set(largePrivate.players.map(p=>p.id)).size,192);
-  assert.equal(largePrivate.meta.checkinRequired,false); // No check-in coverage in this case.
+  assert.equal(largePrivate.meta.checkinRequired,false); // Existing PTN policy; not a check-in workflow test.
+  assert.equal(largePrivate.players.filter(p=>p.checkedIn===true).length,0);
   const largeOptions={db,clock:()=>now+3000,enabled:async code=>code===c.code};
   const largeLifecycle={code:c.code,roomId:c.roomId,rosterRevision:largePrivate.registrationRosterRevision};
   const drawStarted=Date.now();
@@ -312,7 +313,6 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   }));
   assert.equal(new Set(targets.map(m=>m.id)).size,6);
   const score=createTicketScoreHandler(largeOptions);
-  const readMatches=async()=>new Map(JSON.parse((await c.room.get()).data().data).matches.map(m=>[m.id,m]));
   const wave=async(label,command,extra={})=>{
    const snap=(await c.room.get()).data();
    const current=new Map(JSON.parse(snap.data).matches.map(m=>[m.id,m]));
@@ -350,25 +350,40 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(scoredPublic.data().capacity,192);
   assert.equal((await inventory.get()).data().quantity,30);
   console.info('PTN192 six-court emulator metrics',JSON.stringify({courts:6,independentMainRefereeAccounts:refereeIds.length,scoreCommands:12,confirmCommands:6,firstWaveMs:firstWave.ms,secondWaveMs:secondWave.ms,confirmWaveMs:decisions.ms,privateStateBytes:Buffer.byteLength(scoredRoom.data().data),publicStateBytes:Buffer.byteLength(scoredPublic.data().bracketView)}));
-  // Complete the remaining bracket via the existing score handler, not fabricated results.
+  // Complete every remaining match using the real dispatch assignment and
+  // independent main-seat referee identity, never the unscoped owner bypass.
   const fullStarted=Date.now();
+  const matchesByStation=Object.fromEntries(refereeIds.map((_,i)=>[i+1,1]));
   let completedByCommands=targets.length, waves=0;
   for(;waves<256;waves++){
-   const state=JSON.parse((await c.room.get()).data().data);
+   const room=(await c.room.get()).data();
+   const state=JSON.parse(room.data);
    if(state.championId)break;
-   const eligible=state.matches.filter(m=>forfeitMatchAvailable(m)&&
-    !ticketRoundBlocked(m,state.matches,state.meta)&&!ticketBronzeBlocked(m,state.matches,state.meta));
-   assert.ok(eligible.length,'bracket must make progress before champion');
-   const selected=eligible.slice(0,6);
+   const selected=refereeIds.flatMap((actor,i)=>{
+    const station=i+1;
+    const id=state.courtAssignments?.['court'+station]?.currentMatchId;
+    const m=state.matches.find(item=>item.id===id);
+    if(!m||!forfeitMatchAvailable(m)||ticketRoundBlocked(m,state.matches,state.meta)||ticketBronzeBlocked(m,state.matches,state.meta))return [];
+    assert.equal(Number(m.station),station);
+    assert.equal(room.refereeSeatsV1.courts[station].main.uid,actor);
+    return [{id:m.id,station,actor}];
+   });
+   assert.ok(selected.length,'assigned courts must make progress before champion');
+   assert.equal(new Set(selected.map(m=>m.id)).size,selected.length);
    for(const [step,command,extra] of [['first','score',{side:'A',finish:'knockout'}],['second','score',{side:'A',finish:'burst'}],['confirm','confirm',{}]]){
-    const current=await readMatches();
-    const results=await Promise.all(selected.map((m,i)=>score({auth:{uid},app:{},data:{
-     action:'ticket-room-score',code:c.code,roomId:c.roomId,matchId:m.id,
-     matchUpdatedAt:current.get(m.id).updatedAt||0,operationId:'full-'+waves+'-'+step+'-'+i,command,...extra}})));
+    const latest=(await c.room.get()).data();
+    const current=JSON.parse(latest.data);
+    const byId=new Map(current.matches.map(m=>[m.id,m]));
+    const results=await Promise.all(selected.map(({id,station,actor})=>score({auth:{uid:actor},app:{},data:{
+     action:'ticket-room-score',code:c.code,roomId:c.roomId,matchId:id,station,
+     expectedCourtRevision:latest.refereeSeatsV1.courts[station].revision,
+     matchUpdatedAt:byId.get(id).updatedAt||0,operationId:'full-'+waves+'-'+step+'-'+station,command,...extra}})));
     assert.ok(results.every(r=>r.scoreA===(step==='first'?2:4)&&r.completed===(command==='confirm')));
    }
+   for(const {station} of selected)matchesByStation[station]++;
    completedByCommands+=selected.length;
   }
+  assert.equal(Object.values(matchesByStation).reduce((a,b)=>a+b,0),completedByCommands);
   const [finalRoom,finalPublic]=await db.getAll(c.room,c.pub);
   const finalState=JSON.parse(finalRoom.data().data),finalMirror=JSON.parse(finalPublic.data().bracketView);
   assert.ok(finalState.championId,'full bracket must reach champion');
@@ -417,7 +432,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
    sha256:createHash('sha256').update(encoded).digest('hex'),
    players:finalState.players.length,checkedInCount:proof.checkedInCount,checkinRequired:proof.checkinRequired}));
   for(const [index,chunk] of chunks.entries())console.info('PTN192-SETTLEMENT-PROOF chunk '+index+' '+chunk+' '+createHash('sha256').update(chunk).digest('hex'));
-  console.info('PTN192 full bracket emulator metrics',JSON.stringify({completedByCommands,waves,scoreAndConfirmCommands:completedByCommands*3,remainingBracketMs:Date.now()-fullStarted,privateStateBytes:Buffer.byteLength(finalRoom.data().data),publicStateBytes:Buffer.byteLength(finalPublic.data().bracketView)}));
+  console.info('PTN192 full bracket emulator metrics',JSON.stringify({completedByCommands,waves,independentMainRefereeAccounts:refereeIds.length,matchesByStation,ownerScoreCommands:0,scoreAndConfirmCommands:completedByCommands*3,remainingBracketMs:Date.now()-fullStarted,privateStateBytes:Buffer.byteLength(finalRoom.data().data),publicStateBytes:Buffer.byteLength(finalPublic.data().bracketView)}));
   console.info('PTN192 emulator metrics',JSON.stringify({intakeCount:193,confirmed:192,full:1,intakeMs,drainMs,drawMs,startMs,privateStateBytes:Buffer.byteLength(live.data().data),publicStateBytes:Buffer.byteLength(livePub.data().bracketView)}));
  }finally{
   if(previousSale.exists)await sale.set(previousSale.data());else await sale.delete();
