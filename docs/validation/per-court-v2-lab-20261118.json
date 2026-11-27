@@ -1,0 +1,120 @@
+{
+  "productionWrites": 0,
+  "reports": [
+    {
+      "kind": "trusted-core-partition-comparison",
+      "productionWrites": 0,
+      "publicProjection": false,
+      "structuralCommands": false,
+      "candidatePerCourtSchema": true,
+      "runs": [
+        {
+          "width": 4,
+          "round": 1,
+          "rooms": 2,
+          "courts": 17,
+          "acceptedTarget": 68,
+          "elapsedMs": 6323,
+          "errors": [],
+          "allScoresReceiptsAndReplayVerified": true
+        },
+        {
+          "width": 1,
+          "round": 1,
+          "rooms": 2,
+          "courts": 17,
+          "acceptedTarget": 68,
+          "elapsedMs": 1015,
+          "errors": [],
+          "allScoresReceiptsAndReplayVerified": true
+        },
+        {
+          "width": 1,
+          "round": 2,
+          "rooms": 2,
+          "courts": 17,
+          "acceptedTarget": 68,
+          "elapsedMs": 1010,
+          "errors": [],
+          "allScoresReceiptsAndReplayVerified": true
+        },
+        {
+          "width": 4,
+          "round": 2,
+          "rooms": 2,
+          "courts": 17,
+          "acceptedTarget": 68,
+          "elapsedMs": 3632,
+          "errors": [],
+          "allScoresReceiptsAndReplayVerified": true
+        }
+      ],
+      "ok": true,
+      "summary": [
+        {
+          "width": 4,
+          "attempted": 136,
+          "failed": 0,
+          "retries": 26,
+          "latencyMs": {
+            "p50": 28,
+            "p95": 3447,
+            "max": 6123
+          }
+        },
+        {
+          "width": 1,
+          "attempted": 136,
+          "failed": 0,
+          "retries": 0,
+          "latencyMs": {
+            "p50": 180,
+            "p95": 284,
+            "max": 315
+          }
+        }
+      ]
+    },
+    {
+      "kind": "two-room-score-pass-projection-contention",
+      "storageSchema": "bxh-court-buckets-v2",
+      "environment": "Firestore Emulator",
+      "productionWrites": 0,
+      "cycles": 2,
+      "rooms": [
+        {
+          "players": 128,
+          "courts": 5,
+          "matches": 127,
+          "acceptedOperations": 17,
+          "passReplaySafe": true,
+          "allScoresAndReceiptsVerified": true,
+          "publicCatchupVerified": true
+        },
+        {
+          "players": 320,
+          "courts": 12,
+          "matches": 511,
+          "acceptedOperations": 45,
+          "passReplaySafe": true,
+          "allScoresAndReceiptsVerified": true,
+          "publicCatchupVerified": true
+        }
+      ],
+      "ok": true,
+      "latencyMs": {
+        "p50": 119,
+        "p95": 5524,
+        "max": 7019
+      },
+      "failedOperations": 0,
+      "transactionRetries": 20
+    }
+  ],
+  "limitations": [
+    "Firestore Emulator only",
+    "No deployed schema, flags or production rooms were changed",
+    "Mixed PASS workload still has retries and long waits",
+    "Live mobile App Check and event-delivery acceptance remain open"
+  ]
+}

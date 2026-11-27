@@ -1,0 +1,80 @@
+{
+  "kind": "trusted-core-partition-comparison",
+  "productionWrites": 0,
+  "publicProjection": false,
+  "structuralCommands": false,
+  "testOnlyPerCourtSchema": true,
+  "runs": [
+    {
+      "width": 4,
+      "round": 1,
+      "rooms": 2,
+      "courts": 17,
+      "acceptedTarget": 68,
+      "elapsedMs": 7960,
+      "errors": [],
+      "allScoresReceiptsAndReplayVerified": true
+    },
+    {
+      "width": 1,
+      "round": 1,
+      "rooms": 2,
+      "courts": 17,
+      "acceptedTarget": 68,
+      "elapsedMs": 1272,
+      "errors": [],
+      "allScoresReceiptsAndReplayVerified": true
+    },
+    {
+      "width": 1,
+      "round": 2,
+      "rooms": 2,
+      "courts": 17,
+      "acceptedTarget": 68,
+      "elapsedMs": 1338,
+      "errors": [],
+      "allScoresReceiptsAndReplayVerified": true
+    },
+    {
+      "width": 4,
+      "round": 2,
+      "rooms": 2,
+      "courts": 17,
+      "acceptedTarget": 68,
+      "elapsedMs": 6720,
+      "errors": [],
+      "allScoresReceiptsAndReplayVerified": true
+    }
+  ],
+  "ok": true,
+  "summary": [
+    {
+      "width": 4,
+      "attempted": 136,
+      "failed": 0,
+      "retries": 30,
+      "latencyMs": {
+        "p50": 40,
+        "p95": 3909,
+        "max": 7812
+      }
+    },
+    {
+      "width": 1,
+      "attempted": 136,
+      "failed": 0,
+      "retries": 0,
+      "latencyMs": {
+        "p50": 244,
+        "p95": 373,
+        "max": 399
+      }
+    }
+  ],
+  "limitations": [
+    "Local Firestore Emulator, not production capacity or a production root-cause finding",
+    "Only score/undo and receipt replay; PASS, progression, publication and migration excluded",
+    "Two counterbalanced repetitions; no claim that every percentile improves",
+    "One-court schema and module adapter are test-only; deployed routing remains four courts per bucket"
+  ]
+}

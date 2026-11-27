@@ -25,12 +25,12 @@
    if(!manifest){markers.delete(code);if(active?.code===code)stop();return;}
    markers.set(code,clone(manifest));
    const uid=auth.currentUser?.uid;
-   if(active?.code===code&&active.epoch===manifest.epoch&&active.uid===uid)return;
+   if(active?.code===code&&active.epoch===manifest.epoch&&active.manifest.schema===manifest.schema&&active.uid===uid)return;
    stop();const entry={code,epoch:manifest.epoch,manifest:clone(manifest),uid,generation:++generation,session:null,host:{cloudSync:{}},view:null,waiters:new Set()};active=entry;
    status(entry,{status:'syncing',state:null});
    if(enabled!==true)return fail(entry,'bucket-client-disabled');
    if(!uid)return fail(entry,'auth-required');
-   if(manifest.schema!=='bxh-match-buckets-v1'||manifest.status!=='active'||manifest.code!==code||typeof manifest.epoch!=='string'||!manifest.epoch)return fail(entry,'bucket-not-ready');
+   if(!['bxh-match-buckets-v1','bxh-court-buckets-v2'].includes(manifest.schema)||manifest.status!=='active'||manifest.code!==code||typeof manifest.epoch!=='string'||!manifest.epoch)return fail(entry,'bucket-not-ready');
    // App Check setup may finish after a room switch or sign-out. No stale start.
    Promise.resolve().then(()=>ensureAppCheck()).then(()=>{
     if(!current(entry))return;

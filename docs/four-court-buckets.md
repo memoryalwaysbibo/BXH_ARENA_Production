@@ -1,5 +1,208 @@
 # Four-court scoring buckets: isolated candidate
 
+## Deferred PASS public projection candidate (2026-11-18)
+
+Referee `skip` can now omit the public document from its scoring transaction.
+Both server-owned flags `skipPublicProjectionAsyncEnabled` and
+`automaticPublicProjectionEnabled` must be true; absent either flag, the existing
+inline public update remains. No flag is changed in production. Other structural
+commands, including confirmation/quick decision, keep their existing semantics.
+
+The same transaction still commits authoritative buckets, structural root/court
+assignments, lifecycle revision, operation receipt and audit. The stored response
+identifies `publicProjection: deferred` versus `inline`. Client acknowledgement
+continues to require the authoritative lifecycle revision, not the public mirror.
+A changed bucket emits the existing background event. The publisher reads current
+truth, rejects stale structure and prevents backward score vectors. Receipt replay
+checks current court authority and never repeats PASS, even after flags change.
+
+The benefit is removal of one synchronous public read/write dependency, not a
+full reduction to court-local structural transactions. PASS still reads every
+bucket and rewrites the shared root because its engine recomputes global dispatch.
+A delayed/failed worker can leave spectator state behind after referee success;
+activation must verify real event delivery and catch-up first. Closing the PASS
+flag makes future PASS inline; already deferred work still needs publication.
+
+Validation: 132 related unit/adapter cases passed. Gate tests cover both schemas,
+6/12 courts, no public access in deferred mode, inline fallback with either flag
+missing, atomic receipts/lifecycle and authority recheck. Real Firestore Emulator
+6/12-court cases overlap PASS with another court's score, pause and confirmation;
+authoritative scores/statuses and receipt replay passed, followed by explicit
+public catch-up. Native v2 mixed 128/320-player testing accepted 62 operations,
+zero failures and 15 retries (p95 3,788 ms, max 3,915 ms). A single run is not a
+controlled before/after benchmark or production improvement claim.
+
+Actual Functions event acceptance was attempted locally but Unix socket startup
+was denied (EPERM), before any new automatic-event PASS case executed. CI runs
+the same shared scenarios with automatic catch-up and no manual publisher; that
+acceptance and asynchronous full-page behavior remain pending. Summary:
+`docs/validation/async-pass-candidate-20261118.json`. Candidate remains draft.
+
+## Mixed PASS timing follow-up (2026-11-18)
+
+A second native v2 mixed run accepted all 62 operations with zero failures,
+21 transaction retries, p95 3,742 ms and max 8,037 ms. Both rooms' score ledgers,
+operation receipts, PASS replay safety and public catch-up passed. Timing now
+records awaited reads, transaction callback work and the interval after each
+callback until retry/handler completion. The latter includes commit/retry/backoff;
+it must not be described as a direct measurement of database locks.
+
+The 320-player PASS took 7,778 ms across three attempts. Its callbacks took
+473/215/39 ms, while the first two post-callback intervals took 3,207/3,830 ms.
+An overlapping court-11 score took 8,037 ms, also predominantly after callbacks.
+This supports investigating structural transaction contention in the local lab;
+it does not identify the error or exact blocker in the real tournament.
+Evidence: `validation/per-court-v2-pass-timing-20261118.json`.
+
+Full-page acceptance now includes both schemas at 6/12 courts and actual PASS
+buttons with a lost committed reply, reconnect and exact receipt retry. This
+new four-case test **has not passed locally**: host policy denied Chromium's
+process-singleton socket before any page opened. Adapter isolation tests pass
+(3/3), but cannot substitute for browser acceptance. CI still executes the full
+page test; production remains unchanged and uncertified.
+
+## Native per-court v2 candidate (2026-11-18)
+
+`bxh-court-buckets-v2` is now a separate supported candidate schema: court `s`
+routes to `court-s`, and its bucket count equals physical court count. The v1
+schema keeps its original four-court grouping. Every encoder, compositor, local
+score route, resize, private subscription and publication uses the manifest schema;
+no existing v1 bucket is reinterpreted. A missing/wrong-schema bucket blocks scoring.
+
+New-room activation selects the schema through the server-owned configuration
+`activationStorageSchema`; absent configuration keeps v1. Production v2 scoring
+and activation additionally require `perCourtStorageEnabled`, the existing runtime
+gates and exact room/epoch allowlists. Candidate Rules require that extra flag for
+v2 reads. These changes do not set any production flag or activate any room.
+Operator review plans use version 2 plus explicit `storageSchema`, and inspection
+prints that schema. Source digests include layout identity. A v1→v2 change must use
+verified rollback to legacy state followed by a new reviewed activation/epoch;
+in-place schema edits are unsupported. Rollback reads every authoritative bucket
+and remains available when score/publication release flags are disabled.
+
+Validation: 172 related unit/adapter tests pass, including native v2 client waiting
+for all six court subscriptions, wrong-schema rejection, production opt-in and
+operator review count/schema checks. Real Emulator runs cover v2 6/12-court
+activation, independent scores, PASS/replay, resize preserving v2, public catch-up,
+rollback retaining current score logs with disabled release, and semifinal/final
+progression. Existing v1 migration/rollback tests still pass. Web SDK/Rules tests
+cover v1 and v2 synchronization, profile/seat revocation, unauthorized reads,
+client-write refusal and v2 read-flag shutdown.
+
+The canonical layout comparison now uses native schemas rather than rewriting
+bucket-state source. Two counterbalanced rounds accepted 136 score/undo operations
+per layout without failures: v1 had 26 retries / p95 3,447 ms / max 6,123 ms;
+v2 had zero retries / p95 284 ms / max 315 ms (p50 180 ms versus v1's 28 ms).
+This is an isolated local scoring workload, not a real tournament capacity claim.
+The native v2 mixed 128/320-player PASS/publication workload also preserved all
+62 operations, but still had 20 retries / p95 5,524 ms / max 7,019 ms. PASS remains
+a full structural transaction. These runs do not establish a full-system latency
+fix or certify live mobile/App Check/event delivery; production remains closed.
+
+## Partition contention comparison (2026-11-18)
+
+The isolated `partition-comparison-emulator.cjs` holds the trusted scoring engine,
+authorization, operation receipts, root reads and workload constant and changes
+only the bucket-state adapter. Width 4 is the current candidate; width 1 uses a
+distinct, **test-only** schema. Exact source anchors must match before adaptation.
+No deployed schema, migration, client route or runtime flag is changed.
+
+Each run creates 128-player/5-court and 320-player/12-court generated brackets,
+launches 17 courts together and performs two score/undo cycles plus a receipt
+replay per court. Two repetitions reverse layout order (4,1 then 1,4). All 272
+accepted operations and 68 receipt replays passed persisted score, ledger and
+receipt-count checks; neither layout rewrote root/public snapshots.
+
+| Layout | Scoring operations | Failures | Transaction retries | p50 | p95 | Maximum |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Four courts per bucket | 136 | 0 | 30 | 40 ms | 3,909 ms | 7,812 ms |
+| One court per bucket (lab only) | 136 | 0 | 0 | 244 ms | 373 ms | 399 ms |
+
+Run wall times were 7,960/6,720 ms for width 4 and 1,272/1,338 ms for width 1.
+This supports reducing the candidate's shared score-write scope to address tail
+latency; the one-court median was higher, so it is not evidence that every score
+became faster. This is not proof of production throughput or the 11/17 incident
+cause. It excludes PASS, progression, publication, subscriptions and migration.
+Changing the live candidate layout requires a versioned manifest/schema plus
+client, Rules, cutover, rollback and structural-command acceptance; changing the
+divisor in production would reinterpret existing bucket data unsafely.
+
+The bounded summary is committed as
+`docs/validation/score-partition-comparison-20261118.json`; the full synthetic
+per-operation report is generated under `test-results/four-court-buckets/`.
+
+## Public projection snapshot candidate (2026-11-18)
+
+The publisher first reads structural root/configuration, all score buckets and the
+public base in a Firestore **read-only** transaction. It materializes and serializes
+the score projection outside the publication write transaction. The latter reads
+only root/configuration/public, rechecks enabled/room gates and exact root update
+time, then writes only public output. It does not read or lock score buckets during
+publication. A structural change, including PASS, migration or rollback, rejects
+the captured snapshot with `projection-source-changed`; the existing retry-enabled
+trigger can retry from a new snapshot. An unrelated public update also requires a
+fresh snapshot instead of discarding it.
+
+The current public revision vector must not move backward in any bucket: an equal
+vector is deduplicated and a newer/incomparable vector is left untouched. A score
+can arrive after capture, so this remains an eventually consistent public view;
+the bucket score/receipt is authoritative. No projection writes the root. Automatic
+publication shutdown and current production room gates are rechecked before writing.
+
+Five transaction-adapter tests cover the lock scope, structural/public changes,
+stale vectors, shutdown and missing buckets. A real Emulator test delays a captured
+publisher while a new score is published, while PASS commits, and while automatic
+publication is disabled. Each case must preserve the newer public state. These
+tests do not certify real Functions event delivery or complete mobile UI behavior.
+
+The mixed 128/320-player test again verified 62 accepted operations with zero
+scoring failures, but measured 33 retries and p95 7,294 ms / maximum 11,001 ms in
+this run. The preceding whole-transaction run measured 22 retries and maximum
+10,365 ms. These single Emulator runs with fixture read transactions are not a
+controlled benchmark; they do **not** demonstrate latency improvement. PASS,
+score-bucket grouping and other shared reads remain contention candidates.
+
+## Referee PASS candidate support (2026-11-18)
+
+The `skip` action now follows the existing trusted scoring engine as a structural
+transaction, reading the complete authoritative bucket set and atomically writing
+changed buckets, root/court assignments, public projection, receipt and audit.
+It advances `courtLifecycleEpoch` and `courtLifecycleWriteSeq`. The app bridge
+routes referee PASS through the client's retained dispatch intention and waits for
+the authoritative root lifecycle revision, so a bucket score revision alone cannot
+falsely acknowledge a changed court queue. Lost-reply replay uses the same receipt,
+rechecks current court authority and makes no additional writes. PASS does not
+create a match-confirmation duty log.
+
+6/12-court transaction-adapter tests cover next-match assignment, other-bucket
+score/ledger preservation, projection consistency, replay and stale/protected or
+missing-bucket refusal. A bridge test verifies that a score update without the root
+dispatch acknowledgement cannot settle PASS. This does not remove structural
+transaction contention and is not a production latency or full-page acceptance test.
+
+### Mixed score/PASS/publication Emulator observation
+
+`pass-contention-emulator.cjs` generates real synthetic 128-player/5-court and
+320-player/12-court brackets (127 and 511 match records, including BYEs). Both
+rooms run concurrently. Court 1 sends PASS while the other courts each run two
+score/undo cycles; public projection workers overlap. Receipt replay must not
+change the root or add another audit record. Every final score, ledger count,
+receipt count and caught-up public match is checked. Exact demo project/loopback
+assertions execute before Firebase initialization.
+
+The local run accepted 62 operations with zero failed scoring operations and
+verified both room outcomes, but observed 22 transaction retries, p50 55 ms,
+p95 6,363 ms and maximum 10,365 ms. PASS took 6,363 ms with two retries in the
+128-player room and 2,585 ms without retry in the 320-player room. This is evidence
+that correctness passed while waiting still remains in the candidate. It does not
+identify a production lock holder or establish the 11/17 root cause.
+
+The harness uses additional coherent read transactions between commands to avoid
+composing a new bucket against pre-PASS structure; those reads also create load.
+These timings describe this Emulator workload, not real client subscriptions,
+network latency, a whole tournament, a capacity target or a performance improvement
+over legacy scoring. The generated report is `test-results/four-court-buckets/pass-contention.json`.
+
 ## Dynamic physical court count (current candidate)
 
 The trusted `resize` dispatch now changes the manifest in the same Firestore transaction as the root, public projection, receipt, and bucket creation/deletion. An active court count of 1–4 uses one bucket; 5–8 uses two; 9–12 uses three. Growing beyond a boundary creates the new bucket only after checking that its document does not already exist. Shrinking deletes buckets outside the new physical count only after the retirement engine has moved or finished all pending matches there. A match already completed on a retired court keeps its original station and full score history in the authoritative root; re-expansion moves that history back into its court bucket. Detached station-0 matches also stay in the root.

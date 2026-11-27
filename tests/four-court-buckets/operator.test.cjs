@@ -9,6 +9,12 @@ function setup(){
  const operator=O.createBucketMigrationOperator({db:{projectId},auth,projectId,runtime:'emulator',env,operationId:()=> 'operator-operation-0001',serviceFactory});
  return {operator,plan,projectId,env,calls,verified,built:()=>built,setUid:next=>uid=next};
 }
+test('review includes v2 schema and exact independent court count',async()=>{
+ const h=setup();Object.assign(h.plan,{version:2,storageSchema:'bxh-court-buckets-v2',buckets:6});
+ const review=await h.operator.preflight({token:'secret-token',action:'activate',code:h.plan.code,epoch:h.plan.epoch});
+ assert.equal(O.validateReview(review).plan.storageSchema,'bxh-court-buckets-v2');
+ h.plan.buckets=2;await assert.rejects(h.operator.preflight({token:'secret-token',action:'activate',code:h.plan.code,epoch:h.plan.epoch}),/invalid-migration-review/);
+});
 test('operator derives identity only from verified project ID token and always checks revocation',async()=>{
  const h=setup();const review=await h.operator.preflight({token:'secret-token',action:'activate',code:h.plan.code,epoch:h.plan.epoch});assert.equal(review.actorUid,'verified-user');assert.deepEqual(h.verified,[{token:'secret-token',revoked:true}]);assert.equal(h.calls[0].actorUid,'verified-user');
  await assert.rejects(h.operator.preflight({token:'secret-token',actorUid:'forged',action:'activate',code:h.plan.code,epoch:h.plan.epoch}),/invalid-operator-request/);

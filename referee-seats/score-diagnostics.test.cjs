@@ -20,6 +20,19 @@ test('error messages and malformed trace headers are excluded; closed watchdog i
  d.failed(Object.assign(Error('PRIVATE_ERROR'),{code:10}));d.close();const count=f.records.length;f.alarm();assert.equal(f.records.length,count);
  assert.equal(f.records.at(-1).errorCode,10);assert(!JSON.stringify(f.records).includes('SECRET'));assert(!JSON.stringify(f.records).includes('PRIVATE_ERROR'));
 });
+test('fixed engine rejection codes are recorded without deriving a reason from arbitrary messages',()=>{
+ for(const reason of ['score-stale','dispatch-stale','seat-stale','pass-protected']){
+  const f=diagnostics(),d=createScoreDiagnostics(request(),f.opts);
+  d.failed(Object.assign(Error('PRIVATE_ERROR'),{seatCode:reason}));d.close();
+  assert.equal(f.records.at(-1).errorReason,reason);
+  assert.equal(f.records.at(-1).errorCode,'unclassified');
+  assert(!JSON.stringify(f.records).includes('PRIVATE_ERROR'));
+ }
+ for(const error of [Object.assign(Error('PRIVATE_ERROR'),{seatCode:'PRIVATE_REASON'}),Error('score-stale')]){
+  const f=diagnostics(),d=createScoreDiagnostics(request(),f.opts);d.failed(error);d.close();
+  assert.equal(f.records.at(-1).errorReason,'unclassified');assert(!JSON.stringify(f.records).includes('PRIVATE'));
+ }
+});
 function serviceFixture({attempts=1,failure=null,loggerFailure=false}={}){
  const f=diagnostics(loggerFailure?{emit:()=>{throw Error('logger unavailable');}}:{}),req=request(),docs=new Map(),operations=[];
  const state={id:'r',cloudCode:'BXH-TEST',startedAt:1,meta:{eventAuthority:'official',formatType:'single',stations:1,scoringMode:'standard'},players:[{id:'a',name:'A'},{id:'b',name:'B'}],matches:[{id:'m1',station:1,round:0,indexInRound:0,seq:0,bracket:'SE',a:{type:'player',playerId:'a'},b:{type:'player',playerId:'b'},scoreA:0,scoreB:0,log:[],faultActions:[],completed:false,status:'in_progress',refereeSeatScoreRevision:0}]};
@@ -44,6 +57,13 @@ test('real scoring handler logs commit only after transaction resolves; retried 
 test('transaction rejection preserves original error and writes no score or successful diagnostic',async()=>{
  const error=Object.assign(Error('PRIVATE_DEPENDENCY_ERROR'),{code:4}),f=serviceFixture({failure:error});
  await assert.rejects(f.handle(f.req),e=>e===error);assert.equal(f.operations.length,0);assert(!f.records.some(r=>r.event==='complete'));assert.equal(f.records.at(-1).event,'failed');assert(f.cancelled());
+});
+test('real stale-score rejection is distinguishable from a failed database commit without writing',async()=>{
+ const f=serviceFixture();f.req.data.expectedScoreRevision=99;
+ await assert.rejects(f.handle(f.req),e=>e.seatCode==='score-stale');
+ assert.equal(f.operations.length,0);assert.equal(f.records.at(-1).phase,'transition');
+ assert.equal(f.records.at(-1).errorReason,'score-stale');assert(f.cancelled());
+ assert(!f.records.some(r=>r.event==='complete'));
 });
 test('broken logging does not prevent a valid score; invalid requests create no timer',async()=>{
  const f=serviceFixture({loggerFailure:true});assert.equal((await f.handle(f.req)).state.matches[0].scoreA,1);

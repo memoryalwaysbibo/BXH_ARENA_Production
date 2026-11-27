@@ -2,6 +2,8 @@
 const {createHash}=require('node:crypto');
 const {performance}=require('node:perf_hooks');
 const ACTIONS=new Set(['score','fault','undo','rematch','pause','resume','confirm','quick','correct','start','ready','skip','idle-claim','claim-skipped','manual-assign','swap','force-exit','reopen','claim-detached','retirement-transfer','resize']);
+// Only fixed engine codes are safe to expose; never inspect or emit error.message.
+const ENGINE_REASONS=new Set(['score-stale','seat-stale','dispatch-stale','player-mismatch','station-mismatch','station-not-assigned','already-completed','no-more-score','nothing-to-undo','pass-protected','court-exit-stale','current-match-changed','match-unavailable','target-has-play-data','target-retiring','room-read-only','previous-round-waiting','bronze-before-final']);
 // Diagnostic failures must never change the scoring result. Do not log payloads,
 // names, UID, credentials, state, or error messages supplied by dependencies.
 function createScoreDiagnostics(request,{emit=record=>console.log(JSON.stringify(record)),now=()=>performance.now(),schedule=setTimeout,cancel=clearTimeout,slowMs=20000}={}){
@@ -20,7 +22,7 @@ function createScoreDiagnostics(request,{emit=record=>console.log(JSON.stringify
   beginAttempt(){if(closed)return;const previousPhase=phase,previousPhaseMs=elapsed(phaseStarted);attempt++;phase='read-documents';phaseStarted=now();write(attempt>1?'retry':'attempt',{previousPhase,previousPhaseMs});},
   phase(next){if(closed)return;const previousPhase=phase,previousPhaseMs=elapsed(phaseStarted);phase=next;phaseStarted=now();write('phase',{previousPhase,previousPhaseMs});},
   complete(){if(!closed)write('complete');},
-  failed(error){const raw=error?.code;const errorCode=Number.isInteger(raw)?raw:['aborted','deadline-exceeded','unavailable','resource-exhausted','permission-denied','internal','cancelled','not-found','failed-precondition'].includes(raw)?raw:'unclassified';if(!closed)write('failed',{errorCode});},
+  failed(error){const raw=error?.code;const errorCode=Number.isInteger(raw)?raw:['aborted','deadline-exceeded','unavailable','resource-exhausted','permission-denied','internal','cancelled','not-found','failed-precondition'].includes(raw)?raw:'unclassified';const errorReason=ENGINE_REASONS.has(error?.seatCode)?error.seatCode:'unclassified';if(!closed)write('failed',{errorCode,errorReason});},
   close(){closed=true;try{if(timer!==undefined)cancel(timer);}catch{}}
  };
 }

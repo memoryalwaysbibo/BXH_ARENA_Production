@@ -14,7 +14,7 @@ function readSecure(file,maxBytes){
  catch(error){throw Error(error.message==='unsafe-operator-file'?'unsafe-operator-file':'operator-file-unreadable');}finally{if(fd!==undefined)fs.closeSync(fd);}
 }
 function readReview(file){let review;try{review=JSON.parse(readSecure(file,131072));}catch(error){if(['unsafe-operator-file','operator-file-unreadable'].includes(error.message))throw error;throw Error('invalid-migration-review');}return validateReview(review);}
-function summary(review,mode){return {ok:true,mode,projectId:review.projectId,action:review.plan.action,code:review.plan.code,epoch:review.plan.epoch,courts:review.plan.courts,buckets:review.plan.buckets,reviewDigest:review.reviewDigest};}
+function summary(review,mode){return {ok:true,mode,projectId:review.projectId,action:review.plan.action,code:review.plan.code,epoch:review.plan.epoch,courts:review.plan.courts,buckets:review.plan.buckets,storageSchema:review.plan.storageSchema||'bxh-match-buckets-v1',reviewDigest:review.reviewDigest};}
 async function run(argv){
  const o=parse(argv);if(o.mode==='help'){process.stdout.write(usage+'\n');return;}
  if(o.mode==='inspect'){process.stdout.write(JSON.stringify(summary(readReview(o.plan),'inspect'))+'\n');return;}

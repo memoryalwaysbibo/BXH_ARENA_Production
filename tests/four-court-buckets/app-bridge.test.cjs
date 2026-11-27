@@ -30,4 +30,14 @@ test('dispatch and retry success wait for the root lifecycle revision rather tha
 test('a match literally named dispatch still waits for its score revision',async()=>{
  const h=setup();h.state.matches[0].id='dispatch';const pending=h.bridge.cloud.commitRefereeCommand({code:h.state.cloudCode,action:'score',matchId:'dispatch'});await Promise.resolve();h.state.matches[0].refereeSeatScoreRevision=1;h.bridge.publish({status:'ready',state:h.state});assert.equal((await pending).ok,true);h.bridge.close();
 });
+test('referee PASS uses structural dispatch and waits for the root lifecycle acknowledgement',async()=>{
+ const state={cloudCode:'BXH-PASS6',courtLifecycleEpoch:0,meta:{},matches:[{id:'m1',refereeSeatScoreRevision:0}]},sent=[];
+ const client={getView:()=>({status:'ready',state}),score:async()=>{throw Error('PASS must use structural dispatch');},dispatch:async d=>{sent.push(d);return {ok:true,lifecycleRevision:1,scoreRevision:1};}};
+ const bridge=create({client,code:state.cloudCode,uid:'ref1',getUid:()=> 'ref1',timeoutMs:1000});
+ let done=false;const data={code:state.cloudCode,action:'skip',matchId:'m1',station:1,operationId:'pass-original-operation',expectedCourtRevision:1,expectedScoreRevision:0,expectedDispatchRevision:0};
+ const pending=bridge.cloud.commitRefereeCommand(data).then(r=>{done=true;return r;});await Promise.resolve();
+ state.matches[0].refereeSeatScoreRevision=1;bridge.publish({status:'ready',state});await Promise.resolve();assert.equal(done,false);
+ state.courtLifecycleEpoch=1;bridge.publish({status:'ready',state});assert.equal((await pending).ok,true);
+ assert.deepEqual(sent,[data]);bridge.close();
+});
 

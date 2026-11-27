@@ -1,0 +1,174 @@
+{
+  "kind": "two-room-score-pass-projection-contention",
+  "storageSchema": "bxh-court-buckets-v2",
+  "environment": "Firestore Emulator",
+  "productionWrites": 0,
+  "cycles": 2,
+  "rooms": [
+    {
+      "players": 128,
+      "courts": 5,
+      "matches": 127,
+      "acceptedOperations": 17,
+      "passReplaySafe": true,
+      "allScoresAndReceiptsVerified": true,
+      "publicCatchupVerified": true
+    },
+    {
+      "players": 320,
+      "courts": 12,
+      "matches": 511,
+      "acceptedOperations": 45,
+      "passReplaySafe": true,
+      "allScoresAndReceiptsVerified": true,
+      "publicCatchupVerified": true
+    }
+  ],
+  "ok": true,
+  "latencyMs": {
+    "p50": 77,
+    "p95": 3742,
+    "max": 8037
+  },
+  "failedOperations": 0,
+  "transactionRetries": 21,
+  "timingDefinition": {
+    "readMs": "Awaited transaction get/getAll duration; reads in this workload are sequential.",
+    "callbackMs": "Transaction callback duration, including reads and in-process computation.",
+    "afterCallbackMs": "From callback completion to next attempt start or handler completion; includes commit/retry/backoff and is not a direct lock measurement."
+  },
+  "selectedRecords": [
+    {
+      "room": "BXH-MIX128V2",
+      "station": 1,
+      "action": "skip",
+      "operationId": "mixed-pass-operation-00000001",
+      "ok": true,
+      "replayed": false,
+      "elapsedMs": 3013,
+      "attempts": 2,
+      "attemptTimings": [
+        {
+          "attempt": 1,
+          "readMs": 200,
+          "callbackMs": 212,
+          "afterCallbackMs": 2764
+        },
+        {
+          "attempt": 2,
+          "readMs": 16,
+          "callbackMs": 23,
+          "afterCallbackMs": 11
+        }
+      ]
+    },
+    {
+      "room": "BXH-MIX128V2",
+      "station": 1,
+      "action": "skip",
+      "operationId": "mixed-pass-operation-00000001",
+      "ok": true,
+      "replayed": true,
+      "elapsedMs": 59,
+      "attempts": 1,
+      "attemptTimings": [
+        {
+          "attempt": 1,
+          "readMs": 42,
+          "callbackMs": 43,
+          "afterCallbackMs": 10
+        }
+      ]
+    },
+    {
+      "room": "BXH-MIX320V2",
+      "station": 1,
+      "action": "skip",
+      "operationId": "mixed-pass-operation-00000006",
+      "ok": true,
+      "replayed": false,
+      "elapsedMs": 7778,
+      "attempts": 3,
+      "attemptTimings": [
+        {
+          "attempt": 1,
+          "readMs": 426,
+          "callbackMs": 473,
+          "afterCallbackMs": 3207
+        },
+        {
+          "attempt": 2,
+          "readMs": 192,
+          "callbackMs": 215,
+          "afterCallbackMs": 3830
+        },
+        {
+          "attempt": 3,
+          "readMs": 16,
+          "callbackMs": 39,
+          "afterCallbackMs": 11
+        }
+      ]
+    },
+    {
+      "room": "BXH-MIX320V2",
+      "station": 11,
+      "action": "score",
+      "operationId": "mixed-pass-operation-00000016",
+      "ok": true,
+      "replayed": false,
+      "elapsedMs": 8037,
+      "attempts": 3,
+      "attemptTimings": [
+        {
+          "attempt": 1,
+          "readMs": 341,
+          "callbackMs": 350,
+          "afterCallbackMs": 3416
+        },
+        {
+          "attempt": 2,
+          "readMs": 82,
+          "callbackMs": 87,
+          "afterCallbackMs": 4152
+        },
+        {
+          "attempt": 3,
+          "readMs": 14,
+          "callbackMs": 24,
+          "afterCallbackMs": 3
+        }
+      ]
+    },
+    {
+      "room": "BXH-MIX320V2",
+      "station": 1,
+      "action": "skip",
+      "operationId": "mixed-pass-operation-00000006",
+      "ok": true,
+      "replayed": true,
+      "elapsedMs": 28,
+      "attempts": 1,
+      "attemptTimings": [
+        {
+          "attempt": 1,
+          "readMs": 20,
+          "callbackMs": 25,
+          "afterCallbackMs": 2
+        }
+      ]
+    }
+  ],
+  "fullPageValidation": {
+    "status": "blocked-before-browser-launch",
+    "reason": "Host denied Chromium process singleton socket creation (Operation not permitted).",
+    "casesPassed": 0,
+    "newCandidateCases": [
+      "v1 6 courts",
+      "v1 12 courts",
+      "v2 6 courts",
+      "v2 12 courts"
+    ],
+    "candidateCoverage": "Real UI PASS with lost reply, reconnect and same-operation receipt retry, plus existing score/undo/force-exit/reopen/claim."
+  }
+}

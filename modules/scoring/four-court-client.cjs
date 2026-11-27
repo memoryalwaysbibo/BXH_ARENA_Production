@@ -57,7 +57,7 @@
      const nextRoom=clone(event.room),nextBase=JSON.parse(nextRoom.data),nextManifest=B.context(nextRoom,nextBase);
      if(nextManifest.code!==code)throw Error('room-mismatch');
      if(rootVersion===nextVersion&&!sameJsonValue(nextRoom,rootRoom))throw Error('room-version-conflict');
-     const reset=!manifest||nextManifest.epoch!==manifest.epoch||nextManifest.courtCount!==manifest.courtCount||nextManifest.bucketCount!==manifest.bucketCount;
+     const reset=!manifest||nextManifest.epoch!==manifest.epoch||nextManifest.schema!==manifest.schema||nextManifest.courtCount!==manifest.courtCount||nextManifest.bucketCount!==manifest.bucketCount;
      rootRoom=nextRoom;base=nextBase;manifest=nextManifest;rootVersion=nextVersion;
      if(reset){
       stopBuckets();const bucketToken=bucketGeneration;emit('syncing');
@@ -66,7 +66,7 @@
        bucketStops.push(transport.watchBucket(code,id,event=>{
         if(!active||token!==generation||bucketToken!==bucketGeneration||event.fromCache||event.pending)return;
         const value=event.bucket;
-        if(!value||value.bucketId!==id||value.epoch!==manifest.epoch||value.code!==manifest.code||value.roomId!==manifest.roomId||value.schema!==B.schema||!Number.isSafeInteger(value.revision)||value.revision<0){buckets.delete(id);return emit('syncing','bucket-context');}
+        if(!value||value.bucketId!==id||value.epoch!==manifest.epoch||value.code!==manifest.code||value.roomId!==manifest.roomId||value.schema!==manifest.schema||!Number.isSafeInteger(value.revision)||value.revision<0){buckets.delete(id);return emit('syncing','bucket-context');}
         const previous=bucketWatermarks.get(id);
         if(previous&&value.revision<previous.revision)return;
         if(previous&&value.revision===previous.revision&&!sameJsonValue(value,previous)){subscriptionFailed=true;return emit('error','bucket-version-conflict');}
@@ -85,7 +85,7 @@
   function acceptCommittedScore(result,record){
    if(record.type!=='score'||!['score','fault','undo','rematch','pause','resume'].includes(record.data.action)||result.structural!==false||result.matchId!==record.data.matchId||result.scoreRevision!==Number(record.data.expectedScoreRevision)+1||!active||status!=='ready'||record.epoch!==manifest?.epoch)return;
    const patch=result.buckets?.[0],id=result.bucketId;
-   if(!Array.isArray(result.buckets)||result.buckets.length!==1||!patch||patch.bucketId!==id||id!==B.route(Number(record.data.station),manifest.courtCount))return;
+   if(!Array.isArray(result.buckets)||result.buckets.length!==1||!patch||patch.bucketId!==id||id!==B.route(Number(record.data.station),manifest.courtCount,manifest.schema))return;
    const previous=bucketWatermarks.get(id);
    if(!previous||patch.revision<previous.revision||patch.revision===previous.revision&&!sameJsonValue(patch,previous))return;
    const candidate=[...buckets.values()].map(bucket=>bucket.bucketId===id?patch:bucket);

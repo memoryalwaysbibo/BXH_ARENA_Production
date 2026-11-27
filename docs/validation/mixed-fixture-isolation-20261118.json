@@ -1,0 +1,89 @@
+{
+  "kind": "mixed-fixture-namespace-regression",
+  "environment": "Firestore Emulator",
+  "productionWrites": 0,
+  "unitTestsPassed": 134,
+  "sameEmulatorSequentialRuns": true,
+  "freshOperationsTotal": 124,
+  "cause": "Inline-v2 and async-v2 reused root, epoch and operation IDs; replacing root did not remove durable operation receipts. Later commands replayed earlier successes against newly seeded zero scores.",
+  "fix": "Separate mode-specific room codes and epochs; fail seed on existing receipts; fresh score/PASS must not be replayed.",
+  "runs": [
+    {
+      "kind": "two-room-score-pass-projection-contention",
+      "storageSchema": "bxh-court-buckets-v2",
+      "environment": "Firestore Emulator",
+      "deferredPassPublic": false,
+      "productionWrites": 0,
+      "cycles": 2,
+      "rooms": [
+        {
+          "players": 128,
+          "courts": 5,
+          "matches": 127,
+          "acceptedOperations": 17,
+          "passReplaySafe": true,
+          "allScoresAndReceiptsVerified": true,
+          "publicCatchupVerified": true
+        },
+        {
+          "players": 320,
+          "courts": 12,
+          "matches": 511,
+          "acceptedOperations": 45,
+          "passReplaySafe": true,
+          "allScoresAndReceiptsVerified": true,
+          "publicCatchupVerified": true
+        }
+      ],
+      "ok": true,
+      "latencyMs": {
+        "p50": 2028,
+        "p95": 7167,
+        "max": 13274
+      },
+      "failedOperations": 0,
+      "transactionRetries": 32
+    },
+    {
+      "kind": "two-room-score-pass-projection-contention",
+      "storageSchema": "bxh-court-buckets-v2",
+      "environment": "Firestore Emulator",
+      "deferredPassPublic": true,
+      "productionWrites": 0,
+      "cycles": 2,
+      "rooms": [
+        {
+          "players": 128,
+          "courts": 5,
+          "matches": 127,
+          "acceptedOperations": 17,
+          "passReplaySafe": true,
+          "allScoresAndReceiptsVerified": true,
+          "publicCatchupVerified": true
+        },
+        {
+          "players": 320,
+          "courts": 12,
+          "matches": 511,
+          "acceptedOperations": 45,
+          "passReplaySafe": true,
+          "allScoresAndReceiptsVerified": true,
+          "publicCatchupVerified": true
+        }
+      ],
+      "ok": true,
+      "latencyMs": {
+        "p50": 146,
+        "p95": 5445,
+        "max": 7651
+      },
+      "failedOperations": 0,
+      "transactionRetries": 14
+    }
+  ],
+  "limits": [
+    "These sequential runs are not a controlled latency comparison.",
+    "Automatic Functions event delivery and complete page acceptance remain pending CI.",
+    "PASS still reads all buckets and writes shared dispatch state."
+  ]
+}

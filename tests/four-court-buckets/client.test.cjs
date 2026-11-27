@@ -10,6 +10,18 @@ function setup(onView=()=>{}){
  function ready(room=f.room,version='1'){rooms.at(-1).next({room,version});for(const bucket of B.encode(f.state,room.scoreStorage))watches.filter(w=>!w.stopped&&w.id===bucket.bucketId).at(-1).next({bucket});}
  return {f,rooms,watches,sent,views,client,ready,setSend:fn=>send=fn};
 }
+test('v2 client waits for every independent court and never accepts a legacy-schema bucket',()=>{
+ const h=setup();h.f.room.scoreStorage=B.makeManifest(h.f.state,'per-court-client-epoch',B.perCourtSchema);
+ h.client.connect();h.rooms.at(-1).next({room:h.f.room,version:'1'});
+ assert.equal(h.watches.filter(w=>!w.stopped).length,6);
+ const buckets=B.encode(h.f.state,h.f.room.scoreStorage);
+ for(const b of buckets.slice(0,5))h.watches.find(w=>w.id===b.bucketId).next({bucket:b});
+ assert.equal(h.client.getView().status,'syncing');
+ h.watches.find(w=>w.id==='court-6').next({bucket:{...buckets[5],schema:B.schema}});
+ assert.equal(h.client.getView().status,'syncing');
+ h.watches.find(w=>w.id==='court-6').next({bucket:buckets[5]});assert.equal(h.client.getView().status,'ready');
+ assert.equal(h.client.getView().state.matches.length,6);h.client.disconnect();
+});
 test('client waits for all authoritative buckets, uses root seat model and rejects old revisions',()=>{
  const h=setup();h.client.connect();h.ready();assert.equal(h.client.getView().status,'ready');
  assert.equal(h.client.getView().state.createdBy,'host');

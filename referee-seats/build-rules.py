@@ -32,7 +32,8 @@ helper='''
         && room.get('eventAuthority', '') == 'official'
         && room.get('createdByRole', '') != 'partner_organizer'
         && config.get('privateReadsEnabled', false) == true
-        && storage.get('schema', '') == 'bxh-match-buckets-v1'
+        && (storage.get('schema', '') == 'bxh-match-buckets-v1'
+          || (storage.get('schema', '') == 'bxh-court-buckets-v2' && config.get('perCourtStorageEnabled', false) == true))
         && storage.get('status', '') == 'active'
         && storage.get('code', '') == code
         && storage.get('epoch', '') is string && storage.get('epoch', '').size() > 0
