@@ -1,0 +1,13 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync('modules/main-app/core.js','utf8');
+const start=source.indexOf('function ownProfileEmailDisplay(');
+const end=source.indexOf('\n}',start)+2;
+const context=vm.createContext({});
+vm.runInContext(source.slice(start,end),context);
+const display=(...args)=>JSON.parse(JSON.stringify(context.ownProfileEmailDisplay(...args)));
+const account={uid:'self',email:'self@example.com'};
+test('existing profile email is preserved',()=>assert.deepEqual(display({email:'stored@example.com'},'self',account),{email:'stored@example.com',fromLogin:false}));
+test('missing profile email displays same-account login email without changing profile',()=>{const profile=Object.freeze({email:'',phone:''});assert.deepEqual(display(profile,'self',account),{email:'self@example.com',fromLogin:true});assert.equal(profile.email,'');});
+test('missing or mismatched account never supplies an email',()=>{for(const [uid,user] of [['other',account],[null,account],['self',null],['self',{uid:'self',email:null}]])assert.deepEqual(display({},uid,user),{email:'',fromLogin:false});});
+test('profile views explicitly label fallback and keep email read-only',()=>{assert.ok(source.includes('登入信箱（會員資料尚未補齊）'));assert.ok(source.includes('value="${esc(emailDisplay.email)}" disabled'));});
