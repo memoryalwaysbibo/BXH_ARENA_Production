@@ -1,0 +1,25 @@
+name: Registration flow V3 candidate
+on:
+  pull_request:
+    paths:
+      - 'registration-flow-v3/**'
+      - 'modules/cloud/cloud-runtime.js'
+      - 'modules/main-app/core.js'
+      - 'qr-checkin/backend/overlays/room-access-core.js'
+      - 'qr-checkin/backend/overlays/registration-roster-core.js'
+      - 'management-summary/functions/event-staff-core.cjs'
+      - '.github/workflows/registration-flow-v3.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  candidate-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test registration-flow-v3/*.test.cjs
+      - run: node --check modules/cloud/cloud-runtime.js
+      - run: node --check modules/main-app/core.js
