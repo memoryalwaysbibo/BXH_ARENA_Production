@@ -14,6 +14,8 @@ FRONT_BASE = 'a91fe57578e1deb74a76a5d19aada1e59ef19b12'
 FRONT_HEAD = '9b396ba133f569b43316ae88b3a7384e7207cebf'
 BACK_BASE = '0bf2caba485920f56e65084adf23d44df4006b97'
 BACK_HEAD = 'bb5cecec5053bbea77d0c3265b9abb62b73c8598'
+SETTLEMENT_HEAD = 'afde2fc515c0df5f06fd7724726e4433365ab696'
+SETTLEMENT_PORT = 'release/commerce/tests/ptn-settlement-source-port.test.cjs'
 
 def sha(data):
     return hashlib.sha256(data).hexdigest() if data is not None else None
@@ -55,6 +57,64 @@ def port(live, base, candidate):
         return 'conflict', None
     return 'merged-review', result.stdout
 
+def settlement_manifest(source):
+    # The pinned test file declares JSON literals. Parse data only; never execute JS.
+    decoded = source.decode('utf-8')
+    result = []
+    for name in ('hashes', 'edits'):
+        marker = '\nconst ' + name + '='
+        if decoded.count(marker) != 1:
+            raise RuntimeError('missing or ambiguous settlement manifest: ' + name)
+        tail = decoded.split(marker, 1)[1].lstrip()
+        value, end = json.JSONDecoder().raw_decode(tail)
+        if not isinstance(value, dict) or not tail[end:].lstrip().startswith(';'):
+            raise RuntimeError('invalid settlement manifest: ' + name)
+        result.append(value)
+    return tuple(result)
+
+
+def settlement_patch(live, historical_hash, declared_hash, edits):
+    if live is None or sha(live) != historical_hash or historical_hash != declared_hash:
+        raise RuntimeError('settlement source drift; no candidate produced')
+    if not isinstance(edits, list) or not edits:
+        raise RuntimeError('missing settlement edits')
+    candidate = live
+    for pair in edits:
+        if (not isinstance(pair, list) or len(pair) != 2 or
+                not all(isinstance(part, str) for part in pair) or not pair[0]):
+            raise RuntimeError('invalid settlement edit')
+        before, after = (part.encode('utf-8') for part in pair)
+        if candidate.count(before) != 1:
+            raise RuntimeError('settlement edit anchor not unique')
+        candidate = candidate.replace(before, after, 1)
+    return candidate
+
+
+def review_settlement(z, paths, row, manifest, historical, output):
+    hashes, edits = manifest
+    if set(hashes) != set(paths) or set(edits) != set(paths):
+        raise RuntimeError('unexpected settlement manifest file set')
+    proposals = {}
+    report = {}
+    for path in paths:
+        live = member(z, path)
+        expected = row['files'][path]
+        if (sha(live) != expected['liveSha256'] or
+                expected['historicalSha256'] != historical[path] or
+                expected['historicalMatch'] is not True):
+            raise RuntimeError('settlement audit mismatch: ' + path)
+        candidate = settlement_patch(live, historical[path], hashes[path], edits[path])
+        proposals[path] = candidate
+        report[path] = {'status': 'settlement-port-review', 'liveSha256': sha(live),
+                        'reviewSha256': sha(candidate), 'editCount': len(edits[path])}
+    # All three inputs must pass before writing any settlement review files.
+    for path, candidate in proposals.items():
+        target = output / 'ladderAutoSettlement' / path
+        target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        target.write_bytes(candidate)
+    return report
+
+
 def self_test():
     assert port(b'live', b'old', b'old') == ('preserve-live', None)
     assert port(None, None, b'new') == ('new-module-review', b'new')
@@ -66,7 +126,20 @@ def self_test():
     live = base.replace(b'one', b'production')
     candidate = base.replace(b'last', b'expansion')
     assert port(live, base, candidate) == ('merged-review', live.replace(b'last', b'expansion'))
-    print('7 three-way review assertions passed; no cloud access')
+    manifest = settlement_manifest(b'\nconst hashes={"a":"hash"};\nconst edits={"a":[["x","y"]]};\n')
+    assert manifest == ({"a": "hash"}, {"a": [["x", "y"]]})
+    live = b'alpha beta'
+    assert settlement_patch(live, sha(live), sha(live), [['beta', 'gamma']]) == b'alpha gamma'
+    for args in ((live, 'wrong', sha(live), [['beta', 'gamma']]),
+                 (b'beta beta', sha(b'beta beta'), sha(b'beta beta'), [['beta', 'gamma']]),
+                 (live, sha(live), sha(live), [['absent', 'gamma']])):
+        try:
+            settlement_patch(*args)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError('unsafe settlement edit accepted')
+    print('12 review assertions passed; no cloud access')
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
@@ -88,10 +161,12 @@ def main():
             or len(previous['functions']) != len(audit.TARGETS) or set(rows) != set(audit.TARGETS)):
         raise RuntimeError('incomplete audit')
     for root, base, head in ((args.front_root, FRONT_BASE, FRONT_HEAD),
-                              (args.backend_root, BACK_BASE, BACK_HEAD)):
+                              (args.backend_root, BACK_BASE, BACK_HEAD),
+                              (args.backend_root, SETTLEMENT_HEAD, SETTLEMENT_HEAD)):
         for ref in (base, head):
             if git(root, 'rev-parse', ref + '^{commit}').decode().strip() != ref:
                 raise RuntimeError('missing pinned commit')
+    manifest = settlement_manifest(blob(args.backend_root, SETTLEMENT_HEAD, SETTLEMENT_PORT))
     initial = {name: audit.binding(name) for name in audit.TARGETS}
     if any(src[2] != rows[name]['generation'] for name, src in initial.items()):
         raise RuntimeError('live generation changed; refresh audit')
@@ -101,9 +176,6 @@ def main():
         row = rows[name]
         if set(row['files']) != set(paths):
             raise RuntimeError('unexpected audit file set: ' + name)
-        if name == 'ladderAutoSettlement':
-            reports[name] = {'status': 'settlement-port-still-required'}
-            continue
         bucket, obj, generation = initial[name]
         archive = subprocess.check_output(['gcloud', 'storage', 'cat', f'gs://{bucket}/{obj}#{generation}'])
         if sha(archive) != row['archiveSha256']:
@@ -115,6 +187,10 @@ def main():
         with zipfile.ZipFile(io.BytesIO(archive)) as z:
             if len(z.namelist()) != len(set(z.namelist())):
                 raise RuntimeError('duplicate archive members')
+            if name == 'ladderAutoSettlement':
+                reports[name] = review_settlement(z, paths, row, manifest,
+                                                  audit.HISTORICAL[name], output)
+                continue
             for path in paths:
                 repo_path = path if front else 'release/commerce/functions/' + path
                 live, base, candidate = member(z, path), blob(root, base_ref, repo_path), blob(root, head_ref, repo_path)
