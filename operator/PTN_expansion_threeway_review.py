@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -56,6 +57,58 @@ def port(live, base, candidate):
     if result.returncode:
         return 'conflict', None
     return 'merged-review', result.stdout
+
+# The one manually reviewed conflict is tied to the exact audited source bytes.
+# This produces private review output only, never a deployment bundle.
+COMMERCE_LIVE = '20c05d56971d6dd76a4cd38beb47d6eb7a64963bc7a9ebf9d3921425e747a432'
+COMMERCE_CANDIDATE = '045a7ee1a39b2b0c1b938c7916455f2b30b56d4c04674b89ecfc7ac1640d44c7'
+COMMERCE_CONFLICT = 'bbd2da2ee4403be437d0088d1073d221fd767084b50bf087393047763630ab2c'
+COMMERCE_RESOLVED = '554376ba19b01b05187e93fe2ea859e4e843f00854688c80aa289f42cc050669'
+COMMERCE_BLOCKS = re.compile(
+    rb'^<<<<<<< live\.cjs\n(.*?)^\|{7} base\.cjs\n(.*?)'
+    rb'^=======\n(.*?)^>>>>>>> candidate\.cjs\n', re.M | re.S)
+
+
+def resolve_commerce_blocks(source):
+    matches = list(COMMERCE_BLOCKS.finditer(source))
+    if len(matches) != 5 or sha(b''.join(m.group(0) for m in matches)) != COMMERCE_CONFLICT:
+        raise RuntimeError('commerce conflict blocks changed; manual review required')
+    a = [m.groups() for m in matches]
+    replacements = [
+        a[0][0] + a[0][2].split(b'\n', 1)[1],
+        a[1][0] + a[1][2],
+        a[2][0].replace(b'}));', b'})).filter(Boolean);'),
+        a[3][2].rsplit(b'    if(p.status', 1)[0] + a[3][0],
+        a[4][2].rsplit(b"    if(p.delivery.kind==='ticket')", 1)[0] + a[4][0],
+    ]
+    for m, replacement in reversed(list(zip(matches, replacements))):
+        source = source[:m.start()] + replacement + source[m.end():]
+    if re.search(rb'^(<<<<<<<|\|{7}|=======|>>>>>>>)', source, re.M):
+        raise RuntimeError('commerce conflict markers remain')
+    return source
+
+
+def resolve_known_commerce(live, base, candidate):
+    if sha(live) != COMMERCE_LIVE or sha(candidate) != COMMERCE_CANDIDATE or base is None:
+        return None
+    with tempfile.TemporaryDirectory(prefix='ptn-commerce-resolution-') as directory:
+        paths = [Path(directory) / name for name in ('live.cjs', 'base.cjs', 'candidate.cjs')]
+        for path, content in zip(paths, (live, base, candidate)):
+            path.write_bytes(content)
+        merge = subprocess.run(
+            ['git', 'merge-file', '-p', '--diff3', '-L', 'live.cjs', '-L', 'base.cjs',
+             '-L', 'candidate.cjs', *map(str, paths)],
+            capture_output=True)
+        if merge.returncode != 5 or merge.stderr:
+            raise RuntimeError('unexpected commerce merge result; manual review required')
+        resolved = resolve_commerce_blocks(merge.stdout)
+        if sha(resolved) != COMMERCE_RESOLVED:
+            raise RuntimeError('resolved commerce digest differs from reviewed candidate')
+        path = Path(directory) / 'service.resolved.cjs'
+        path.write_bytes(resolved)
+        subprocess.run(['node', '--check', str(path)], check=True, capture_output=True)
+        return resolved
+
 
 def settlement_manifest(source):
     # The pinned test file declares JSON literals. Parse data only; never execute JS.
@@ -125,7 +178,8 @@ def verify_review_outputs(output, reports):
             counts[status] = counts.get(status, 0) + 1
             target = output / name / path
             if 'reviewSha256' in entry:
-                if status not in ('new-module-review', 'merged-review', 'settlement-port-review'):
+                if status not in ('new-module-review', 'merged-review', 'settlement-port-review',
+                                  'commerce-conflict-resolved-review'):
                     raise RuntimeError('unexpected proposed file status')
                 if not target.is_file() or target.is_symlink() or sha(target.read_bytes()) != entry['reviewSha256']:
                     raise RuntimeError('review output hash mismatch: ' + name + '/' + path)
@@ -231,7 +285,22 @@ def self_test():
         assert verify_review_outputs(output, {'ladderAutoSettlement': result}) == {'settlement-port-review': 2}
         assert (output / 'ladderAutoSettlement' / 'first.js').read_bytes() == b'alpha new'
         assert (output / 'ladderAutoSettlement' / 'last.js').read_bytes() == b'gamma new'
-    print('22 review assertions passed; no cloud access')
+    assert resolve_known_commerce(b'changed', b'base', b'candidate') is None
+    try:
+        resolve_commerce_blocks(b'<<<<<<< live.cjs\nchanged\n')
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError('unknown commerce conflict accepted')
+    with tempfile.TemporaryDirectory(prefix='ptn-commerce-review-check-') as directory:
+        output = Path(directory)
+        target = output / 'commerceService' / 'service.cjs'
+        target.parent.mkdir()
+        target.write_bytes(b'candidate')
+        report = {'commerceService': {'service.cjs': {
+            'status': 'commerce-conflict-resolved-review', 'reviewSha256': sha(b'candidate')}}}
+        assert verify_review_outputs(output, report) == {'commerce-conflict-resolved-review': 1}
+    print('25 review assertions passed; no cloud access')
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
@@ -290,6 +359,10 @@ def main():
                 if sha(live) != expected['liveSha256'] or sha(candidate) != expected['candidateSha256']:
                     raise RuntimeError('audited file hash mismatch: ' + name + '/' + path)
                 status, proposed = port(live, base, candidate)
+                if status == 'conflict' and name == 'commerceService' and path == 'service.cjs':
+                    resolved = resolve_known_commerce(live, base, candidate)
+                    if resolved is not None:
+                        status, proposed = 'commerce-conflict-resolved-review', resolved
                 entry = {'status': status, 'liveSha256': sha(live), 'baseSha256': sha(base),
                          'candidateSha256': sha(candidate)}
                 if proposed is not None:
