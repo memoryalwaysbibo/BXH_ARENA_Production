@@ -115,6 +115,42 @@ def review_settlement(z, paths, row, manifest, historical, output):
     return report
 
 
+def verify_review_outputs(output, reports):
+    """Verify all proposed bytes and reject stray files before reporting."""
+    counts = {}
+    expected = set()
+    for name, files in reports.items():
+        for path, entry in files.items():
+            status = entry['status']
+            counts[status] = counts.get(status, 0) + 1
+            target = output / name / path
+            if 'reviewSha256' in entry:
+                if status not in ('new-module-review', 'merged-review', 'settlement-port-review'):
+                    raise RuntimeError('unexpected proposed file status')
+                if not target.is_file() or target.is_symlink() or sha(target.read_bytes()) != entry['reviewSha256']:
+                    raise RuntimeError('review output hash mismatch: ' + name + '/' + path)
+                expected.add(target.relative_to(output))
+            elif status not in ('preserve-live', 'already-present', 'conflict'):
+                raise RuntimeError('missing proposed file hash: ' + name + '/' + path)
+    actual = {p.relative_to(output) for p in output.rglob('*') if p.is_file() or p.is_symlink()}
+    if actual != expected:
+        raise RuntimeError('unexpected or missing review files')
+    return counts
+
+
+def rollback_inventory(initial, rows):
+    # Reference-only evidence. This does not prove a rollback can be deployed.
+    return {
+        'status': 'SOURCE_REFERENCES_ONLY_NOT_ROLLBACK_VALIDATED',
+        'productionWrites': 0,
+        'functions': {
+            name: {'bucket': bucket, 'object': obj, 'generation': generation,
+                   'archiveSha256': rows[name]['archiveSha256']}
+            for name, (bucket, obj, generation) in initial.items()
+        }
+    }
+
+
 def self_test():
     assert port(b'live', b'old', b'old') == ('preserve-live', None)
     assert port(None, None, b'new') == ('new-module-review', b'new')
@@ -139,7 +175,37 @@ def self_test():
             pass
         else:
             raise AssertionError('unsafe settlement edit accepted')
-    print('12 review assertions passed; no cloud access')
+    with tempfile.TemporaryDirectory(prefix='ptn-review-check-') as directory:
+        output = Path(directory)
+        target = output / 'fn' / 'candidate.js'
+        target.parent.mkdir()
+        target.write_bytes(b'candidate')
+        report = {'fn': {'candidate.js': {'status': 'merged-review', 'reviewSha256': sha(b'candidate')},
+                         'conflict.js': {'status': 'conflict'}}}
+        assert verify_review_outputs(output, report) == {'merged-review': 1, 'conflict': 1}
+        for invalid in ('changed', 'stray', 'missing'):
+            target.write_bytes(b'candidate')
+            stray = output / 'fn' / 'conflict.js'
+            if invalid == 'changed':
+                target.write_bytes(b'changed')
+            elif invalid == 'stray':
+                stray.write_bytes(b'unexpected')
+            else:
+                target.unlink()
+            try:
+                verify_review_outputs(output, report)
+            except RuntimeError:
+                pass
+            else:
+                raise AssertionError('invalid review output accepted: ' + invalid)
+            if stray.exists():
+                stray.unlink()
+    inventory = rollback_inventory({'fn': ('bucket', 'object', '123')},
+                                   {'fn': {'archiveSha256': 'archive-hash'}})
+    assert inventory['functions']['fn'] == {'bucket': 'bucket', 'object': 'object',
+                                            'generation': '123', 'archiveSha256': 'archive-hash'}
+    assert inventory['status'] == 'SOURCE_REFERENCES_ONLY_NOT_ROLLBACK_VALIDATED'
+    print('18 review assertions passed; no cloud access')
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
@@ -208,8 +274,14 @@ def main():
                 reports[name][path] = entry
     if any(audit.binding(name) != src for name, src in initial.items()):
         raise RuntimeError('source changed during review; discard private output')
+    counts = verify_review_outputs(output, reports)
+    inventory = rollback_inventory(initial, rows)
+    (output / 'rollback-source-inventory.json').write_text(json.dumps(inventory, indent=2))
     result = {'status': 'THREEWAY_REVIEW_ONLY_NOT_DEPLOYABLE', 'productionWrites': 0,
-              'privateReviewDir': str(output), 'functions': reports}
+              'privateReviewDir': str(output), 'functions': reports,
+              'reviewStatusCounts': counts, 'conflictCount': counts.get('conflict', 0),
+              'rollbackSourceInventory': str(output / 'rollback-source-inventory.json'),
+              'rollbackValidated': False}
     (output / 'summary.json').write_text(json.dumps(result, indent=2))
     print(json.dumps(result, indent=2))
 
