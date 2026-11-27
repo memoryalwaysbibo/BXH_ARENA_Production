@@ -12,7 +12,7 @@ function fixture(role='super_admin'){
   for(const [k,v] of draft)data.set(k,v);return result;
  }};
  const create=createRoomHandler({db,newCode:()=> 'BXH-ABC123',newId:()=> 'new-room'});
- const input={operationId:'create-001',name:'V3',location:'Arena',stations:4,capacity:192,registrationOpenAt:10,registrationCloseAt:100,cancellationDeadline:90};
+ const input={operationId:'create-001',name:'V3',location:'Arena',eventDate:'2027-01-01',startAt:'13:00',stations:4,capacity:192,registrationOpenAt:10,registrationCloseAt:100,cancellationDeadline:90};
  return {data,call:(patch={},app={})=>create({auth:{uid:'actor'},app,data:{...input,...patch}})};
 }
 test('super admin atomically creates new V3 draft and zero ledger; replay is safe',async()=>{

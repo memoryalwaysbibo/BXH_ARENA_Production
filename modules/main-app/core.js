@@ -24924,7 +24924,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(!isSuperAdmin()||!canCreateOfficialTournament())return;
     const fields=`<div class="field"><label>賽事名稱</label><input id="v3-create-name" maxlength="80"></div>
       <div class="field"><label>地點</label><input id="v3-create-location" maxlength="160"></div>
-      <div class="field"><label>名額（最多 192）</label><input id="v3-create-capacity" type="number" min="1" max="192" value="128"></div>
+      <div class="field"><label>活動日期</label><input id="v3-create-date" type="date"></div><div class="field"><label>開賽時間（台灣時間）</label><input id="v3-create-start" type="time"></div><div class="field"><label>名額（最多 192）</label><input id="v3-create-capacity" type="number" min="1" max="192" value="128"></div>
       <div class="field"><label>裁判台數</label><input id="v3-create-stations" type="number" min="1" max="12" value="4"></div>
       <div class="field"><label>報名開放（台灣時間）</label><input id="v3-create-open-at" type="datetime-local"></div>
       <div class="field"><label>報名截止（台灣時間）</label><input id="v3-create-close-at" type="datetime-local"></div>
@@ -24934,8 +24934,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       if(!isSuperAdmin())return;
       const val=id=>document.getElementById("v3-create-"+id)?.value||"";
       const at=id=>Date.parse(val(id)+"+08:00");
-      const payload={name:val("name"),location:val("location"),capacity:Number(val("capacity")),stations:Number(val("stations")),registrationOpenAt:at("open-at"),registrationCloseAt:at("close-at"),cancellationDeadline:at("cancel-at")};
-      if(!payload.name.trim()||!payload.location.trim()||!Number.isSafeInteger(payload.capacity)||payload.capacity<1||payload.capacity>192||
+      const payload={name:val("name"),location:val("location"),eventDate:val("date"),startAt:val("start"),capacity:Number(val("capacity")),stations:Number(val("stations")),registrationOpenAt:at("open-at"),registrationCloseAt:at("close-at"),cancellationDeadline:at("cancel-at")};
+      if(!payload.name.trim()||!payload.location.trim()||!payload.eventDate||!payload.startAt||!Number.isSafeInteger(payload.capacity)||payload.capacity<1||payload.capacity>192||
         !Number.isSafeInteger(payload.stations)||payload.stations<1||payload.stations>12||![payload.registrationOpenAt,payload.registrationCloseAt,payload.cancellationDeadline].every(Number.isFinite)||payload.registrationOpenAt>=payload.registrationCloseAt){
         showToast("請填寫完整賽事及正確報名時間",true);return;
       }
@@ -26315,6 +26315,22 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="open-registration-publish-preview"){
+    if(isV3ManagementRoom()){
+      const code=state.cloudCode,actor=currentAuthUid();
+      if(!code)return;
+      openModal({type:"generic",title:"發布 V3 報名",message:"確認發布目前已儲存的 V3 賽事及報名設定？",confirmLabel:"發布",onConfirm:()=>{
+        (async()=>{
+          try{
+            const result=await window.engagementService.registrationV3Operation({code,action:"publishRoom"});
+            if(result?.ok!==true)throw Error("registration-operation-unconfirmed");
+            if(actor!==currentAuthUid()||code!==state.cloudCode)return;
+            showToast("V3 賽事已發布");
+            await resolveAndJoinTournamentByCode(code,{forcePrivate:true});render();
+          }catch(e){showToast(mapRegistrationError(e),true);}
+        })();
+      }});return;
+    }
+
     if(!state.cloudCode && !canCreateOfficialTournament()){
       cloudAccessLimited = true;
       cloudAccessMessage = "目前帳號無法建立新的正式賽事。";

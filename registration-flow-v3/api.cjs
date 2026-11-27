@@ -3,6 +3,7 @@ const {createHoldService}=require('./hold-service.cjs');
 const {createAuthorizers,canReview}=require('./permissions.cjs');
 const {summary}=require('./hold-core.cjs');
 const {createSummarySync}=require('./summary-sync.cjs');
+const {createPublishHandler}=require('./publish-room.cjs');
 const active=u=>u?.active===true&&!u.deleted&&!['deleted','disabled','frozen'].includes(u.accountStatus);
 const id=/^[A-Za-z0-9_-]{1,128}$/;
 const codePattern=/^BXH-[A-Z0-9]{4,16}$/;
@@ -11,6 +12,7 @@ const ownView=h=>h?{status:h.status,sequence:h.sequence,submittedAt:h.submittedA
 // Callable factory; registration with Firebase is a separate release step.
 // Mutations and reads share the same trusted room version and account checks.
 function createApi({db,clock=Date.now,observe}){
+ const publish=createPublishHandler({db,clock});
  const sync=createSummarySync({db,clock,observe});
  const mutate=createHoldService({db,...createAuthorizers({db}),clock,observe});
  return async request=>{
@@ -18,6 +20,7 @@ function createApi({db,clock=Date.now,observe}){
   if(typeof uid!=='string'||!id.test(uid))throw Error('auth-required');
   if(typeof d.code!=='string'||!codePattern.test(d.code))throw Error('invalid-code');
   if(['join','approve','reject','cancel'].includes(d.action))return mutate(request);
+  if(d.action==='publishRoom')return publish(request);
   if(d.action==='syncSummary')return sync(d.code,{authorize:async(tx,room)=>{
    const [user]=await tx.getAll(db.doc('users/'+uid));
    return canReview({user:user.data(),uid,room,now:clock()});

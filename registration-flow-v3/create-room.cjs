@@ -6,22 +6,22 @@ const active=u=>u?.active===true&&!u.deleted&&u.isTestAccount!==true&&u.role==='
 function normalize(d){
  const text=(v,max)=>typeof v==='string'&&v.trim()&&v.trim().length<=max?v.trim():null;
  const name=text(d.name,80),location=text(d.location,160);
- const {capacity,stations,registrationOpenAt,registrationCloseAt,cancellationDeadline}=d;
- if(!name||!location||!Number.isSafeInteger(capacity)||capacity<1||capacity>192||
+ const {capacity,stations,registrationOpenAt,registrationCloseAt,cancellationDeadline,eventDate,startAt}=d;
+ if(!name||!location||!/^\d{4}-\d{2}-\d{2}$/.test(eventDate||'')||!/^\d{2}:\d{2}$/.test(startAt||'')||!Number.isFinite(Date.parse(eventDate+'T'+startAt+'+08:00'))||!Number.isSafeInteger(capacity)||capacity<1||capacity>192||
  !Number.isSafeInteger(stations)||stations<1||stations>12||
  ![registrationOpenAt,registrationCloseAt,cancellationDeadline].every(x=>Number.isSafeInteger(x)&&x>0)||
  registrationOpenAt>=registrationCloseAt)throw Error('invalid-room-settings');
- return {name,location,capacity,stations,registrationOpenAt,registrationCloseAt,cancellationDeadline};
+ return {name,location,capacity,stations,registrationOpenAt,registrationCloseAt,cancellationDeadline,eventDate,startAt};
 }
 function documents({input,code,owner,roomId,now}){
  const ledger={capacity:input.capacity,occupiedCount:0,pendingReviewCount:0,confirmedCount:0,sequence:0,revision:0};
  const common={...summary(ledger),registrationFlowVersion:3,registrationSummaryRevision:0,
- name:input.name,location:input.location,eventAuthority:'official',formatType:'single',battleMode:'individual',
+ name:input.name,location:input.location,eventDate:input.eventDate,startAt:input.startAt,eventAuthority:'official',formatType:'single',battleMode:'individual',
  ladderMode:'general',tournamentPhase:'waiting',archiveStatus:'ongoing',visibility:'private',
  registrationVisibility:'private',publishedAt:null,registrationEnabled:false,registrationStatus:'draft',
  registrationOpenAt:input.registrationOpenAt,registrationCloseAt:input.registrationCloseAt,cancellationDeadline:input.cancellationDeadline,
  waitlistEnabled:false,waitlistCapacity:0,waitlistCount:0,createdAt:now,updatedAt:now};
- const meta={registrationFlowVersion:3,name:input.name,location:input.location,stations:input.stations,eventAuthority:'official',formatType:'single',
+ const meta={registrationFlowVersion:3,name:input.name,location:input.location,date:input.eventDate,startTime:input.startAt,stations:input.stations,eventAuthority:'official',formatType:'single',
  battleMode:'individual',ladderMode:'general',registrationCapacity:input.capacity,registrationEnabled:false,
  registrationStatus:'draft',registrationOpenAt:input.registrationOpenAt,registrationCloseAt:input.registrationCloseAt,
  cancellationDeadline:input.cancellationDeadline,registrationVisibility:'private',checkinRequired:true};
