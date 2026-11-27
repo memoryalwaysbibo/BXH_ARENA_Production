@@ -5,7 +5,7 @@ const {test,after}=require('node:test');
 const {randomBytes}=require('node:crypto');
 const {db,service,handlers}=require('./harness.cjs');
 const {createApi}=require('../backend/api.cjs');
-const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketRemoveHandler,createTicketDelegateHandler,createTicketDelegateSearchHandler}=require('../backend/ticket-room-create.cjs');
+const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketStationsHandler,createTicketRemoveHandler,createTicketDelegateHandler,createTicketDelegateSearchHandler}=require('../backend/ticket-room-create.cjs');
 const {createStartHandler,createDrawHandler,createTicketForfeitHandler,createTicketScoreHandler}=require('../backend/lifecycle.cjs');
 const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
 
@@ -218,6 +218,21 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  assert.ok(confirmed.bracket.length>0);
  assert.equal(confirmed.bracket.some(match=>match.canScore),false);
  assert.deepEqual(confirmed.matches,[]);
+ if(ptn){
+  const resize=createTicketStationsHandler({db,clock:()=>now+2000});
+  const edit={auth:{uid:owner},app:{},data:{action:'ticket-room-stations',code,roomId,operationId:'ticket-resize-after-draw',expectedUpdatedAt:confirmed.updatedAt,stations:4}};
+  await assert.rejects(resize({...edit,auth:{uid:other}}),/permission-denied/);
+  await resize(edit);
+  const resized=await status(statusRequest);
+  assert.equal(resized.stations,4);assert.equal(resized.drawId,confirmed.drawId);assert.equal(resized.drawReady,true);
+  const pairing=b=>b.map(m=>[m.id,m.a,m.b,m.winnerId]);
+  assert.deepEqual(pairing(resized.bracket),pairing(confirmed.bracket));
+  assert.ok(resized.bracket.filter(m=>!m.isBye).every(m=>m.station>=1&&m.station<=4));
+  assert.equal(new Set(resized.bracket.filter(m=>!m.isBye).map(m=>m.station)).size,4);
+  assert.equal((await ticket.get()).data().status,'reserved');
+  // Return to one station to preserve subsequent single-court fixtures.
+  await resize({...edit,data:{...edit.data,operationId:'ticket-resize-back',expectedUpdatedAt:resized.updatedAt,stations:1}});
+ }
  const removalUid=confirmed.participants.find(player=>player.registrationId!==remainingUid).registrationId;
  const remove=createTicketRemoveHandler({db,queue,enabled:async candidate=>candidate===code,clock:()=>now});
  const removal={auth:creation.auth,app:creation.app,data:{action:'ticket-room-remove',code,
@@ -268,6 +283,7 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  const live=await status(statusRequest);
  if(ptn)assert.equal(live.ticketStatus,'consumed');
  assert.equal(live.phase,'live');
+ if(ptn)await assert.rejects(createTicketStationsHandler({db,clock:()=>now+3000})({auth:{uid:owner},app:{},data:{action:'ticket-room-stations',code,roomId,operationId:'ticket-resize-live',expectedUpdatedAt:live.updatedAt,stations:2}}),/tournament-started/);
  assert.equal(live.eligibleCount,29);
  assert.equal(live.drawId,result.drawId);
  assert.ok(live.bracket.length>live.matches.length);

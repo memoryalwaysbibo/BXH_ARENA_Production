@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler}=require('../backend/ticket-room-create.cjs');
+const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketStationsHandler}=require('../backend/ticket-room-create.cjs');
 const {ticketGateForCode,authorizeTicketManager}=require('../backend/ticket-host.cjs');
 
 test('a second paid ticket creates an independent PTN room and retries cannot consume it twice',async()=>{
@@ -72,7 +72,37 @@ test('published vouchers create independent PTN gates for two eligible organizer
   if(capacity==='32'){
    const waiting=await createTicketRoomStateHandler({db,clock:()=>now})({auth:{uid},app:{},data:{action:'ticket-room-state',code}});
    assert.equal(waiting.phase,'waiting');assert.equal(waiting.stations,4);assert.equal(waiting.bracket,undefined);
+   const resize=createTicketStationsHandler({db,clock:()=>now+1000});
+   const resizeRequest={auth:{uid},app:{},data:{action:'ticket-room-stations',code,roomId:first.roomId,operationId:'resize-to-six',expectedUpdatedAt:waiting.updatedAt,stations:6}};
+   await assert.rejects(resize({...resizeRequest,data:{...resizeRequest.data,stations:13}}),/invalid-operation/);
+   assert.equal((await resize(resizeRequest)).ok,true);
+   assert.equal((await resize(resizeRequest)).replayed,true);
+   await assert.rejects(resize({...resizeRequest,data:{...resizeRequest.data,operationId:'resize-stale'}}),/version-conflict/);
+   const current=await createTicketRoomStateHandler({db,clock:()=>now})({auth:{uid},app:{},data:{action:'ticket-room-state',code}});
+   assert.equal(current.stations,6);
+   assert.equal(JSON.parse(rows.get('publicTournaments/'+code).bracketView).meta.stations,6);
+   assert.equal(rows.get('commerceTickets/'+id).status,'reserved');
    const existing=rows.get('tournaments/'+code),state=JSON.parse(existing.data);
+   const {createEngine}=require('../../referee-seats/functions/engine/index.cjs');
+   const {signature}=require('../../modules/main-app/bracket-commit.js');
+   state.players=Array.from({length:7},(_,i)=>({id:'fixture-'+i,name:'選手'+i}));
+   const engine=createEngine(state,{uid},now,'fixture-draw','fixture-seed');
+   assert.equal(engine.generateSingleElim(),true);engine.rebuildCourtAssignments();
+   state.bracketDraw={id:'draw-fixed',rosterRevision:0};
+   rows.set('tournaments/'+code,{...existing,data:JSON.stringify(state)});
+   const beforePublic=rows.get('publicTournaments/'+code);
+   const mirror=JSON.parse(beforePublic.bracketView);
+   Object.assign(mirror,{bracketSize:state.bracketSize,drawnAt:state.drawnAt,matches:state.matches,courtAssignments:state.courtAssignments});
+   rows.set('publicTournaments/'+code,{...beforePublic,bracketView:JSON.stringify(mirror)});
+   const beforeSignature=signature(state);
+   await resize({...resizeRequest,data:{...resizeRequest.data,operationId:'resize-draw-two',expectedUpdatedAt:current.updatedAt,stations:2}});
+   const after=JSON.parse(rows.get('tournaments/'+code).data),afterPublic=JSON.parse(rows.get('publicTournaments/'+code).bracketView);
+   assert.equal(signature(after),beforeSignature);assert.equal(signature(afterPublic),beforeSignature);
+   assert.equal(after.bracketDraw.id,'draw-fixed');assert.equal(after.meta.stations,2);
+   assert.equal(Object.keys(after.courtAssignments).length,2);
+   assert.ok(after.matches.filter(m=>!m.isBye).every(m=>m.station>=1&&m.station<=2));
+   assert.equal(rows.get('commerceTickets/'+id).status,'reserved');
+   await resize({...resizeRequest,data:{...resizeRequest.data,operationId:'resize-draw-six',expectedUpdatedAt:rows.get('tournaments/'+code).updatedAt,stations:6}});
    state.players=[{id:'a',name:'甲',source:'online',registrationId:'private-a'},
     {id:'b',name:'乙',source:'online',registrationId:'private-b'}];
    state.startedAt=now;state.championId='a';state.runnerUpId='b';state.archiveStatus='completed';
@@ -83,7 +113,7 @@ test('published vouchers create independent PTN gates for two eligible organizer
    const result=await createTicketRoomStateHandler({db,clock:()=>now})(
     {auth:{uid},app:{},data:{action:'ticket-room-state',code}});
    assert.equal(result.phase,'done');
-   assert.equal(result.stations,4);
+   assert.equal(result.stations,6);
    assert.deepEqual(result.participants,[{name:'甲'},{name:'乙'}]);
    assert.equal(result.bracket.length,1);
    assert.equal(result.bracket[0].completed,true);
