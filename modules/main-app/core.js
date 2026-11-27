@@ -18991,6 +18991,15 @@ function syncProfileDistrictSelect(){
 }
 document.addEventListener("change",ev=>{if(ev.target&&ev.target.id==="profile-city")syncProfileDistrictSelect();});
 
+// Display-only fallback for the signed-in player's missing profile email.
+// Never copy an email into Firestore or modify Firebase Auth here.
+function ownProfileEmailDisplay(p, profileUid, account){
+  const stored=typeof p?.email==="string"?p.email.trim():"";
+  if(stored)return {email:stored,fromLogin:false};
+  const login=typeof account?.email==="string"?account.email.trim():"";
+  if(!profileUid||account?.uid!==profileUid||!login)return {email:"",fromLogin:false};
+  return {email:login,fromLogin:true};
+}
 function profileCompletionPercent(p){
   if(!p) return 0;
   const location=profileLocationParts(p);
@@ -19061,6 +19070,7 @@ function renderPlayerProfileEditModal(){
     gender:value("profile-gender",userProfile.gender||""),
     region:city?(city+(district?" "+district:"")):""
   };
+  const emailDisplay=ownProfileEmailDisplay(userProfile,currentAuthUid(),window.cloudAuth?.getCurrentUser?.());
   const game=value("profile-gameid",effectiveGameId(userProfile));
   const pref=value("profile-preferred-name-mode",p.preferredNameMode)==="gameId"?"gameId":"realName";
   return `<div class="modal-overlay profile-edit-overlay" data-action="player-close-profile-edit">
@@ -19069,7 +19079,7 @@ function renderPlayerProfileEditModal(){
       ${playerProfileEditError?`<div class="auth-error">${esc(playerProfileEditError)}</div>`:""}
       <div class="field"><label>本名（必填）</label><input id="profile-realname" type="text" value="${esc(p.realName||"")}"><div class="hint">提供 BXH 後台核對本人。若修改本名，狀態會自動改為「待確認」。</div></div>
       <div class="field"><label>遊戲 ID（建議設定）</label><input id="profile-gameid" type="text" maxlength="24" value="${esc(game)}" placeholder="例如：黑爸"><div class="hint">賽事設定使用遊戲 ID 時會顯示此名稱；未設定則自動使用本名。</div></div>
-      <div class="field"><label>Email</label><input type="email" value="${esc(p.email||"")}" disabled><div class="hint">登入 Email 目前不在會員資料頁直接修改。</div></div>
+      <div class="field"><label>Email</label><input type="email" value="${esc(emailDisplay.email)}" disabled><div class="hint">${emailDisplay.fromLogin?"目前顯示登入信箱；會員資料尚未補齊。":"登入 Email 目前不在會員資料頁直接修改。"}</div></div>
       <div class="field"><label>手機號碼（建議）</label><input id="profile-phone" type="tel" value="${esc(p.phone||"")}"></div>
       <div class="grid grid-2">
         <div class="field"><label>出生年月日（選填）</label><input id="profile-birthdate" type="date" value="${esc(p.birthDate||"")}"></div>
@@ -19274,6 +19284,7 @@ function renderPlayerCenterOverview(p){
 }
 function renderPlayerProfileTab(p){
   const profileUid=currentAuthUid();
+  const emailDisplay=ownProfileEmailDisplay(p,profileUid,window.cloudAuth?.getCurrentUser?.());
   if(playerProfileSectionUid!==profileUid){playerProfileSectionUid=profileUid;playerProfileSection="overview";playerCenterPeriod="season";playerCenterCareerVisibleCount=10;playerCenterHistoryVisibleCount=10;}
   const refereeEnabled=window.BXH_REFEREE_CERTIFICATES_V1===true;
   if(!refereeEnabled&&['duty','achievements'].includes(playerProfileSection))playerProfileSection='overview';
@@ -19318,7 +19329,7 @@ function renderPlayerProfileTab(p){
         <section class="profile-info-group">
           <div class="profile-info-group-title">聯絡與基本資料</div>
           <div class="profile-info-list">
-            <div class="profile-info-row"><div class="profile-info-label">Email</div><div class="profile-info-value">${esc(p.email||"—")}</div></div>
+            <div class="profile-info-row"><div class="profile-info-label">Email</div><div class="profile-info-value">${esc(emailDisplay.email||"—")}</div>${emailDisplay.fromLogin?'<div class="profile-info-sub">登入信箱（會員資料尚未補齊）</div>':""}</div>
             <div class="profile-info-row"><div class="profile-info-label">手機號碼</div><div class="profile-info-value">${esc(p.phone||"尚未設定")}</div></div>
             <div class="profile-info-row"><div class="profile-info-label">出生年月日</div><div class="profile-info-value">${esc(p.birthDate||"尚未設定")}</div></div>
             <div class="profile-info-row"><div class="profile-info-label">性別</div><div class="profile-info-value">${esc(({female:"女性",male:"男性",other:"其他／不指定"}[p.gender]||"尚未設定"))}</div></div>

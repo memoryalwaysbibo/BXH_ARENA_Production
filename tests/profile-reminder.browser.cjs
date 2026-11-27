@@ -9,6 +9,7 @@ const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const core=read('modules/main-app/core.js');
 const cut=(start,end)=>core.slice(core.indexOf(start),core.indexOf(end,core.indexOf(start)));
 const reminderFunctions=cut('function playerProfileReminderVisible(){','let googleLinkBusy=false;');
+const emailFunction=cut('function ownProfileEmailDisplay(', 'function profileCompletionPercent(');
 const editFunction=cut('function renderPlayerProfileEditModal(){','let playerProfileSection=');
 const action=cut('  if(action==="player-profile-reminder-edit"||','  if(action==="player-close-profile-edit"){');
 const fixture=`
@@ -24,6 +25,7 @@ const mailboxContext=()=>({open:false});
 const profileLocationParts=()=>({city:'',region:''});
 const profileCityOptionsHtml=()=>'',profileDistrictOptionsHtml=()=>'';
 ${reminderFunctions}
+${emailFunction}
 ${editFunction}
 function render(){document.body.innerHTML='<button id="home-action">首頁</button>'+renderPlayerProfileEditModal()+renderPlayerProfileReminder();}
 function handle(action,target){${action}}
