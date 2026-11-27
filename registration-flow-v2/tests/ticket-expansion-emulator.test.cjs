@@ -205,8 +205,9 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(used.data().capacity,160);
   assert.equal(used.data().addedCapacity,32);
   assert.equal(remaining.data().quantity,31);
-  // Concurrent writes on six distinct assigned courts through the existing PTN
-  // score handler; one authorized manager, not a multi-account seat test.
+  // Exercise two supported PTN manager identities, not independent referee seats.
+  // The existing room authority permits exactly one delegated player.
+  await c.room.update({ptnDelegateUid:delegate});
   const liveState=JSON.parse(live.data().data);
   const assigned=new Map();
   for(const m of liveState.matches){
@@ -220,7 +221,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   const readMatches=async()=>new Map(JSON.parse((await c.room.get()).data().data).matches.map(m=>[m.id,m]));
   const wave=async(label,command,extra={})=>{
    const current=await readMatches();
-   const requests=targets.map((m,i)=>({auth:{uid},app:{},data:{action:'ticket-room-score',code:c.code,roomId:c.roomId,matchId:m.id,
+   const requests=targets.map((m,i)=>({auth:{uid:i%2===0?uid:delegate},app:{},data:{action:'ticket-room-score',code:c.code,roomId:c.roomId,matchId:m.id,
     matchUpdatedAt:current.get(m.id).updatedAt||0,operationId:'large-score-'+label+'-'+i,command,...extra}}));
    const t=Date.now();
    const results=await Promise.all(requests.map(r=>score(r)));
@@ -229,6 +230,8 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   const firstWave=await wave('first','score',{side:'A',finish:'knockout'});
   assert.ok(firstWave.results.every(r=>r.scoreA===2&&r.completed===false));
   assert.equal((await score(firstWave.requests[0])).replayed,true);
+  const deniedRequest={...firstWave.requests[0],auth:{uid:entrants[0]}};
+  await assert.rejects(score(deniedRequest),/permission-denied/);
   const secondWave=await wave('second','score',{side:'A',finish:'burst'});
   assert.ok(secondWave.results.every(r=>r.scoreA===4&&r.completed===false));
   const decisions=await wave('confirm','confirm');
@@ -246,7 +249,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(scoredRoom.data().capacity,192);
   assert.equal(scoredPublic.data().capacity,192);
   assert.equal((await inventory.get()).data().quantity,31);
-  console.info('PTN192 six-court emulator metrics',JSON.stringify({courts:6,scoreCommands:12,confirmCommands:6,firstWaveMs:firstWave.ms,secondWaveMs:secondWave.ms,confirmWaveMs:decisions.ms,privateStateBytes:Buffer.byteLength(scoredRoom.data().data),publicStateBytes:Buffer.byteLength(scoredPublic.data().bracketView)}));
+  console.info('PTN192 six-court emulator metrics',JSON.stringify({courts:6,authorizedManagerAccounts:2,scoreCommands:12,confirmCommands:6,firstWaveMs:firstWave.ms,secondWaveMs:secondWave.ms,confirmWaveMs:decisions.ms,privateStateBytes:Buffer.byteLength(scoredRoom.data().data),publicStateBytes:Buffer.byteLength(scoredPublic.data().bracketView)}));
   // Complete the remaining bracket via the existing score handler, not fabricated results.
   const fullStarted=Date.now();
   let completedByCommands=targets.length, waves=0;
