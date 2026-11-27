@@ -16,6 +16,7 @@ function createGuardedLegacyWriter({db,makeHandler,isMutation}){
   const guarded=new Proxy(db,{get(target,key){
    if(key==='runTransaction')return (callback,options)=>target.runTransaction(async tx=>{
     const room=await tx.get(roomRef);
+    if(room.data()?.registrationFlowVersion===3)throw Error('registration-v3-required');
     if(registrationQueueOwnsRoom(room.data()))throw Error('registration-queue-required');
     return callback(tx);
    },options);
