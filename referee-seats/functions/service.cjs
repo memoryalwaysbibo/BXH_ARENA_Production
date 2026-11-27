@@ -3,7 +3,7 @@ const {createHash,randomUUID,randomBytes}=require('node:crypto');
 const C=require('./core.cjs');
 const {activeAccount}=require('./event-staff-core.cjs');
 const {assertLegacyScoringWritable}=require('./bucket-legacy-fence.cjs');
-function createHandler(db,{clock=Date.now,uuid=randomUUID}={}){return async request=>{
+function createHandler(db,{clock=Date.now,uuid=randomUUID,resolveTicketAuthority=null,projectTicketView=null}={}){return async request=>{
  const uid=request.auth?.uid,d={...request.data},code=String(d.code||'').trim().toUpperCase();
  if(!uid)throw new Error('unauthenticated');
  if(['invite-mail-list','invite-mail-read'].includes(d.action)){
@@ -18,7 +18,8 @@ function createHandler(db,{clock=Date.now,uuid=randomUUID}={}){return async requ
   await inbox.doc(d.messageId).update({readAt:d.unread===true?null:clock()});
   return {ok:true};
  }
- if(!/^BXH-[A-Z0-9]{4,16}$/.test(code)||!/^[-a-zA-Z0-9]{16,80}$/.test(d.operationId||''))throw new Error('invalid-request');
+ const ticketCode=/^PTN-[A-Z0-9]{6}$/.test(code);
+ if((!/^BXH-[A-Z0-9]{4,16}$/.test(code)&&!(ticketCode&&typeof resolveTicketAuthority==='function'))||!/^[-a-zA-Z0-9]{16,80}$/.test(d.operationId||''))throw new Error('invalid-request');
  const id=uuid(),qrToken=randomBytes(32).toString('base64url'),ref=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code);
  const operationRef=ref.collection('refereeSeatOperations').doc(createHash('sha256').update(uid+':'+d.operationId).digest('hex'));
  return db.runTransaction(async tx=>{
@@ -30,19 +31,24 @@ function createHandler(db,{clock=Date.now,uuid=randomUUID}={}){return async requ
   const room=roomSnap.data(),user=userSnap.data();
   assertLegacyScoringWritable(room);
   const authority={now,communitySeatsEnabled:releaseSnap.data()?.communitySeatsEnabled===true,partnerEnabled:releaseSnap.data()?.partnerSeatsEnabled===true};
-  if(C.partnerRoom(room)){
+  if(C.partnerRoom(room)&&!ticketCode){
    if(!authority.partnerEnabled)throw Error('partner-release-not-ready');
    const parent=await tx.get(db.doc('users/'+room.createdBy));
    authority.parentUser=parent.data();
   }
 
   let state;try{state=JSON.parse(room.data);}catch{throw new Error('corrupt-data');}
+  if(ticketCode){
+   if(releaseSnap.data()?.ticketSeatsEnabled!==true)throw Error('ticket-invite-unavailable');
+   authority.ticket=await resolveTicketAuthority({tx,room,publicRoom:publicSnap.data(),state,user,uid,code,now,request});
+   if(d.action==='view'&&typeof projectTicketView==='function')return projectTicketView({room,state,user,uid,code,now,authority});
+  }
   const qrAction=['inspect-qr','accept-qr'].includes(d.action);
-  if(['accept-invite','create-qr','find-invite-player', 'inspect-qr','accept-qr'].includes(d.action)&&room.eventAuthority==='community'
+  if(['accept-invite','create-qr','find-invite-player', 'inspect-qr','accept-qr'].includes(d.action)&&(room.eventAuthority==='community'||ticketCode)
    &&(room.tournamentPhase==='done'||state.completedAt||[room.archiveStatus,state.archiveStatus].some(status=>['completed','archived'].includes(status))))
    throw Error('community-result-available');
   if(d.action==='find-invite-player'){
-   if(!C.canEnableCommunity(room,state,user,uid,{action:'enable'},authority))throw Error('permission-denied');
+   if(!C.canInvite(room,state,user,uid,authority))throw Error('permission-denied');
    // Reuse all room/mode/seat fences before querying the private player directory.
    C.transition({room,state,user,uid,d:{action:'create-qr',station:d.station,slot:d.slot,expectedCourtRevision:d.expectedCourtRevision,tokenHash:'search-only'},now,id,authority});
    const query=typeof d.query==='string'?d.query.trim():'';
@@ -59,10 +65,10 @@ function createHandler(db,{clock=Date.now,uuid=randomUUID}={}){return async requ
    if(typeof d.qrToken!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(d.qrToken)||typeof d.requestId!=='string')throw Error('invalid-qr');
    d.tokenHash=createHash('sha256').update(d.qrToken).digest('hex');
    const invitation=room.refereeSeatsV1?.requests?.[d.requestId];
-   if(!C.communityRoom(room,authority)||!activeAccount(user)||user.role!=='player')throw Error('permission-denied');
+   if(!C.invitationRoom(room,authority)||!activeAccount(user)||user.role!=='player')throw Error('permission-denied');
    if(!invitation||invitation.kind!=='qr'||invitation.tokenHash!==d.tokenHash)throw Error('invalid-qr');
    qrOwner=(await tx.get(db.doc('users/'+invitation.fromUid))).data();
-   if(!C.communityOwner(room,qrOwner,invitation.fromUid,authority))throw Error('permission-denied');
+   if(!C.invitationOwner(room,qrOwner,invitation.fromUid,authority))throw Error('permission-denied');
    d.station=invitation.station;d.slot=invitation.slot;
    // A receipt can be replayed only while this player still holds this QR's seat.
    if(receiptSnap.exists&&d.action==='accept-qr'){
@@ -72,11 +78,11 @@ function createHandler(db,{clock=Date.now,uuid=randomUUID}={}){return async requ
     if(d.action==='inspect-qr')return {ok:true,station:d.station,slot:d.slot,expiresAt:invitation.expiresAt,ownerName:String(qrOwner.gameId||qrOwner.displayName||'房主').slice(0,80)};
    }
   }
-  const communityReceipt=(['invite','create-qr','revoke'].includes(d.action)&&C.communityOwner(room,user,uid,authority))
+  const invitationReceipt=(['invite','create-qr','revoke'].includes(d.action)&&C.invitationOwner(room,user,uid,authority))
    ||qrAction
-   ||(d.action==='accept-invite'&&C.communityRoom(room,authority)&&activeAccount(user)
+   ||(d.action==='accept-invite'&&C.invitationRoom(room,authority)&&activeAccount(user)
     &&user.role==='player'&&room.refereeSeatsV1?.requests?.[d.requestId]?.toUid===uid);
-  if(receiptSnap.exists&&!communityReceipt&&!C.eligible(room,user,uid,authority)&&!C.canEnableCommunity(room,state,user,uid,d,authority))throw new Error('not-event-staff');
+  if(receiptSnap.exists&&!invitationReceipt&&!C.eligible(room,user,uid,authority)&&!C.canEnableCommunity(room,state,user,uid,d,authority)&&!C.canEnableTicket(room,state,user,uid,authority))throw new Error('not-event-staff');
   // Hash the original client intent, independent of resolved UID/seat or generated token.
   const hash=createHash('sha256').update(JSON.stringify(request.data)).digest('hex');
   if(receiptSnap.exists){const receipt=receiptSnap.data();if(receipt.hash!==hash)throw new Error('operation-conflict');return receipt.result;}
@@ -87,7 +93,7 @@ function createHandler(db,{clock=Date.now,uuid=randomUUID}={}){return async requ
   if(d.action==='request'&&targetUid)targetUser=(await tx.get(db.doc('users/'+targetUid))).data();
   if(['respond','accept-invite'].includes(d.action)&&requesterUid)requesterUser=(await tx.get(db.doc('users/'+requesterUid))).data();
   if(d.action==='invite'&&typeof d.targetGameId==='string'&&!d.targetUid){
-   if(!C.canEnableCommunity(room,state,user,uid,{action:'enable'},authority))throw Error('permission-denied');
+   if(!C.canInvite(room,state,user,uid,authority))throw Error('permission-denied');
    const gameId=d.targetGameId.trim();
    if(!gameId||gameId.length>80)throw Error('target-ineligible');
    const targets=await tx.get(db.collection('users').where('gameId','==',gameId).limit(2));
@@ -98,7 +104,7 @@ function createHandler(db,{clock=Date.now,uuid=randomUUID}={}){return async requ
   if(d.action==='create-qr')d.tokenHash=createHash('sha256').update(qrToken).digest('hex');
   const out=C.transition({room,state,user,uid,d,now,id,targetUser,requesterUser,authority});
   if(d.action==='create-qr')Object.assign(out.result,{qrToken,expiresAt:now+300000});
-  const projection=C.project(out.model,room.createdBy,state.meta.stations),staff=room.eventAuthority==='community'?(room.assignedStaffUids||[]):[...new Set([...(room.assignedStaffUids||[]),room.createdBy,...projection.refereeStationUids].filter(Boolean))];
+  const projection=C.project(out.model,room.createdBy,state.meta.stations),staff=['community','ticket'].includes(room.eventAuthority)?(room.assignedStaffUids||[]):[...new Set([...(room.assignedStaffUids||[]),room.createdBy,...projection.refereeStationUids].filter(Boolean))];
   state.meta={...state.meta,...projection,assignedStaffUids:staff,refereeSeatsV1:out.model};
   const updatedAt=Math.max(now,Number(room.updatedAt||0)+1,Number(state.updatedAt||0)+1);state.updatedAt=updatedAt;
   let mirror;try{mirror=JSON.parse(publicSnap.data().bracketView);}catch{throw new Error('public-mirror-missing');}

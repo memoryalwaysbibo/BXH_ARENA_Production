@@ -41,3 +41,43 @@ ctx.applyRemoteState({id:'clock-room',updatedAt:9999999});assert.equal(ctx.state
 ctx.applyRemoteState({id:'clock-room',updatedAt:11,forcedCourtExits:{1:{closed:false,revision:2}}});assert.equal(ctx.state.forcedCourtExits[1].closed,false);
 ctx.applyRemoteState({id:'clock-room',updatedAt:99999999,forcedCourtExits:{1:{closed:true,revision:1}}});assert.equal(ctx.state.forcedCourtExits[1].revision,2);
 console.log('PASS emergency exit listener over clock skew and delayed snapshots');
+
+// One physical-count contract covers official, community and ticket seat models.
+for(const eventAuthority of ['official','community','ticket']){
+ const model={version:1,revision:7,courts:{1:{revision:3,main:{uid:'keep',name:'保留'},backup1:null,backup2:null},5:{revision:4,main:{uid:'remove',name:'退出'},backup1:null,backup2:null},6:{revision:2,main:null,backup1:{uid:'still-playing',name:'進行中'},backup2:null}},requests:{qr:{id:'qr',kind:'qr',station:5,status:'pending',expiresAt:1000},mail:{id:'mail',kind:'invite',station:6,status:'pending',expiresAt:1000},keep:{id:'keep',station:1,status:'pending',expiresAt:1000}}};
+ const st={meta:{stations:6,eventAuthority},startedAt:1,matches:[{id:'active',station:6,status:'in_progress',scoreA:2,log:[{points:2}],completed:false}],courtAssignments:{court6:{currentMatchId:'active'}}};
+ assert(api.request(st,4,6,10).ok);assert.equal(st.meta.stations,6);
+ assert.equal(api.reconcileSeatCount(model,st.meta.stations,10).changed,false);
+ assert(api.forceExit(st,6,'active',0,0,20).ok);assert.equal(st.matches[0].scoreA,2);assert.equal(st.matches[0].station,0);assert.equal(st.meta.stations,4);
+ const cleaned=api.reconcileSeatCount(model,st.meta.stations,20);
+ assert.equal(cleaned.changed,true);assert.equal(cleaned.model.courts[5].main,null);assert.equal(cleaned.model.courts[6].backup1,null);assert.equal(cleaned.model.courts[1].main.uid,'keep');
+ assert.equal(cleaned.model.requests.qr.status,'stale');assert.equal(cleaned.model.requests.mail.status,'stale');assert.equal(cleaned.model.requests.keep.status,'pending');
+ assert.equal(api.reconcileSeatCount(cleaned.model,4,21).changed,false);
+ assert.deepEqual(Object.keys(api.projectSeats(cleaned.model,'host',4).refereeSeatNames),['1','2','3','4']);
+ assert(!api.projectSeats(cleaned.model,'host',4).refereeStationUids.includes('remove'));
+ const legacyExpanded=api.reconcileSeatCount(model,6,30,4).model;assert.equal(legacyExpanded.courts[5].main,null);assert.equal(legacyExpanded.requests.mail.status,'stale');
+ const expanded=api.reconcileSeatCount(cleaned.model,6,30).model;
+ assert.equal(expanded.courts[5].main,null);assert(expanded.courts[5].revision>model.courts[5].revision);assert.equal(expanded.requests.mail.status,'stale');
+ const empty={meta:{stations:6,eventAuthority},matches:[],courtAssignments:{}};
+ assert(api.request(empty,4,6,40).ok);assert.equal(empty.meta.stations,4);
+ assert.equal(api.reconcileSeatCount(model,4,40).model.courts[5].main,null);
+}
+console.log('PASS shared official/community/PTN physical removal: draining preserves seats, empty occupied court clears, old invites stay stale on re-expansion');
+
+// A first-score-free current assignment is still work on a live court.
+for(const eventAuthority of ['official','community','ticket']){
+ const make=startedAt=>({startedAt,meta:{stations:3,eventAuthority},
+  matches:[{id:'current',seq:1,station:3,status:'ready',scoreA:0,scoreB:0,log:[],completed:false},
+   {id:'next',seq:2,station:3,status:'ready',scoreA:0,scoreB:0,log:[],completed:false}],
+  courtAssignments:{court3:{currentMatchId:'current',nextMatchId:'next'}}});
+ const live=make(1);
+ assert(api.request(live,2,3,10).ok);
+ assert.equal(live.meta.stations,3);assert.equal(live.matches[0].station,3);
+ assert(live.matches[1].station<=2);assert.equal(live.courtRetirementPlan.courts[3].status,'draining');
+ assert(api.forceExit(live,3,'current',0,0,20).ok);
+ assert.equal(live.meta.stations,2);assert.equal(live.matches[0].station,0);
+ assert(api.claimDetached(live,'current',1,1,30).ok);assert.equal(live.matches[0].station,1);
+ const waiting=make(null);assert(api.request(waiting,2,3,10).ok);assert.equal(waiting.meta.stations,2);
+ assert(waiting.matches.every(m=>m.station<=2));
+}
+console.log('PASS all three modes: assigned zero-score live court stays until exit; pre-start preview does not pin a court');

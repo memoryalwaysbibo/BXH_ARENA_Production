@@ -14,6 +14,10 @@ REFERENCE = ROOT / 'referee-seats/reference/community-referee.production-2026110
 MANIFEST = ROOT / 'release/community-referee/backend-manifest.json'
 OVERLAYS = ('core.cjs', 'dispatch-core.cjs', 'scoring-service.cjs', 'service.cjs')
 ADDITIONS = ('score-diagnostics.cjs',)
+# The November 4 capture deliberately preserves its old engine. These
+# overlays have since evolved with the shared retirement engine; freeze their
+# original reviewed bytes rather than implying the old archive can run them.
+FROZEN_OVERLAYS = frozenset(('core.cjs', 'scoring-service.cjs', 'service.cjs'))
 
 
 def sha(data):
@@ -57,7 +61,9 @@ def build():
             raise ValueError('Live source file mismatch: ' + name)
     files = dict(original)
     for name in (*OVERLAYS, *ADDITIONS):
-        files[name] = (ROOT / 'referee-seats/functions' / name).read_bytes()
+        overlay_dir = (ROOT / 'release/community-referee/frozen-overlays'
+                       if name in FROZEN_OVERLAYS else ROOT / 'referee-seats/functions')
+        files[name] = (overlay_dir / name).read_bytes()
         if name == 'dispatch-core.cjs':
             # This frozen authorization candidate deliberately preserves its
             # captured engine. PASS return ships separately with a matching engine.

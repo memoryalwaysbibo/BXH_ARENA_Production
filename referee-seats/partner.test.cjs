@@ -52,3 +52,33 @@ test('partner seat and score operations never update contract quota or start sna
 for(const patch of [{scope:'contract',orderCode:''},{organizationId:42},{expiresAtMs:'10000'},{startsAtMs:'invalid'},{startsAtMs:Infinity}])test('malformed partner grant cannot enable or authorize invited referee: '+JSON.stringify(patch),async()=>{const f=await ready();Object.assign(f.profile('host').partnerOrganizer,patch);await deniesWithoutWrites(f,f.seat('main','claim','main'),/not-event-staff/);await deniesWithoutWrites(f,f.seat('host','claim','main'),/not-event-staff/);});
 test('manual partner authorization retains event-scoped three seats without a contract',async()=>{const f=fixture();const grant=f.profile('host').partnerOrganizer;delete grant.orderCode;grant.scope='manual';f.doc().partnerContractOrderCode=null;for(const a of Object.values(f.doc().eventStaffAssignments)){a.parentOrderCode=null;a.parentFingerprint=E.parentFingerprint(f.profile('host'));}await f.run('host','enable');await f.seat('main','claim','main');await f.scoreHandle(f.scoreRequest());});
 test('forged request authority cannot turn an uninvited player into a referee',async()=>{const f=await ready();delete f.doc().eventStaffAssignments.main;const r=f.command('main','claim',{station:1,slot:'main',expectedCourtRevision:0,authority:{partnerEnabled:true,parentUser:f.profile('host')},user:{role:'admin'},eventStaffAssignment:{status:'accepted',duties:['referee']}});await deniesWithoutWrites(f,f.handle(r),/not-event-staff/);});
+
+for(const eventAuthority of ['official','community'])test(`${eventAuthority} pre-draw resize retires occupied empty courts without altering retained seats or resurrecting old invites`,async()=>{
+ const f=fixture(),room=f.doc(),state=JSON.parse(room.data),host=f.profile('host');
+ room.createdByRole=eventAuthority==='official'?'staff':'player';room.ownerUid='host';room.eventAuthority=eventAuthority;room.ladderMode=eventAuthority==='community'?'general':'ranked';
+ host.role=eventAuthority==='official'?'admin':'player';
+ f.docs.get('systemConfig/refereeSeatsV1').communitySeatsEnabled=true;
+ state.meta.eventAuthority=eventAuthority;state.meta.ladderMode=room.ladderMode;state.startedAt=null;state.matches=[];state.courtAssignments={};state.bracketSize=0;
+ room.refereeSeatsV1={version:1,revision:2,courts:{1:{revision:1,main:{uid:'keep',name:'保留'},backup1:null,backup2:null},2:{revision:2,main:{uid:'removed',name:'移除'},backup1:null,backup2:null}},requests:{inv:{id:'inv',kind:'invite',station:2,status:'pending',expiresAt:10000}}};
+ room.data=JSON.stringify(state);f.docs.set('publicTournaments/BXH-PARTNER',{bracketView:JSON.stringify(state)});
+ await f.scoreHandle(f.command('host','resize',{count:1,expectedTarget:2,expectedPlanRevision:0}));
+ const reduced=f.doc(),after=JSON.parse(reduced.data),mirror=JSON.parse(f.docs.get('publicTournaments/BXH-PARTNER').bracketView);
+ assert.equal(after.meta.stations,1);assert.equal(reduced.refereeSeatsV1.courts[2].main,null);assert.equal(reduced.refereeSeatsV1.requests.inv.status,'stale');assert.equal(reduced.refereeSeatsV1.courts[1].main.uid,'keep');
+ assert.deepEqual(reduced.refereeStationUids,['keep']);assert.deepEqual(Object.keys(mirror.meta.refereeSeatNames),['1']);assert(!mirror.meta.refereeSeatsV1);
+ await f.scoreHandle(f.command('host','resize',{count:2,expectedTarget:1,expectedPlanRevision:after.courtRetirementPlan.revision}));
+ assert.equal(f.doc().refereeSeatsV1.courts[2].main,null);assert.equal(f.doc().refereeSeatsV1.requests.inv.status,'stale');assert(f.doc().refereeSeatsV1.courts[2].revision>2);
+});
+
+for(const eventAuthority of ['official','community'])test(`${eventAuthority} live court keeps its seat and score until physical retirement`,async()=>{
+ const f=fixture(),room=f.doc(),state=JSON.parse(room.data),host=f.profile('host');
+ room.createdByRole=eventAuthority==='official'?'staff':'player';room.ownerUid='host';room.eventAuthority=eventAuthority;room.ladderMode=eventAuthority==='community'?'general':'ranked';host.role=eventAuthority==='official'?'admin':'player';
+ f.docs.get('systemConfig/refereeSeatsV1').communitySeatsEnabled=true;
+ state.meta.eventAuthority=eventAuthority;state.meta.ladderMode=room.ladderMode;
+ const m=state.matches[0];m.station=2;m.scoreA=2;m.log=[{test:'preserve'}];state.courtAssignments={court1:{currentMatchId:null},court2:{currentMatchId:'m',nextMatchId:null}};
+ room.refereeSeatsV1={version:1,revision:2,courts:{1:{revision:1,main:{uid:'keep',name:'保留'},backup1:null,backup2:null},2:{revision:2,main:{uid:'removed',name:'退場'},backup1:null,backup2:null}},requests:{inv:{id:'inv',kind:'invite',station:2,status:'pending',expiresAt:10000}}};
+ room.data=JSON.stringify(state);f.docs.set('publicTournaments/BXH-PARTNER',{bracketView:JSON.stringify(state)});
+ await f.scoreHandle(f.command('host','resize',{count:1,expectedTarget:2,expectedPlanRevision:0}));
+ let saved=f.doc(),s=JSON.parse(saved.data);assert.equal(s.meta.stations,2);assert.equal(s.courtRetirementPlan.targetCount,1);assert.equal(saved.refereeSeatsV1.courts[2].main.uid,'removed');assert.equal(saved.refereeSeatsV1.requests.inv.status,'pending');
+ await f.scoreHandle(f.command('host','force-exit',{station:2,matchId:'m',expectedCourtRevisions:{2:2},expectedScoreRevision:0,expectedDispatchRevision:0,expectedExitRevision:0,playerAId:'a',playerBId:'b'}));
+ saved=f.doc();s=JSON.parse(saved.data);assert.equal(s.meta.stations,1);assert.equal(s.matches[0].station,0);assert.equal(s.matches[0].scoreA,2);assert.deepEqual(s.matches[0].log,[{test:'preserve'}]);assert.equal(saved.refereeSeatsV1.courts[2].main,null);assert.equal(saved.refereeSeatsV1.requests.inv.status,'stale');
+});

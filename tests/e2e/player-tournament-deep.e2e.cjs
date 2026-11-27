@@ -96,10 +96,9 @@ test('four-player community event reaches first confirmed referee result', async
 
   await expect(page.getByRole('region', { name: '房間總覽' })).toBeVisible();
   await page.getByRole('navigation', { name: '房間管理' }).getByRole('button', { name: '人員管理', exact: true }).click();
-  // The initial sync chain is already resolved before the subscription's
-  // first snapshot arrives. Wait for a room-scoped roster before draining it.
+  // Wait for the room-scoped initial roster subscription before draining it.
   await page.waitForFunction(() =>
-    !!state.cloudCode && adminRosterCode === state.cloudCode &&
+    !!state.cloudCode && adminRosterCode === state.cloudCode && typeof adminRosterUnsub === 'function' &&
     Array.isArray(adminRegistrationsCache) && !adminRegistrationsLoading &&
     !adminRegistrationsError && !peopleRosterBusy,
     null, { timeout: 30000 });

@@ -112,7 +112,7 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  assert.deepEqual(waiting,{ok:true,code,roomId,name:'Fixture',location:'Tainan',capacity:32,confirmedCount:0,
   phase:'waiting',startAt:now+600000,stations:1,
   registrationOpenAt:now-2000,registrationCloseAt:now+300000,registrationEnabled:true,updatedAt:now,
-  drawId:null,rosterRevision:0,eligibleCount:0,drawReady:false,participants:[],...(ptn?{ticketStatus:'reserved',delegateUid:null,delegateName:null,delegateGameId:null,canAssignDelegate:true,expansionEnabled:false,expansionMaxCapacity:null}:{})});
+  drawId:null,rosterRevision:0,eligibleCount:0,drawReady:false,participants:[],...(ptn?{ticketStatus:'reserved',delegateUid:null,delegateName:null,delegateGameId:null,canAssignDelegate:true,refereeSeatView:null,expansionEnabled:false,expansionMaxCapacity:null}:{})});
  if(ptn){
   const delegate='delegate-'+code,admin='super-'+code,unrelated='unrelated-'+code;
   await db.doc('users/'+delegate).set({active:true,role:'player',realName:'同名測試',gameId:'delegate-one'});
@@ -168,6 +168,27 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
   await release.update({roomCode:otherCode});
   await assert.rejects(create({...creation,data:{...creation.data,code:otherCode,operationId:'ticket-other-room'}}),/ticket-unavailable/);
   await release.update({roomCode:code});
+ }
+ if(ptn){
+  // The candidate uses the same Firestore seat and inbox transaction before
+  // opening; neither the reserved ticket nor the drawn bracket is consumed.
+  const {createTicketRefereeHandler}=require('../backend/ticket-referee-seat.cjs');
+  await db.doc('systemConfig/refereeSeatsV1').set({enabled:true,perCourtScoringVerified:true,ticketSeatsEnabled:true});
+  const staff='staff-'+code,qrPlayer='qr-ref-'+code;
+  await db.doc('users/'+staff).set({active:true,role:'staff',realName:'Fixture Staff'});
+  await db.doc('users/'+qrPlayer).set({active:true,role:'player',realName:'Fixture QR'});
+  const seat=createTicketRefereeHandler({db,enabled:async c=>c===code,clock:()=>now+1100});
+  const command=(uid,seatAction,operationId,fields)=>({auth:{uid},app:creation.app,data:{action:'ticket-room-referee',code,seatAction,operationId,...fields}});
+  const mail=await seat(command(owner,'invite','fixture-mail-invite',{station:1,slot:'main',targetUid:other,expectedCourtRevision:0}));
+  await seat(command(other,'accept-invite','fixture-mail-accept',{station:1,slot:'main',requestId:mail.requestId}));
+  const qr=await seat(command(owner,'create-qr','fixture-qr-create',{station:1,slot:'backup1',expectedCourtRevision:1}));
+  await seat(command(qrPlayer,'accept-qr','fixture-qr-accept',{requestId:qr.requestId,qrToken:qr.qrToken}));
+  await seat(command(staff,'claim','fixture-staff-claim',{station:1,slot:'backup2',expectedCourtRevision:2}));
+  const seatView=(await status(statusRequest)).refereeSeatView;
+  assert.equal(seatView.courts[1].backup1.name,'Fixture QR');
+  assert.equal(seatView.courts[1].backup2.name,'Fixture Staff');
+  assert.equal((await db.doc('users/'+other+'/communityRefereeInbox/ref-invite-'+mail.requestId).get()).data().refereeInviteStatus,'accepted');
+  assert.equal((await ticket.get()).data().status,'reserved');
  }
  assert.equal(createdPub.data().registrationQueueVersion,2);
  const playerIds=Array.from({length:33},(_,i)=>'ticket-'+code+'-'+i);
@@ -281,16 +302,23 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  assert.equal(savedTicket.data().usedAt,now);
  assert.equal(savedPub.data().ticketAccessV1,undefined);
  const live=await status(statusRequest);
- if(ptn)assert.equal(live.ticketStatus,'consumed');
+ if(ptn){assert.equal(live.ticketStatus,'consumed');assert.equal(live.refereeSeatView.courts[1].backup1.name,'Fixture QR');assert.equal(live.refereeSeatView.courts[1].backup2.name,'Fixture Staff');}
  assert.equal(live.phase,'live');
- if(ptn)await assert.rejects(createTicketStationsHandler({db,clock:()=>now+3000})({auth:{uid:owner},app:{},data:{action:'ticket-room-stations',code,roomId,operationId:'ticket-resize-live',expectedUpdatedAt:live.updatedAt,stations:2}}),/tournament-started/);
+ if(ptn)await assert.rejects(createTicketStationsHandler({db,clock:()=>now+3000})({auth:{uid:owner},app:{},data:{action:'ticket-room-stations',code,roomId,operationId:'ticket-resize-live-disabled',expectedUpdatedAt:live.updatedAt,stations:2}}),/court-room-not-live/);
  assert.equal(live.eligibleCount,29);
  assert.equal(live.drawId,result.drawId);
  assert.ok(live.bracket.length>live.matches.length);
  let scoredMatch={id:'not-scored'};
  if(ptn){
  const score=createTicketScoreHandler(options);
- scoredMatch=live.bracket.find(item=>item.round===0&&item.canScore);
+ const {createTicketRefereeHandler}=require('../backend/ticket-referee-seat.cjs');
+ const referee=createTicketRefereeHandler(options);
+ const scopedView=await referee({auth:{uid:other},app:creation.app,data:{action:'ticket-room-referee',code,seatAction:'view',operationId:'fixture-seat-view'}});
+ assert.deepEqual(Object.keys(scopedView.refereeSeatControl.courts),['1']);
+ assert.equal(scopedView.participants,undefined);
+ assert.equal(scopedView.bracket.length,1);assert.equal(scopedView.bracket[0].canScore,true);
+ scoredMatch=live.bracket.find(item=>item.id===scopedView.bracket[0].id);
+ assert.ok(scoredMatch?.canScore);
  let scoreUpdatedAt=scoredMatch.updatedAt;
  const scoreRequest=(command,suffix,extra={})=>({auth:creation.auth,app:creation.app,
   data:{action:'ticket-room-score',code,roomId,matchId:scoredMatch.id,matchUpdatedAt:scoreUpdatedAt,
@@ -299,6 +327,10 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  await assert.rejects(score({...scoreRequest('score','other',{side:'A',finish:'spin'}),auth:{uid:other}}),/permission-denied/);
  for(let i=0;i<4;i++){
   const request=scoreRequest('score','point-'+i,{side:'A',finish:'spin'});
+  if(i===0){
+   request.auth={uid:other};Object.assign(request.data,{station:1,expectedCourtRevision:scopedView.refereeSeatControl.courts[1].revision});
+   await assert.rejects(score({...request,auth:{uid:'qr-ref-'+code}}),/permission-denied/);
+  }
   const saved=await score(request);
   assert.equal(saved.scoreA,i+1);
   assert.equal((await score(request)).replayed,true);
@@ -350,6 +382,58 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  }
  assert.deepEqual(unchangedTicket.data(),savedTicket.data());
  await assert.rejects(forfeit({...forfeitRequest,data:{...forfeitData,operationId:'another-forfeit'}}),/forfeit-match-stale/);
+ if(ptn){
+  // Real Firestore transaction: expansion after a score and a forfeit must
+  // keep both decisions and the already-consumed voucher intact.
+  const resize=createTicketStationsHandler(options);
+  const current=(await room.get()).data();
+  const command=(operationId,expectedUpdatedAt,fields)=>({auth:creation.auth,app:creation.app,data:{action:'ticket-room-stations',code,roomId,operationId,expectedUpdatedAt,...fields}});
+  await resize(command('ticket-live-expand',current.updatedAt,{stations:2}));
+  const expanded=(await room.get()).data(),expandedState=JSON.parse(expanded.data);
+  assert.equal(expandedState.meta.stations,2);
+  assert.equal(JSON.parse((await pub.get()).data().bracketView).meta.stations,2);
+  assert.equal(expandedState.matches.find(m=>m.id===scoredMatch.id).scoreA,4);
+  assert.equal(expandedState.matches.find(m=>m.id===match.id).winnerId,match.b.id);
+  // Exercise the manager routing and correction handlers against real emulator
+  // documents after expansion; the existing score/forfeit must stay intact.
+  const routeStatus=createTicketRoomStateHandler(options);
+  const readRoute=()=>routeStatus(statusRequest);
+  const route=await readRoute(),court=route.courtControl.courts.find(c=>c.swapTargets.length);
+  assert.ok(court,'expanded field has an eligible cross-court swap');
+  const targetId=court.swapTargets[0],sourceId=court.currentMatchId;
+  const targetStation=expandedState.matches.find(m=>m.id===targetId).station;
+  const swap=command('ticket-emulator-swap',route.updatedAt,{command:'swap',station:court.station,matchId:sourceId,targetMatchId:targetId});
+  await resize(swap);assert.equal((await resize(swap)).replayed,true);
+  const readPair=async()=>{const [r,p]=await db.getAll(room,pub);return [JSON.parse(r.data().data),JSON.parse(p.data().bracketView)];};
+  for(const document of await readPair()){
+   assert.equal(document.courtAssignments['court'+court.station].currentMatchId,targetId);
+   assert.equal(document.matches.find(m=>m.id===sourceId).station,targetStation);
+  }
+  const score=createTicketScoreHandler(options);
+  const scoreRoute=async(suffix,kind='score')=>{
+   const latest=(await readRoute()).bracket.find(m=>m.id===targetId);
+   return score({auth:creation.auth,app:creation.app,data:{action:'ticket-room-score',code,roomId,matchId:targetId,
+    matchUpdatedAt:latest.updatedAt,operationId:'ticket-emulator-route-'+suffix,command:kind,...(kind==='score'?{side:'A',finish:'knockout'}:{})}});
+  };
+  await scoreRoute('first');await scoreRoute('second');await scoreRoute('confirm','confirm');
+  const previous=await readRoute();
+  assert.equal(previous.courtControl.courts.find(c=>c.station===court.station).previousMatchId,targetId);
+  const correction=command('ticket-emulator-correct',previous.updatedAt,{command:'correct',station:court.station,matchId:targetId,mode:'edit'});
+  await resize(correction);assert.equal((await resize(correction)).replayed,true);
+  for(const document of await readPair()){
+   const corrected=document.matches.find(m=>m.id===targetId);
+   assert.equal(corrected.completed,false);assert.equal(corrected.scoreA,4);assert.equal(corrected.winnerId,null);assert.equal(corrected.log.length,2);
+  }
+  await scoreRoute('reconfirm','confirm');
+  const afterRouting=(await room.get()).data();
+  await resize(command('ticket-live-shrink',afterRouting.updatedAt,{stations:1}));
+  const shrinking=(await room.get()).data(),shrinkingState=JSON.parse(shrinking.data);
+  const currentMatchId=shrinkingState.courtAssignments?.court2?.currentMatchId;
+  if(currentMatchId)await resize(command('ticket-live-exit',shrinking.updatedAt,{command:'exit',station:2,matchId:currentMatchId}));
+  assert.equal(JSON.parse((await room.get()).data().data).meta.stations,1);
+  assert.equal(JSON.parse((await pub.get()).data().bracketView).meta.stations,1);
+  assert.deepEqual((await ticket.get()).data(),savedTicket.data());
+ }
  await release.update({enabled:false});
  assert.equal((await start(startRequest)).replayed,true);
  await assert.rejects(start({...startRequest,data:{...startData,operationId:'ticket-fresh-start'}}),/bracket-started/);
