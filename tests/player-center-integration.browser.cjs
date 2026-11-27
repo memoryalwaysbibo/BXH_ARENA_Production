@@ -19,7 +19,7 @@ function fn(name){let a=core.indexOf('function '+name+'(');if(core.slice(a-6,a)=
  const hunterRecordCardHtml=r=>'<div class="hunter-record-card">第 '+r.round+' 輪 · '+esc(r.opponent.name)+' · '+(r.isWin?'勝':'敗')+'</div>';
  const renderPlayerRegisteredTab=()=>'<details class="panel"><summary>下週主題賽 · 本人正取</summary><p>已報名 · 報到尚未開放</p></details>';
  const hunterProfileCache={records:[1,2,3].map(i=>({eventCode:'BXH-E1',eventName:'手機版面驗收示意賽事',eventDate:'2026-10-18',matchId:'m'+i,completedAt:Date.parse('2026-10-18')+i,isWin:i!==3,round:i,opponent:{name:'對手 '+i}})),skipped:[]};
- ${['playerCenterResultContext','loadPlayerCenterEventResult','playerCenterEventOutcome','playerCenterEventOutcomeHtml','playerCenterEventGroups','playerCenterDataNotice','playerCenterEventHtml','renderPlayerCenterCareer','renderPlayerCenterOverview','renderPlayerProfileTab'].map(fn).join('\n')}
+ ${['playerCenterResultContext','loadPlayerCenterEventResult','playerCenterEventOutcome','playerCenterEventOutcomeHtml','playerCenterEventGroups','playerCenterDataNotice','playerCenterEventHtml','renderPlayerCenterCareer','renderPlayerCenterOverview','ownProfileEmailDisplay','renderPlayerProfileTab'].map(fn).join('\n')}
  const userProfile={gameId:'黑爸',realName:'吳健凱'};function render(){document.getElementById('app').innerHTML=renderPlayerProfileTab(userProfile);}const renderPreservingScroll=render;
  document.addEventListener('click',e=>{const target=e.target.closest('[data-action]');if(!target)return;const action=target.dataset.action;
  ${core.slice(core.indexOf('  if(action==="profile-section"){'),core.indexOf('  if(action==="test-ladder-toggle"){'))}

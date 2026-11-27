@@ -33,7 +33,7 @@ function context(){
     renderAdmin:ctx=>{calls.push({view:'admin',uid:ctx.uid});return '<p>admin</p>';},
     resetSession:()=>calls.push('reset'),handleAction:(action,target,ctx)=>calls.push({action,uid:ctx.uid})
   };
-  for(const name of ['canManageRefereeCertificates','refereeLicenseContext','renderRefereeLicensePage','renderPlayerProfileTab'])vm.runInContext(extract(name),c);
+  for(const name of ['canManageRefereeCertificates','refereeLicenseContext','renderRefereeLicensePage','ownProfileEmailDisplay','renderPlayerProfileTab'])vm.runInContext(extract(name),c);
   c.currentAuthUid=()=>c.firebaseUser?.uid||null;
   return c;
 }
