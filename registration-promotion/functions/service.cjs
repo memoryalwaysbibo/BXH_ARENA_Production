@@ -63,6 +63,7 @@ function createPromotionHandler(db,{clock=Date.now,timestamp=()=>clock(),allowUn
    if((!local&&reg.status!==(demote?'waitlist':'confirmed'))||!projected||t.confirmedCount!==pub.confirmedCount||t.waitlistCount!==pub.waitlistCount)fail('operation-outdated');
    return {...os.data().result,capacity:t.capacity,confirmedCount:t.confirmedCount,waitlistCount:t.waitlistCount,state,replayed:true};
   }
+  if(t.registrationFlowVersion===3||pub.registrationFlowVersion===3)fail('registration-v3-required');
   if(rejectV2OwnedRoom&&t.registrationQueueVersion===2)fail('registration-queue-required');
   if(regRef&&reg.status!==(demote?'confirmed':'waitlist'))fail(demote?'not-confirmed':'not-waitlist');
   const capacity=t.capacity,confirmed=t.confirmedCount,waiting=t.waitlistCount;

@@ -1,0 +1,62 @@
+{
+  "familyRegistration": {
+    "path": "family-registration.js",
+    "sha256": "ca798a8c4539683dba8679fd03ccf869158333fb37a3117742da8d4f2fe928e8",
+    "revision": "familyregistration-00045-len",
+    "generation": "1794564639444026"
+  },
+  "registrationRosterService": {
+    "path": "roster-service.js",
+    "sha256": "a00c723f4b21fd9db28b8735f18a33aebddaf4be2d837a5304d1df938462a85f",
+    "revision": "registrationrosterservice-00011-haq",
+    "generation": "1794245551101788"
+  },
+  "promoteSeatedRegistration": {
+    "path": "service.cjs",
+    "sha256": "c50fca86fae2d4de9a97cb4487b1b0a77694358e11356d44d92c1bfb1c382080",
+    "revision": "promoteseatedregistration-00004-duc",
+    "generation": "1794232120385964"
+  },
+  "registrationInvitations": {
+    "path": "registration-invitations.js",
+    "sha256": "49f87f68f6c21e18abd9af3752763ed17bfde0e00254ce35eeeae2806a262193",
+    "revision": "registrationinvitations-00008-keh",
+    "generation": "1794358217956702"
+  },
+  "lotteryRegistration": {
+    "path": "registration-selection.js",
+    "sha256": "ca2014df587d0f5dafb25d9530c5b74b82cb87a54219a4ef17a535c17761f2f1",
+    "revision": "lotteryregistration-00038-kip",
+    "generation": "1794220706384947"
+  },
+  "manageRegistrationSelection": {
+    "path": "registration-selection.js",
+    "sha256": "77ec55dc234f2a96a1b16b975cc4bee3be06918c74485fd77cbc304e61003bcb",
+    "revision": "manageregistrationselection-00006-haw",
+    "generation": "1794245188436867"
+  },
+  "manageOnsiteWaitlist": {
+    "path": "onsite-waitlist/firestore-store.js",
+    "sha256": "788589149e40c9e0148c7d0210af7b800edc89ac53dd524f31c26c3d9044a1f8",
+    "revision": "manageonsitewaitlist-00006-geg",
+    "generation": "1794236098642168"
+  },
+  "syncRegistrationRoster": {
+    "path": "registration-roster-sync.js",
+    "sha256": "cca750b88caaadd193b833d2782dc322e581d7b3f28166956bd8749c3365898d",
+    "revision": "syncregistrationroster-00006-hiw",
+    "generation": "1794195450338165"
+  },
+  "backfillRegistrationRoster": {
+    "path": "registration-roster-sync.js",
+    "sha256": "8492e02b8c55ec5f7de368f315e573309e7cc1d0965d0553a2cde963f817f540",
+    "revision": "backfillregistrationroster-00005-nuv",
+    "generation": "1793642834106512"
+  },
+  "teamRegistration": {
+    "path": "team-registration-service.js",
+    "sha256": "0f31293a02c2c2bc568e4d0c8da501a47708af9fb144e094d576cbc675482c25",
+    "revision": "teamregistration-00021-mel",
+    "generation": "1792191831296600"
+  }
+}

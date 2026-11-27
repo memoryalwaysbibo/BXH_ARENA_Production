@@ -77,6 +77,7 @@ function createRosterService(db,FieldValue,clock=Date.now,{myEventsProofEnabled=
   const user=us.data();if(!active(user))throw Error('auth-required');
   if(!ts.exists||!ps.exists)throw Error('not-found');
   const t=ts.data(),pub=ps.data();
+  if(t.registrationFlowVersion===3||pub.registrationFlowVersion===3)throw Error('registration-v3-required');
   if([t, pub].some(x=>x&&['scoreStorage','scoreBucketProjection'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');
   const s=parse(t.data),quick=quickPolicy(t,pub);
   if(quick&&(!s||typeof s!=='object'||Array.isArray(s)||!Array.isArray(s.players)))throw Error('corrupt-state');

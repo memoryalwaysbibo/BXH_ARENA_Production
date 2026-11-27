@@ -1,0 +1,51 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {randomBytes}=require('node:crypto');
+const {createRoomHandler}=require('./create-room.cjs');
+const {createApi}=require('./api.cjs');
+const {createSummarySync}=require('./summary-sync.cjs');
+assert.equal(process.env.FIRESTORE_EMULATOR_HOST,'127.0.0.1:8198');
+assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-registration-v3');
+const {initializeApp}=require('firebase-admin/app');
+const {getFirestore}=require('firebase-admin/firestore');
+const db=getFirestore(initializeApp({projectId:process.env.GCLOUD_PROJECT}));
+async function main(){
+ const suffix=randomBytes(5).toString('hex'),admin='admin-'+suffix,players=['a','b','c'].map(x=>x+'-'+suffix);
+ const now=Date.now(),eventDate=new Date(now+86400000).toISOString().slice(0,10);
+ const input={name:'Synthetic V3 lifecycle',location:'Emulator',capacity:2,stations:1,eventDate,startAt:'23:59',
+ registrationOpenAt:now-1000,registrationCloseAt:now+3600000,cancellationDeadline:now+3600000,operationId:'create-'+suffix};
+ const batch=db.batch();batch.set(db.doc('users/'+admin),{active:true,role:'super_admin'});
+ for(const uid of players)batch.set(db.doc('users/'+uid),{active:true,role:'player',realName:uid,phone:'000',profileCompleted:true});
+ await batch.commit();
+ const created=await createRoomHandler({db})({auth:{uid:admin},app:{},data:input});
+ const code=created.code,room=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code);
+ let api=createApi({db});
+ const call=(uid,action,extra={})=>api({auth:{uid},app:{},data:{code,action,...extra}});
+ await assert.rejects(call(players[0],'publishRoom'),/permission-denied/);
+ assert.equal((await call(admin,'publishRoom')).ok,true);
+ const join=uid=>call(uid,'join',{operationId:'join-'+uid});
+ const [a,b]=await Promise.all([join(players[0]),join(players[1])]);
+ assert.equal(a.status,'pending_review');assert.equal(b.status,'pending_review');
+ await assert.rejects(join(players[2]),/full/);
+ const page=await call(admin,'reviewPage',{limit:1});assert.equal(page.rows.length,1);assert(page.nextSequence);
+ await assert.rejects(call(players[0],'reviewPage'),/permission-denied/);
+ api=createApi({db}); // new service instance, same persistent state
+ assert.equal((await join(players[0])).replayed,true);
+ const approve=await call(admin,'approve',{registrationId:players[0],expectedAttemptId:a.attemptId,operationId:'approve-'+suffix});
+ assert.equal(approve.status,'confirmed');
+ await call(admin,'reject',{registrationId:players[1],expectedAttemptId:b.attemptId,operationId:'reject-'+suffix});
+ assert.equal((await join(players[2])).status,'pending_review');
+ const result=await createSummarySync({db})(code);
+ assert.equal(result.changed,true);
+ const [rs,ps,ls]=await db.getAll(room,pub,room.collection('registrationV3State').doc('ledger'));
+ assert.equal(rs.data().confirmedCount,1);assert.equal(ps.data().pendingReviewCount,1);assert.equal(ls.data().occupiedCount,2);
+ assert.equal(JSON.parse(ps.data().bracketView).players.length,1);
+ assert.equal((await room.collection('registrations').get()).size,1);
+ assert.equal((await createSummarySync({db})(code)).changed,false);
+ await call(players[0],'cancel',{expectedAttemptId:a.attemptId,operationId:'cancel-'+suffix});
+ await createSummarySync({db})(code);
+ assert.equal(JSON.parse((await pub.get()).data().bracketView).players.length,0);
+ assert.equal((await call(players[0],'mine')).hold.status,'cancelled');
+ console.log(JSON.stringify({ok:true,checks:['create','publish','permission','capacity','pagination','restart-replay','approve','reject','release','summary','cancel'],scope:'Firestore emulator; direct API factories, no production or browser'},null,2));
+}
+main().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>db.terminate());

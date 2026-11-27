@@ -13207,8 +13207,24 @@ function renderTeamAdminRegistrations(list,registrationLocked){
     section('已取消隊伍',cancelled,false,'','目前沒有取消紀錄');
 }
 
+let v3ReviewPage=null,v3ReviewBusy=false,v3ReviewError="";
+function isV3ManagementRoom(){return state.registrationFlowVersion===3||state.meta?.registrationFlowVersion===3;}
+function v3ReviewKey(){return [state.cloudCode,currentAuthUid(),engagementSessionEpoch].join("|");}
+function renderV3ReviewPanel(){
+  const page=v3ReviewPage?.key===v3ReviewKey()?v3ReviewPage:null;
+  const rows=page?.rows||[],summary=page?.summary;
+  return `<div class="panel"><div class="panel-title">V3 待審核名單</div>
+    <p class="hint">先保留名額，通過後正式入列；駁回立即釋位。每頁最多 20 筆。</p>
+    ${summary?`<div class="grid"><div>待審核 ${Number(summary.pendingReviewCount)}</div><div>正式正取 ${Number(summary.confirmedCount)}</div><div>剩餘 ${Number(summary.availableCount)}</div></div>`:''}
+    ${v3ReviewError?`<p role="alert">${esc(v3ReviewError)}</p>`:''}
+    <div class="btn-row"><button class="btn btn-primary" data-action="v3-review-refresh" ${v3ReviewBusy?'disabled':''}>讀取待審核</button><button class="btn btn-ghost" data-action="v3-review-sync" ${v3ReviewBusy?'disabled':''}>同步正式名單與摘要</button></div>
+    ${page&&!rows.length?'<p class="hint">目前沒有待審核名單。</p>':''}
+    ${rows.map(r=>`<div class="registration-mobile-card"><div class="registration-mobile-main"><strong>#${Number(r.sequence)} ${esc(r.displayName||r.uid)}</strong><small>待審核</small></div><div class="btn-row"><button class="btn btn-primary btn-sm" data-action="v3-review-approve" data-uid="${esc(r.uid)}" data-attempt="${esc(r.attemptId)}" ${v3ReviewBusy?'disabled':''}>通過</button><button class="btn btn-danger btn-sm" data-action="v3-review-reject" data-uid="${esc(r.uid)}" data-attempt="${esc(r.attemptId)}" ${v3ReviewBusy?'disabled':''}>不通過</button></div></div>`).join('')}
+    ${page?.nextSequence?`<button class="btn btn-ghost" data-action="v3-review-next" ${v3ReviewBusy?'disabled':''}>下一頁</button>`:''}</div>`;
+}
 function renderAdminRegistrationsTab(){
   if(staffRosterReadOnly())return renderStaffRegistrationRoster();
+  if(state.registrationFlowVersion===3||state.meta?.registrationFlowVersion===3)return renderV3ReviewPanel();
   const registrationLocked=currentTournamentRegistrationLocked();
   if(!state.meta || !state.meta.registrationEnabled){
     return `<div class="panel">
@@ -16400,6 +16416,7 @@ function lobbySummary(raw){
        raw.ticketRoomVersion||raw.registrationSelection||
        raw.battleMode==="team"||raw.parsedData?.meta?.battleMode==="team"||
        !/^BXH-[A-Z0-9]{4,16}$/.test(raw.code||""))return "";
+    if(raw.registrationFlowVersion===3)return "V3 先卡位後審核";
     const version=raw.registrationQueueVersion;
     const route=window.engagementService?.knownRegistrationV2DisplayRoute?.(raw.code);
     if(version===2)return route===true?"V2 排隊報名":"";
@@ -17265,7 +17282,12 @@ async function loadTournamentDetail(code){
     if(uid){
       const detailBattleMode=(data.battleMode||(data.parsedData&&data.parsedData.meta&&data.parsedData.meta.battleMode))==="team"?"team":"individual";
       let registrationLoaded=false;
-      if(detailBattleMode==="team"&&window.engagementService?.teamRegistration){
+      if(data.registrationFlowVersion===3){
+        const mine=await window.engagementService.registrationV3Operation({action:'mine',code});
+        tournamentDetailMyReg=mine.hold||null;
+        tournamentDetailMyRegs=mine.hold?[mine.hold]:[];
+        registrationLoaded=true;
+      }else if(detailBattleMode==="team"&&window.engagementService?.teamRegistration){
         try{
           const mine=await window.engagementService.teamRegistration({action:'mine',code});
           tournamentDetailMyRegs=(mine?.rows||[]).filter(row=>row&&['confirmed','waitlist'].includes(row.status));
@@ -17443,6 +17465,20 @@ function renderTournamentDetailScreen(){
         ${childRegistrationAllowed?`<button class="btn btn-ghost" data-action="submit-tournament-registration" data-participant-mode="children" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>${willBeWaitlist?'兒童加入備取':'兒童報名'}</button>`:''}
       </div>`;
     }
+  }
+  if(t.registrationFlowVersion===3&&!isGuestMode&&!publicTournamentRegistrationLocked(t)){
+    const mine=tournamentDetailMyReg;
+    const active=mine&&['pending_review','confirmed'].includes(mine.status);
+    const status=({pending_review:'卡位成功・待審核',confirmed:'審核通過・正式正取',rejected:'審核未通過・名額已釋放',cancelled:'已取消報名'})[mine?.status];
+    const canJoin=!active&&isLoggedIn&&!profileIncomplete&&effStatus==='open'&&t.availableCount!==0&&!tournamentDetailError;
+    const canCancel=active&&t.cancellationDeadline&&now<t.cancellationDeadline;
+    actionHtml=`<div class="registration-result-panel" id="registration-result-panel"><div class="registration-result-title">${esc(status||'V3 先卡位後審核')}</div>
+      <p class="hint">${active?(mine.status==='pending_review'?'已為您保留名額，等待主辦方審核。':'已取得正式參賽資格。'):'送出報名後先保留名額，經審核通過才成為正式正取。'}</p>
+      ${status&&mine.sequence?'<p>卡位序號：'+esc(String(mine.sequence))+'</p>':''}
+      ${tournamentDetailError?'<p role="alert">'+esc(tournamentDetailError)+'</p>':''}
+      ${canJoin?`<button class="btn btn-primary" data-action="v3-join" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>立即卡位</button>`:''}
+      ${canCancel?`<button class="btn btn-ghost" data-action="v3-cancel" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>取消報名</button>`:''}
+      <button class="btn btn-ghost" data-action="reload-tournament-detail" data-code="${esc(code)}">重新整理狀態</button></div>`;
   }
   if(isTeamBattle){
     actionHtml=renderTeamRegistrationAction(t,code,effStatus,now,isGuestMode,isLoggedIn,profileIncomplete,activeMyRegs,confirmedRemaining,waitlistRemaining);
@@ -19574,9 +19610,9 @@ function renderNewTournamentRegistrationVersion(){
     <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px" aria-label="報名流程版本">
       <button type="button" class="btn btn-primary" aria-pressed="true" style="min-width:0;min-height:44px;padding:5px 2px;white-space:normal;display:block;line-height:1.22"><strong>V1</strong><br>標準報名</button>
       <button type="button" class="btn btn-ghost" disabled aria-pressed="false" style="min-width:0;min-height:44px;padding:5px 2px;white-space:normal;display:block;line-height:1.22"><strong>V2</strong><br>排隊報名</button>
-      <button type="button" class="btn btn-ghost" disabled aria-pressed="false" style="min-width:0;min-height:44px;padding:5px 2px;white-space:normal;display:block;line-height:1.22"><strong>V3</strong><br>先保留名額</button>
+      <button type="button" class="btn btn-ghost" data-action="v3-create-open" ${isSuperAdmin()?'':'disabled'} aria-pressed="false" style="min-width:0;min-height:44px;padding:5px 2px;white-space:normal;display:block;line-height:1.22"><strong>V3</strong><br>先保留名額</button>
     </div>
-    <p class="hint" style="margin:6px 0 0">目前僅開放 V1。V2 和 V3 不可選擇。</p>
+    <p class="hint" style="margin:6px 0 0">${isSuperAdmin()?'V3 由最高管理員建立獨立草稿；V1 不變。':'目前僅開放 V1。'}</p>
   </fieldset>`;
 }
 
@@ -22594,6 +22630,32 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     (async()=>{try{if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();if(!cloudAvailable()||!window.cloudSync.queryMyDutyLogs) throw new Error("network");dutyLogsCache=await window.cloudSync.queryMyDutyLogs();}catch(e){console.warn("[duty logs]",e);dutyLogsCache=[];dutyLogsError="讀取執勤紀錄失敗，請確認網路與 Firestore Rules。";}finally{dutyLogsLoading=false;render();}})();
     return;
   }
+  if(["v3-review-refresh","v3-review-next","v3-review-approve","v3-review-reject","v3-review-sync"].includes(action)){
+    if(!isV3ManagementRoom()||staffRosterReadOnly()||v3ReviewBusy)return;
+    const code=state.cloudCode,key=v3ReviewKey(),op=window.engagementService?.registrationV3Operation;
+    if(!code||!op)return;
+    const page=v3ReviewPage?.key===key?v3ReviewPage:null;
+    const registrationId=target.getAttribute("data-uid"),expectedAttemptId=target.getAttribute("data-attempt");
+    if((action==="v3-review-approve"||action==="v3-review-reject")&&!page?.rows.some(r=>r.uid===registrationId&&r.attemptId===expectedAttemptId))return;
+    v3ReviewBusy=true;v3ReviewError="";render();
+    (async()=>{
+      try{
+        if(action==="v3-review-approve"||action==="v3-review-reject"){
+          const result=await op({code,action:action==="v3-review-approve"?"approve":"reject",registrationId,expectedAttemptId});
+          if(!result?.ok)throw Error("registration-operation-unconfirmed");
+          if(key!==v3ReviewKey())return;
+          showToast(action==="v3-review-approve"?"審核通過":"已駁回並釋位");
+        }else if(action==="v3-review-sync"){
+          await op({code,action:"syncSummary"});
+          if(key!==v3ReviewKey())return;
+          showToast("正式名單與摘要已同步");
+        }
+        const result=await op({code,action:"reviewPage",limit:20,afterSequence:action==="v3-review-next"?page?.nextSequence||0:0});
+        if(key===v3ReviewKey())v3ReviewPage={...result,key};
+      }catch(e){if(key===v3ReviewKey())v3ReviewError=mapRegistrationError(e);}
+      finally{v3ReviewBusy=false;render();}
+    })();return;
+  }
   if(action==="load-admin-registrations"){
     loadAdminRegistrationRows();
     return;
@@ -23836,6 +23898,25 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     render();
     return;
   }
+  if(action==="v3-join"||action==="v3-cancel"){
+    const code=target.getAttribute("data-code");
+    if(isGuestReadOnlyContext()||tournamentDetailBusy||tournamentDetailData?.registrationFlowVersion!==3||code!==tournamentDetailCode)return;
+    const mine=tournamentDetailMyReg;
+    tournamentDetailBusy=true;render();
+    (async()=>{
+      try{
+        if(action==="v3-join"&&tournamentDetailData?.roomAccessMode==="password"){
+          const access=await window.engagementService.roomAccess({action:"status",code});
+          if(!access?.hasAccess){tournamentDetailBusy=false;render();openRoomPasswordGate(code,()=>handleAction(action,target));return;}
+        }
+        const result=await window.engagementService.registrationV3Operation({action:action==="v3-join"?"join":"cancel",code,...(action==="v3-cancel"?{expectedAttemptId:mine?.attemptId}:{})});
+        if(result?.ok!==true)throw Error("registration-operation-unconfirmed");
+        showToast(result.status==="pending_review"?"卡位成功・待審核":"已取消報名");
+        publicTournamentsCache=null;invalidateMyRegistrationsCache();tournamentDetailBusy=false;
+        await loadTournamentDetail(code);
+      }catch(e){tournamentDetailBusy=false;showToast(mapRegistrationError(e),true);await loadTournamentDetail(code);}
+    })();return;
+  }
   if(action==="lobby-register"){
     if(isGuestReadOnlyContext()){ showToast("遊客模式不可報名，請切換至玩家模式", true); return; }
     const lobbyTarget=(publicTournamentsCache||[]).map(lobbySummary).find(x=>x.code===target.getAttribute("data-code"));
@@ -23844,7 +23925,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const code=target.getAttribute("data-code");
     const targetGroup=target.getAttribute("data-target-group")||"open";
     if(!code) return;
-    if(targetGroup==="children" || (lobbyTarget&&lobbyTarget.battleMode==="team")){
+    if(targetGroup==="children" || (lobbyTarget&&(lobbyTarget.battleMode==="team"||lobbyTarget.raw?.registrationFlowVersion===3))){
       resetTournamentDetailState(); tournamentDetailCode=code; tournamentDetailLoading=true; appPhase="tournament-detail"; render(); loadTournamentDetail(code); return;
     }
     target.disabled=true;
@@ -23852,7 +23933,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       try{
         if(!window.cloudSync || !window.cloudSync.joinTournamentAsPlayer) throw {code:"network"};
         const result=await window.cloudSync.joinTournamentAsPlayer(code,true);
-        showToast(result.status==="pending_draw"?"報名成功，等待抽籤":result.status==="confirmed"?"報名成功（正取）":"報名成功（備取）");
+        showToast(result.status==="pending_review"?"卡位成功・待審核":result.status==="pending_draw"?"報名成功，等待抽籤":result.status==="confirmed"?"報名成功（正取）":"報名成功（備取）");
         publicTournamentsCache=null; invalidateMyRegistrationsCache(result); render();
       }catch(e){ const raw=String(e?.message||e||""); if(raw.includes("room-password-required")){openRoomPasswordGate(code,()=>handleAction("lobby-register",target));return;} showToast(mapRegistrationError(e),true); }finally{target.disabled=false;}
     })();
@@ -24933,13 +25014,46 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(code) copyTextToClipboard(code, "已複製賽事代碼："+code);
     return;
   }
+  if(action==="v3-create-open"){
+    if(!isSuperAdmin()||!canCreateOfficialTournament())return;
+    const fields=`<div class="field"><label>賽事名稱</label><input id="v3-create-name" maxlength="80"></div>
+      <div class="field"><label>地點</label><input id="v3-create-location" maxlength="160"></div>
+      <div class="field"><label>活動日期</label><input id="v3-create-date" type="date"></div><div class="field"><label>開賽時間（台灣時間）</label><input id="v3-create-start" type="time"></div><div class="field"><label>名額（最多 192）</label><input id="v3-create-capacity" type="number" min="1" max="192" value="128"></div>
+      <div class="field"><label>裁判台數</label><input id="v3-create-stations" type="number" min="1" max="12" value="4"></div>
+      <div class="field"><label>報名開放（台灣時間）</label><input id="v3-create-open-at" type="datetime-local"></div>
+      <div class="field"><label>報名截止（台灣時間）</label><input id="v3-create-close-at" type="datetime-local"></div>
+      <div class="field"><label>取消截止（台灣時間）</label><input id="v3-create-cancel-at" type="datetime-local"></div>
+      <p class="hint">建立未發布草稿，不影響現有房間。</p>`;
+    openModal({type:"generic",title:"建立 V3 新賽事",messageIsHtml:true,message:fields,confirmLabel:"建立 V3 草稿",onConfirm:()=>{
+      if(!isSuperAdmin())return;
+      const val=id=>document.getElementById("v3-create-"+id)?.value||"";
+      const at=id=>Date.parse(val(id)+"+08:00");
+      const payload={name:val("name"),location:val("location"),eventDate:val("date"),startAt:val("start"),capacity:Number(val("capacity")),stations:Number(val("stations")),registrationOpenAt:at("open-at"),registrationCloseAt:at("close-at"),cancellationDeadline:at("cancel-at")};
+      if(!payload.name.trim()||!payload.location.trim()||!payload.eventDate||!payload.startAt||!Number.isSafeInteger(payload.capacity)||payload.capacity<1||payload.capacity>192||
+        !Number.isSafeInteger(payload.stations)||payload.stations<1||payload.stations>12||![payload.registrationOpenAt,payload.registrationCloseAt,payload.cancellationDeadline].every(Number.isFinite)||payload.registrationOpenAt>=payload.registrationCloseAt){
+        showToast("請填寫完整賽事及正確報名時間",true);return;
+      }
+      const actor=currentAuthUid();
+      (async()=>{
+        try{
+          const result=await window.engagementService.createRegistrationRoomV3(payload);
+          if(result?.ok!==true||!result.code)throw Error("registration-operation-unconfirmed");
+          if(actor!==currentAuthUid())return;
+          showToast("V3 草稿已建立："+result.code);
+          const joined=await resolveAndJoinTournamentByCode(result.code,{forcePrivate:true});
+          if(joined.ok){appPhase="app";activeTab="settings";render();}
+          else{adminTournamentListOpen=true;await loadAdminTournamentList();}
+        }catch(e){showToast(mapRegistrationError(e),true);}
+      })();
+    }});return;
+  }
   if(action==="cloud-admin-new-tournament"){
     if(!hasAdminAccess()){ showToast("目前身分沒有此操作權限。", true); return; }
     if(!canCreateOfficialTournament()){ showToast("目前帳號無法建立新的賽事。", true); return; }
     adminTournamentListOpen = false;
     render();
     const hasData = state.players.length>0 || state.matches.length>0 || (state.meta && (state.meta.name || state.meta.date || state.meta.location));
-    if(hasData){
+    if(hasData||isSuperAdmin()){
       openModal({ type:"generic", title:isTester()?"建立測試賽事":"建立新賽事", message:`目前賽事會保留，不會被刪除。確定建立一場新的空白${isTester()?"測試":""}賽事？`, confirmLabel:isTester()?"新增測試賽事":"新增賽事", showNewTournamentRegistrationVersion:!isTester(), onConfirm:()=>doNewTournament(false) });
     } else { doNewTournament(false); }
     return;
@@ -26295,6 +26409,22 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="open-registration-publish-preview"){
+    if(state.registrationFlowVersion===3||state.meta?.registrationFlowVersion===3){
+      const code=state.cloudCode,actor=currentAuthUid();
+      if(!code)return;
+      openModal({type:"generic",title:"發布 V3 報名",message:"確認發布目前已儲存的 V3 賽事及報名設定？",confirmLabel:"發布",onConfirm:()=>{
+        (async()=>{
+          try{
+            const result=await window.engagementService.registrationV3Operation({code,action:"publishRoom"});
+            if(result?.ok!==true)throw Error("registration-operation-unconfirmed");
+            if(actor!==currentAuthUid()||code!==state.cloudCode)return;
+            showToast("V3 賽事已發布");
+            await resolveAndJoinTournamentByCode(code,{forcePrivate:true});render();
+          }catch(e){showToast(mapRegistrationError(e),true);}
+        })();
+      }});return;
+    }
+
     if(!state.cloudCode && !canCreateOfficialTournament()){
       cloudAccessLimited = true;
       cloudAccessMessage = "目前帳號無法建立新的正式賽事。";

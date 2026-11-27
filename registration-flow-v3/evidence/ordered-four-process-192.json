@@ -1,0 +1,27 @@
+{
+  "capacity": 192,
+  "concurrency": 193,
+  "instances": 4,
+  "actualProcesses": true,
+  "submitted": 193,
+  "success": 192,
+  "errors": {
+    "full": 1
+  },
+  "elapsedMs": 12258.987521000001,
+  "ledger": {
+    "capacity": 192,
+    "occupiedCount": 192,
+    "pendingReviewCount": 192,
+    "confirmedCount": 0,
+    "sequence": 192,
+    "revision": 192
+  },
+  "metrics": {
+    "reads": 995,
+    "committedWrites": 576,
+    "attempts": 199,
+    "p50Ms": 3476,
+    "p95Ms": 11990
+  }
+}
