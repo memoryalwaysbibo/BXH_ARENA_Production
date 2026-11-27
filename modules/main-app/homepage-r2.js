@@ -1,7 +1,7 @@
 /* Official R2 homepage reader. Release switch requires an independently reviewed change. */
 (function(root){
 'use strict';
-const ENABLED=false;
+const ENABLED=true;
 const validVersion=v=>Number.isSafeInteger(v)&&v>=0;
 const validID=id=>typeof id==='string'&&/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(id);
 const validCards=cards=>Array.isArray(cards)&&cards.length<=20&&cards.every(c=>c&&validID(c.id)&&typeof c.name==='string'&&c.visibility==='public')&&new Set(cards.map(c=>c.id)).size===cards.length;
