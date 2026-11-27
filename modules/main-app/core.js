@@ -3620,6 +3620,12 @@ async function ensureRoomAccessGrant(code){
 async function openCommunityRefereeRoom(code,station){
   const actor=currentAuthUid();
   if(!actor)throw Error('auth-required');
+  if(/^PTN-[A-Z0-9]{6}$/.test(code||'')){
+    if(!window.BXHCommerce?.openTicketRefereeSession)throw Error('ticket-invite-unavailable');
+    await window.BXHCommerce.openTicketRefereeSession(code,station);
+    if(currentAuthUid()===actor){mailboxContext().open=false;render();}
+    return;
+  }
   const result=await window.cloudSync?.joinRoom?.(code);
   if(currentAuthUid()!==actor)return;
   if(!result?.ok)throw Error('referee-room-unavailable');
@@ -5622,6 +5628,63 @@ function publicTournamentListSignature(items){
     return {...view,players:lobbyPublicPlayers(summary)};
   }).sort((a,b)=>String(a.code).localeCompare(String(b.code))));
 }
+// Official R2 is deliberately limited to the guest lobby for the initial staged rollout.
+// Player registration and the complete catalog retain the exact R1 implementation.
+let homepageR2Controller=null,homepageR2FallbackGeneration=-1,homepageR2DetailReads=new Set(),homepageR2PageVersion=null;
+function homepageR2Eligible(){
+  return window.BXHHomepageR2?.enabled===true&&appPhase==="guest-lobby"&&guestActiveTab==="events"&&homepageR2FallbackGeneration!==lobbyGeneration&&
+    !findEventsFilters.keyword&&!findEventsFilters.date&&!findEventsFilters.region&&(!findEventsFilters.format||findEventsFilters.format==="all");
+}
+function clearHomepageR2View(){
+  homepageR2DetailReads.clear();homepageR2PageVersion=null;
+  publicTournamentsCache=null;publicTournamentsLastSignature=null;publicTournamentsFreshness="unknown";publicTournamentsDataRevision++;
+}
+function useR1HomepageForContext(){
+  if(!homepageR2Controller&&!homepageR2Eligible())return;
+  homepageR2FallbackGeneration=lobbyGeneration;
+  stopPublicTournamentsRealtime();clearHomepageR2View();publicTournamentsReconcilePromise=null;
+  if(isTournamentLobbyVisible()){startPublicTournamentsRealtime();void reconcilePublicTournamentsNow("r2-fallback");requestLobbyRender();}
+}
+function beginHomepageR2(context){
+  if(!homepageR2Eligible()||homepageR2Controller)return false;
+  const api=window.cloudSync;
+  if(typeof api?.readArenaHomeR2!=="function"||typeof api?.watchArenaHomeR2Version!=="function"){homepageR2FallbackGeneration=lobbyGeneration;return false;}
+  const valid=()=>lobbyContextIsCurrent(context)&&isTournamentLobbyVisible()&&homepageR2Eligible();
+  clearHomepageR2View();publicTournamentsCache=[];
+  const controller=window.BXHHomepageR2.create({
+    watch:(next,fail)=>api.watchArenaHomeR2Version(next,fail),read:req=>api.readArenaHomeR2(req),
+    notify:({cards,server,version})=>{
+      if(!valid()||homepageR2Controller!==controller)return;
+      if(homepageR2PageVersion!==version||!server){homepageR2DetailReads.clear();homepageR2PageVersion=version??null;}
+      const prior=new Map((publicTournamentsCache||[]).filter(x=>x.__r2DetailLoaded).map(x=>[x.code,x]));
+      const items=cards.map(card=>{const raw=window.BXHHomepageR2.toLobbyItem(card);const old=prior.get(raw.code);return old&&old.__r2Version===version?{...old,...raw}:raw;});
+      publicTournamentsRealtimeCanSkipPoll=server;
+      applyPublicTournamentItems(items,{source:{ok:true,r2:true,fromCache:!server,hasPendingWrites:false}});
+      if(!server)requestLobbyRender();
+    },fallback:()=>{if(valid()&&homepageR2Controller===controller)useR1HomepageForContext();}
+  });
+  homepageR2Controller=controller;publicTournamentsRealtimeUnsub=()=>{controller.stop();if(homepageR2Controller===controller){homepageR2Controller=null;clearHomepageR2View();}};
+  controller.start();requestLobbyRender();return true;
+}
+async function hydrateHomepageR2Card(code){
+  if(!homepageR2Controller)return;
+  const controller=homepageR2Controller,version=homepageR2PageVersion,context=captureLobbyContext();
+  if(!controller||publicTournamentsFreshness!=="server"||homepageR2DetailReads.has(code))return;
+  const original=(publicTournamentsCache||[]).find(x=>x.code===code&&x.__r2Summary&&!x.__r2DetailLoaded);
+  if(!original)return;
+  homepageR2DetailReads.add(code);
+  try{
+    const result=await window.cloudSync.readArenaHomeR2({mode:"detail",code});
+    if(homepageR2Controller!==controller||homepageR2PageVersion!==version||!lobbyContextIsCurrent(context)||publicTournamentsFreshness!=="server")return;
+    if(result?.kind==="withdrawn"){controller.invalidate();return;}
+    if(result?.kind!=="detail"||result.card?.id!==code)return;
+    const detail=window.BXHHomepageR2.toLobbyItem(result.card);
+    const next=(publicTournamentsCache||[]).map(x=>x.code===code?{...x,...detail,__r2DetailLoaded:true,__r2Version:version}:x);
+    applyPublicTournamentItems(next,{source:{ok:true,r2:true,fromCache:false,hasPendingWrites:false}});requestLobbyRender();
+  }catch{if(homepageR2Controller===controller&&homepageR2PageVersion===version)homepageR2DetailReads.delete(code);}
+}
+document.addEventListener("toggle",e=>{const el=e.target;if(el?.open&&el.matches?.("details[data-lobby-code]"))void hydrateHomepageR2Card(el.getAttribute("data-lobby-code"));},true);
+
 function applyPublicTournamentItems(items,{renderIfChanged=true,source=null}={}){
   const previousFreshness=publicTournamentsFreshness;
   if(source)publicTournamentsFreshness=publicTournamentSourceState(source);
@@ -5634,7 +5697,7 @@ function applyPublicTournamentItems(items,{renderIfChanged=true,source=null}={})
   publicTournamentsLastSignature=signature;
   publicTournamentsError=null;
   publicTournamentsLastRefreshAt=Date.now();
-  try{ if(window.BXHLobbyFastCache) window.BXHLobbyFastCache.write(next); }catch(e){}
+  try{ if(!source?.r2&&window.BXHLobbyFastCache) window.BXHLobbyFastCache.write(next); }catch(e){}
   if(changed && renderIfChanged && isTournamentLobbyVisible())requestLobbyRender();
   return changed;
 }
@@ -5655,7 +5718,7 @@ function stopPublicTournamentsRealtime(){
   }
 }
 function schedulePublicTournamentsReconcile(delay=PUBLIC_TOURNAMENTS_RECONCILE_MS){
-  if(!isTournamentLobbyVisible()) return;
+  if(!isTournamentLobbyVisible()||homepageR2Controller) return;
   if(shouldSkipLobbyIdlePoll()){
     if(publicTournamentsReconcileTimer){
       clearTimeout(publicTournamentsReconcileTimer);
@@ -5676,6 +5739,8 @@ function schedulePublicTournamentsReconcile(delay=PUBLIC_TOURNAMENTS_RECONCILE_M
 }
 async function reconcilePublicTournamentsNow(reason="manual"){
   const context=captureLobbyContext();
+  if(homepageR2Controller){await homepageR2Controller.refresh();return true;}
+  if(homepageR2Eligible()&&isTournamentLobbyVisible()){handleAction("load-public-tournaments",{getAttribute:()=>null});return true;}
   if(publicTournamentsReconcilePromise)return publicTournamentsReconcilePromise;
   if(!isTournamentLobbyVisible())return false;
   const revision=publicTournamentsDataRevision;
@@ -5715,6 +5780,7 @@ function startPublicTournamentsRealtime(){
     schedulePublicTournamentsReconcile(5000);
     return;
   }
+  if(beginHomepageR2(context))return;
   const epoch=++publicTournamentsRealtimeEpoch;
   publicTournamentsRealtimeStarting=true;
   const active=()=>epoch===publicTournamentsRealtimeEpoch&&lobbyContextIsCurrent(context)&&isTournamentLobbyVisible();
@@ -12528,10 +12594,10 @@ function previousMatchCorrectionHtml(stationNum,currentId){
 function refereeWorkstationHeader(m, stationNum, ticketView=null){
   const closed=!ticketView&&state.forcedCourtExits?.[stationNum]?.closed;
   const exitButton=!ticketView&&state.bracketSize&&(closed?canManageCourtRetirement():canForceExitCourt(stationNum))&&state.archiveStatus!=="completed"?`<details class="ref-court-maintenance"><summary>更多操作</summary><div><p>整台管理操作，與裁判入席／退出無關。</p><button type="button" class="btn btn-sm ref-court-exit-btn" data-action="${closed?'court-force-reopen':'court-force-exit'}" data-station="${stationNum}" ${courtRetirementBusy?'disabled':''}>${closed?'重新啟用本台':'裁判台強制退場'}</button></div></details>`:"";
-  const assigned=ticketView?"尚未入席":refereeDisplayForStation(stationNum);
-  const status=ticketView?{label:"等待開賽",cls:"waiting"}:refereeStationStatus(m);
-  const matchMeta=m?`${esc(refereeStageLabel(m))} · 第 ${m.indexInRound+1} 場`:"等待安排場次";
-  return `<div class="ref-workstation-head"><div class="ref-workstation-identity"><span class="court-badge">台${stationNum}</span><div><span>責任裁判</span><b title="${esc(assigned)}">${esc(assigned)}</b></div></div><div class="ref-workstation-meta"><span class="ref-station-status ${status.cls}">${status.label}</span><small>${matchMeta}｜已完成 ${ticketView?0:stationCompletedCount(stationNum)} 場${!ticketView&&refereeStationRestrictionEnabled()?"｜桌次限制":""}</small>${exitButton}</div></div>${ticketView?"":window.BXHRefereeSeats?.render(state,stationNum)||""}`;
+  const assigned=ticketView?(ticketView.refereeSeatControl?.courts?.[stationNum]?.main?.name||ticketView.refereeSeatView?.courts?.[stationNum]?.main?.name||"尚未入席"):refereeDisplayForStation(stationNum);
+  const status=ticketView?(ticketView.phase==="waiting"?{label:"等待開賽",cls:"waiting"}:ticketView.courtControl?.courts?.find(c=>c.station===stationNum)?.closed||ticketView.refereeSeatControl?.courts?.[stationNum]?.closed?{label:"已退場",cls:"waiting"}:m?{label:Math.max(Number(m.scoreA||0),Number(m.scoreB||0))>=4?"待確認賽果":m.status==="paused"?"已暫停":"進行中",cls:m.status==="paused"?"paused":"live"}:{label:"等待安排場次",cls:"waiting"}):refereeStationStatus(m);
+  const matchMeta=m?(ticketView?`第 ${Number(m.round||0)+1} 輪 · 第 ${Number(m.seq||0)+1} 場`:`${esc(refereeStageLabel(m))} · 第 ${m.indexInRound+1} 場`):"等待安排場次";
+  return `<div class="ref-workstation-head"><div class="ref-workstation-identity"><span class="court-badge">台${stationNum}</span><div><span>責任裁判</span><b title="${esc(assigned)}">${esc(assigned)}</b></div></div><div class="ref-workstation-meta"><span class="ref-station-status ${status.cls}">${status.label}</span><small>${matchMeta}｜已完成 ${ticketView?Number(ticketView.refereeSeatControl?.courts?.[stationNum]?.completedCount??ticketView.courtControl?.courts?.find(c=>c.station===stationNum)?.completedCount??0):stationCompletedCount(stationNum)} 場${!ticketView&&refereeStationRestrictionEnabled()?"｜桌次限制":""}</small>${exitButton}</div></div>${ticketView?(window.BXHRefereeSeats?.renderPendingTicketSeats?.(stationNum,ticketView)||""):window.BXHRefereeSeats?.render(state,stationNum)||""}`;
 }
 function renderQuickDecisionPanel(m, court, stationNum){
   const aName = playerName(m.a.playerId), bName = playerName(m.b.playerId);
@@ -12791,16 +12857,17 @@ function renderWaitingRefereeCourt(stationNum,ticketView=null){
   const seatsEnabled=!ticketView&&state.meta?.refereeSeatsV1?.version===1;
   return `<div class="panel court-card referee-workstation referee-workstation-waiting" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum,ticketView?ticketView.roomId:state.id)}">
     ${refereeWorkstationHeader(null,stationNum,ticketView)}
-    ${ticketView?'<div class="hint" role="status">裁判邀請及入席尚未啟用。</div>':seatsEnabled?"":'<div class="hint" role="status">本場尚未啟用三席裁判制。</div>'}
+    ${ticketView?(ticketView.refereeSeatControl?.version===1?'':'<div class="hint" role="status">裁判邀請及入席尚未啟用。</div>'):seatsEnabled?"":'<div class="hint" role="status">本場尚未啟用三席裁判制。</div>'}
     ${ticketView?renderRefereeScorePanel(null,stationNum,true):refereeWaitingControls(stationNum)}
   </div>`;
 }
 // Only render authoritative, configured courts; no seat or scoring writes here.
-window.BXHSharedTicketWaitingCourts={render(room){
+window.BXHSharedTicketWaitingCourts={header:(match,station,room)=>refereeWorkstationHeader(match,station,room),render(room){
   const n=room?.stations;
   if(room?.phase!=="waiting"||!Number.isInteger(n)||n<1||n>12)return "";
-  const grid=n===1?"court-grid court-grid-1":n===2?"court-grid court-grid-2":n===4?"court-grid court-grid-many court-grid-4fit":"court-grid court-grid-many";
-  return '<div class="'+grid+'">'+Array.from({length:n},(_,i)=>renderWaitingRefereeCourt(i+1,room)).join("")+'</div>';
+  const courts=room.scoped?Object.keys(room.refereeSeatControl?.courts||{}).map(Number).filter(i=>Number.isInteger(i)&&i>=1&&i<=n):Array.from({length:n},(_,i)=>i+1);
+  const count=courts.length,grid=count===1?"court-grid court-grid-1":count===2?"court-grid court-grid-2":count===4?"court-grid court-grid-many court-grid-4fit":"court-grid court-grid-many";
+  return '<div class="'+grid+'">'+courts.map(i=>renderWaitingRefereeCourt(i,room)).join("")+'</div>';
 }};
 function canUseRefereeSyncRecovery(){
   return !!(state?.cloudCode&&state.id&&state.startedAt&&state.meta?.battleMode!=="team"&&currentAuthUid()&&canOperateCurrentTournament());
@@ -16467,6 +16534,7 @@ function lobbyPublicPlayers(t){
   })).filter(p=>p.name);
 }
 function lobbyPlayerRosterHtml(t){
+  if(t.raw?.__r2Summary&&!t.raw.__r2DetailLoaded)return `<div class="lobby-roster-note">展開後讀取公開名單與活動介紹</div>`;
   const players=lobbyPublicPlayers(t);
   const confirmed=Number(t&&t.confirmedCount||0);
   const checked=players.filter(p=>p.checkedIn).length;
@@ -16483,6 +16551,7 @@ function lobbyPlayerRosterHtml(t){
 }
 
 function lobbyCard(t, kind, loggedIn, expanded=false){
+  if(expanded&&t.raw?.__r2Summary&&!t.raw.__r2DetailLoaded)setTimeout(()=>hydrateHomepageR2Card(t.code),0);
   const life=publicEventLifecycleStatus(t);
   const displayPhase=t.phase==="waiting" ? ((t.regStatus==="open"||t.regStatus==="full")&& (t.authority!=="community"||isCommunityQuickRegistration(t)) ? "registration" : "prestart") : life.phase;
   const authorityLabel=t.authority==="community"?"COMMUNITY":t.authority==="ticket"&&t.code?.startsWith("PTN-")?"合作賽事":"BXH OFFICIAL";
@@ -16586,6 +16655,7 @@ function renderTournamentLobby(opts={}){
 }
 function renderTournamentLobbyContent(opts={}){
   const loggedIn=!!opts.loggedIn;
+  if(homepageR2Controller&&publicTournamentsFreshness!=="server")return `<div class="panel"><div class="empty-state">正在確認最新賽事摘要……</div><button class="btn btn-ghost" data-action="refresh-public-tournaments">重新整理</button><button class="btn btn-ghost" data-action="homepage-r2-full-list">查看完整賽事列表</button></div>`;
   if(publicTournamentsCache!==null && typeof queuePublicTournamentsBackgroundRefresh==="function") queuePublicTournamentsBackgroundRefresh();
   if(publicTournamentsCache===null){
     if(!publicTournamentsLoading) setTimeout(()=>handleAction("load-public-tournaments",{getAttribute:()=>null}),0);
@@ -16612,6 +16682,7 @@ function renderTournamentLobbyContent(opts={}){
       </div>
     </div>
     ${lobbyFilterPanelHtml()}
+    ${homepageR2Controller?`<div class="lobby-filter-summary">首頁精簡列表 <button class="link-btn" data-action="homepage-r2-full-list">查看完整賽事列表</button></div>`:""}
     ${filtered?`<div class="lobby-filter-summary">目前篩選結果 ${total} 場 <button class="link-btn" data-action="clear-find-events-filter">清除篩選</button></div>`:""}
     ${lobbySectionHtml("live","🟡 比賽中",live.length,liveBody,live.length>0)}
     ${lobbySectionHtml("registration","🟢 報名中",registration.length,registrationBody,false)}
@@ -20136,7 +20207,9 @@ function render(){
     roomMissing:({code,roomId})=>{const selected=state;if(selected.id===roomId)void detachConfirmedDeletedRoom(code,selected);}});
   window.BXHQrCheckin?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,render,qr:renderQrCodeInto,applyRemote:data=>applyRemoteState(data,true),toast:showToast});
   window.BXHCommunityRefereeInvite?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,
-    inviter:()=>isCommunityRoomOwner()&&!isTester(),render,qr:renderQrCodeInto,toast:showToast,open:openCommunityRefereeRoom});
+    inviter:()=>isCommunityRoomOwner()&&!isTester(),render,qr:renderQrCodeInto,toast:showToast,open:openCommunityRefereeRoom,
+    ticketInvite:{enabled:()=>window.BXH_PTN_TICKET_SALE===true,hostRoom:()=>window.BXHCommerce?.ticketInviteHostRoom?.(),
+      command:data=>window.BXHCommerce.ticketInviteCommand(data),open:openCommunityRefereeRoom}});
   reconcileLobbyContext();
   if(appPhase!=="player-login"&&appPhase!=="player-apply")authFormRenderContext=null;
   hunterClashEntry?.session(firebaseUser,userProfile);
@@ -20168,6 +20241,8 @@ function render(){
   const refereeInviteEntry=window.BXHCommunityRefereeInvite?.renderEntry();
   if(firebaseUser&&userProfile?.active===true&&refereeInviteEntry){app.innerHTML=refereeInviteEntry;return;}
   if(firebaseUser&&userProfile?.active===true&&qrCheckinEntry){app.innerHTML=qrCheckinEntry;return;}
+  const ptnRefereeSession=window.BXHCommerce?.ticketRefereeSessionView?.();
+  if(firebaseUser&&userProfile?.active===true&&ptnRefereeSession){app.innerHTML=ptnRefereeSession;return;}
   if(appPhase==='raffle-public'){app.innerHTML=authShellOpen()+authBrandHeader()+'<button class="btn btn-ghost" data-action="raffle-home">返回首頁</button>'+renderRafflePage()+authShellClose();return;}
   if(appPhase==="partner-organizer"){ if(!roleAllowsMode(userProfile?.role,"partner_organizer",userProfile)){appPhase="landing";currentRole=null;} else {currentRole="admin";appPhase="app";activeTab="management";} }
   if(appPhase==="landing"){ app.innerHTML = renderLandingScreen(); bindAuthInputs(); return; }
@@ -20939,6 +21014,7 @@ function renderTournamentManagementTab(){
     ${adminTournamentListError && adminTournamentListItems.length?`<div class="auth-error" role="status">${esc(adminTournamentListError)}；保留已載入的清單，可重試本次讀取。</div>`:""}
   </div>
   ${window.BXHCommerce?.ownedTicketRoomCard?.()||''}
+  ${window.BXHCommerce?.ticketRefereeSupportPanel?.(userProfile?.active===true&&!isTester()&&['staff','admin','super_admin'].includes(userProfile?.role))||''}
   ${body}
   ${adminTournamentListPaginationHtml()}
   ${canCreateOfficialTournament()?`<div class="panel" style="margin-top:12px;border-style:dashed;text-align:center;"><div style="font-family:var(--font-d);font-weight:700;font-size:16px;margin-bottom:8px;">建立下一場賽事</div><button class="btn btn-primary" data-action="cloud-admin-new-tournament">＋ 新增賽事</button></div>`:""}`;
@@ -23609,8 +23685,20 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     })();
     return;
   }
+  if(action==="homepage-r2-full-list"){useR1HomepageForContext();return;}
   if(action==="load-public-tournaments" || action==="refresh-public-tournaments"){
     const context=captureLobbyContext();
+    if(homepageR2Eligible()){
+      if(homepageR2Controller){void homepageR2Controller.refresh();return;}
+      if(publicTournamentsLoading)return;
+      publicTournamentsLoading=true;
+      (async()=>{
+        try{await window.cloudSync?.connect?.();if(lobbyContextIsCurrent(context)&&cloudAvailable()&&beginHomepageR2(context))return;}catch{}
+        finally{if(lobbyContextIsCurrent(context))publicTournamentsLoading=false;}
+        if(!lobbyContextIsCurrent(context))return;homepageR2FallbackGeneration=lobbyGeneration;
+        handleAction(action,target);
+      })();return;
+    }
     if(publicTournamentsLoading) return;
     const refresh=()=>{if(isTournamentLobbyVisible())requestLobbyRender();else render();};
     if(action==="load-public-tournaments" && publicTournamentsCache===null && window.BXHLobbyFastCache){
@@ -23684,6 +23772,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       format: document.getElementById("fe-format")?.value || "all"
     };
     findEventsFiltersOpen = false;
+    if(homepageR2Controller)useR1HomepageForContext();
     renderPreservingScroll();
     return;
   }
@@ -23691,6 +23780,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     findEventsFilters = Object.assign({}, findEventsFilters, {
       keyword: document.getElementById("fe-quick-search")?.value.trim() || ""
     });
+    if(homepageR2Controller)useR1HomepageForContext();
     renderPreservingScroll();
     return;
   }
@@ -26569,7 +26659,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
 
     const stationsChanged=requestedStations!==previousCourtTarget;
     const physicalCourtCount=state.meta.stations;
-    if(stationsChanged&&state.bracketSize>0){
+    if(stationsChanged&&(state.bracketSize>0||state.meta?.refereeSeatsV1?.version===1)){
       if(!canManageCourtRetirement()){showToast("目前身分無法調整退場台",true);return;}
       // Apply other draft fields only after the cloud retirement transaction succeeds.
       const draftBefore=cloneStateForSave(state);applyMeta();const nextMeta=JSON.parse(JSON.stringify(state.meta));state=draftBefore;state.meta.stations=physicalCourtCount;

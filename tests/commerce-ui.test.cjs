@@ -592,6 +592,14 @@ test('PTN live takeover shows bracket and scores only its verified room',async()
  t.sandbox.activeTab='referee';
  const panel=t.ui.ticketManagedTab('referee');
  assert.match(panel,/court-grid court-grid-1 commerce-ptn-courts/);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../modules/main-app/referee-seats.js'),'utf8'),t.sandbox);
+ const withSeats=t.ui.ticketManagedTab('referee');
+ assert.equal((withSeats.match(/class="ref-seat-button" aria-disabled="true" disabled>/g)||[]).length,3);
+ assert.doesNotMatch(withSeats,/data-seat-action=/);
+ assert.match(withSeats,/備用裁判 2/);
+ t.ui.context().ticketRoom.refereeSeatView={version:1,courts:{1:{main:{name:'主裁甲'},backup1:null,backup2:null}}};
+ assert.match(t.ui.ticketManagedTab('referee'),/主裁甲/);
+ assert.doesNotMatch(t.ui.ticketManagedTab('referee'),/data-seat-action=/);
  assert.match(panel,/ref-vs-arena standard/);
  assert.match(panel,/旋轉勝利＋1分/);
  assert.match(panel,/擊飛勝利＋2分/);
@@ -738,12 +746,24 @@ test('PTN pre-start configured courts share the official waiting scorer without 
  const extract=(start,end)=>core.slice(core.indexOf(start),core.indexOf(end,core.indexOf(start)));
  Object.assign(t.sandbox,{POINT_LABELS:{spin:'旋轉勝利＋1分',knockout:'擊飛勝利＋2分',burst:'爆裂勝利＋2分',extreme:'極限勝利＋3分'},refereeSwapControl:()=>'<button disabled>⇄</button>'});
  vm.runInContext(extract('function refereeWorkstationHeader(','function renderQuickDecisionPanel(')+extract('function courtAtmosphereStyle(','function renderCourtCard(')+extract('function renderRefereeScorePanel(','function renderSkippedMatches(')+extract('function renderWaitingRefereeCourt(','function canUseRefereeSyncRecovery('),t.sandbox);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../modules/main-app/referee-seats.js'),'utf8'),t.sandbox);
  t.sandbox.activeTab='referee';
  const html=t.ui.ticketManagedTab('referee');
  assert.equal((html.match(/referee-workstation-waiting/g)||[]).length,4);
+ assert.equal((html.match(/class="ref-seat-button" aria-disabled="true" disabled>/g)||[]).length,12);
+ assert.doesNotMatch(html,/data-seat-action=/);
+ assert.match(html,/備用裁判 2/);
  assert.match(html,/台4/);assert.match(html,/等待開賽/);
  assert.doesNotMatch(html,/data-action="(?:score|fault|confirm-result|undo-score|rematch|commerce-ticket-score)"/);
  assert.equal((html.match(/data-type="spin" disabled/g)||[]).length,8);
+ c.ticketRoom.refereeSeatView={version:1,courts:{1:{main:{name:'主裁 <測試>'},backup1:{name:'備裁甲'},backup2:null}}};
+ const filled=t.ui.ticketManagedTab('referee');
+ assert.match(filled,/主裁 &lt;測試&gt;/);assert.match(filled,/備裁甲/);assert.match(filled,/空席/);
+ assert.doesNotMatch(filled,/data-seat-action=|主裁 <測試>/);
+ assert.equal((filled.match(/class="ref-seat-button" aria-disabled="true" disabled>/g)||[]).length,12);
+ c.ticketRoom.refereeSeatControl={version:1,canInvite:true,canJoin:false,canManage:true,courts:{1:{revision:1,main:{uid:'buyer',name:'已入席主裁'},backup1:null,backup2:null}},requests:[]};
+ const enabled=t.ui.ticketManagedTab('referee');assert.match(enabled,/已入席主裁/);assert.doesNotMatch(enabled,/裁判邀請及入席尚未啟用/);
+ assert.match(enabled,/等待開賽/);assert.doesNotMatch(enabled,/data-action="commerce-ticket-score"/);
  c.ticketRoom.stations=null;
  assert.doesNotMatch(t.ui.ticketManagedTab('referee'),/referee-workstation-waiting/);
 });
@@ -811,4 +831,142 @@ test('PTN settings adjust station count independently of closed registration, th
  assert.equal((t.ui.ticketManagedTab('referee').match(/referee-workstation-waiting/g)||[]).length,4);
  room.phase='live';await t.ui.load('ticket-room-state');t.sandbox.activeTab='settings';
  assert.doesNotMatch(t.ui.ticketManagedTab('settings'),/data-commerce-form="ticket-stations"/);
+});
+
+
+test('PTN live court controls require backend capability and use room-scoped resize/exit/claim/reopen actions',async()=>{
+ const t=setup({partner:true}),code='PTN-TST001',calls=[];
+ t.sandbox.activeTab='management';
+ const room={ok:true,code,roomId:'room-generation',name:'測試',phase:'live',stations:3,updatedAt:321,
+  bracket:[{id:'m1',station:3,scoreA:2,scoreB:0,a:{name:'甲'},b:{name:'乙'},canScore:true},{id:'detached',station:null,scoreA:1,scoreB:2,a:{name:'丙'},b:{name:'丁'},canScore:false}],
+  courtControl:{version:1,targetCount:2,courts:[{station:1,closed:false,draining:false,currentMatchId:null},{station:2,closed:true,draining:false,currentMatchId:null},{station:3,closed:false,draining:true,currentMatchId:'m1'}],detached:['detached']}};
+ t.sandbox.window.engagementService.ticketRoomOperation=async request=>{calls.push({...request});return request.action==='ticket-room-stations'?{ok:true}:{...room};};
+ await t.ui.handle('commerce-open-ticket-room',{dataset:{id:code}});
+ t.sandbox.activeTab='settings';assert.match(t.ui.ticketManagedTab('settings'),/目標 2 台，等待退場/);
+ assert.match(t.ui.ticketManagedTab('settings'),/name="stations" type="number" value="2"/);
+ t.sandbox.FormData=function(form){return Object.entries(form.values);};
+ const submit=async form=>t.listeners.submit({target:{closest:()=>form},preventDefault(){}});
+ await submit({dataset:{commerceForm:'ticket-stations'},values:{stations:'4'}});
+ assert.deepEqual(calls.at(-1),{action:'ticket-room-stations',code,roomId:room.roomId,expectedUpdatedAt:321,stations:4,operationId:'same-operation'});
+ await t.ui.load('ticket-room-state');t.sandbox.activeTab='referee';
+ const html=t.ui.ticketManagedTab('referee');assert.match(html,/待接管對戰/);assert.match(html,/丙 1 : 2 丁/);
+ assert.match(html,/data-command="exit" data-id="3"/);assert.match(html,/data-command="reopen" data-id="2"/);
+ assert.doesNotMatch(html,/<option value="[23]">/);
+ await t.ui.handle('commerce-ticket-court',{dataset:{id:'3',command:'exit'}});
+ assert.deepEqual(calls.at(-1),{action:'ticket-room-stations',code,roomId:room.roomId,expectedUpdatedAt:321,command:'exit',station:3,matchId:'m1',operationId:'same-operation'});
+ await t.ui.load('ticket-room-state');
+ await submit({dataset:{commerceForm:'ticket-court-claim',matchId:'detached'},values:{station:'1'}});
+ assert.deepEqual(calls.at(-1),{action:'ticket-room-stations',code,roomId:room.roomId,expectedUpdatedAt:321,command:'claim',station:1,matchId:'detached',operationId:'same-operation'});
+ await t.ui.load('ticket-room-state');
+ room.courtControl.deferred=['deferred'];room.bracket.push({id:'deferred',station:3,scoreA:2,scoreB:1,a:{name:'回補甲'},b:{name:'回補乙'},canScore:false});
+ await t.ui.load('ticket-room-state');
+ const passHtml=t.ui.ticketManagedTab('referee');assert.match(passHtml,/PASS 待回補對戰/);assert.match(passHtml,/回補甲 2 : 1 回補乙/);
+ await submit({dataset:{commerceForm:'ticket-court-pass-claim',matchId:'deferred'},values:{station:'1'}});
+ assert.deepEqual(calls.at(-1),{action:'ticket-room-stations',code,roomId:room.roomId,expectedUpdatedAt:321,command:'claim-skipped',station:1,matchId:'deferred',operationId:'same-operation'});
+ await t.ui.load('ticket-room-state');
+ await t.ui.handle('commerce-ticket-court',{dataset:{id:'2',command:'reopen'}});
+ assert.equal(calls.at(-1).command,'reopen');
+ await t.ui.load('ticket-room-state');t.sandbox.activeTab='live';assert.doesNotMatch(t.ui.ticketManagedTab('live'),/丙<\/span>/);
+});
+
+test('PTN accepted referee opens a scoped session and scoring uses the exact current court revision',async()=>{
+ const t=setup(),code='PTN-TST001',calls=[];let onPublic,unsub=0;
+ const room={ok:true,code,roomId:'room-generation',name:'Scoped',phase:'live',stations:4,updatedAt:321,
+  bracket:[{id:'m2',station:2,round:0,seq:1,updatedAt:12,scoreA:1,scoreB:0,a:{name:'甲'},b:{name:'乙'},canScore:true}],
+  refereeSeatControl:{version:1,canInvite:false,canJoin:false,canManage:false,courts:{2:{revision:7,main:{uid:'buyer',name:'我的席位'},backup1:null,backup2:null}},requests:[]}};
+ t.sandbox.window.cloudSync={subscribePublic(c,fn){assert.equal(c,code);onPublic=fn;return()=>{unsub++;};}};
+ t.sandbox.window.engagementService.ticketRoomOperation=async p=>{calls.push({...p});if(p.action==='ticket-room-score'){room.bracket[0].scoreA+=1;room.bracket[0].updatedAt++;room.updatedAt++;return {ok:true};}return JSON.parse(JSON.stringify(room));};
+ await t.ui.openTicketRefereeSession(code,2);
+ assert.equal(calls[0].seatAction,'view');assert.match(t.ui.ticketRefereeSessionView(),/2 號台/);assert.doesNotMatch(t.ui.ticketRefereeSessionView(),/管理房間|調整台數|1 號台/);
+ assert.equal(t.ui.verifiedBracketRoom(),null);
+ await t.ui.handle('commerce-ticket-score',{dataset:{id:'m2',command:'score',side:'A',finish:'spin'}});
+ assert.deepEqual(calls.find(x=>x.action==='ticket-room-score'),{action:'ticket-room-score',code,roomId:room.roomId,matchId:'m2',matchUpdatedAt:12,station:2,expectedCourtRevision:7,command:'score',side:'A',finish:'spin',operationId:'same-operation'});
+ let count=calls.length;onPublic({},room.updatedAt);assert.equal(calls.length,count);
+ room.updatedAt++;room.bracket[0].canScore=false;room.refereeSeatControl.courts[2].main={uid:'another',name:'接任主裁'};room.refereeSeatControl.courts[2].backup1={uid:'buyer',name:'備裁'};
+ onPublic({},room.updatedAt);for(let n=0;n<5;n++)await new Promise(resolve=>setImmediate(resolve));
+ assert.equal((t.ui.ticketRefereeSessionView().match(/data-command="score"[^>]*disabled/g)||[]).length,8);
+ count=calls.length;await t.ui.handle('commerce-ticket-score',{dataset:{id:'m2',command:'score',side:'A',finish:'spin'}});assert.equal(calls.length,count);
+ t.setUid('other');assert.equal(t.ui.ticketRefereeSessionView(),'');assert.equal(unsub,1);onPublic({},999);assert.equal(calls.length,count);
+});
+
+test('PTN host seat grid reuses the existing invitation dialog and room-specific transport',async()=>{
+ const t=setup({partner:true}),code='PTN-TST001',calls=[],opened=[];t.sandbox.activeTab='management';
+ const room={ok:true,code,roomId:'room-generation',name:'Host room',phase:'waiting',stations:1,updatedAt:321,
+  refereeSeatControl:{version:1,canInvite:true,canJoin:false,canManage:true,courts:{1:{revision:0,main:null,backup1:null,backup2:null}},requests:[]}};
+ t.sandbox.window.engagementService.ticketRoomOperation=async p=>{calls.push({...p});return p.action==='ticket-room-referee'?{ok:true,requestId:'request-id'}:room;};
+ t.sandbox.window.BXHCommunityRefereeInvite={open:(base,c)=>opened.push({base,c})};
+ await t.ui.handle('commerce-open-ticket-room',{dataset:{id:code}});t.sandbox.activeTab='referee';
+ assert.equal(t.ui.ticketInviteHostRoom().code,code);
+ const click=t.listeners.click;vm.runInContext(fs.readFileSync(path.join(__dirname,'../modules/main-app/referee-seats.js'),'utf8'),t.sandbox);
+ assert.match(t.ui.renderTicketSeatGrid(1,room),/data-ptn-seat-action="seat"/);
+ assert.match(t.ui.renderTicketSeatGrid(1,room),/邀請裁判/);
+ click({target:{closest:()=>({dataset:{ptnSeatAction:'seat',station:'1',slot:'main'}})},preventDefault(){},stopImmediatePropagation(){}});
+ assert.equal(opened[0].c,code);assert.equal(opened[0].base.expectedCourtRevision,0);
+ await t.ui.ticketInviteCommand({code,action:'invite',operationId:'room-unique-operation',station:1,slot:'main',targetUid:'fixture-player',expectedCourtRevision:0});
+ assert.deepEqual(calls.find(x=>x.seatAction==='invite'),{code,action:'ticket-room-referee',seatAction:'invite',operationId:'room-unique-operation',station:1,slot:'main',targetUid:'fixture-player',expectedCourtRevision:0});
+ assert.match(t.ui.ticketRefereeSupportPanel(true),/PTN 合作賽事裁判協助/);assert.equal(t.ui.ticketRefereeSupportPanel(false),'');
+});
+
+
+test('PTN live manager renders exactly one workstation per configured court; queued match is not a second scorecard',()=>{
+ const t=setup({partner:true}),code='PTN-TST001',c=t.ui.context();t.sandbox.activeTab='referee';
+ c.view='ticket-manage';c.ownedPtn={code};c.ticketRoomOpen=true;c.roomManageOpen=true;
+ const match=(id,station,name)=>({id,station,round:0,seq:0,canScore:true,scoreA:0,scoreB:0,a:{name},b:{name:'乙'}});
+ c.ticketRoom={ok:true,code,roomId:'fixture',phase:'live',stations:3,bracket:[match('current',1,'執行中'),match('queued',1,'下一場'),match('closed',2,'已退場')],courtControl:{version:1,targetCount:3,courts:[{station:1,currentMatchId:'current',closed:false},{station:2,currentMatchId:'closed',closed:true},{station:3,currentMatchId:null,closed:false}],detached:[]}};
+ const html=t.ui.ticketManagedTab('referee');
+ for(const n of [1,2,3])assert.equal((html.match(new RegExp('data-ptn-station="'+n+'"','g'))||[]).length,1);
+ assert.match(html,/執行中/);assert.doesNotMatch(html,/data-id="queued"|data-id="closed"|下一場/);
+ assert.equal((html.match(/data-command="score"/g)||[]).length,8);
+});
+
+test('PTN referee session drains a newer public revision received during an authoritative read',async()=>{
+ const t=setup(),code='PTN-TST001';let notify,release,reads=0;
+ const snapshot=version=>({ok:true,code,roomId:'stable',phase:'live',stations:1,updatedAt:version,bracket:[],refereeSeatControl:{version:1,canInvite:false,canJoin:false,courts:{1:{revision:version,main:{uid:'buyer',name:'裁判'+version}}},requests:[]}});
+ t.sandbox.window.cloudSync={subscribePublic(_code,callback){notify=callback;return()=>{};}};
+ t.sandbox.window.engagementService.ticketRoomOperation=async()=>{reads++;if(reads===1)return snapshot(1);if(reads===2)return new Promise(resolve=>{release=resolve;});return snapshot(3);};
+ await t.ui.openTicketRefereeSession(code,1);
+ notify({},2);assert.equal(reads,2);
+ notify({},3);assert.equal(reads,2);release(snapshot(2));
+ for(let n=0;n<8;n++)await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(reads,3);assert.equal(t.ui.context().refereeSession.room.updatedAt,3);
+ notify({},3);assert.equal(reads,3);
+});
+
+
+test('PTN standard controls expose fault, undo, pause/resume and rematch only with the matching backend capability',async()=>{
+ const t=setup(),code='PTN-TST001',calls=[];
+ const match={id:'m',station:1,round:0,seq:0,status:'in_progress',updatedAt:12,scoreA:0,scoreB:0,a:{name:'甲'},b:{name:'乙'},canScore:true,standardControls:true,faultActions:[{side:'A'}]};
+ const room={ok:true,code,roomId:'room-generation',phase:'live',stations:1,updatedAt:321,bracket:[match],refereeSeatControl:{version:1,canInvite:false,canJoin:false,courts:{1:{revision:1,main:{uid:'buyer',name:'主裁'}}},requests:[]}};
+ t.sandbox.window.engagementService.ticketRoomOperation=async p=>{calls.push({...p});if(p.action==='ticket-room-score'){if(p.command==='pause')match.status='paused';if(p.command==='resume')match.status='in_progress';match.updatedAt++;return {ok:true};}return JSON.parse(JSON.stringify(room));};
+ await t.ui.openTicketRefereeSession(code,1);let html=t.ui.ticketRefereeSessionView();
+ assert.match(html,/失誤 1\/2/);assert.match(html,/撤銷上一筆失誤/);assert.match(html,/本局重賽/);assert.match(html,/暫停比賽/);
+ match.canSkip=true;await t.ui.handle('commerce-ticket-referee-refresh',{});assert.match(t.ui.ticketRefereeSessionView(),/跳過（PASS）/);await t.ui.handle('commerce-ticket-score',{dataset:{id:'m',command:'skip'}});assert.ok(calls.some(p=>p.command==='skip'));
+ match.canSkip=false;await t.ui.handle('commerce-ticket-referee-refresh',{});assert.doesNotMatch(t.ui.ticketRefereeSessionView(),/跳過（PASS）/);
+ const beforeSwap=calls.length;await t.ui.handle('commerce-ticket-swap-view',{dataset:{id:'m'}});assert.match(t.ui.ticketRefereeSessionView(),/ref-vs-arena standard swapped/);assert.equal(calls.length,beforeSwap);
+ room.refereeSeatControl.courts[1].nextMatch={id:'next',seq:2,a:{name:'下一位甲'},b:{name:'下一位乙'}};await t.ui.handle('commerce-ticket-referee-refresh',{});assert.match(t.ui.ticketRefereeSessionView(),/下一場・第 3 場/);assert.match(t.ui.ticketRefereeSessionView(),/下一位甲 vs 下一位乙/);assert.doesNotMatch(t.ui.ticketRefereeSessionView(),/data-id="next"/);
+ await t.ui.handle('commerce-ticket-score',{dataset:{id:'m',command:'fault',side:'A'}});assert.equal(calls.find(p=>p.command==='fault').side,'A');
+ await t.ui.handle('commerce-ticket-score',{dataset:{id:'m',command:'pause'}});assert.match(t.ui.ticketRefereeSessionView(),/恢復比賽/);
+ await t.ui.handle('commerce-ticket-score',{dataset:{id:'m',command:'resume'}});assert.match(t.ui.ticketRefereeSessionView(),/暫停比賽/);
+ await t.ui.handle('commerce-ticket-score',{dataset:{id:'m',command:'rematch'}});assert.ok(calls.some(p=>p.command==='rematch'));
+ match.standardControls=false;await t.ui.handle('commerce-ticket-referee-refresh',{});html=t.ui.ticketRefereeSessionView();assert.doesNotMatch(html,/data-command="(?:fault|rematch|pause|resume)"/);
+ const count=calls.length;await t.ui.handle('commerce-ticket-score',{dataset:{id:'m',command:'rematch'}});assert.equal(calls.length,count);
+});
+
+
+test('PTN manager routes only server-listed cross-court and previous-result operations',async()=>{
+ const t=setup({partner:true}),code='PTN-TST001',calls=[];t.sandbox.activeTab='management';
+ const match=(id,station,completed=false)=>({id,station,completed,scoreA:completed?4:0,scoreB:0,a:{name:'甲'+id},b:{name:'乙'+id},canScore:!completed});
+ const room={ok:true,code,roomId:'routing-fixture',phase:'live',stations:2,updatedAt:321,bracket:[match('active',1),match('waiting',2),match('previous',1,true)],courtControl:{version:1,targetCount:2,courts:[{station:1,currentMatchId:'active',swapTargets:['waiting'],previousMatchId:'previous',closed:false,draining:false},{station:2,closed:false,draining:false}],detached:[]}};
+ t.sandbox.FormData=function(form){return Object.entries(form.values);};
+ t.sandbox.window.engagementService.ticketRoomOperation=async data=>{calls.push({...data});return data.action==='ticket-room-stations'?{ok:true}:JSON.parse(JSON.stringify(room));};
+ await t.ui.handle('commerce-open-ticket-room',{dataset:{id:code}});t.sandbox.activeTab='referee';
+ const html=t.ui.ticketManagedTab('referee');assert.match(html,/跨台換場/);assert.match(html,/修正上一場/);
+ const submit=async form=>t.listeners.submit({target:{closest:()=>form},preventDefault(){}});
+ await submit({dataset:{commerceForm:'ticket-court-swap',station:'1',matchId:'active'},values:{targetMatchId:'waiting'}});
+ assert.deepEqual(calls.at(-1),{action:'ticket-room-stations',code,roomId:room.roomId,expectedUpdatedAt:321,command:'swap',station:1,matchId:'active',targetMatchId:'waiting',operationId:'same-operation'});
+ await t.ui.load('ticket-room-state');
+ await submit({dataset:{commerceForm:'ticket-court-correct',station:'1',matchId:'previous'},values:{mode:'reset'}});
+ assert.deepEqual(calls.at(-1),{action:'ticket-room-stations',code,roomId:room.roomId,expectedUpdatedAt:321,command:'correct',station:1,matchId:'previous',mode:'reset',operationId:'same-operation'});
+ await t.ui.load('ticket-room-state');room.courtControl.courts[0].swapTargets=[];room.courtControl.courts[0].previousMatchId=null;await t.ui.load('ticket-room-state');
+ assert.doesNotMatch(t.ui.ticketManagedTab('referee'),/data-commerce-form="ticket-court-(?:swap|correct)"/);
 });

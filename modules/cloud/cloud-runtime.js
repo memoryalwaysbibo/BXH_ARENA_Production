@@ -917,7 +917,7 @@
     if(!allowAnonymous&&(!authReady || !authHandle || !authHandle.currentUser)) throw new Error("auth-required");
     if(!functionsHandle || !fnx) throw new Error("service-unavailable");
     try{
-      if(['hunterClashCommand','groupStageCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','adminOverrideRoster','adminRecoverOnsiteWaitlist','teamPreviewRead','teamCommand','teamEmblemUpload','ladderTeamDisplay','registrationDrawV2','registrationStartV2'].includes(name)||(name==='registrationRosterQueueV2'&&['create-ticket-room','ticket-ptn-status','ticket-room-state','ticket-room-schedule','ticket-room-stations','ticket-room-delegate','ticket-room-delegate-search','ticket-room-remove','ticket-room-forfeit','ticket-room-score'].includes(payload?.action))){
+      if(['hunterClashCommand','groupStageCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','adminOverrideRoster','adminRecoverOnsiteWaitlist','teamPreviewRead','teamCommand','teamEmblemUpload','ladderTeamDisplay','registrationDrawV2','registrationStartV2'].includes(name)||(name==='registrationRosterQueueV2'&&['create-ticket-room','ticket-ptn-status','ticket-room-state','ticket-room-schedule','ticket-room-stations','ticket-room-delegate','ticket-room-delegate-search','ticket-room-remove','ticket-room-forfeit','ticket-room-score','ticket-room-referee'].includes(payload?.action))){
         const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);
         if(!verified){const err=new Error('網站驗證未完成，請重新嘗試。');err.code='functions/permission-denied';err.details={reason:'app-check-unavailable'};throw err;}
         if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
@@ -1118,7 +1118,7 @@
         }
         throw Error('registration-operation-unconfirmed');
       }
-      if(['create-ticket-room','ticket-ptn-status','ticket-room-state','ticket-room-schedule','ticket-room-stations','ticket-room-delegate','ticket-room-delegate-search','ticket-room-forfeit','ticket-room-score'].includes(action))return callEngagementFunction('registrationRosterQueueV2',{...payload,action,...(unassigned?{}:{code})},30000);
+      if(['create-ticket-room','ticket-ptn-status','ticket-room-state','ticket-room-schedule','ticket-room-stations','ticket-room-delegate','ticket-room-delegate-search','ticket-room-forfeit','ticket-room-score','ticket-room-referee'].includes(action))return callEngagementFunction('registrationRosterQueueV2',{...payload,action,...(unassigned?{}:{code})},30000);
       if(['ticket-room-draw','ticket-room-start'].includes(action))return callEngagementFunction(action==='ticket-room-draw'?'registrationDrawV2':'registrationStartV2',{...payload,code},30000);
       throw Error('invalid-action');
     },
@@ -1438,6 +1438,20 @@
     // client-side in the calling code. Fine for the scale BXH actually runs
     // at; would need real indexes + pagination if this ever needs to handle
     // thousands of concurrent public tournaments.
+    // R2 card data is served exclusively by the authority-checking callable.
+    async readArenaHomeR2(request){
+      if(!cloudEnabled||!functionsHandle||!fnx)throw Error("homepage-r2-unavailable");
+      await ensureHunterClashAppCheck();
+      return (await fnx.httpsCallable(functionsHandle,"readArenaHomeR2",{timeout:15000})(request)).data;
+    },
+    watchArenaHomeR2Version(next,fail){
+      if(!cloudEnabled||!fx?.onSnapshot)throw Error("homepage-r2-unavailable");
+      return fx.onSnapshot(fx.doc(dbHandle,"arenaHomeR2","version"),{includeMetadataChanges:true},snap=>{
+        if(!snap.exists()&&snap.metadata.fromCache===false){fail(Error("homepage-r2-version-missing"));return;}
+        next({...snap.data(),fromCache:snap.metadata.fromCache,hasPendingWrites:snap.metadata.hasPendingWrites});
+      },fail);
+    },
+
     async queryPublicTournaments(){
       // Structured result — never silently collapses a real failure into an
       // empty array. {ok:true, items, rawCount} on success (even if items is
@@ -4205,6 +4219,11 @@ if(testerSession){
       catch(error){return {ok:false,reason:error?.message||"cloud-unavailable"};}
     },
     async manageRefereeSeats(data){
+      if(isPtnTicketRoom(data?.code)){
+        const {action,...fields}=data;
+        try{return await callEngagementFunction('registrationRosterQueueV2',{...fields,action:'ticket-room-referee',seatAction:action},30000);}
+        catch(error){return {ok:false,reason:error?.message||'cloud-unavailable'};}
+      }
       if(fourCourtLifecycle?.isBucket(data.code))return fourCourtLifecycle.command(data,"manageRefereeSeats");
       if(!cloudEnabled||!fnx||!functionsHandle)return {ok:false,reason:"cloud-unavailable"};
       try{const result=await fnx.httpsCallable(functionsHandle,"manageRefereeSeats")(data);return result.data;}

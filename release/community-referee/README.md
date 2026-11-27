@@ -35,6 +35,9 @@ The original two-export `index.js`, source engine, package and lockfile,
 event-staff helpers and bucket fence remain byte-identical to live. It does not
 introduce any bucket function exports or the repository's newer scoring engine.
 `backend-manifest.json` pins every before/after file hash.
+The two evolved referee overlays are retained in `frozen-overlays/` so this
+historical capture remains exactly reproducible. New retirement functionality
+requires a separate release against the current deployed engine.
 
 The dedicated CI uses this exact staged source and release Rules for real
 Emulator transactions. Set `REFEREE_FUNCTIONS_ROOT` to the staging `functions`

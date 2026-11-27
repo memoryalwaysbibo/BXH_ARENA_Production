@@ -36,8 +36,8 @@ test('manual assignment, idle claim and skipped claim move complete match record
 });
 test('retirement transfer drains a bucket and atomically shrinks the manifest',async()=>{
  const h=setup();prepare(h,state=>{state.matches.find(m=>m.id==='m5').status='paused';state.matches.find(m=>m.id==='m6').status='paused';state.courtRetirementPlan={targetCount:4,revision:1,courts:{5:{status:'draining'},6:{status:'draining'}}};});
- await h.send('host',h.cmd('retirement-transfer','m5',{targetStation:1}));assert.equal(h.read().state.meta.stations,6);assert.equal(h.read().state.matches.find(m=>m.id==='m5').station,1);
- await h.send('host',h.cmd('retirement-transfer','m6',{targetStation:1}));assert.equal(h.read().state.meta.stations,4);assert.equal(h.read().room.scoreStorage.bucketCount,1);assert(!h.docs.has(h.root+'/matchBuckets/court-2'));
+ await h.send('host',h.cmd('retirement-transfer','m5',{targetStation:1}));assert.equal(h.read().state.meta.stations,6);assert.equal(h.read().room.refereeSeatsV1.courts[5].main.uid,'ref5');assert.equal(h.read().state.matches.find(m=>m.id==='m5').station,1);
+ await h.send('host',h.cmd('retirement-transfer','m6',{targetStation:1}));assert.equal(h.read().state.meta.stations,4);assert.equal(h.read().room.scoreStorage.bucketCount,1);assert(!h.docs.has(h.root+'/matchBuckets/court-2'));assert.equal(h.read().room.refereeSeatsV1.courts[5].main,null);assert(!h.read().room.refereeStationUids.includes('ref5'));
 });
 test('automatic bucket growth at 4→5 and 8→9 preserves scores and guards stale plans',async()=>{
  for(const count of [4,8]){
