@@ -1409,6 +1409,7 @@
     // R2 card data is served exclusively by the authority-checking callable.
     async readArenaHomeR2(request){
       if(!cloudEnabled||!functionsHandle||!fnx)throw Error("homepage-r2-unavailable");
+      await ensureHunterClashAppCheck();
       return (await fnx.httpsCallable(functionsHandle,"readArenaHomeR2",{timeout:15000})(request)).data;
     },
     watchArenaHomeR2Version(next,fail){
