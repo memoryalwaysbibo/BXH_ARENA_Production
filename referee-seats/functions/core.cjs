@@ -4,6 +4,7 @@ const LABELS=Object.freeze({main:'主裁判',backup1:'備用裁判 1',backup2:'�
 const clone=value=>JSON.parse(JSON.stringify(value));
 function fail(code){throw Object.assign(new Error(code),{seatCode:code});}
 const EventStaff=require('./event-staff-core.cjs');
+const {BXHCourtRetirement:R}=require('./engine/court-retirement.cjs');
 function admin(user){return EventStaff.activeAccount(user)&&['admin','super_admin'].includes(user.role);}
 function partnerRoom(room){return room?.createdByRole==='partner_organizer';}
 function ownsPartnerEvent(room,user,uid,now){
@@ -26,12 +27,30 @@ function communityOwner(room,user,uid,authority={}){
   &&['player','staff','admin','super_admin'].includes(user.role)
   &&!!uid&&room.ownerUid===uid&&room.createdBy===uid;
 }
+// A ticket context is supplied only by the server's validated PTN lifecycle
+// adapter. The shared seat engine does not infer authority from client data.
+function ticketRoom(room,authority={}){
+ const ticket=authority.ticket;
+ return ticket?.enabled===true&&room?.eventAuthority==='ticket'&&room.createdByRole==='partner_organizer'&&
+  room.ownerUid===ticket.ownerUid&&room.createdBy===ticket.ownerUid&&room.ticketAccessV1?.roomId===ticket.roomId;
+}
+function ticketOwner(room,user,uid,authority={}){
+ return ticketRoom(room,authority)&&EventStaff.activeAccount(user)&&user.role==='player'&&uid===room.ownerUid;
+}
+function invitationRoom(room,authority={}){return communityRoom(room,authority)||ticketRoom(room,authority);}
+function invitationOwner(room,user,uid,authority={}){return communityOwner(room,user,uid,authority)||ticketOwner(room,user,uid,authority);}
+function ticketManager(room,user,uid,authority={}){
+ return ticketRoom(room,authority)&&EventStaff.activeAccount(user)&&(ticketOwner(room,user,uid,authority)||user.role==='super_admin'||user.role==='player'&&room.ptnDelegateUid===uid);
+}
 function manager(room,user,uid,authority={}){
+ if(room?.eventAuthority==='ticket')return ticketManager(room,user,uid,authority);
  return communityOwner(room,user,uid,authority)||admin(user)||(EventStaff.activeAccount(user)&&room.createdBy===uid&&user.role==='staff')||partnerOwner(room,user,uid,authority);
 }
 // Activity grants are read from the authoritative room, never user memberships or request data.
 function eligible(room,user,uid,authority={}){
  if(!uid||!EventStaff.activeAccount(user))return false;
+ if(room?.eventAuthority==='ticket')return ticketRoom(room,authority)&&(ticketManager(room,user,uid,authority)||['staff','admin','super_admin'].includes(user.role)||
+  user.role==='player'&&Object.values(room.refereeSeatsV1?.courts||{}).some(court=>!court.retired&&SLOTS.some(slot=>court[slot]?.uid===uid)));
  if(['staff','admin','super_admin'].includes(user.role))return true;
  if(communityOwner(room,user,uid,authority))return true;
  if(communityRoom(room,authority)&&user.role==='player'){
@@ -59,44 +78,49 @@ function invalidate(model,station,now){for(const req of Object.values(model.requ
  }
  if(req.station===station||req.expiresAt<=now){req.status=req.expiresAt<=now?'expired':'stale';req.resolvedAt=now;}
 }}
-function project(model,ownerUid=null,stations=0){
- const assignments={},names={},publicSeats={},uids=new Set();
- const courts={...model.courts};for(let n=1;n<=Math.min(32,Number(stations)||0);n++)courts[n]=courts[n]||{main:null,backup1:null,backup2:null};
- for(const [station,court] of Object.entries(courts)){
-  assignments[station]=[];names[station]=[];publicSeats[station]={};
-  if(ownerUid)assignments[station].push(ownerUid);
-  for(const slot of SLOTS){const seat=court[slot];publicSeats[station][slot]=seat?{name:seat.name}:null;if(seat){if(!assignments[station].includes(seat.uid))assignments[station].push(seat.uid);names[station].push(seat.name);uids.add(seat.uid);}}
- }
- return {refereeStationAssignments:assignments,refereeStationNames:names,refereeStationUids:[...uids],refereeStationRestrictionEnabled:true,refereeSeatNames:publicSeats};
-}
+function project(model,ownerUid=null,stations=0){return R.projectSeats(model,ownerUid,stations);}
+function reconcileSeatCount(model,stations,now,previousStations){return R.reconcileSeatCount(model,stations,now,previousStations);}
 function canEnableCommunity(room,state,user,uid,d,authority){
  return d.action==='enable'&&authority.communitySeatsEnabled===true
   &&room.eventAuthority==='community'&&state.meta?.eventAuthority==='community'
   &&room.ladderMode==='general'&&state.meta.ladderMode==='general'
   &&communityOwner(room,user,uid,authority);
 }
+function canEnableTicket(room,state,user,uid,authority={}){
+ return ticketRoom(room,authority)&&state?.meta?.eventAuthority==='ticket'&&state.id===authority.ticket.roomId&&ticketManager(room,user,uid,authority);
+}
+function canInvite(room,state,user,uid,authority={}){
+ return canEnableCommunity(room,state,user,uid,{action:'enable'},authority)||
+  (canEnableTicket(room,state,user,uid,authority)&&ticketOwner(room,user,uid,authority));
+}
 function transition({room,state,user,uid,d,now,id,targetUser,requesterUser,authority={}}){
  const communityEnable=canEnableCommunity(room,state,user,uid,d,authority);
  const communityHost=['invite','create-qr','revoke'].includes(d.action)&&canEnableCommunity(room,state,user,uid,{action:'enable'},authority);
+ const ticketMode=ticketRoom(room,authority)&&state.meta?.eventAuthority==='ticket'&&state.id===authority.ticket.roomId;
+ const ticketEnable=d.action==='enable'&&canEnableTicket(room,state,user,uid,authority);
+ const inviteHost=communityHost||(['invite','create-qr'].includes(d.action)&&canInvite(room,state,user,uid,authority));
  const communityAccept=['accept-invite','accept-qr'].includes(d.action)&&authority.communitySeatsEnabled===true
   &&room.eventAuthority==='community'&&state.meta?.eventAuthority==='community'
   &&room.ladderMode==='general'&&state.meta.ladderMode==='general'
   &&EventStaff.activeAccount(user)&&user.role==='player';
- writable(room,state,communityEnable||communityHost||communityAccept||
+ const inviteAccept=communityAccept||(['accept-invite','accept-qr'].includes(d.action)&&ticketMode&&EventStaff.activeAccount(user)&&user.role==='player');
+ writable(room,state,communityEnable||ticketEnable||inviteHost||inviteAccept||(ticketMode&&eligible(room,user,uid,authority))||
   (communityRoom(room,authority)&&state.meta?.eventAuthority==='community'&&eligible(room,user,uid,authority)));
- if(!communityEnable&&!communityHost&&!communityAccept&&!eligible(room,user,uid,authority))fail('not-event-staff');
- const isManager=communityEnable||communityHost||manager(room,user,uid,authority),action=d.action;
+ if(!communityEnable&&!ticketEnable&&!inviteHost&&!inviteAccept&&!eligible(room,user,uid,authority))fail('not-event-staff');
+ const isManager=communityEnable||ticketEnable||communityHost||manager(room,user,uid,authority),action=d.action;
  let model=room.refereeSeatsV1?clone(room.refereeSeatsV1):null;
- if(action==='enable'){
+ const ticketFirstSeat=ticketMode&&!model&&(inviteHost&&['invite','create-qr'].includes(action)||action==='claim'&&['staff','admin','super_admin'].includes(user.role));
+ if(action==='enable'||ticketFirstSeat){
   if(state.meta?.battleMode==='team')fail('team-not-supported');
   if(state.meta?.playMode==='enchantment')fail('enchantment-not-supported');
-  if(!isManager)fail('permission-denied');
+  if(!isManager&&!ticketFirstSeat)fail('permission-denied');
   if(model?.version===1)fail('already-enabled');
   if(Object.values(room.refereeStationAssignments||{}).some(list=>Array.isArray(list)&&list.length))fail('legacy-assignments-exist');
   const count=Number(state.meta?.stations);
-  if(!Number.isSafeInteger(count)||count<1||count>(communityEnable?32:64))fail('invalid-stations');
+  if(!Number.isSafeInteger(count)||count<1||count>(ticketMode?12:communityEnable?32:64))fail('invalid-stations');
   model={version:1,revision:0,courts:Object.fromEntries(Array.from({length:count},(_,i)=>[String(i+1),{revision:0,main:null,backup1:null,backup2:null}])),requests:{}};
- }else{
+ }
+ if(action!=='enable'){
   if(model?.version!==1)fail('not-enabled');
   const station=Number(d.station),slot=d.slot;
   if(!Number.isSafeInteger(station)||station<1||station>Number(state.meta.stations)||state.forcedCourtExits?.[station]?.closed||!SLOTS.includes(slot))fail('invalid-seat');
@@ -104,28 +128,28 @@ function transition({room,state,user,uid,d,now,id,targetUser,requesterUser,autho
   const court=model.courts[String(station)]||(model.courts[String(station)]={revision:0,main:null,backup1:null,backup2:null});
   const seat=court[slot];
   if(action==='create-qr'){
-   if(!communityHost)fail('permission-denied');
+   if(!inviteHost)fail('permission-denied');
    if(seat||d.expectedCourtRevision!==court.revision)fail('seat-stale');
    // Generating a new code replaces previous QR invitations for this seat.
    for(const r of Object.values(model.requests))if(r.kind==='qr'&&r.station===station&&r.slot===slot&&r.status==='pending')r.status='cancelled';
    model.requests[id]={id,kind:'qr',station,slot,fromUid:uid,tokenHash:d.tokenHash,courtRevision:court.revision,status:'pending',createdAt:now,expiresAt:now+300000};
   }else if(action==='accept-qr'){
    const req=model.requests[d.requestId];
-   if(!communityAccept||!req||req.kind!=='qr'||req.tokenHash!==d.tokenHash)fail('invalid-qr');
+   if(!inviteAccept||!req||req.kind!=='qr'||req.tokenHash!==d.tokenHash)fail('invalid-qr');
    if(req.status!=='pending'||req.expiresAt<=now||req.station!==station||req.slot!==slot||req.courtRevision!==court.revision||seat)fail('qr-expired');
-   if(req.fromUid===uid||!communityOwner(room,requesterUser,req.fromUid,authority))fail('permission-denied');
+   if(req.fromUid===uid||!invitationOwner(room,requesterUser,req.fromUid,authority))fail('permission-denied');
    if(SLOTS.some(s=>court[s]?.uid===uid))fail('already-seated');
    court[slot]={uid,name:display(user),joinedAt:now};court.revision++;
    req.status='accepted';req.toUid=uid;req.resolvedAt=now;invalidate(model,station,now);
   }else if(action==='invite'){
-   if(!communityHost||!EventStaff.activeAccount(targetUser)||targetUser.role!=='player'||d.targetUid===uid)fail('target-ineligible');
+   if(!inviteHost||!EventStaff.activeAccount(targetUser)||targetUser.role!=='player'||d.targetUid===uid)fail('target-ineligible');
    if(seat||d.expectedCourtRevision!==court.revision)fail('seat-stale');
    if(Object.values(model.requests).some(r=>r.kind==='invite'&&r.station===station&&r.slot===slot&&r.status==='pending'&&r.expiresAt>now&&r.courtRevision===court.revision))fail('request-pending');
    model.requests[id]={id,kind:'invite',station,slot,fromUid:uid,toUid:d.targetUid,courtRevision:court.revision,status:'pending',createdAt:now,expiresAt:now+900000};
   }else if(action==='accept-invite'){
    const req=model.requests[d.requestId];
-   if(!communityAccept||!req||req.kind!=='invite'||req.status!=='pending'||req.toUid!==uid||req.station!==station||req.slot!==slot)fail('request-unavailable');
-   if(req.expiresAt<=now||req.courtRevision!==court.revision||seat||req.fromUid!==room.ownerUid||req.fromUid!==room.createdBy||!communityOwner(room,requesterUser,req.fromUid,authority))fail('request-stale');
+   if(!inviteAccept||!req||req.kind!=='invite'||req.status!=='pending'||req.toUid!==uid||req.station!==station||req.slot!==slot)fail('request-unavailable');
+   if(req.expiresAt<=now||req.courtRevision!==court.revision||seat||req.fromUid!==room.ownerUid||req.fromUid!==room.createdBy||!invitationOwner(room,requesterUser,req.fromUid,authority))fail('request-stale');
    if(SLOTS.some(s=>court[s]?.uid===uid))fail('already-seated');
    court[slot]={uid,name:display(user),joinedAt:now};court.revision++;
    req.status='accepted';req.resolvedAt=now;invalidate(model,station,now);
@@ -145,7 +169,7 @@ function transition({room,state,user,uid,d,now,id,targetUser,requesterUser,autho
   }else{
    if(d.expectedCourtRevision!==court.revision)fail('seat-stale');
    if(action==='claim'){
-    if(communityRoom(room,authority)&&user.role==='player')fail('invitation-required');
+    if(invitationRoom(room,authority)&&user.role==='player')fail('invitation-required');
     if(seat)fail('seat-occupied');
     if(SLOTS.some(s=>court[s]?.uid===uid))fail('already-seated');
     court[slot]={uid,name:display(user),joinedAt:now};court.revision++;invalidate(model,station,now);
@@ -172,4 +196,4 @@ function transition({room,state,user,uid,d,now,id,targetUser,requesterUser,autho
  model.requests=Object.fromEntries(recent.filter((r,i)=>r.status==='pending'&&r.expiresAt>now||i<50).map(r=>[r.id,r]));
  return {model,projection:project(model),result:{ok:true,revision:model.revision,...(['request','invite','create-qr'].includes(action)?{requestId:id}:{}),...(action==='respond'?{status:model.requests[d.requestId]?.status}:{})}};
 }
-module.exports={communityRoom,communityOwner,canEnableCommunity,SLOTS,LABELS,admin,manager,eligible,partnerRoom,transition,project};
+module.exports={communityRoom,communityOwner,canEnableCommunity,ticketRoom,ticketOwner,invitationRoom,invitationOwner,canEnableTicket,canInvite,SLOTS,LABELS,admin,manager,eligible,partnerRoom,transition,project,reconcileSeatCount};
