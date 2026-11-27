@@ -39,6 +39,10 @@ def member(z, path):
 def port(live, base, candidate):
     # An unchanged PR file must never replace a different production file.
     if base == candidate:
+        # An audited dependency present in both Git refs but absent from the
+        # deployed archive is not evidence that it is safe to preserve live.
+        if live is None and candidate is not None:
+            return 'conflict', None
         return 'preserve-live', None
     if live == candidate:
         return 'already-present', None
@@ -207,6 +211,7 @@ def rollback_inventory(initial, rows):
 
 def self_test():
     assert port(b'live', b'old', b'old') == ('preserve-live', None)
+    assert port(None, b'dependency', b'dependency') == ('conflict', None)
     assert port(None, None, b'new') == ('new-module-review', b'new')
     assert port(b'other', None, b'new') == ('conflict', None)
     assert port(b'new', b'old', b'new') == ('already-present', None)
@@ -300,7 +305,7 @@ def self_test():
         report = {'commerceService': {'service.cjs': {
             'status': 'commerce-conflict-resolved-review', 'reviewSha256': sha(b'candidate')}}}
         assert verify_review_outputs(output, report) == {'commerce-conflict-resolved-review': 1}
-    print('25 review assertions passed; no cloud access')
+    print('26 review assertions passed; no cloud access')
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
@@ -378,6 +383,9 @@ def main():
     (output / 'rollback-source-inventory.json').write_text(json.dumps(inventory, indent=2))
     result = {'status': 'THREEWAY_REVIEW_ONLY_NOT_DEPLOYABLE', 'productionWrites': 0,
               'privateReviewDir': str(output), 'functions': reports,
+              'reviewRefs': {'frontBase': FRONT_BASE, 'frontHead': FRONT_HEAD,
+                             'backendBase': BACK_BASE, 'backendHead': BACK_HEAD,
+                             'settlementHead': SETTLEMENT_HEAD},
               'reviewStatusCounts': counts, 'conflictCount': counts.get('conflict', 0),
               'rollbackSourceInventory': str(output / 'rollback-source-inventory.json'),
               'rollbackValidated': False}
