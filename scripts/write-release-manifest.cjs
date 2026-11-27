@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),cp=require('node:child_process');
 const repository='memoryalwaysbibo/BXH_ARENA_Production';
-const paths=['version.json','index.html','modules/main-app/core.js','modules/cloud/cloud-runtime.js'];
+const paths=['version.json','index.html','modules/main-app/core.js','modules/main-app/homepage-r2.js','modules/cloud/cloud-runtime.js'];
 function writeManifest(directory,metadata){
  const {sourceCommit,checkoutCommit,validationRunId,deploymentRunId,deploymentAttempt,artifactCreatedAt}=metadata;
  if(!/^[a-f0-9]{40}$/.test(sourceCommit||'')||sourceCommit!==checkoutCommit)throw Error('validated-checkout-mismatch');

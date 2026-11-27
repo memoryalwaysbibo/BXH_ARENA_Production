@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {writeManifest}=require('../scripts/write-release-manifest.cjs');
 function fixture(t){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'bxh-release-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
- const contents={'version.json':JSON.stringify({version:'v14.3.42',build:'20261030.3'}),'index.html':'index','modules/main-app/core.js':'core','modules/cloud/cloud-runtime.js':'cloud'};
+ const contents={'version.json':JSON.stringify({version:'v14.3.42',build:'20261030.3'}),'index.html':'index','modules/main-app/core.js':'core','modules/main-app/homepage-r2.js':'r2','modules/cloud/cloud-runtime.js':'cloud'};
  for(const [f,s]of Object.entries(contents)){fs.mkdirSync(path.dirname(path.join(root,f)),{recursive:true});fs.writeFileSync(path.join(root,f),s);}
  const metadata={repository:'memoryalwaysbibo/BXH_ARENA_Production',sourceCommit:'a'.repeat(40),checkoutCommit:'a'.repeat(40),validationRunId:'123',deploymentRunId:'456',deploymentAttempt:'1',artifactCreatedAt:'2026-11-02T00:00:00.000Z'};
  return {root,metadata,contents};
@@ -38,3 +38,5 @@ test('CLI binds metadata to the real checkout and rejects an unrelated validated
  assert.throws(()=>cp.execFileSync(process.execPath,[script,f.root],{cwd:f.root,env:{...env,EXPECTED_COMMIT:'b'.repeat(40)},stdio:'pipe'}));
  assert.equal(fs.existsSync(path.join(f.root,'release.json')),false);
 });
+
+test('missing R2 module prevents release manifest',t=>{const f=fixture(t);fs.unlinkSync(path.join(f.root,'modules/main-app/homepage-r2.js'));assert.throws(()=>writeManifest(f.root,f.metadata));assert.equal(fs.existsSync(path.join(f.root,'release.json')),false);});
