@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'operator/PTN_expansion*.py'
+      - 'operator/PTN_expansion_cloudshell_review.sh'
       - '.github/workflows/ptn-expansion-source-review.yml'
 permissions:
   contents: read
@@ -14,3 +15,4 @@ jobs:
       - uses: actions/checkout@v4
       - run: python3 -m py_compile operator/PTN_expansion_source_audit.py operator/PTN_expansion_source_diff.py operator/PTN_expansion_threeway_review.py
       - run: python3 operator/PTN_expansion_threeway_review.py --self-test
+      - run: bash -n operator/PTN_expansion_cloudshell_review.sh
