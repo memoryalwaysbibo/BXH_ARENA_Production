@@ -22,7 +22,7 @@ def module(name, path):
 
 CAP = module('capture816', ROOT / 'operator/BXH816_capture_bucket_sources.py')
 BUILD = module('build816', ROOT / 'scripts/build-score-stability-release.py')
-BUNDLE = ROOT / 'referee-seats/reference/BXH816_bucket_sources-20261118.zip'
+BUNDLE = ROOT / 'referee-seats/reference/BXH816_bucket_sources-20261128.zip'
 
 
 def digest(data): return hashlib.sha256(data).hexdigest()
@@ -102,7 +102,7 @@ def prepare():
     after = {name: CAP.describe(name) for name in CAP.GENERATIONS}
     if before != after or policy != policy_snapshot(token, baseline): raise ValueError('Live baseline changed during preparation')
     report = {'project': CAP.PROJECT, 'readOnly': True, 'productionWrites': 0,
-              'deployed': False, 'roomsMigrated': False, 'candidateCommit': 'f660febcdad99809d63d1b10b6908ff46fef355b',
+              'deployed': False, 'roomsMigrated': False, 'candidateCommit': 'S2-20261128-review-only',
               'functions': before, 'policy': policy, 'plan': plan,
               'archives': {name: {'backupSha256': digest((backup / (name + '.zip')).read_bytes()),
                                  'candidateSha256': digest((candidate / (name + '.zip')).read_bytes())} for name in before}}

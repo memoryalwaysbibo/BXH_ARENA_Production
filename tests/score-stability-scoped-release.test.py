@@ -9,7 +9,7 @@ import zipfile
 ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('builder',ROOT/'scripts/build-score-stability-release.py')
 M=importlib.util.module_from_spec(spec);spec.loader.exec_module(M)
-BUNDLE=ROOT/'referee-seats/reference/BXH816_bucket_sources-20261118.zip'
+BUNDLE=ROOT/'referee-seats/reference/BXH816_bucket_sources-20261128.zip'
 
 class ScopedRelease(unittest.TestCase):
     def test_only_reviewed_modules_change_and_deployed_auth_entrypoints_are_preserved(self):
@@ -23,6 +23,12 @@ class ScopedRelease(unittest.TestCase):
                 self.assertIn(b'PassReturn.readiness',members['scoring-core.cjs'])
                 self.assertIn(b'singleElimRoundDispatchBlocked',members['scoring-core.cjs'])
                 self.assertIn(b'publicProjection:deferredPublic',members['bucket-scoring-service.cjs'])
+            self.assertEqual(report['functions']['commitBucketRefereeCommand']['changedFiles'], ['bucket-scoring-service.cjs','scoring-core.cjs'])
+            for function in ('manageBucketRefereeSeats','projectBucketPublicScore'):
+                self.assertEqual(report['functions'][function]['changedFiles'], ['bucket-scoring-service.cjs','dispatch-core.cjs','engine/pass-return.cjs','scoring-core.cjs'])
+            for members in files.values():
+                self.assertIn(b'manualRequestedAt:m.passReturn.manualRequestedAt',members['scoring-core.cjs'])
+                self.assertIn(b'PassReturn.readiness(state,m,{manual:true})',members['dispatch-core.cjs'])
             # All three callable/event definitions will execute identical reviewed code.
             self.assertEqual(files['commitBucketRefereeCommand'],files['manageBucketRefereeSeats'])
             self.assertEqual(files['commitBucketRefereeCommand'],files['projectBucketPublicScore'])

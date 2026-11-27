@@ -48,6 +48,15 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /arenaHomeR2/version {
+      allow get: if resource.data.keys().hasOnly(['version', 'previous'])
+        && resource.data.keys().hasAll(['version', 'previous'])
+        && resource.data.version is int && resource.data.version >= 0
+        && (resource.data.previous == null || (resource.data.previous is int
+          && resource.data.previous >= 0 && resource.data.previous < resource.data.version));
+      allow list, create, update, delete: if false;
+    }
+
     match /onlinePresence/{uid} { allow read, write: if false; }
     match /playerPrivacy/{uid} { allow read, write: if false; }
     match /playerDirectory/{uid} { allow read, write: if false; }
@@ -121,7 +130,8 @@ service cloud.firestore {
       let room = get(tourPath(code)).data;
       let changed = request.resource.data.diff(resource.data).affectedKeys();
       let enabled = room.get('refereeSeatsV1', {}).get('version', 0) == 1;
-      return !changed.hasAny(['registrationQueueVersion','refereeSeatsV1','refereeSeatNames','bucketMigration']) && room.get('registrationQueueVersion', 0) != 2
+      return !changed.hasAny(['registrationFlowVersion','registrationSummaryRevision','registrationFormalRevision','registrationQueueVersion','refereeSeatsV1','refereeSeatNames','bucketMigration']) && room.get('registrationQueueVersion', 0) != 2
+        && (room.get('registrationFlowVersion', 0) != 3 || !changed.hasAny(['capacity','confirmedCount','waitlistCount','pendingReviewCount','occupiedCount','availableCount','registrationEnabled','registrationOpenAt','registrationCloseAt','cancellationDeadline','registrationStatus','registrationVisibility','publishedAt','visibility','waitlistEnabled','waitlistCapacity']))
         && (!enabled || !privateDoc || !changed.hasAny(['refereeStationAssignments','refereeStationNames','refereeStationUids','refereeStationRestrictionEnabled']))
         && (!enabled || !changed.hasAny([privateDoc ? 'data' : 'bracketView'])
           || isAdminOrAbove() || isCommunityOwnerData(room) || isStaffOfficialCreatorExistingData(room));
@@ -997,12 +1007,13 @@ service cloud.firestore {
     }
 
     function registrationQueueOwnsRoom(d) { return d.get('registrationQueueVersion', 0) == 2; }
-    function noOperationsCreate(d) { return !d.keys().hasAny(['registrationQueueVersion','refereeSeatsV1','refereeSeatNames','bucketMigration','qrCheckin','qrCheckinManaged','qrCheckinRevision','systemClosed','systemClosure','entrySelectionRevision','callRevision','onsiteWaitlistServerOwned','onsiteWaitlistFinalized','onsiteWaitlistDrawEnabled','onsiteWaitlistDraw','onsiteWaitlistRuntimeRevision']); }
+    function noOperationsCreate(d) { return !d.keys().hasAny(['registrationFlowVersion','registrationSummaryRevision','registrationFormalRevision','pendingReviewCount','occupiedCount','availableCount','registrationQueueVersion','refereeSeatsV1','refereeSeatNames','bucketMigration','qrCheckin','qrCheckinManaged','qrCheckinRevision','systemClosed','systemClosure','entrySelectionRevision','callRevision','onsiteWaitlistServerOwned','onsiteWaitlistFinalized','onsiteWaitlistDrawEnabled','onsiteWaitlistDraw','onsiteWaitlistRuntimeRevision']); }
     function completedRoomExpiryValid() { return resource.data.get('eventAuthority','') != 'community' || resource.data.get('archiveStatus','') != 'completed' || request.resource.data.get('expiresAt',null) == null; }
     function noOperationsChange() { return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['systemClosed','systemClosure','registrationSelection','registeredCount']); }
     function lotteryRuntimeWritable() { return !('registrationSelection' in resource.data) || (!(resource.data.registrationSelection.status in ['drawing','deleting']) && request.resource.data.get('capacity',null) == resource.data.get('capacity',null)); }
-    function legacyRegistrationWritable(code) { let t = get(tourPath(code)).data; return !registrationQueueOwnsRoom(t) && !onsiteWaitlistOwned(t) && !('registrationSelection' in t); }
+    function legacyRegistrationWritable(code) { let t = get(tourPath(code)).data; return t.get('registrationFlowVersion', 0) != 3 && !registrationQueueOwnsRoom(t) && !onsiteWaitlistOwned(t) && !('registrationSelection' in t); }
     function tournamentOperationsUnlocked(code) { return operationsUnlocked(get(/databases/$(database)/documents/tournaments/$(code)).data); }
+    match /registrationV3RoomCreateOperations/{id} { allow read, write: if false; }
     match /tournamentActivity/{code} { allow read, write: if false; }
     match /systemSettings/releaseControls { allow read, write: if false; }
     match /systemSettings/accountManagementControl { allow read, write: if false; }
@@ -1028,6 +1039,9 @@ service cloud.firestore {
         && isPartnerTournamentData(myProfile(), getAfter(/databases/$(database)/documents/tournaments/$(request.resource.data.lastRoomCode)).data);
     }
     match /tournaments/{code} {
+      match /registrationV3Holds/{id} { allow read, write: if false; }
+      match /registrationV3State/{id} { allow read, write: if false; }
+      match /registrationV3Operations/{id} { allow read, write: if false; }
       match /refereeSeatOperations/{id} { allow read, write: if false; }
       match /refereeScoreOperations/{id} { allow read, write: if false; }
       match /refereeScoreAudit/{id} { allow read, write: if false; }

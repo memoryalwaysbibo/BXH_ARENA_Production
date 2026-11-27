@@ -39,7 +39,7 @@ on:
       - 'operator/BXH816_prepare_trial.py'
       - 'scripts/build-score-stability-release.py'
       - 'release/score-stability/**'
-      - 'referee-seats/reference/BXH816_bucket_sources-20261118.zip'
+      - 'referee-seats/reference/BXH816_bucket_sources-20261128.zip'
       - 'firebase.scoped-callable-lab.json'
       - 'docs/four-court-buckets.md'
       - '.github/workflows/four-court-buckets-lab.yml'
@@ -71,7 +71,7 @@ jobs:
           python3 -B tests/score-stability-scoped-release.test.py
           python3 -B tests/score-stability-trial-prepare.test.py
           python3 -B tests/score-stability-trial-release.test.py
-          python3 -B scripts/build-score-stability-release.py --bundle referee-seats/reference/BXH816_bucket_sources-20261118.zip --output test-results/score-stability-scoped
+          python3 -B scripts/build-score-stability-release.py --bundle referee-seats/reference/BXH816_bucket_sources-20261128.zip --output test-results/score-stability-scoped
       - name: Install isolated emulator dependencies
         run: npm install --prefix /tmp/bxh-four-court-deps --no-save --ignore-scripts firebase-tools@14 firebase-admin@13.10.0 firebase-functions@6.6.0 playwright@1.55.0 esbuild@0.25.0 firebase@12 @firebase/rules-unit-testing@5
       - name: Verify same-value key order and Timestamp compatibility

@@ -13,9 +13,9 @@ import urllib.error
 import zipfile
 
 PROJECT = 'bxh-arena'
-GENERATIONS = {'commitBucketRefereeCommand': '1794722128839589',
-               'manageBucketRefereeSeats': '1794722195891401',
-               'projectBucketPublicScore': '1794722273213484'}
+GENERATIONS = {'commitBucketRefereeCommand': '1795789649341559',
+               'manageBucketRefereeSeats': '1795789577496578',
+               'projectBucketPublicScore': '1795789721560852'}
 
 
 def command(args):

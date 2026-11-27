@@ -6,9 +6,9 @@ from pathlib import Path
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-BUNDLE_SHA = 'aefe79320490411e4fc8b2f4b91c5a2fb8f710b98ecb59d52a727a31731d5eac'
-RULES_SHA = '23f7acd2e06c428f3a628d1dad02d703b746cd28d1f48e6caf8c606248982e68'
-GENS = {'commitBucketRefereeCommand': '1794722128839589', 'manageBucketRefereeSeats': '1794722195891401', 'projectBucketPublicScore': '1794722273213484'}
+BUNDLE_SHA = '6cc3622e824b63aa6357a3ee9a10431aa8a39a5022a813d42b29a6334c63e1b9'
+RULES_SHA = '004f5e93fada69dfd14c9b614d8b14fb69901b3d593491f227f8ddb189313377'
+GENS = {'commitBucketRefereeCommand': '1795789649341559', 'manageBucketRefereeSeats': '1795789577496578', 'projectBucketPublicScore': '1795789721560852'}
 COPY = ('bucket-state.cjs', 'bucket-runtime.cjs', 'bucket-scoring-service.cjs', 'bucket-public-projection.cjs',
         'bucket-projection-trigger.cjs', 'bucket-migration-plan.cjs', 'bucket-migration-service.cjs',
         'bucket-migration-operator.cjs', 'bucket-general-archive.cjs', 'score-diagnostics.cjs',
@@ -26,21 +26,20 @@ def once(text, old, new):
 
 
 def overlay_scoring(live, candidate):
-    # Retain deployed official-only authorization and all existing exports.
-    text = once(live, 'const POINTS=', "const PassReturn=require('./engine/pass-return.cjs').BXHPassReturn;\nconst POINTS=")
-    old = " if(m.callPass?.waitFor?.some(id=>!state.matches.find(x=>x.id===id)?.completed))fail('pass-protected');"
-    text = once(text, old, old + "\n if(m.skippedAt&&PassReturn.supported(state))fail(PassReturn.readiness(state,m).ok?'pass-awaiting-dispatch':'pass-protected');")
-    old = "  if(engine.singleElimBronzeBeforeFinalBlocked(m,state.matches,state.meta))fail('bronze-before-final');"
-    text = once(text, old, old + "\n  if(['start','ready'].includes(action)&&engine.singleElimRoundDispatchBlocked(m,state.matches,state.meta))fail('previous-round-waiting');")
-    old = next(line for line in live.splitlines() if line.startswith(' mirror.matches='))
-    new = next(line for line in candidate.splitlines() if line.startswith(' mirror.matches='))
-    return once(text, old, new)
+    # The current live baseline already has PASS and round guards. Add only
+    # the two reviewed manual-return fields, without replacing authorization.
+    old = "requestedStation:m.passReturn.requestedStation||null,waitFor:"
+    new = "requestedStation:m.passReturn.requestedStation||null,manualRequestedAt:m.passReturn.manualRequestedAt||null,manualWaitFor:m.passReturn.manualWaitFor||[],waitFor:"
+    if candidate.count(new) != 1: raise ValueError('Candidate projection anchor changed')
+    return once(live, old, new)
 
 
 def overlay_dispatch(live):
-    old = "const ACTIONS=new Set("
-    text = once(live, old, "const PassReturn=require('./engine/pass-return.cjs').BXHPassReturn;\n" + old)
-    return once(text, "  if(protectedPass(state,m))fail('pass-protected');", "  if(protectedPass(state,m)&&!(action==='claim-skipped'&&PassReturn.supported(state)&&PassReturn.readiness(state,m).ok))fail('pass-protected');")
+    old = "PassReturn.readiness(state,m).ok))fail('pass-protected');"
+    new = "PassReturn.readiness(state,m,{manual:true}).ok))fail('pass-protected');"
+    # The score function already has the reviewed manual PASS dispatch guard.
+    if live.count(new) == 1 and live.count(old) == 0: return live
+    return once(live, old, new)
 
 
 def overlay_rules(live):

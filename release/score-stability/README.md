@@ -1,4 +1,27 @@
-# BXH816 captured-source overlay — review only
+# S2 / BXH816 captured-source overlay — review only
+
+## Current baseline (2026-11-28 Taiwan time)
+
+The operator supplied a fresh read-only capture, `referee-seats/reference/BXH816_bucket_sources-20261128.zip`, SHA-256 `6cc3622e824b63aa6357a3ee9a10431aa8a39a5022a813d42b29a6334c63e1b9`. All selected file hashes and current Rules hash were checked. No production writes were made.
+
+| Function | Captured revision | Immutable source generation |
+| --- | --- | --- |
+| commitBucketRefereeCommand | commitbucketrefereecommand-00009-hel | 1795789649341559 |
+| manageBucketRefereeSeats | managebucketrefereeseats-00004-vom | 1795789577496578 |
+| projectBucketPublicScore | projectbucketpublicscore-00004-zup | 1795789721560852 |
+
+Both existing pilot rooms remain on S1 (`bxh-match-buckets-v1`, one bucket). S2 and asynchronous PASS flags are absent, and migration is disabled. The current capture already contains the reviewed court-retirement engine; all four engine dependency equality checks remain mandatory. The live score service already has manual PASS dispatch and court seat reconciliation. The seat and publisher source maps receive only the reviewed matching score service / PASS helper / dispatch guard. All three get the two reviewed manual PASS projection fields, while the official-only authorization, protected entrypoints and seat service remain byte-identical to their respective live sources. The resulting selected maps are identical. The Rules overlay changes exactly one opt-in schema predicate; current registration and community permissions remain untouched. Current Rules SHA-256: `004f5e93fada69dfd14c9b614d8b14fb69901b3d593491f227f8ddb189313377`; staged Rules SHA-256: `fe2625376f5acc5a1983d69cd6027972d14b34b9abfa6eeba248098f1b7776b6`.
+
+Reproduce offline (output directory must not already exist):
+
+```sh
+python3 -B tests/score-stability-scoped-release.test.py
+python3 -B scripts/build-score-stability-release.py --bundle referee-seats/reference/BXH816_bucket_sources-20261128.zip --output test-results/score-stability-scoped
+```
+
+The current upload is a selected review bundle, not full deployable immutable archives. Full archives must still be re-downloaded from the exact generations and checked against the captured archive hashes via the read-only preparation tool. `BXH816_release_trial.py` remains pinned to the historical reviewed release and does not authorize the new S2 preparation; a separate review and explicit authorization is required before any deployment. No migration, flag changes or room writes are authorized. Full isolated browser/event CI remains required, and production latency has not been established.
+
+## Historical evidence (2026-11-18; not the current deployment baseline)
 
 This package is built from the operator's read-only 2026-11-18 source capture, rather than replacing production with the generic laboratory source tree. It performs no cloud writes, deployment, feature enablement, or room migration.
 
