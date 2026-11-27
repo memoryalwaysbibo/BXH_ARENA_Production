@@ -13156,7 +13156,7 @@ function renderV3ReviewPanel(){
     ${page?.nextSequence?`<button class="btn btn-ghost" data-action="v3-review-next" ${v3ReviewBusy?'disabled':''}>下一頁</button>`:''}</div>`;
 }
 function renderAdminRegistrationsTab(){
-  if(isV3ManagementRoom()&&!staffRosterReadOnly())return renderV3ReviewPanel();
+  if((state.registrationFlowVersion===3||state.meta?.registrationFlowVersion===3)&&!staffRosterReadOnly())return renderV3ReviewPanel();
   if(staffRosterReadOnly())return renderStaffRegistrationRoster();
   const registrationLocked=currentTournamentRegistrationLocked();
   if(!state.meta || !state.meta.registrationEnabled){
@@ -26319,7 +26319,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="open-registration-publish-preview"){
-    if(isV3ManagementRoom()){
+    if(state.registrationFlowVersion===3||state.meta?.registrationFlowVersion===3){
       const code=state.cloudCode,actor=currentAuthUid();
       if(!code)return;
       openModal({type:"generic",title:"發布 V3 報名",message:"確認發布目前已儲存的 V3 賽事及報名設定？",confirmLabel:"發布",onConfirm:()=>{
