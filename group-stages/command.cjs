@@ -10,6 +10,15 @@ function createGroupStageCommand(coordinator, readHistory, settleGroup) {
           throw Object.assign(new Error('group-history-unavailable'), { code: 'group-history-unavailable' });
         }
         return readHistory(parentCode, actorUid);
+      case 'historical-preview':
+        return coordinator.historicalImport(parentCode, actorUid, request.data.payload);
+      case 'historical-import': {
+        const digest = request.data.digest;
+        if (typeof digest !== 'string' || !/^[0-9a-f]{64}$/.test(digest)) {
+          throw Object.assign(new Error('history-import-preview-required'), { code: 'history-import-preview-required' });
+        }
+        return coordinator.historicalImport(parentCode, actorUid, request.data.payload, digest);
+      }
       case 'routing': return coordinator.readRouting(parentCode, actorUid);
       case 'status': return coordinator.readOperatorStatus(parentCode, actorUid);
       case 'prepare': return coordinator.prepare(parentCode, actorUid, groupCount);

@@ -8,7 +8,8 @@
   const ACTIVE=['preparing','submitting','checking','unconfirmed'];
   const STATUS=['confirmed','waitlist','pending_draw'];
   const identifier=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
-  const valid=r=>r&&r.version===1&&identifier(r.uid)&&/^BXH-[A-Z0-9]{4,16}$/.test(r.code)
+  const roomCode=s=>typeof s==='string'&&/^(?:BXH-[A-Z0-9]{4,16}|PTN-[A-Z0-9]{6})$/.test(s);
+  const valid=r=>r&&r.version===1&&identifier(r.uid)&&roomCode(r.code)
     &&Array.isArray(r.ids)&&r.ids.length>0&&r.ids.length<=21&&r.ids.every(identifier)
     &&new Set(r.ids).size===r.ids.length&&Number.isFinite(r.createdAt)
     &&(r.action===undefined||r.action==='cancel'&&r.ids.length===1);
@@ -164,7 +165,7 @@
     }
     function run(code,send,action='join'){
       restore();const uid=getUid();if(!uid||disposed)return Promise.reject(Error('auth-required'));
-      if(!/^BXH-[A-Z0-9]{4,16}$/.test(code))return Promise.reject(Error('invalid-code'));
+      if(!roomCode(code))return Promise.reject(Error('invalid-code'));
       const existing=entries.get(code);
       if(existing&&ACTIVE.includes(existing.state)){
         existing.hidden=false;emit();

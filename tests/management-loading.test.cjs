@@ -2,6 +2,7 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
+const entryUtils=fs.readFileSync(path.join(__dirname,'../modules/main-app/tournament-entry-utils.js'),'utf8');
 function between(start,end){const a=core.indexOf(start),b=core.indexOf(end,a+start.length);assert.ok(a>=0&&b>a);return core.slice(a,b);}
 const source=between('let adminTournamentListOpen = false;','let refereeDirectoryUsers = null;')+'\n'
  +between('function renderTournamentManagementTab(){','\nfunction renderAdminNoTournamentScreen(){');
@@ -17,7 +18,8 @@ function setup(query=async()=>page()){
  registrationStatusLabel:status=>({open:'報名中',full:'額滿',scheduled:'即將開放',closed:'已關閉'})[status]||status,esc:value=>String(value??''),
  window:{cloudSync:{connect:async()=>true,queryAdminTournamentSummaries:request=>{calls.push(JSON.parse(JSON.stringify(request)));return query(request);},queryAdminTournaments:()=>{throw Error('full tournament downloads forbidden');},repairTournamentLifecycle:()=>{throw Error('list must not repair room state');},enrichAdminTournamentCreatorNames:()=>{throw Error('optional user-profile reads forbidden');}}},
  render(){s.reconcileAdminTournamentListContext();}};
- vm.createContext(s);vm.runInContext(source,s);const evaluate=code=>vm.runInContext(code,s);s.reconcileAdminTournamentListContext();
+ vm.createContext(s);vm.runInContext(entryUtils,s);s.isValidRoomCode=s.window.BXHTournamentEntryUtils.isValidRoomCode;
+ vm.runInContext(source,s);const evaluate=code=>vm.runInContext(code,s);s.reconcileAdminTournamentListContext();
  return{s,calls,timer,evaluate,state:()=>JSON.parse(JSON.stringify(evaluate('({items:adminTournamentListItems,busy:adminTournamentListBusy,loaded:adminTournamentListLoaded,error:adminTournamentListError,cursor:adminTournamentListCursor,more:adminTournamentListHasMore,counts:adminTournamentListCounts,filter:adminTournamentListFilter,search:adminTournamentListSearch})'))),view:()=>s.renderTournamentManagementTab(),load:options=>s.loadAdminTournamentList(options),query:fn=>{query=fn;}};
 }
 test('management cards refresh their counts while visible without downloading full rooms',async()=>{
@@ -138,6 +140,9 @@ test('only successful management entry replaces the scoped pointer; viewing anot
  t.s.previewTournamentByCode=async()=>({ok:false,reason:'forbidden'});await t.entry('BXH-CCCCCC');assert.equal(t.saved().code,'BXH-AAAAAA');assert.match(t.view(),/返回上次管理/);
  t.s.firebaseUser={uid:'other'};assert.equal(t.saved(),null);
 });
+test('a managed PTN room keeps its resume pointer',async()=>{
+ const t=navigationSetup();await t.entry('PTN-ABC123');assert.equal(t.saved().code,'PTN-ABC123');
+});
 test('reload re-reads the saved room from cloud and restores its tab and current court match',async()=>{
  const t=navigationSetup();await t.entry('BXH-AAAAAA');t.s.activeTab='referee';t.s.refereeResumeFocus=()=>({station:3});t.s.rememberManagedRoomView();
  t.s.state={cloudCode:'BXH-BBBBBB'};let reads=0;
@@ -178,7 +183,7 @@ function rig(){
  const calls={toasts:[],queries:[],pins:0,frames:[],timers:[],renders:0,scrolls:0};
  const s={state:{id:'room',cloudCode:'BXH-ABC123',meta:{}},appPhase:'app',activeTab:'settings',activeMode:'admin',actor:'u1',
   tournamentSettingsSavedNotice:null,adminTournamentListOpen:true,viewingRecordId:'old',viewingRecordData:{},mainTabNavCenterRequested:false,
-  currentAuthUid:()=>s.actor,hasAdminAccess:()=>true,saveRegistrationSettingsAndReport:async()=>true,
+  currentAuthUid:()=>s.actor,hasAdminAccess:()=>true,isPartnerOrganizerMode:()=>s.activeMode==='partner_organizer',saveRegistrationSettingsAndReport:async()=>true,
   rememberManagedRoomView(){calls.pins++;},changeAdminTournamentListQuery(q){calls.queries.push(q);return Promise.resolve();},
   render(){calls.renders++;},renderPreservingScroll(){calls.renders++;},showToast:m=>calls.toasts.push(m),
   requestAnimationFrame:f=>calls.frames.push(f),setTimeout:f=>calls.timers.push(f),document:{querySelectorAll:()=>[]},window:{scrollTo:()=>calls.scrolls++}};
@@ -197,6 +202,10 @@ test('save stays on settings until acceptance; failure does not navigate or refr
 });
 test('new local draft remains on settings with a publication prompt',async()=>{
  const {s,calls,save}=rig();s.state.cloudCode=null;await save();assert.equal(s.activeTab,'settings');assert.match(calls.toasts.at(-1),/草稿已儲存.*發布/);assert.equal(calls.queries.length,0);
+});
+test('partner local draft says no room code was created',async()=>{
+ const {s,calls,save}=rig();s.activeMode='partner_organizer';s.state.cloudCode=null;await save();
+ assert.equal(s.activeTab,'settings');assert.match(calls.toasts.at(-1),/僅儲存在此裝置.*尚未建立賽事房號/);assert.equal(calls.queries.length,0);
 });
 test('completion never pulls user back after room, identity, mode or tab changes',async()=>{
  for(const change of [s=>s.state={id:'other',cloudCode:'BXH-OTHER1'},s=>s.actor='u2',s=>s.activeMode='staff',s=>s.activeTab='people',s=>s.appPhase='player-center']){

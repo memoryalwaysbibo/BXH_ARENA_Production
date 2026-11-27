@@ -1,6 +1,6 @@
 (function(){
 function isValidRoomCode(code){
-  return typeof code==="string" && /^BXH-[A-Z0-9]{6}$/.test(code);
+  return typeof code==="string" && /^(?:BXH|PTN)-[A-Z0-9]{6}$/.test(code);
 }
 const TOURNAMENT_ENTRY_TYPES = ["event","register","watch","bracket","result"];
 function normalizeTournamentEntryType(raw){

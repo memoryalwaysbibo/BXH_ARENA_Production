@@ -38,7 +38,7 @@ function harness(){
  let opSeq=0;
  const run=(uid,action,args={})=>handle({auth:{uid},data:{code:'BXH-TEST',operationId:'operation-number-'+(++opSeq),action,...args}});
  const doc=()=>docs.get('tournaments/BXH-TEST');
- return {docs,handle,run,doc,advance:ms=>{now+=ms;},retry:()=>{retryNext=true;}};
+ return {db,docs,handle,run,doc,advance:ms=>{now+=ms;},retry:()=>{retryNext=true;}};
 }
 function communityFixture(){
  const h=harness(),room=h.doc(),state=JSON.parse(room.data);

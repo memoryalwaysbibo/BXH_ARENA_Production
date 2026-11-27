@@ -3620,6 +3620,12 @@ async function ensureRoomAccessGrant(code){
 async function openCommunityRefereeRoom(code,station){
   const actor=currentAuthUid();
   if(!actor)throw Error('auth-required');
+  if(/^PTN-[A-Z0-9]{6}$/.test(code||'')){
+    if(!window.BXHCommerce?.openTicketRefereeSession)throw Error('ticket-invite-unavailable');
+    await window.BXHCommerce.openTicketRefereeSession(code,station);
+    if(currentAuthUid()===actor){mailboxContext().open=false;render();}
+    return;
+  }
   const result=await window.cloudSync?.joinRoom?.(code);
   if(currentAuthUid()!==actor)return;
   if(!result?.ok)throw Error('referee-room-unavailable');
@@ -4219,7 +4225,7 @@ function bxhEventTemplateContext(){
 function canUseBxhStandardTemplate(){
   return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true &&
     (["super_admin","admin","staff"].includes(userProfile.role) || (typeof isPartnerOrganizerMode==="function"&&isPartnerOrganizerMode())) &&
-    state && state.meta && state.meta.eventAuthority!=="community");
+    state && state.meta && !["community","ticket"].includes(state.meta.eventAuthority) && state.eventAuthority!=="ticket");
 }
 function roomStandardTemplateConfig(st=state){
   if(!st.eventInfo) st.eventInfo=emptyEventInfoV2();
@@ -4227,6 +4233,7 @@ function roomStandardTemplateConfig(st=state){
   return st.eventInfo.standardTemplate;
 }
 function roomStandardTemplateSelected(st=state){
+  if(st.meta?.eventAuthority==="ticket"||st.eventAuthority==="ticket") return false;
   const cfg=roomStandardTemplateConfig(st);
   const explicit=!!(cfg.templateId || cfg.snapshot || cfg.version || cfg.versionLabel);
   if(explicit) return cfg.enabled===true;
@@ -4305,7 +4312,7 @@ function buildPublicEventInfo(st){
   return {
     schemaVersion:EVENT_INFO_SCHEMA_VERSION,
     venue:safeVenue,
-    standardTemplate:(cfg.enabled===true && snapshot)?{
+    standardTemplate:(st?.meta?.eventAuthority!=="ticket" && st?.eventAuthority!=="ticket" && cfg.enabled===true && snapshot)?{
       enabled:true,
       templateId:String(cfg.templateId||snapshot.id||"bxh-standard"),
       version:Math.max(1,Number(cfg.version||snapshot.version)||1),
@@ -5071,10 +5078,16 @@ function registrationParticipantNameMode(value){
 }
 
 function ensureRegistrationFormDraft(){
-  if(registrationFormDraft) return;
+  // Only an empty, unpublished official draft defaults to the unified signup flow.
+  // Opening an existing onsite room must never change its registration or roster.
+  const newOfficialDraft=state.meta?.eventAuthority!=="community"&&!state.cloudCode&&!state.meta?.publishedAt&&!state.startedAt&&!state.bracketSize&&!(state.players||[]).length;
+  if(registrationFormDraft){
+    if(newOfficialDraft)registrationFormDraft.registrationEnabled=true;
+    return;
+  }
   const m = state.meta;
   registrationFormDraft = {
-    registrationEnabled: !!m.registrationEnabled,
+    registrationEnabled: newOfficialDraft || !!m.registrationEnabled,
     registrationOpenAt: m.registrationOpenAt || null,
     registrationCloseAt: m.registrationCloseAt || null,
     registrationCapacity: m.registrationCapacity || null,
@@ -5388,6 +5401,15 @@ let publicTournamentsReconcilePromise = null;
 let publicTournamentsReconcileTimer = null;
 let publicTournamentsLastSignature = "";
 const PUBLIC_TOURNAMENTS_RECONCILE_MS = 90000;
+let publicTournamentsRealtimeCanSkipPoll = false;
+let publicTournamentsRealtimeEpoch = 0;
+let publicTournamentsRealtimeRetryPending = false;
+let publicTournamentsRealtimeHealthyReceipt = 0;
+function shouldSkipLobbyIdlePoll(){
+  return window.BXH_LOBBY_SKIP_HEALTHY_IDLE_POLL!==false &&
+    !!publicTournamentsRealtimeUnsub && publicTournamentsRealtimeCanSkipPoll &&
+    publicTournamentsFreshness==="server";
+}
 
 function isTournamentLobbyVisible(){
   return (appPhase==="player-center" && playerActiveTab==="home" && !!firebaseUser && !!userProfile && currentRole==="player" && !mailboxContext().open)
@@ -5479,6 +5501,8 @@ function publicTournamentSourceState(source){
   return source&&source.ok===true&&source.fromCache===false&&source.hasPendingWrites===false?"server":"unknown";
 }
 function markLobbySourceUnknown(){
+  publicTournamentsRealtimeCanSkipPoll=false;
+  schedulePublicTournamentsReconcile();
   if(publicTournamentsFreshness!=="unknown"){publicTournamentsFreshness="unknown";requestLobbyRender();}
 }
 function invalidateMyRegistrationsCache(result){
@@ -5620,22 +5644,40 @@ function applyPublicTournamentItems(items,{renderIfChanged=true,source=null}={})
   if(changed && renderIfChanged && isTournamentLobbyVisible())requestLobbyRender();
   return changed;
 }
-function stopPublicTournamentsRealtime(){
-  if(publicTournamentsRealtimeUnsub){
-    try{ publicTournamentsRealtimeUnsub(); }catch(e){}
-    publicTournamentsRealtimeUnsub=null;
-  }
+function detachPublicTournamentsRealtime(){
+  ++publicTournamentsRealtimeEpoch;
+  publicTournamentsRealtimeCanSkipPoll=false;
+  const dispose=publicTournamentsRealtimeUnsub;
+  publicTournamentsRealtimeUnsub=null;
   publicTournamentsRealtimeStarting=false;
+  if(dispose){try{dispose();}catch(e){}}
+}
+function stopPublicTournamentsRealtime(){
+  detachPublicTournamentsRealtime();
+  publicTournamentsRealtimeRetryPending=false;
   if(publicTournamentsReconcileTimer){
     clearTimeout(publicTournamentsReconcileTimer);
     publicTournamentsReconcileTimer=null;
   }
 }
 function schedulePublicTournamentsReconcile(delay=PUBLIC_TOURNAMENTS_RECONCILE_MS){
-  if(publicTournamentsReconcileTimer || !isTournamentLobbyVisible()) return;
+  if(!isTournamentLobbyVisible()) return;
+  if(shouldSkipLobbyIdlePoll()){
+    if(publicTournamentsReconcileTimer){
+      clearTimeout(publicTournamentsReconcileTimer);
+      publicTournamentsReconcileTimer=null;
+    }
+    return;
+  }
+  if(publicTournamentsReconcileTimer) return;
   publicTournamentsReconcileTimer=setTimeout(()=>{
     publicTournamentsReconcileTimer=null;
-    reconcilePublicTournamentsNow("timer");
+    if(!isTournamentLobbyVisible())return;
+    if(publicTournamentsRealtimeRetryPending&&cloudAvailable()&&typeof window.cloudSync?.subscribePublicTournaments==="function"){
+      publicTournamentsRealtimeRetryPending=false;
+      startPublicTournamentsRealtime();
+    }
+    if(!shouldSkipLobbyIdlePoll())reconcilePublicTournamentsNow("timer");
   },Math.max(1000,Number(delay)||PUBLIC_TOURNAMENTS_RECONCILE_MS));
 }
 async function reconcilePublicTournamentsNow(reason="manual"){
@@ -5643,12 +5685,14 @@ async function reconcilePublicTournamentsNow(reason="manual"){
   if(publicTournamentsReconcilePromise)return publicTournamentsReconcilePromise;
   if(!isTournamentLobbyVisible())return false;
   const revision=publicTournamentsDataRevision;
+  const healthyReceipt=publicTournamentsRealtimeHealthyReceipt;
+  const superseded=()=>reason==="timer"&&healthyReceipt!==publicTournamentsRealtimeHealthyReceipt&&shouldSkipLobbyIdlePoll();
   publicTournamentsReconcilePromise=(async()=>{
     try{
       if(window.cloudSync&&window.cloudSync.connect)await window.cloudSync.connect();
       if(!lobbyContextIsCurrent(context)||!cloudAvailable()||!window.cloudSync?.queryPublicTournaments)return false;
       const result=await window.cloudSync.queryPublicTournaments();
-      if(!lobbyContextIsCurrent(context)||revision!==publicTournamentsDataRevision)return false;
+      if(!lobbyContextIsCurrent(context)||revision!==publicTournamentsDataRevision||superseded())return false;
       if(result?.ok){applyPublicTournamentItems(result.items,{source:result});return true;}
       markLobbySourceUnknown();
       if(publicTournamentsCache===null){
@@ -5658,7 +5702,7 @@ async function reconcilePublicTournamentsNow(reason="manual"){
       }
       return false;
     }catch(e){
-      if(lobbyContextIsCurrent(context)&&revision===publicTournamentsDataRevision)markLobbySourceUnknown();
+      if(lobbyContextIsCurrent(context)&&revision===publicTournamentsDataRevision&&!superseded())markLobbySourceUnknown();
       console.warn("[lobby reconcile]",reason,e);return false;
     }finally{
       if(lobbyContextIsCurrent(context)){
@@ -5671,29 +5715,47 @@ async function reconcilePublicTournamentsNow(reason="manual"){
 }
 function startPublicTournamentsRealtime(){
   const context=captureLobbyContext();
-  if(publicTournamentsRealtimeUnsub || publicTournamentsRealtimeStarting || !isTournamentLobbyVisible()) return;
+  if(publicTournamentsRealtimeUnsub || publicTournamentsRealtimeStarting ||
+    publicTournamentsRealtimeRetryPending || !isTournamentLobbyVisible()) return;
   if(!cloudAvailable() || !window.cloudSync || !window.cloudSync.subscribePublicTournaments){
     schedulePublicTournamentsReconcile(5000);
     return;
   }
+  const epoch=++publicTournamentsRealtimeEpoch;
   publicTournamentsRealtimeStarting=true;
-  try{
-    publicTournamentsRealtimeUnsub=window.cloudSync.subscribePublicTournaments((result)=>{
-      if(!lobbyContextIsCurrent(context)||!isTournamentLobbyVisible()) return;
-      if(result&&result.ok){
-        applyPublicTournamentItems(result.items,{source:result});
-      }else if(publicTournamentsCache===null){
-        publicTournamentsCache=[];
-        publicTournamentsError=PUBLIC_TOURNAMENTS_ERROR_MESSAGES[result&&result.reason]||PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
-        requestLobbyRender();
-      }else{markLobbySourceUnknown();}
-    });
-  }catch(e){
+  const active=()=>epoch===publicTournamentsRealtimeEpoch&&lobbyContextIsCurrent(context)&&isTournamentLobbyVisible();
+  const terminal=()=>{
+    detachPublicTournamentsRealtime();
+    publicTournamentsRealtimeRetryPending=true; // The existing 90s fallback is the only retry slot.
     markLobbySourceUnknown();
+  };
+  try{
+    const dispose=window.cloudSync.subscribePublicTournaments((result)=>{
+      if(!active())return;
+      if(result&&result.ok){
+        publicTournamentsRealtimeCanSkipPoll=publicTournamentSourceState(result)==="server" &&
+          result.requiresLifecycleReconcile===false;
+        if(publicTournamentsRealtimeCanSkipPoll)++publicTournamentsRealtimeHealthyReceipt;
+        applyPublicTournamentItems(result.items,{source:result});
+      }else{
+        // Firestore onSnapshot error is terminal, unlike cache/pending metadata.
+        terminal();
+        if(publicTournamentsCache===null){
+          publicTournamentsCache=[];
+          publicTournamentsError=PUBLIC_TOURNAMENTS_ERROR_MESSAGES[result&&result.reason]||PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
+          requestLobbyRender();
+        }
+      }
+      schedulePublicTournamentsReconcile();
+    });
+    if(active()&&typeof dispose==="function")publicTournamentsRealtimeUnsub=dispose;
+    else if(typeof dispose==="function")try{dispose();}catch(e){}
+    else if(active())terminal();
+  }catch(e){
+    if(active())terminal();
     console.warn("[lobby realtime subscribe]",e);
-    publicTournamentsRealtimeUnsub=null;
   }finally{
-    publicTournamentsRealtimeStarting=false;
+    if(epoch===publicTournamentsRealtimeEpoch)publicTournamentsRealtimeStarting=false;
     schedulePublicTournamentsReconcile();
   }
 }
@@ -5977,7 +6039,7 @@ function renderPlayerTitleCenter(p){
     ${engagementError?`<div class="hint">${esc(engagementError)}；已確認儲存的設定不受影響。<button class="btn btn-ghost btn-sm" data-action="player-refresh-engagement">重新連線</button></div>`:''}
     ${window.BXHTitleUtils.onlineTimeArtworkPreviewHtml?.(isSuperAdmin())||''}
     <div class="panel-title" style="margin-top:20px;">稱號圖鑑</div>
-    ${catalog.length?(()=>{const filters=[['all','全部'],['earned','已取得'],['official','官方積分賽'],['event','主辦成就'],['fun','趣味成就'],['activity','每日簽到'],['special','限定／特殊']];const shown=catalog.filter(t=>{if(titleGalleryFilter==='all')return true;if(titleGalleryFilter==='earned')return earnedIds.has(t.id);return titleConditionMeta(t).category===titleGalleryFilter;});return `<div class="btn-row" style="margin:10px 0 12px;gap:6px;flex-wrap:wrap;">${filters.map(([k,v])=>`<button type="button" class="btn ${titleGalleryFilter===k?'btn-primary':'btn-ghost'} btn-sm" onclick="titleGalleryFilter='${k}';render();">${v}</button>`).join('')}</div>${shown.length?`<div class="title-gallery">${shown.map(t=>{const got=earnedIds.has(t.id);const hidden=t.isHidden&&!got;const current=Number((t.progress&&t.progress.currentValue)||0),target=Math.max(1,Number(t.targetValue||1));const pct=got?100:Math.min(100,Math.round(current/target*100));return `<article class="title-card rarity-${esc(titleTierClass(t))} ${got?'':'locked'}">${!hidden&&titleArtworkPath(t.name,titleTierClass(t))?`<img class="title-gallery-art" src="${titleArtworkPath(t.name,titleTierClass(t))}" alt="${esc(titleDisplayName(t.name))}" loading="lazy" decoding="async" onerror="if(this.dataset.fallback==='png'){this.style.display='none';return;}this.dataset.fallback='png';this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">`:''}<div class="title-card-name"><span>${esc(hidden?'？？？':titleDisplayName(t.name))}</span><span>${titleClassificationHtml(t)}</span></div><details class="title-card-details"><summary>稱號說明與取得條件</summary><div class="title-card-desc">${esc(hidden?(t.hint||'達成特殊條件後解鎖'):(t.description||t.hint||'榮譽稱號'))}</div>${!hidden?titleConditionBadge(t):''}${!hidden&&t.source?`<div class="hint">來源：${esc(t.source)}</div>`:''}</details><div class="title-progress"><span style="width:${pct}%"></span></div><div class="hint" style="margin-top:5px;">${esc(titleGalleryProgressText(t,got))}${t.isActive===false?'・籌備中':''}${titleLimitedTypeValue(t)!=='none'?'・'+titleLimitedLabel(t):''}${t.isPermanent===false?'・期間制':'・永久'}${t.isArchived?'・已絕版':''}</div></article>`;}).join('')}</div>`:`<div class="empty-state">此分類目前沒有稱號。</div>`}`;})():`<div class="empty-state">稱號圖鑑尚未發布；已取得紀錄不會受到影響。</div>`}
+    ${catalog.length?(()=>{const filters=[['all','全部'],['earned','已取得'],['official','官方積分賽'],['event','主辦成就'],['fun','趣味成就'],['activity','每日簽到'],['special','限定／特殊']];const shown=catalog.filter(t=>{if(titleGalleryFilter==='all')return true;if(titleGalleryFilter==='earned')return earnedIds.has(t.id);return titleConditionMeta(t).category===titleGalleryFilter;});return `<div class="btn-row" style="margin:10px 0 12px;gap:6px;flex-wrap:wrap;">${filters.map(([k,v])=>`<button type="button" class="btn ${titleGalleryFilter===k?'btn-primary':'btn-ghost'} btn-sm" onclick="titleGalleryFilter='${k}';render();">${v}</button>`).join('')}</div>${shown.length?`<div class="title-gallery">${shown.map(t=>{const got=earnedIds.has(t.id);const hidden=t.isHidden&&!got;const current=Number((t.progress&&t.progress.currentValue)||0),target=Math.max(1,Number(t.targetValue||1));const pct=got?100:Math.min(100,Math.round(current/target*100));return `<article class="title-card rarity-${esc(titleTierClass(t))} ${got?'':'locked'}">${!hidden&&titleArtworkPath(t.name,titleTierClass(t))?`<img class="title-gallery-art" src="${titleArtworkPath(t.name,titleTierClass(t))}" alt="${esc(titleDisplayName(t.name))}" loading="lazy" decoding="async" onerror="if(this.dataset.fallback==='png'){this.style.display='none';return;}this.dataset.fallback='png';this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">`:''}<div class="title-card-name"><span>${esc(hidden?'？？？':titleDisplayName(t.name))}</span><span>${titleClassificationHtml(t)}</span></div><details class="title-card-details"><summary>稱號說明與取得條件</summary><div class="title-card-desc">${esc(hidden?(t.hint||'達成特殊條件後解鎖'):(t.description||t.hint||'榮譽稱號'))}</div>${!hidden?titleConditionBadge(t):''}${!hidden?(window.BXHTitleUtils.titleHolderHtml?.(t)||''):''}${!hidden&&t.source?`<div class="hint">來源：${esc(t.source)}</div>`:''}</details><div class="title-progress"><span style="width:${pct}%"></span></div><div class="hint" style="margin-top:5px;">${esc(titleGalleryProgressText(t,got))}${t.isActive===false?'・籌備中':''}${titleLimitedTypeValue(t)!=='none'?'・'+titleLimitedLabel(t):''}${t.isPermanent===false?'・期間制':'・永久'}${t.isArchived?'・已絕版':''}</div></article>`;}).join('')}</div>`:`<div class="empty-state">此分類目前沒有稱號。</div>`}`;})():`<div class="empty-state">稱號圖鑑尚未發布；已取得紀錄不會受到影響。</div>`}
   </section>`;
 }
 let communityEventsCache = null;
@@ -6171,7 +6233,7 @@ function canLinkGoogleAccount(){
 }
 function isAdminTierOrAbove(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="super_admin" || userProfile.role==="admin")); }
 function isStaffTier(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="staff" || isPartnerOrganizerMode() || isEventStaffMode())); }
-function canCreateOfficialTournament(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="super_admin" || userProfile.role==="admin" || userProfile.role==="staff" || isPartnerOrganizerMode())); }
+function canCreateOfficialTournament(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="super_admin" || userProfile.role==="admin" || userProfile.role==="staff")); }
 function currentAuthUid(){ return (firebaseUser&&firebaseUser.uid)||null; }
 function canManageRefereeCertificates(){
   return !!(currentAuthUid()&&userProfile?.active===true&&userProfile.isTestAccount!==true&&userProfile.deleted!==true&&userProfile.role==='super_admin'&&!['deleted','disabled','frozen'].includes(userProfile.accountStatus));
@@ -10786,19 +10848,23 @@ function renderBracket(){
     <div style="margin-top:16px;"><button class="btn btn-primary" data-action="goto-settings">前往賽事設定</button></div>
     </div></div>`;
   }
-  const treeIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4v16M5 7h5M5 17h5M10 7v4h5M10 17v-4h5"/><rect x="15" y="8.5" width="5" height="7" rx="1.2"/></svg>';
-  const listIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>';
   const quickNav = refereeBracketRoundtripNav("referee");
   const swapBanner = renderCourtSwapSelectionBanner();
-  const modeToggle = `<div class="bracket-view-toggle" role="group" aria-label="對戰表檢視模式">
-    <button class="bvt-btn ${bracketViewMode==='board'?'active':''}" data-action="set-bracket-view-mode" data-mode="board" aria-pressed="${bracketViewMode==='board'}">${treeIcon}<span>樹狀總覽</span></button>
-    <button class="bvt-btn ${bracketViewMode==='standard'?'active':''}" data-action="set-bracket-view-mode" data-mode="standard" aria-pressed="${bracketViewMode==='standard'}">${listIcon}<span>賽事清單</span></button>
-  </div>`;
-  const topControls=`<div class="bracket-top-controls">${modeToggle}${refreshBtn}</div>`;
+  const topControls=renderBracketModeControls(refreshBtn);
   if(bracketViewMode==="board"){
     return swapBanner + quickNav + topControls + renderBoardMode();
   }
   return swapBanner + quickNav + topControls + bracketCommitStatusHtml() + matchLegendHtml() + renderTournamentMatchList();
+}
+
+function renderBracketModeControls(refreshBtn){
+  const treeIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4v16M5 7h5M5 17h5M10 7v4h5M10 17v-4h5"/><rect x="15" y="8.5" width="5" height="7" rx="1.2"/></svg>';
+  const listIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>';
+  const modeToggle = `<div class="bracket-view-toggle" role="group" aria-label="對戰表檢視模式">
+    <button class="bvt-btn ${bracketViewMode==='board'?'active':''}" data-action="set-bracket-view-mode" data-mode="board" aria-pressed="${bracketViewMode==='board'}">${treeIcon}<span>樹狀總覽</span></button>
+    <button class="bvt-btn ${bracketViewMode==='standard'?'active':''}" data-action="set-bracket-view-mode" data-mode="standard" aria-pressed="${bracketViewMode==='standard'}">${listIcon}<span>賽事清單</span></button>
+  </div>`;
+  return `<div class="bracket-top-controls">${modeToggle}${refreshBtn}</div>`;
 }
 
 function tournamentMatchListGroup(m, fmt){
@@ -10809,20 +10875,20 @@ function tournamentMatchListGroup(m, fmt){
   return `${side}・第 ${Math.max(1,(Number(m.round)||0)+1)} 輪`;
 }
 
-function renderTournamentMatchList(){
-  const fmt=state.meta.formatType||"single";
+function renderTournamentMatchList(view=null){
+  const fmt=view?"single":state.meta.formatType||"single";
   const groups=new Map();
-  state.matches.filter(m=>!m.isBye).forEach(m=>{
-    const label=tournamentMatchListGroup(m,fmt);
+  (view?view.matches:state.matches).filter(m=>!m.isBye).forEach(m=>{
+    const label=view?(m.bracket==="BZ"?"季軍賽":view.title(m.round)):tournamentMatchListGroup(m,fmt);
     if(!groups.has(label)) groups.set(label,[]);
     groups.get(label).push(m);
   });
   const sections=[...groups.entries()].map(([label,matches])=>`<section class="compact-round">
     <div class="compact-round-head"><span class="compact-round-title">${esc(label)}</span><span class="compact-round-count">${matches.length} 場比賽</span></div>
-    <div class="compact-round-matches">${matches.map(m=>matchBoxHtml(m,displayMatchLabel(m))).join("")}</div>
+    <div class="compact-round-matches">${matches.map(m=>view?seMatchBoxHtml(m,m.round,m.indexInRound,view.label(m),view):matchBoxHtml(m,displayMatchLabel(m))).join("")}</div>
   </section>`).join("");
   return `<div class="panel tournament-match-list">
-    ${eventTitleBar('<button class="btn btn-ghost btn-sm" data-action="print-bracket">列印 / 另存 PDF</button>')}
+    ${view?'<div class="event-title-bar"><div class="event-title-center">'+esc(view.name)+'</div></div>':eventTitleBar('<button class="btn btn-ghost btn-sm" data-action="print-bracket">列印 / 另存 PDF</button>')}
     <div class="hint" style="margin-bottom:12px;">依賽程階段列出實際出賽場次、選手、狀態與戰鬥台；輪空不占用場次。</div>
     ${wrapBracketWatermark(`<div class="compact-bracket">${sections||'<div class="empty-state">目前沒有需要對戰的場次</div>'}</div>`)}
   </div>`;
@@ -10899,26 +10965,26 @@ function selectSingleBracketPlayerPath(id){
     (lines.length?lines.join('\n'):'尚未安排場次')+'\n\n包含目前範圍以外的已知場次；高亮只標示已確認晉級的路線。再次點選同一位選手可取消。');
 }
 
-function seMatchBoxHtml(m, roundIdx, boxIdx, headLabel){
+function seMatchBoxHtml(m, roundIdx, boxIdx, headLabel, view=null){
   if(m.isBye){
-    return `<div class="match-box bye-placeholder" aria-hidden="true" data-id="${m.id}" data-round="${roundIdx}" data-index="${boxIdx}">
+    return `<div class="match-box bye-placeholder" aria-hidden="true" data-id="${esc(m.id)}" data-round="${roundIdx}" data-index="${boxIdx}">
       <div class="mb-head"><span>輪空</span><span></span></div>
-      <div class="mb-row" data-side="A">${playerBracketRowHtml(m.a?.playerId,"輪空")}<span class="sc"></span></div>
-      <div class="mb-row" data-side="B">${playerBracketRowHtml(m.b?.playerId,"輪空")}<span class="sc"></span></div>
+      <div class="mb-row" data-side="A">${view ? view.row(m.a?.playerId,"輪空") : playerBracketRowHtml(m.a?.playerId,"輪空")}<span class="sc"></span></div>
+      <div class="mb-row" data-side="B">${view ? view.row(m.b?.playerId,"輪空") : playerBracketRowHtml(m.b?.playerId,"輪空")}<span class="sc"></span></div>
       <div class="match-status-bar ms-bar-pending">等待中</div>
     </div>`;
   }
-  const matchNo=displayMatchNumber(m);
-  const aName = m.a ? playerName(m.a.playerId) : (m.isBye ? "（輪空）" : "待定");
-  const bName = m.b ? playerName(m.b.playerId) : (m.isBye ? "（輪空）" : "待定");
+  const matchNo=view ? view.number(m) : displayMatchNumber(m);
+  const aName = m.a ? (view ? m.a.name : playerName(m.a.playerId)) : (m.isBye ? "（輪空）" : "待定");
+  const bName = m.b ? (view ? m.b.name : playerName(m.b.playerId)) : (m.isBye ? "（輪空）" : "待定");
   const aWin = m.completed && m.winnerId && m.a && m.winnerId===m.a.playerId;
   const bWin = m.completed && m.winnerId && m.b && m.winnerId===m.b.playerId;
   return `
-  <div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}${courtSwapMatchClass(m)}" style="${activeMatchCourtAtmosphereStyle(m)}" data-action="open-match" data-id="${m.id}" data-round="${roundIdx}" data-index="${boxIdx}" data-match-number="${matchNo==null?'':matchNo}">
+  <div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}${view?"":courtSwapMatchClass(m)}" style="${activeMatchCourtAtmosphereStyle(m)}" ${view ? "" : 'data-action="open-match"'} data-id="${esc(m.id)}" data-round="${roundIdx}" data-index="${boxIdx}" data-match-number="${matchNo==null?'':matchNo}">
     ${matchNo==null?'':`<span class="match-order-badge" aria-label="第 ${matchNo} 場">${matchNo}</span>`}
-    <div class="mb-head"><span>${headLabel}${quickModeTagHtml(m)}${courtSwapMatchBadge(m)}</span><span>台${m.station}</span></div>
-    <div class="mb-row ${aWin?'winner':''}" data-side="A">${singleBracketPlayerHtml(m.a?.playerId,aName)}<span class="sc">${matchScoreCellHtml(m,"A")}</span></div>
-    <div class="mb-row ${bWin?'winner':''}" data-side="B">${singleBracketPlayerHtml(m.b?.playerId,bName)}<span class="sc">${matchScoreCellHtml(m,"B")}</span></div>
+    <div class="mb-head"><span>${headLabel}${quickModeTagHtml(m)}${view?"":courtSwapMatchBadge(m)}</span><span>台${esc(m.station??"—")}</span></div>
+    <div class="mb-row ${aWin?'winner':''}" data-side="A">${view ? view.row(m.a?.playerId,aName) : singleBracketPlayerHtml(m.a?.playerId,aName)}<span class="sc">${matchScoreCellHtml(m,"A")}</span></div>
+    <div class="mb-row ${bWin?'winner':''}" data-side="B">${view ? view.row(m.b?.playerId,bName) : singleBracketPlayerHtml(m.b?.playerId,bName)}<span class="sc">${matchScoreCellHtml(m,"B")}</span></div>
     ${matchStatusBarHtml(m)}
   </div>`;
 }
@@ -11373,7 +11439,12 @@ function currentRoundLabelForBoard(){
   return "尚未開始";
 }
 
-function boardStageContext(){
+function activeTicketBoardView(){
+  const room=activeTab==="bracket"?window.BXHCommerce?.verifiedBracketRoom?.():null;
+  return room?ticketBracketView(room):null;
+}
+function boardStageContext(view=activeTicketBoardView()){
+  if(view)return JSON.stringify([view.code,2**view.total,"single","individual"]);
   return JSON.stringify([state.cloudCode||state.id||"",state.bracketSize,state.meta.formatType||"single",state.meta.battleMode||"individual"]);
 }
 // View-only identity and positioning. Never fetch registrations or infer identity from names.
@@ -11477,18 +11548,19 @@ async function locateBoardSelf(){
   const status=match.completed?"本場已結束":match.status==="in_progress"?"正在比賽":match.status==="paused"?"暫停中":"等待上場";
   showToast((changed?"已切換為全部輪次・":"")+displayMatchLabel(match)+"・"+status+(match.completed?"":station?"・台 "+station:"・尚未派台"));
 }
-function availableBoardStage(size){
+function availableBoardStage(size,view=activeTicketBoardView()){
+  if(view)return size===0||(BOARD_STAGE_SIZES.includes(size)&&size<=2**view.total);
   const bracketSize=Number(state.bracketSize);
   return (state.meta.formatType||"single")==="single" && state.meta.battleMode!=="team"
     && bracketSize>=2 && Number.isInteger(Math.log2(bracketSize))
     && (size===0 || (BOARD_STAGE_SIZES.includes(size) && size<=bracketSize));
 }
-function selectedBoardStage(){
-  return boardStageSelection.key===boardStageContext() && availableBoardStage(boardStageSelection.size) ? boardStageSelection.size : 0;
+function selectedBoardStage(view=activeTicketBoardView()){
+  return boardStageSelection.key===boardStageContext(view) && availableBoardStage(boardStageSelection.size,view) ? boardStageSelection.size : 0;
 }
-function boardStageStartRound(){
-  const size=selectedBoardStage();
-  return size ? Math.max(0,numRoundsTotal()-Math.log2(size)) : 0;
+function boardStageStartRound(view=activeTicketBoardView()){
+  const size=selectedBoardStage(view);
+  return size ? Math.max(0,(view?view.total:numRoundsTotal())-Math.log2(size)) : 0;
 }
 function boardStageSummary(){
   const size=selectedBoardStage();
@@ -11513,7 +11585,7 @@ function setBoardStage(size){
   const canvas=document.getElementById("board-canvas");
   if(!canvas){render();return;}
   // Keep the shell/viewport in place so native fullscreen and focused controls survive.
-  canvas.innerHTML=renderSingleElimBracket(true);
+  canvas.innerHTML=renderSingleElimBracket(true,activeTicketBoardView());
   document.querySelectorAll('.board-stage-switch [data-stage]').forEach(button=>{
     const active=Number(button.getAttribute("data-stage"))===size;
     button.classList.toggle("active",active);
@@ -11528,17 +11600,17 @@ function setBoardStage(size){
   scheduleSeRelayout();
 }
 
-function renderBoardMode(){
-  const commitStatus=bracketCommitStatusHtml();
-  const fmt = state.meta.formatType || "single";
+function renderBoardMode(view=null){
+  const commitStatus=view?"":bracketCommitStatusHtml();
+  const fmt = view?"single":state.meta.formatType || "single";
   let inner;
   if(fmt==="double") inner = renderDoubleElimBracket();
   else if(fmt==="roundrobin") inner = renderRoundRobinBracket();
-  else inner = renderSingleElimBracket(true);
+  else inner = renderSingleElimBracket(true,view);
 
-  const st = tournamentStatus();
+  const st = view?view.phase:tournamentStatus();
   const stLabel = st==="waiting" ? "尚未開始" : (st==="done" ? "已完成" : "進行中");
-  const boardCode = state.cloudCode || "本機賽事";
+  const boardCode = view?view.code:state.cloudCode || "本機賽事";
   const standaloneChampionHtml = (fmt!=="single" && state.championId) ? `
     <div class="board-champion-area">
       <span class="board-trophy">${trophySvg()}</span>
@@ -11553,21 +11625,21 @@ function renderBoardMode(){
       <div class="board-header-left">
         <img class="board-logo" src="${LOGO_SRC}" alt="BXH">
         <div>
-          <div class="board-title">${esc(state.meta.name||"未命名賽事")}</div>
-          <div class="board-sub"><span>${esc(FORMAT_LABELS[fmt]||"")}</span><span>${esc(currentRoundLabelForBoard())}</span><span class="board-status-chip status-${st}">${stLabel}</span>${availableBoardStage(0)?`<span id="board-stage-summary" role="status">${boardStageSummary()}</span>`:""}</div>
+          <div class="board-title">${esc(view?view.name:state.meta.name||"未命名賽事")}</div>
+          <div class="board-sub"><span>${esc(FORMAT_LABELS[fmt]||"")}</span><span>${esc(view?(view.phase==="waiting"?"尚未開始":view.phase==="done"?"已完成":view.title(view.matches.find(m=>!m.completed&&!m.isBye)?.round||0)):currentRoundLabelForBoard())}</span><span class="board-status-chip status-${st}">${stLabel}</span>${availableBoardStage(0)?`<span id="board-stage-summary" role="status">${boardStageSummary()}</span>`:""}</div>
         </div>
       </div>
       <details class="board-share-menu">
         <summary class="share-btn" title="分享與儲存對戰表" aria-label="分享與儲存對戰表">${SHARE_ICON_SVG}</summary>
         <div class="board-share-options">
           <button class="btn btn-ghost btn-sm" data-action="board-export-image">${BOARD_ICON_EXPORT} 儲存${boardExportLabel()}</button>
-          <button class="btn btn-ghost btn-sm" data-action="open-share-modal">分享連結與 QR</button>
+          ${view?'<button class="btn btn-ghost btn-sm" data-action="ptn-board-share">複製對戰表連結</button>':'<button class="btn btn-ghost btn-sm" data-action="open-share-modal">分享連結與 QR</button>'}
         </div>
       </details>
     </div>
 
     <div class="board-toolbar">
-      ${availableBoardStage(0)?'<button type="button" class="btn btn-ghost btn-sm board-locate-self" data-action="board-locate-self">◎ 我在哪</button>':""}
+      ${!view&&availableBoardStage(0)?'<button type="button" class="btn btn-ghost btn-sm board-locate-self" data-action="board-locate-self">◎ 我在哪</button>':""}
       <span class="board-zoom-group">
         <button class="btn btn-ghost btn-sm" data-action="board-zoom-out" aria-label="縮小對戰表">${BOARD_ICON_MINUS}</button>
         <span class="board-zoom-pct" id="board-zoom-pct">${Math.round(boardZoom*100)}%</span>
@@ -11644,36 +11716,36 @@ function renderCompactSingleElimBracket(){
   </div>`;
 }
 
-function renderSingleElimBracket(forceTree=false){
+function renderSingleElimBracket(forceTree=false, view=null){
   if(!forceTree && effectiveSingleBracketLayout()==="compact") return renderCompactSingleElimBracket();
-  const total = numRoundsTotal();
-  const startRound = forceTree ? boardStageStartRound() : 0;
+  const total = view ? view.total : numRoundsTotal();
+  const startRound = forceTree ? boardStageStartRound(view) : 0;
   let cols = "";
   for(let r=startRound;r<total;r++){
-    const ms = matchesInRound(r);
+    const ms = view ? view.round(r) : matchesInRound(r);
     const isFinalRound=r===total-1;
-    const title = isFinalRound ? "冠亞" : singleRoundTitle(r);
-    const boxes = ms.map((m,i)=> seMatchBoxHtml(m, r, i, displayMatchLabel(m))).join("");
+    const title = isFinalRound ? "冠亞" : (view ? view.title(r) : singleRoundTitle(r));
+    const boxes = ms.map((m,i)=> seMatchBoxHtml(m, r, i, view ? view.label(m) : displayMatchLabel(m), view)).join("");
     cols += `<div class="se-col ${isFinalRound?"se-final-stage-col":""}" data-round="${r}" ${isFinalRound?'data-final-stage="championship"':""}><div class="se-col-title">${title}</div>${isFinalRound?'<div class="se-stage-tag se-stage-tag-final">冠亞</div>':""}${boxes}</div>`;
   }
   let bronzeCol = "";
-  const bronze = state.bronzeMatchId ? getMatch(state.bronzeMatchId) : null;
+  const bronze = view ? view.bronze : state.bronzeMatchId ? getMatch(state.bronzeMatchId) : null;
   if(bronze){
-    const bronzeBox=matchBoxHtml(bronze,"季殿").replace('class="match-box','class="match-box se-bronze-match');
+    const bronzeBox=(view ? seMatchBoxHtml(bronze, bronze.round, 0, "季殿", view) : matchBoxHtml(bronze,"季殿")).replace('class="match-box','class="match-box se-bronze-match');
     bronzeCol = `<div class="bracket-col se-bronze-col"><div class="bracket-col-title">季殿</div><div class="se-stage-tag se-stage-tag-bronze">季殿</div>${bronzeBox}</div>`;
   }
-  const championHtml = state.championId ? `
+  const championHtml = (view ? view.champion : state.championId) ? `
   <div class="champion-box">
     <div class="cap">冠　軍</div>
-    <div class="name">${esc(playerName(state.championId))}</div>
-    ${state.runnerUpId ? `<div class="hint" style="margin-top:10px;">亞軍：${esc(playerName(state.runnerUpId))}</div>`:""}
-    ${state.meta.bronzeMatch && state.thirdId ? `<div class="hint">季軍：${esc(playerName(state.thirdId))}　殿軍：${esc(playerName(state.fourthId))}</div>`:""}
+    <div class="name">${esc(view ? view.champion : playerName(state.championId))}</div>
+    ${!view && state.runnerUpId ? `<div class="hint" style="margin-top:10px;">亞軍：${esc(playerName(state.runnerUpId))}</div>`:""}
+    ${!view && state.meta.bronzeMatch && state.thirdId ? `<div class="hint">季軍：${esc(playerName(state.thirdId))}　殿軍：${esc(playerName(state.fourthId))}</div>`:""}
   </div>` : "";
-  const finalsChampionHtml = state.championId ? `
+  const finalsChampionHtml = (view ? view.champion : state.championId) ? `
     <div class="se-finals-champion-card" aria-label="本場賽事冠軍">
       <span class="board-trophy">${trophySvg()}</span>
       <div class="board-champion-label">冠軍</div>
-      <div class="board-champion-name">${esc(playerName(state.championId))}</div>
+      <div class="board-champion-name">${esc(view ? view.champion : playerName(state.championId))}</div>
     </div>` : "";
   const treeHtml = `<div class="se-bracket-outer ${total===1?'se-bracket-two-player':''}" id="se-bracket-outer">
     <svg class="se-bracket-svg" id="se-bracket-svg"></svg>
@@ -11683,12 +11755,33 @@ function renderSingleElimBracket(forceTree=false){
   return `
   ${championHtml}
   <div class="panel">
-    ${eventTitleBar('<button class="btn btn-ghost btn-sm" data-action="print-bracket">列印 / 另存 PDF</button>')}
+    ${view ? '<div class="event-title-bar"><div class="event-title-center">'+esc(view.name)+'</div></div>' : eventTitleBar('<button class="btn btn-ghost btn-sm" data-action="print-bracket">列印 / 另存 PDF</button>')}
     <div class="hint" style="margin-bottom:10px;">輪空節點已隱藏且不占用正式場次編號。</div>
     <div class="bracket-wrap">${wrapBracketWatermark(treeHtml)}</div>
   </div>
   `;
 }
+
+// Shared bracket rendering for the verified PTN manager projection.
+function ticketBracketView(room){
+  if(!room?.ok || !Array.isArray(room.bracket) || !room.bracket.length)return null;
+  const matches=room.bracket.map(m=>({...m,a:m.a?{...m.a,playerId:m.a.id}:null,b:m.b?{...m.b,playerId:m.b.id}:null,
+    log:(m.scoreA||m.scoreB)?[{}]:[],status:m.completed?'completed':(['pending','ready','in_progress','paused'].includes(m.status)?m.status:'pending')}));
+  const round=r=>matches.filter(m=>m.bracket!=='BZ'&&m.round===r).sort((a,b)=>a.seq-b.seq);
+  const total=Math.max(...matches.filter(m=>m.bracket!=='BZ').map(m=>m.round))+1;
+  if(!Number.isInteger(total)||total<1||total>8)return null;
+  for(let r=0;r<total;r++)round(r).forEach((m,i)=>{m.indexInRound=i;});
+  const played=matches.filter(m=>!m.isBye).sort((a,b)=>a.seq-b.seq);
+  const number=m=>played.indexOf(m)+1;
+  return {code:room.code,phase:room.phase,matches,round,total,number,label:m=>window.BXHFormatUtils.matchSequenceLabel(number(m)),
+    title:r=>{const n=2**(total-r);return r===0&&round(0).some(m=>m.isBye)?(n/2)+'強入圍戰':n===2?'冠軍賽':n===4?'四強':n+'強';},
+    row:(id,name)=>'<span class="player-line"><span class="seed-num seed-empty"></span><span class="nm">'+esc(name)+'</span></span>',
+    bronze:matches.find(m=>m.bracket==='BZ'),champion:room.championName,name:room.name||'合作賽事'};
+}
+window.BXHSharedTicketBracket={render(room){
+  const view=ticketBracketView(room);
+  return view?renderBracketModeControls('<button class="btn btn-ghost btn-sm bracket-refresh-btn" data-action="commerce-ticket-refresh">↻ 刷新</button>')+(bracketViewMode==="board"?renderBoardMode(view):renderTournamentMatchList(view)):'';
+}};
 
 /* ==== single-elim tree: dynamic DOM-measured layout + SVG connectors ==== */
 function layoutSingleElimBracket(suffix){
@@ -11700,7 +11793,12 @@ function layoutSingleElimBracket(suffix){
       .sort((a,b)=>(+a.getAttribute("data-round"))-(+b.getAttribute("data-round")));
     if(!allCols.length) return;
     const maxRound = allCols.reduce((mx,c)=>Math.max(mx,+c.getAttribute("data-round")),0);
-    const inBoard = !!outer.closest?.("#board-canvas") && suffix!=="-print";
+    const isTicket=!!outer.closest?.(".commerce-ptn-management");
+    const view=isTicket?ticketBracketView(window.BXHCommerce?.verifiedBracketRoom?.()):null;
+    if(isTicket&&!view)return;
+    const roundMatches=view?view.round:matchesInRound;
+    const findMatch=view?id=>view.matches.find(m=>m.id===id):getMatch;
+    const inBoard = (!!outer.closest?.("#board-canvas")||isTicket) && suffix!=="-print";
 
     if(!inBoard){
       const round0Col = outer.querySelector('.se-col[data-round="0"]');
@@ -11773,10 +11871,10 @@ function layoutSingleElimBracket(suffix){
 
     // Later rounds sit midway between their two feeder matches.
     for(let r=anchorRound+1;r<=maxRound;r++){
-      const logicalPrev=matchesInRound(r-1);
+      const logicalPrev=roundMatches(r-1);
       const boxes=realBoxesByRound.get(r)||[];
       boxes.forEach(box=>{
-        const m=getMatch(box.getAttribute("data-id"));
+        const m=findMatch(box.getAttribute("data-id"));
         if(!m)return;
         const a=logicalPrev[m.indexInRound*2],b=logicalPrev[m.indexInRound*2+1];
         const ca=a?centers.get(a.id):undefined,cb=b?centers.get(b.id):undefined;
@@ -11790,11 +11888,11 @@ function layoutSingleElimBracket(suffix){
     // tightly above/below the destination center so they never overlap.
     for(let r=anchorRound-1;r>=0;r--){
       const boxes=realBoxesByRound.get(r)||[];
-      const nextLogical=matchesInRound(r+1);
-      const logicalHere=matchesInRound(r);
+      const nextLogical=roundMatches(r+1);
+      const logicalHere=roundMatches(r);
       const desired=[];
       boxes.forEach(box=>{
-        const m=getMatch(box.getAttribute("data-id"));
+        const m=findMatch(box.getAttribute("data-id"));
         if(!m)return;
         const dest=nextLogical[Math.floor(m.indexInRound/2)];
         const destBox=dest?outer.querySelector('.match-box[data-id="'+dest.id+'"]'):null;
@@ -11840,7 +11938,7 @@ function layoutSingleElimBracket(suffix){
 
 function positionSingleElimFinalDecorations(outer){
   try{
-    if(!outer || !outer.closest?.("#board-canvas")) return;
+    if(!outer || !outer.closest?.("#board-canvas,.commerce-ptn-management")) return;
     const finalCol=outer.querySelector('.se-final-stage-col');
     const finalBox=finalCol&&finalCol.querySelector('.match-box:not(.bye-placeholder)');
     const finalTag=finalCol&&finalCol.querySelector('.se-stage-tag-final');
@@ -11886,7 +11984,10 @@ function drawSingleElimConnectors(outer, allCols, maxRound, suffix){
   suffix = suffix || "";
   const svg = document.getElementById("se-bracket-svg"+suffix);
   if(!svg) return;
-  const matches=new Map(state.matches.map(m=>[m.id,m]));
+  const ticket=outer.closest?.(".commerce-ptn-management") ? window.BXHCommerce?.verifiedBracketRoom?.() : null;
+  const view=ticket?ticketBracketView(ticket):null;
+  if(outer.closest?.(".commerce-ptn-management")&&!view)return;
+  const matches=new Map((view ? view.matches : state.matches).map(m=>[m.id,m]));
   const colsWrap = document.getElementById("se-bracket-cols"+suffix);
   const totalWidth = colsWrap ? colsWrap.scrollWidth : outer.scrollWidth;
   const totalHeight = colsWrap ? colsWrap.scrollHeight : outer.scrollHeight;
@@ -11958,8 +12059,8 @@ function drawSingleElimConnectors(outer, allCols, maxRound, suffix){
     });
   }
   svg.innerHTML = paths;
-  applySingleBracketPlayerPath(outer);
-  markBoardOwnPlayer();
+  if(!view){applySingleBracketPlayerPath(outer);
+  markBoardOwnPlayer();}
 }
 
 let __seRelayoutQueued = false;
@@ -12430,13 +12531,13 @@ function previousMatchCorrectionHtml(stationNum,currentId){
     </div>
   </div>`;
 }
-function refereeWorkstationHeader(m, stationNum){
-  const closed=state.forcedCourtExits?.[stationNum]?.closed;
-  const exitButton=state.bracketSize&&(closed?canManageCourtRetirement():canForceExitCourt(stationNum))&&state.archiveStatus!=="completed"?`<details class="ref-court-maintenance"><summary>更多操作</summary><div><p>整台管理操作，與裁判入席／退出無關。</p><button type="button" class="btn btn-sm ref-court-exit-btn" data-action="${closed?'court-force-reopen':'court-force-exit'}" data-station="${stationNum}" ${courtRetirementBusy?'disabled':''}>${closed?'重新啟用本台':'裁判台強制退場'}</button></div></details>`:"";
-  const assigned=refereeDisplayForStation(stationNum);
-  const status=refereeStationStatus(m);
-  const matchMeta=m?`${esc(refereeStageLabel(m))} · 第 ${m.indexInRound+1} 場`:"等待安排場次";
-  return `<div class="ref-workstation-head"><div class="ref-workstation-identity"><span class="court-badge">台${stationNum}</span><div><span>責任裁判</span><b title="${esc(assigned)}">${esc(assigned)}</b></div></div><div class="ref-workstation-meta"><span class="ref-station-status ${status.cls}">${status.label}</span><small>${matchMeta}｜已完成 ${stationCompletedCount(stationNum)} 場${refereeStationRestrictionEnabled()?"｜桌次限制":""}</small>${exitButton}</div></div>${window.BXHRefereeSeats?.render(state,stationNum)||""}`;
+function refereeWorkstationHeader(m, stationNum, ticketView=null){
+  const closed=!ticketView&&state.forcedCourtExits?.[stationNum]?.closed;
+  const exitButton=!ticketView&&state.bracketSize&&(closed?canManageCourtRetirement():canForceExitCourt(stationNum))&&state.archiveStatus!=="completed"?`<details class="ref-court-maintenance"><summary>更多操作</summary><div><p>整台管理操作，與裁判入席／退出無關。</p><button type="button" class="btn btn-sm ref-court-exit-btn" data-action="${closed?'court-force-reopen':'court-force-exit'}" data-station="${stationNum}" ${courtRetirementBusy?'disabled':''}>${closed?'重新啟用本台':'裁判台強制退場'}</button></div></details>`:"";
+  const assigned=ticketView?(ticketView.refereeSeatControl?.courts?.[stationNum]?.main?.name||ticketView.refereeSeatView?.courts?.[stationNum]?.main?.name||"尚未入席"):refereeDisplayForStation(stationNum);
+  const status=ticketView?(ticketView.phase==="waiting"?{label:"等待開賽",cls:"waiting"}:ticketView.courtControl?.courts?.find(c=>c.station===stationNum)?.closed||ticketView.refereeSeatControl?.courts?.[stationNum]?.closed?{label:"已退場",cls:"waiting"}:m?{label:Math.max(Number(m.scoreA||0),Number(m.scoreB||0))>=4?"待確認賽果":m.status==="paused"?"已暫停":"進行中",cls:m.status==="paused"?"paused":"live"}:{label:"等待安排場次",cls:"waiting"}):refereeStationStatus(m);
+  const matchMeta=m?(ticketView?`第 ${Number(m.round||0)+1} 輪 · 第 ${Number(m.seq||0)+1} 場`:`${esc(refereeStageLabel(m))} · 第 ${m.indexInRound+1} 場`):"等待安排場次";
+  return `<div class="ref-workstation-head"><div class="ref-workstation-identity"><span class="court-badge">台${stationNum}</span><div><span>責任裁判</span><b title="${esc(assigned)}">${esc(assigned)}</b></div></div><div class="ref-workstation-meta"><span class="ref-station-status ${status.cls}">${status.label}</span><small>${matchMeta}｜已完成 ${ticketView?Number(ticketView.refereeSeatControl?.courts?.[stationNum]?.completedCount??ticketView.courtControl?.courts?.find(c=>c.station===stationNum)?.completedCount??0):stationCompletedCount(stationNum)} 場${!ticketView&&refereeStationRestrictionEnabled()?"｜桌次限制":""}</small>${exitButton}</div></div>${ticketView?(window.BXHRefereeSeats?.renderPendingTicketSeats?.(stationNum,ticketView)||""):window.BXHRefereeSeats?.render(state,stationNum)||""}`;
 }
 function renderQuickDecisionPanel(m, court, stationNum){
   const aName = playerName(m.a.playerId), bName = playerName(m.b.playerId);
@@ -12456,10 +12557,10 @@ function renderQuickDecisionPanel(m, court, stationNum){
   </div>`;
 }
 
-function courtAtmosphereStyle(stationNum){
+function courtAtmosphereStyle(stationNum,roomId=state.id){
   // Automatically assigns a visually distinct atmosphere-light hue to each court.
   // The golden-angle step keeps adjacent courts far apart in hue without requiring manual setup.
-  const base = Array.from(String(state.id||"BXH")).reduce((sum,ch)=>sum+ch.charCodeAt(0),0) % 360;
+  const base = Array.from(String(roomId||"BXH")).reduce((sum,ch)=>sum+ch.charCodeAt(0),0) % 360;
   const hue = (base + (Math.max(1,stationNum)-1) * 137.508) % 360;
   return `--court-hue:${hue.toFixed(1)};--court-accent:hsl(${hue.toFixed(1)} 88% 62%);--court-glow:hsla(${hue.toFixed(1)} 88% 58% / .30);--court-glow-soft:hsla(${hue.toFixed(1)} 88% 58% / .10);`;
 }
@@ -12512,19 +12613,19 @@ function renderCourtCard(stationNum){
   </div>`;
 }
 
-function renderRefereeScorePanel(match,stationNum){
+function renderRefereeScorePanel(match,stationNum,ticketWaiting=false){
   // A display-only placeholder: never inserted into state.matches or court assignments.
   const waiting=!match;
   const m=match||{id:'',scoreA:0,scoreB:0,log:[],status:'pending',completed:false};
   const aName=waiting?'—':playerName(m.a.playerId),bName=waiting?'—':playerName(m.b.playerId);
   const winSide = waiting?null:checkWinnerSide(m);
   const warnBanner = m.completed ? `<div class="banner warn"><span>此對戰已完成確認，任何得分或重賽操作將修改已確認的比賽結果，請謹慎操作。</span></div>` : "";
-  const locked = !!(pendingModal && pendingModal.type==="confirm-result" && pendingModal.matchId===m.id);
-  const preStartLocked=!state.startedAt;
+  const locked = !ticketWaiting&&!!(pendingModal && pendingModal.type==="confirm-result" && pendingModal.matchId===m.id);
+  const preStartLocked=ticketWaiting||!state.startedAt;
   const stationLocked=waiting||!canOperateStation(stationNum);
   const uploadSaving=!waiting&&refereeUploadPending(m);
   const operationLocked=stationLocked||uploadSaving;
-  const enchantmentPending=state.meta&&state.meta.playMode==="enchantment";
+  const enchantmentPending=!ticketWaiting&&state.meta&&state.meta.playMode==="enchantment";
   const faultSaving=!waiting&&refereeFaultWritePending(m);
   const scoreLocked=waiting || locked || faultSaving || preStartLocked || operationLocked || !!winSide || enchantmentPending;
 
@@ -12548,7 +12649,7 @@ function renderRefereeScorePanel(match,stationNum){
     ${warnBanner}
     ${!waiting&&preStartLocked?`<div class="banner warn" style="margin:12px 16px 0;"><span>賽事尚未開始。比分、判定與場次控制目前鎖定。</span></div>`:""}
     <div class="match-status-controls ref-match-toolbar">
-      <span class="msc-label">場次狀態：${waiting?'等待對戰｜計分尚未開放':matchStatusBarHtml(m, true)}</span>
+      <span class="msc-label">場次狀態：${waiting?(ticketWaiting?'等待開賽':'等待對戰｜計分尚未開放'):matchStatusBarHtml(m, true)}</span>
       <div class="msc-btns">
         ${!waiting&&state.startedAt&&m.status==="in_progress" ? `<button class="btn btn-ghost btn-sm" data-action="pause-match-status" data-id="${m.id}" ${operationLocked?'disabled':''}>暫停比賽</button>` : ""}
         ${!waiting&&state.startedAt&&m.status==="paused" ? `<button class="btn btn-ghost btn-sm" data-action="resume-match-status" data-id="${m.id}" ${operationLocked?'disabled':''}>恢復比賽</button>` : ""}
@@ -12576,7 +12677,7 @@ function renderRefereeScorePanel(match,stationNum){
 
     <div class="score-log">${m.log.map(l=>`<span>${l.side==='A'?esc(aName):esc(bName)} ${POINT_LABELS[l.type]}</span>`).join("") || '<span>尚無得分紀錄</span>'}</div>
 
-    ${refereeUploadStatusHtml(stationNum)}
+    ${ticketWaiting?"":refereeUploadStatusHtml(stationNum)}
     <div class="btn-row ref-result-actions" style="margin-top:16px;">
       <button class="btn btn-ghost ref-undo-score" ${waiting?'':`data-action="undo-score" data-id="${m.id}"`} ${!undoAvailable||locked||faultSaving||operationLocked?'disabled':''}>${undoLabel}</button>
       <button class="btn btn-ghost ref-rematch" ${waiting?'':`data-action="rematch" data-id="${m.id}"`} ${locked||faultSaving||operationLocked?'disabled':''}>本局重賽</button>
@@ -12692,14 +12793,22 @@ function refereeWaitingControls(stationNum){
   })||"";
   return tools+renderRefereeScorePanel(null,stationNum);
 }
-function renderWaitingRefereeCourt(stationNum){
-  const seatsEnabled=state.meta?.refereeSeatsV1?.version===1;
-  return `<div class="panel court-card referee-workstation referee-workstation-waiting" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
-    ${refereeWorkstationHeader(null,stationNum)}
-    ${seatsEnabled?"":'<div class="hint" role="status">本場尚未啟用三席裁判制。</div>'}
-    ${refereeWaitingControls(stationNum)}
+function renderWaitingRefereeCourt(stationNum,ticketView=null){
+  const seatsEnabled=!ticketView&&state.meta?.refereeSeatsV1?.version===1;
+  return `<div class="panel court-card referee-workstation referee-workstation-waiting" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum,ticketView?ticketView.roomId:state.id)}">
+    ${refereeWorkstationHeader(null,stationNum,ticketView)}
+    ${ticketView?(ticketView.refereeSeatControl?.version===1?'':'<div class="hint" role="status">裁判邀請及入席尚未啟用。</div>'):seatsEnabled?"":'<div class="hint" role="status">本場尚未啟用三席裁判制。</div>'}
+    ${ticketView?renderRefereeScorePanel(null,stationNum,true):refereeWaitingControls(stationNum)}
   </div>`;
 }
+// Only render authoritative, configured courts; no seat or scoring writes here.
+window.BXHSharedTicketWaitingCourts={header:(match,station,room)=>refereeWorkstationHeader(match,station,room),render(room){
+  const n=room?.stations;
+  if(room?.phase!=="waiting"||!Number.isInteger(n)||n<1||n>12)return "";
+  const courts=room.scoped?Object.keys(room.refereeSeatControl?.courts||{}).map(Number).filter(i=>Number.isInteger(i)&&i>=1&&i<=n):Array.from({length:n},(_,i)=>i+1);
+  const count=courts.length,grid=count===1?"court-grid court-grid-1":count===2?"court-grid court-grid-2":count===4?"court-grid court-grid-many court-grid-4fit":"court-grid court-grid-many";
+  return '<div class="'+grid+'">'+courts.map(i=>renderWaitingRefereeCourt(i,room)).join("")+'</div>';
+}};
 function canUseRefereeSyncRecovery(){
   return !!(state?.cloudCode&&state.id&&state.startedAt&&state.meta?.battleMode!=="team"&&currentAuthUid()&&canOperateCurrentTournament());
 }
@@ -12820,7 +12929,7 @@ function renderReferee(){
   const quickNav = refereeBracketRoundtripNav("bracket")+refereeSyncRecoveryControlsHtml()
     +(isCommunityRoomOwner()&&!window.BXHRefereeSeats?.enabled(state)?window.BXHRefereeSeats?.settings()||"":"");
   if(!state.bracketSize){
-    return quickNav+selector+`<div class="${gridClass}">${stations.map(renderWaitingRefereeCourt).join("")}</div>`;
+    return quickNav+selector+`<div class="${gridClass}">${stations.map(station=>renderWaitingRefereeCourt(station)).join("")}</div>`;
   }
   const rm = refereeMatches();
   if(rm.length===0){
@@ -13222,10 +13331,6 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
     ${showModeSelector?managedRegistrationSettingsNotice():""}
     ${registrationFormDraftDirty ? `<div class="banner warn"><span>尚有未儲存的變更，請記得點擊下方「儲存報名設定」。</span></div>` : ""}
     ${showModeSelector ? `<div class="scoring-mode-cards">
-      <button class="scoring-mode-card ${!d.registrationEnabled?'active':''}" data-action="set-registration-enabled" data-value="false" ${locked?'disabled':''}>
-        <div class="smc-title">現場報名</div>
-        <div class="smc-desc">現場直接新增選手，不開放線上報名。</div>
-      </button>
       <button class="scoring-mode-card ${d.registrationEnabled?'active':''}" data-action="set-registration-enabled" data-value="true" ${locked?'disabled':''}>
         <div class="smc-title">線上報名</div>
         <div class="smc-desc">發布後玩家可掃 QR 或從賽事大廳自行報名。</div>
@@ -13991,6 +14096,7 @@ function renderBxhEventTemplateSettingsSection(readOnly){
 }
 
 function renderSettings(){
+  const partnerSettings=isPartnerOrganizerMode();
   const settingsReadOnly=state.archiveStatus==="completed";
   const ladderModeLocked=settingsReadOnly||state.matches.some(m=>!!m.winnerId);
   const onsiteRosterLocked=onsiteRegistrationSettingsLocked()&&state.onsiteWaitlistFinalized!==true;
@@ -14013,38 +14119,35 @@ function renderSettings(){
     </div>
     <div class="btn-row">
       <button class="btn btn-ghost btn-sm" data-action="cloud-open-admin-list">返回賽事管理</button>
-      ${aiCreateBetaActorAllowed()?'<button class="btn btn-ghost btn-sm ai-create-assist-btn" data-action="ai-create-open">✨ AI 協助建立 <span style="opacity:.62">BETA</span></button>':""}
-      <button class="btn btn-primary btn-sm" data-action="new-tournament-blank">＋ 新增賽事</button>
+      ${!partnerSettings&&aiCreateBetaActorAllowed()?'<button class="btn btn-ghost btn-sm ai-create-assist-btn" data-action="ai-create-open">✨ AI 協助建立 <span style="opacity:.62">BETA</span></button>':""}
+      ${isPartnerOrganizerMode()?(window.BXHCommerce?.ticketPilot?.()?'<button class="btn btn-primary btn-sm" data-action="commerce-open-ticket-create">＋ 選券建房</button>':'<span class="hint">合作主辦建房目前僅開放指定票券試點</span>'):'<button class="btn btn-primary btn-sm" data-action="new-tournament-blank">＋ 新增賽事</button>'}
     </div>
   </div>
 
-  ${renderAiCreateAssistant()}
-  ${aiCreateLastApplied && (settingsFormDraftDirty||registrationFormDraftDirty)?`<div class="ai-create-applied-banner">
+  ${!partnerSettings?renderAiCreateAssistant():""}
+  ${!partnerSettings&&aiCreateLastApplied && (settingsFormDraftDirty||registrationFormDraftDirty)?`<div class="ai-create-applied-banner">
     <strong>✨ AI 草稿已套用｜${esc(aiCreateLastApplied.eventName)}</strong>
     <span>已填入：${aiCreateLastApplied.mappedFields.map(esc).join("、")}。目前只是未儲存草稿，請逐欄審核後再按「儲存賽事設定」。</span>
     ${aiCreateLastApplied.warnings.length?`<div class="ai-create-applied-warnings">⚠️ ${aiCreateLastApplied.warnings.map(esc).join("　")}</div>`:""}
   </div>`:""}
-  ${renderAiCreateSuggestionPanel()}
-  ${renderAiCreateReviewPanel()}
+  ${!partnerSettings?renderAiCreateSuggestionPanel():""}
+  ${!partnerSettings?renderAiCreateReviewPanel():""}
 
-  <div class="settings-section-head" style="margin-top:0;">
+  ${partnerSettings?"":`<div class="settings-section-head" style="margin-top:0;">
     <span class="settings-section-num">1</span>
     <span class="settings-section-title">報名方式</span>
-    <span class="settings-section-desc">先決定現場報名或線上報名</span>
+    <span class="settings-section-desc">統一使用線上報名；可依現場需求設定開放時間</span>
   </div>
   <div class="panel settings-flow-panel">
     <div class="settings-choice-row">
-      <button class="scoring-mode-card ${!registrationChoice?"active":""}" data-action="set-registration-enabled" data-value="false" ${state.bracketSize>0||onsiteRegistrationSettingsLocked()?'disabled':''}>
-        <div class="smc-title">現場報名</div><div class="smc-desc">現場直接新增選手，不開放線上報名。</div>
-      </button>
       <button class="scoring-mode-card ${registrationChoice?"active":""}" data-action="set-registration-enabled" data-value="true" ${state.bracketSize>0||onsiteRegistrationSettingsLocked()?'disabled':''}>
         <div class="smc-title">線上報名</div><div class="smc-desc">玩家可由賽事大廳或 QR CODE 進入報名。</div>
       </button>
     </div>
-  </div>
+  </div>`}
 
   <div class="settings-section-head">
-    <span class="settings-section-num">2</span>
+    <span class="settings-section-num">${partnerSettings?1:2}</span>
     <span class="settings-section-title">活動基本資料</span>
     <span class="settings-section-desc">活動資訊、活動時間與線上報名資料集中設定</span>
   </div>
@@ -14054,9 +14157,9 @@ function renderSettings(){
       <label>賽事類型</label>
       ${ladderModeLocked?`<div class="banner warn"><span>本場已有比賽結果或已完成封存，賽事類型已鎖定。</span></div>`:""}
       <div class="settings-choice-row">
-        <button class="scoring-mode-card ${ladderMode==="general"?"active":""}" data-action="set-ladder-mode" data-mode="general" ${ladderModeLocked?'disabled':''}>
+        ${partnerSettings?"":`<button class="scoring-mode-card ${ladderMode==="general"?"active":""}" data-action="set-ladder-mode" data-mode="general" ${ladderModeLocked?'disabled':''}>
           <div class="smc-title">一般賽事</div><div class="smc-desc">交流／主題活動，不影響 BXH 天梯。</div>
-        </button>
+        </button>`}
         <button class="scoring-mode-card ${ladderMode==="ranked"?"active":""}" data-action="set-ladder-mode" data-mode="ranked" ${ladderModeLocked?'disabled':''}>
           <div class="smc-title">${isTester()?'測試積分賽事':'積分賽事'}</div><div class="smc-desc">${isTester()?'寫入獨立測試天梯，不影響正式 BXH 天梯。':'納入 BXH 天梯，完賽後自動結算積分。'}</div>
         </button>
@@ -14123,14 +14226,14 @@ function renderSettings(){
       <div class="settings-mini-title">線上報名設定</div>
       <div class="settings-integrated-registration">${renderRegistrationSettingsPanel(false)}</div>
     `:`
-      <div class="settings-mini-title">現場報名</div>
-      <p class="hint">本場採現場報名，不需要設定報名開放時間、截止時間、名額或備取。</p>
+      <div class="settings-mini-title">既有現場房間</div>
+      <p class="hint">${partnerSettings?'本場保留原有設定與名單。':'本場保留原有設定與名單。若要開放帳號報名，請選擇上方「線上報名」並完成設定。'}</p>
     `}
   </div>
 
   ${renderBxhEventTemplateSettingsSection(settingsReadOnly)}
   <div class="settings-section-head">
-    <span class="settings-section-num">4</span>
+    <span class="settings-section-num">${partnerSettings?2:4}</span>
     <span class="settings-section-title">賽制與比賽判定</span>
     <span class="settings-section-desc">決定怎麼打、幾台、如何判定勝負</span>
   </div>
@@ -14168,8 +14271,8 @@ function renderSettings(){
 
   <div class="settings-save-bar">
     <div>
-      <strong>${settingsFormDraftDirty||registrationFormDraftDirty?'尚有未儲存設定':!state.cloudCode?'草稿已儲存，尚未發布':'設定已儲存'}</strong>
-      <span>活動資料、時間、賽制與線上報名資料會一起儲存。</span>
+      <strong>${settingsFormDraftDirty||registrationFormDraftDirty?'尚有未儲存設定':!state.cloudCode?(isPartnerOrganizerMode()?'本機草稿，尚未建立房號':'草稿已儲存，尚未發布'):'設定已儲存'}</strong>
+      <span>${isPartnerOrganizerMode()&&!state.cloudCode?'此頁設定僅儲存在目前裝置；選券建房後才會取得 PTN 房號。':'活動資料、時間、賽制與線上報名資料會一起儲存。'}</span>
     </div>
     <button class="btn btn-primary" data-action="save-meta" ${settingsReadOnly||onsiteRosterLocked?'disabled':''} ${onsiteRosterLocked?'aria-describedby="onsite-registration-lock-notice"':''}>${settingsReadOnly?'已完成・設定鎖定':onsiteRosterLocked?'候補抽選中・暫停儲存':'儲存賽事設定'}</button>
     ${renderTournamentPublishAction(settingsReadOnly)}
@@ -15474,8 +15577,8 @@ function renderPlayerApplyScreen(){
         <div class="hint">BXH 賽事長期採用本名制，請填寫與報名資料一致的真實姓名。</div>
       </div>
       <div class="field"><label>Email（必填）</label><input type="email" id="apply-email" autocomplete="username"></div>
-      <div class="field"><label>密碼（必填，至少 8 碼）</label><input type="password" id="apply-password" autocomplete="new-password"></div>
-      <div class="field"><label>再次輸入密碼（必填）</label><input type="password" id="apply-password2" autocomplete="new-password"></div>
+      <div class="field"><label>密碼（必填，至少 6 碼）</label><input type="password" id="apply-password" minlength="6" autocomplete="new-password"></div>
+      <div class="field"><label>再次輸入密碼（必填）</label><input type="password" id="apply-password2" minlength="6" autocomplete="new-password"></div>
       <div class="field">
         <label for="apply-nickname">遊戲 ID／ARENA 角色名稱（必填）</label>
         <input type="text" id="apply-nickname" maxlength="24" required>
@@ -16231,6 +16334,19 @@ function lobbyMyRegistration(code){
   return myRegistrationsCache.find(r=>r.tournamentCode===code && (r.status==="confirmed"||r.status==="waitlist"||r.status==="pending_draw")) || null;
 }
 function lobbySummary(raw){
+  // Display only: do not call registration route lookups or classify unmarked rooms.
+  function lobbyRegistrationVersionLabel(raw){
+    if(publicTournamentsFreshness!=="server"||!raw||raw.eventAuthority!=="official"||
+       raw.ticketRoomVersion||raw.registrationSelection||
+       raw.battleMode==="team"||raw.parsedData?.meta?.battleMode==="team"||
+       !/^BXH-[A-Z0-9]{4,16}$/.test(raw.code||""))return "";
+    const version=raw.registrationQueueVersion;
+    const route=window.engagementService?.knownRegistrationV2DisplayRoute?.(raw.code);
+    if(version===2)return route===true?"V2 排隊報名":"";
+    if(route!==false)return "";
+    if(version===1||(version==null&&raw.code==="BXH-6SW48P"))return "V1 標準報名";
+    return "";
+  }
   const pd = raw.parsedData || {};
   const m = pd.meta || {};
   const regStatus = lobbyRegistrationStateKnown(raw)?getEffectiveRegistrationStatus(raw):"unknown";
@@ -16239,7 +16355,7 @@ function lobbySummary(raw){
   return {
     raw, communityQuickRegistration:isCommunityQuickRegistration(raw), registrationEnabled:raw.registrationEnabled, registrationStatus:raw.registrationStatus, code:raw.code, name:m.name||raw.name||"未命名賽事", date:m.date||raw.eventDate||"", startAt:m.startTime||raw.startAt||"",
     location:m.location||raw.location||"", phase:canonicalPublicTournamentPhase(raw), regStatus,
-    authority, hostName, systemClosure:raw.systemClosure||pd.systemClosure||null,
+    authority, hostName, registrationVersionLabel:lobbyRegistrationVersionLabel(raw), systemClosure:raw.systemClosure||pd.systemClosure||null,
     ladderMode:(raw.ladderMode??m.ladderMode)==="ranked"?"ranked":"general",
     registrationSelection:raw.registrationSelection||null,registeredCount:Number(raw.registeredCount||0),capacity:raw.capacity??null, confirmedCount:communityRegistrationParticipantCount(raw), waitlistEnabled:!!raw.waitlistEnabled,
     waitlistCapacity:raw.waitlistCapacity||0, waitlistCount:raw.waitlistCount||0,
@@ -16359,7 +16475,7 @@ function lobbyPlayerRosterHtml(t){
 function lobbyCard(t, kind, loggedIn, expanded=false){
   const life=publicEventLifecycleStatus(t);
   const displayPhase=t.phase==="waiting" ? ((t.regStatus==="open"||t.regStatus==="full")&& (t.authority!=="community"||isCommunityQuickRegistration(t)) ? "registration" : "prestart") : life.phase;
-  const authorityLabel=t.authority==="community"?"COMMUNITY":"BXH OFFICIAL";
+  const authorityLabel=t.authority==="community"?"COMMUNITY":t.authority==="ticket"&&t.code?.startsWith("PTN-")?"合作賽事":"BXH OFFICIAL";
   const authorityClass=t.authority==="community"?"community":"official";
   const timeLabel=[t.date,t.startAt].filter(Boolean).join(" ") || "時間待公布";
   const details=[
@@ -16384,6 +16500,7 @@ function lobbyCard(t, kind, loggedIn, expanded=false){
         </div>
         <div class="lobby-card-right">
           <span class="lobby-room-code">房號 ${esc(t.code)}</span>
+          ${t.registrationVersionLabel?`<span class="badge badge-metal" style="white-space:nowrap;flex-shrink:0" title="${esc(t.registrationVersionLabel)}" aria-label="${esc(t.registrationVersionLabel)}">${esc(t.registrationVersionLabel.slice(0,2))}</span>`:""}
           <span class="badge ${t.ladderMode==="ranked"?"badge-neon":"badge-metal"}" style="white-space:nowrap;flex-shrink:0">${t.ladderMode==="ranked"?"積分賽事":"一般賽事"}</span>
           <span class="lobby-authority ${authorityClass}">${authorityLabel}</span>
           ${t.roomAccessMode==="password"?'<span class="badge badge-metal">🔒 密碼房</span>':""}
@@ -16411,7 +16528,7 @@ function lobbyMatchesActiveFilters(t){
   const f=findEventsFilters||{keyword:"",date:"",region:"",format:"all"};
   const keyword=(f.keyword||"").trim().toLowerCase();
   const region=(f.region||"").trim().toLowerCase();
-  if(keyword && !String(t.name||"").toLowerCase().includes(keyword) && !String(t.hostName||"").toLowerCase().includes(keyword) && !String(t.location||"").toLowerCase().includes(keyword)) return false;
+  if(keyword && !String(t.name||"").toLowerCase().includes(keyword) && !String(t.hostName||"").toLowerCase().includes(keyword) && !String(t.location||"").toLowerCase().includes(keyword) && !String(t.code||"").toLowerCase().includes(keyword)) return false;
   if(f.date && t.date!==f.date) return false;
   if(region && !String(t.location||"").toLowerCase().includes(region)) return false;
   if(f.format && f.format!=="all" && t.formatType!==f.format) return false;
@@ -17121,6 +17238,7 @@ function resetTournamentDetailState(){
 
 
 function renderTournamentStandardTemplate(t){
+  if(t?.eventAuthority==="ticket"||t?.parsedData?.meta?.eventAuthority==="ticket"||String(t?.code||"").startsWith("PTN-")) return "";
   const cfg=t&&t.parsedData&&t.parsedData.eventInfo&&t.parsedData.eventInfo.standardTemplate;
   if(!cfg||cfg.enabled!==true||!cfg.snapshot)return "";
   const s=cfg.snapshot;
@@ -17288,7 +17406,7 @@ function renderTournamentDetailScreen(){
           ${publicVenue.address?`<span class="venue-detail-address-row"><span class="venue-detail-address">${esc(publicVenue.address)}</span>${renderVenueNavigationMenu(publicVenue)}</span>`:renderVenueNavigationMenu(publicVenue)}
         </div></div>
         <div class="stat-box"><div class="label">報到時間</div><div class="value small">${esc(t.checkInAt||"—")}</div></div>
-        <div class="stat-box"><div class="label">開賽時間</div><div class="value small">${esc(t.startAt||"—")}</div></div>
+        <div class="stat-box"><div class="label">開賽時間</div><div class="value small">${esc(typeof t.startAt==='number'?formatTournamentDetailDateTime(t.startAt):t.startAt||"—")}</div></div>
         <div class="stat-box"><div class="label">對戰形式</div><div class="value small">${isTeamBattle?esc(teamSize+"V"+teamSize+" 團體戰"):"個人戰"}</div></div>
         <div class="stat-box"><div class="label">賽事制度</div><div class="value small">${esc(FORMAT_LABELS[t.formatType]||(t.formatType||"—"))}</div></div>
         <div class="stat-box"><div class="label">報名費</div><div class="value small">${t.fee!=null?esc(String(t.fee))+" 元":"免費"}</div></div>
@@ -18919,6 +19037,10 @@ let googleLinkError="";
 // v13.23.1：玩家資料編輯視窗支援 Esc 關閉。
 // 不在儲存中時可直接退出；儲存中則避免中斷狀態。
 document.addEventListener("keydown",(ev)=>{
+  if(ev.key==="Escape" && pendingModal?.type==="player-password-change"){
+    if(!pendingModal.confirmBusy)closeModal();
+    return;
+  }
   if(ev.key==="Escape" && playerProfileEditOpen && !playerProfileEditBusy){
     playerProfileEditOpen=false;
     playerProfileEditError="";
@@ -19042,7 +19164,11 @@ function playerCenterEventGroups(records){
     group.records.push(r);
     group.timestamp=Math.max(group.timestamp,hunterRecordTimestamp(r));
   });
-  return [...groups.values()].sort((a,b)=>b.timestamp-a.timestamp||a.key.localeCompare(b.key)).map(g=>({...g,summary:hunterCareerSummary(g.records)}));
+  return [...groups.values()].sort((a,b)=>b.timestamp-a.timestamp||a.key.localeCompare(b.key)).map(g=>{
+    // All count-bearing rows must agree. Older rows may omit the new field.
+    const counts=new Set(g.records.map(r=>r.eventParticipantCount).filter(n=>Number.isSafeInteger(n)&&n>=2));
+    return {...g,participantCount:counts.size===1?[...counts][0]:null,summary:hunterCareerSummary(g.records)};
+  });
 }
 // S1 began at midnight in Taiwan on 2026/10/01. Keep earlier and undated
 // matches visible as history without crediting them to official career totals.
@@ -19070,7 +19196,7 @@ function playerCenterDataNotice(){
 function playerCenterEventHtml(group){
   const foldKey='profile-career:'+group.key;
   let open=false;try{open=sessionStorage.getItem('bxh-fold:'+currentAuthUid()+':'+foldKey)==='1';}catch(e){}
-  return '<details class="panel player-center-event" data-personal-event="'+esc(group.code)+'" data-fold-key="'+esc(foldKey)+'" '+(open?'open':'')+'><summary><span><strong>'+esc(group.name)+'</strong><small>'+esc(group.date||'日期未記錄')+' · '+group.summary.wins+' 勝 '+group.summary.losses+' 敗</small></span><span class="hint">展開／收合</span></summary><div class="player-center-event-body">'+playerCenterEventOutcomeHtml(group)+'<p class="hint">已讀取 '+group.summary.matches+' 場對戰</p>'+group.records.slice().sort((a,b)=>hunterRecordTimestamp(a)-hunterRecordTimestamp(b)).map(hunterRecordCardHtml).join('')+'</div></details>';
+  return '<details class="panel player-center-event" data-personal-event="'+esc(group.code)+'" data-fold-key="'+esc(foldKey)+'" '+(open?'open':'')+'><summary><span><strong>'+esc(group.name)+'</strong><small>'+esc(group.date||'日期未記錄')+' · '+group.summary.wins+' 勝 '+group.summary.losses+' 敗 · 參賽人數 '+(Number.isSafeInteger(group.participantCount)&&group.participantCount>=2?group.participantCount+' 人':'—')+'</small></span><span class="hint">展開／收合</span></summary><div class="player-center-event-body">'+playerCenterEventOutcomeHtml(group)+'<p class="hint">已讀取 '+group.summary.matches+' 場對戰</p>'+group.records.slice().sort((a,b)=>hunterRecordTimestamp(a)-hunterRecordTimestamp(b)).map(hunterRecordCardHtml).join('')+'</div></details>';
 }
 document.addEventListener('toggle',e=>{const code=e.target?.dataset?.personalEvent;if(e.target?.open&&code)void loadPlayerCenterEventResult(code);},true);
 function renderPlayerCenterCareer(){
@@ -19378,10 +19504,28 @@ function courtForceExitConfirmation(change,m){
       return executeCourtForceAction(change);
     }};
 }
+function renderNewTournamentRegistrationVersion(){
+  return `<fieldset style="min-width:0;margin:12px 0;padding:8px;border:1px solid var(--border,#454955);border-radius:9px">
+    <legend style="padding:0 4px;font-weight:700">報名流程版本</legend>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px" aria-label="報名流程版本">
+      <button type="button" class="btn btn-primary" aria-pressed="true" style="min-width:0;min-height:44px;padding:5px 2px;white-space:normal;display:block;line-height:1.22"><strong>V1</strong><br>標準報名</button>
+      <button type="button" class="btn btn-ghost" disabled aria-pressed="false" style="min-width:0;min-height:44px;padding:5px 2px;white-space:normal;display:block;line-height:1.22"><strong>V2</strong><br>排隊報名</button>
+      <button type="button" class="btn btn-ghost" disabled aria-pressed="false" style="min-width:0;min-height:44px;padding:5px 2px;white-space:normal;display:block;line-height:1.22"><strong>V3</strong><br>先保留名額</button>
+    </div>
+    <p class="hint" style="margin:6px 0 0">目前僅開放 V1。V2 和 V3 不可選擇。</p>
+  </fieldset>`;
+}
+
+function isCurrentPlayerPasswordModal(mm){
+  return !!mm&&mm.type==="player-password-change"&&appPhase==="player-center"&&playerActiveTab==="profile"&&
+    mm.uid===currentAuthUid()&&mm.epoch===engagementSessionEpoch&&window.cloudAuth?.getCurrentUser?.()?.uid===mm.uid;
+}
 function renderModal(){
   if(!pendingModal) return "";
   const mm = pendingModal;
+  if(mm.type==="player-password-change"&&!isCurrentPlayerPasswordModal(mm)){pendingModal=null;return "";}
   let body = mm.messageIsHtml ? `<div class="modal-rich-content">${mm.message||""}</div>` : `<p>${esc(mm.message).replace(/\n/g,"<br>")}</p>`;
+  if(mm.showNewTournamentRegistrationVersion===true)body+=renderNewTournamentRegistrationVersion();
   mm.confirmDisabled = false;
   if(mm.type==='court-force-exit'){
     mm.confirmDisabled=mm.acknowledged!==true;
@@ -19457,6 +19601,14 @@ function renderModal(){
     <div class="field"><label>房間密碼</label><input type="password" id="room-password-input" maxlength="20" autocomplete="off" placeholder="4～20 字元"></div>
     <p class="hint">驗證成功後會取得此房間的暫時 Access Grant；密碼不會保存在瀏覽器。</p>`;
     mm.confirmDisabled=false;
+  }
+  if(mm.type==="player-password-change"){
+    body=`<p>請輸入目前密碼確認身分。</p>
+      ${mm.error?`<div class="auth-error" role="alert">${esc(mm.error)}</div>`:""}
+      <div class="field"><label for="player-password-current">目前密碼</label><input id="player-password-current" type="password" autocomplete="current-password" ${mm.confirmBusy?"disabled":""}></div>
+      <div class="field"><label for="player-password-new">新密碼</label><input id="player-password-new" type="password" minlength="6" autocomplete="new-password" ${mm.confirmBusy?"disabled":""}></div>
+      <p class="hint">新密碼至少 6 碼。</p>
+      <div class="field"><label for="player-password-repeat">再次輸入新密碼</label><input id="player-password-repeat" type="password" minlength="6" autocomplete="new-password" ${mm.confirmBusy?"disabled":""}></div>`;
   }
   if(mm.type==="reauth-unarchive"){
     body = `<p>此賽事已封存為歷史紀錄。更正歷史結果需要重新確認您的身分。</p>
@@ -19740,8 +19892,7 @@ function renderHistory(){
     </div>
     <div class="btn-row">
       <button class="btn btn-ghost" data-action="refresh-history-cloud" ${historyCloudSyncBusy?'disabled':''}>${historyCloudSyncBusy?'同步雲端紀錄中…':'重新同步雲端紀錄'}</button>
-      <button class="btn btn-primary" data-action="new-tournament-copy">建立新賽事（複製目前設定）</button>
-      <button class="btn btn-ghost" data-action="new-tournament-blank">建立空白新賽事</button>
+      ${isPartnerOrganizerMode()?(window.BXHCommerce?.ticketPilot?.()?'<button class="btn btn-primary" data-action="commerce-open-ticket-create">選券建立合作賽事</button>':'<span class="hint">合作主辦建房目前僅開放指定票券試點</span>'):'<button class="btn btn-primary" data-action="new-tournament-copy">建立新賽事（複製目前設定）</button><button class="btn btn-ghost" data-action="new-tournament-blank">建立空白新賽事</button>'}
       <button class="btn btn-ghost" data-action="export-all-backup">全部備份匯出</button>
       <button class="btn btn-ghost" data-action="import-backup-trigger">匯入備份</button>
       ${hasActiveFilters ? `<button class="btn btn-ghost" data-action="clear-history-filters">清除篩選</button>` : ""}
@@ -19848,6 +19999,9 @@ function captureRenderViewport(){
   const canReadWindow = typeof window!=="undefined";
   const focused=typeof document!=="undefined"?document.activeElement:null;
   const profileEditor=focused?.closest?.(".profile-edit-modal");
+  const passwordModal=isCurrentPlayerPasswordModal(pendingModal)&&!pendingModal.confirmBusy&&!pendingModal.resetPasswordFields?pendingModal:null;
+  const passwordFields=passwordModal?["player-password-current","player-password-new","player-password-repeat"].map(id=>document.getElementById(id)).filter(field=>field&&!field.disabled):[];
+  const passwordFocus=passwordFields.includes(focused)?focused:null;
   const profileFocus=typeof playerProfileEditOpen!=="undefined"&&playerProfileEditOpen&&typeof currentAuthUid==="function"&&profileEditor?.getAttribute("data-profile-uid")===currentAuthUid()&&focused?.id
     ? {uid:currentAuthUid(),id:focused.id,start:focused.selectionStart,end:focused.selectionEnd}:null;
   const completionUid=(typeof pendingNewPlayerProfile!=="undefined"&&pendingNewPlayerProfile?.uid)||(typeof pendingExistingAccountProfile!=="undefined"&&pendingExistingAccountProfile?.uid);
@@ -19861,13 +20015,20 @@ function captureRenderViewport(){
     y: canReadWindow ? (window.scrollY || 0) : 0,
     navScroll: captureHorizontalNavPositions(),
     mailbox: canReadWindow ? window.BXHMailbox?.captureViewport?.() : null,
-    profileFocus,completionFocus
+    profileFocus,completionFocus,passwordModal,passwordFields,passwordFocus
   };
 }
 function finishRenderViewport(snapshot){
   if(!snapshot) return;
   __lastRenderedViewportKey = snapshot.key;
   if(typeof window==="undefined") return;
+  if(snapshot.passwordModal===pendingModal&&isCurrentPlayerPasswordModal(pendingModal)&&!pendingModal.confirmBusy){
+    for(const field of snapshot.passwordFields||[]){
+      const replacement=document.getElementById(field.id);
+      if(replacement&&replacement!==field)replacement.replaceWith(field);
+    }
+    if(snapshot.passwordFocus&&document.getElementById(snapshot.passwordFocus.id)===snapshot.passwordFocus)snapshot.passwordFocus.focus({preventScroll:true});
+  }
   const focus=snapshot.profileFocus;
   if(focus&&typeof document!=="undefined"&&typeof currentAuthUid==="function"&&currentAuthUid()===focus.uid){
     const editor=document.querySelector(".profile-edit-modal"),field=document.getElementById(focus.id);
@@ -19946,7 +20107,9 @@ function render(){
     roomMissing:({code,roomId})=>{const selected=state;if(selected.id===roomId)void detachConfirmedDeletedRoom(code,selected);}});
   window.BXHQrCheckin?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,render,qr:renderQrCodeInto,applyRemote:data=>applyRemoteState(data,true),toast:showToast});
   window.BXHCommunityRefereeInvite?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,
-    inviter:()=>isCommunityRoomOwner()&&!isTester(),render,qr:renderQrCodeInto,toast:showToast,open:openCommunityRefereeRoom});
+    inviter:()=>isCommunityRoomOwner()&&!isTester(),render,qr:renderQrCodeInto,toast:showToast,open:openCommunityRefereeRoom,
+    ticketInvite:{enabled:()=>window.BXH_PTN_TICKET_SALE===true,hostRoom:()=>window.BXHCommerce?.ticketInviteHostRoom?.(),
+      command:data=>window.BXHCommerce.ticketInviteCommand(data),open:openCommunityRefereeRoom}});
   reconcileLobbyContext();
   if(appPhase!=="player-login"&&appPhase!=="player-apply")authFormRenderContext=null;
   hunterClashEntry?.session(firebaseUser,userProfile);
@@ -19961,6 +20124,7 @@ function render(){
   const recipientPanel=document.getElementById('title-recipient-panel');
   if(recipientPanel&&titleRecipientState?.key===currentAuthUid()+':'+engagementSessionEpoch){titleRecipientState.open=recipientPanel.open;}
   syncEngagementIdentity();
+  if(pendingModal?.type==="player-password-change"&&!isCurrentPlayerPasswordModal(pendingModal))pendingModal=null;
   reconcileHistoryCloudContext();
   rememberAuthenticatedView();
   const __viewportSnapshot = captureRenderViewport();
@@ -19977,6 +20141,8 @@ function render(){
   const refereeInviteEntry=window.BXHCommunityRefereeInvite?.renderEntry();
   if(firebaseUser&&userProfile?.active===true&&refereeInviteEntry){app.innerHTML=refereeInviteEntry;return;}
   if(firebaseUser&&userProfile?.active===true&&qrCheckinEntry){app.innerHTML=qrCheckinEntry;return;}
+  const ptnRefereeSession=window.BXHCommerce?.ticketRefereeSessionView?.();
+  if(firebaseUser&&userProfile?.active===true&&ptnRefereeSession){app.innerHTML=ptnRefereeSession;return;}
   if(appPhase==='raffle-public'){app.innerHTML=authShellOpen()+authBrandHeader()+'<button class="btn btn-ghost" data-action="raffle-home">返回首頁</button>'+renderRafflePage()+authShellClose();return;}
   if(appPhase==="partner-organizer"){ if(!roleAllowsMode(userProfile?.role,"partner_organizer",userProfile)){appPhase="landing";currentRole=null;} else {currentRole="admin";appPhase="app";activeTab="management";} }
   if(appPhase==="landing"){ app.innerHTML = renderLandingScreen(); bindAuthInputs(); return; }
@@ -20260,6 +20426,7 @@ function accountMenuItemsHtml(){
     <button data-action="account-logout" class="danger">登出系統</button>
   ` : `
     <button data-action="account-goto-home">返回系統首頁</button>
+    ${isPartnerOrganizerMode() ? `<button data-action="switch-tab" data-tab="commerce-shop">商城</button><button data-action="switch-tab" data-tab="commerce-orders">我的訂單</button>` : ""}
     ${isSuperAdmin() ? `<button data-action="open-account-management">帳號管理</button>` : ""}
     ${(userProfile && roleAllowsMode(userProfile.role,"player")) ? `<button data-action="switch-to-player-mode">切換至玩家模式</button><button data-action="account-open-checkin">每日簽到</button>` : ""}
     ${themePickerHtml()}
@@ -20503,6 +20670,11 @@ function adminManagementContextHtml(){
   if(!hasAdminAccess()){
     return publicManagementContextHtml();
   }
+  const ticket=window.BXHCommerce?.ticketManagementContext?.();
+  if(ticket){
+    const phase=ticket.verified?({waiting:'等待開賽',live:'進行中',done:'已結束',cancelled:'已取消'})[ticket.phase]||'票券房管理':'正在驗證管理權限';
+    return `<div class="admin-context-hud"><span class="badge ${ticket.phase==='live'?'badge-neon':'badge-metal'}">${esc(phase)}</span><span class="admin-context-code"><span>票券賽事 ${esc(ticket.code)}</span></span></div>`;
+  }
   const phase=statusBadge();
   const configured=(typeof window!=="undefined"&&window.cloudSync&&window.cloudSync.isConfigured&&window.cloudSync.isConfigured());
   let cloudAlert="";
@@ -20670,6 +20842,8 @@ function renderTournamentManagementTab(){
   if(!hasAdminAccess()){
     return `<div class="panel"><div class="empty-state">目前身分沒有賽事管理權限。</div></div>`;
   }
+  const ticketCreation=window.BXHCommerce?.ticketCreationPage?.();
+  if(ticketCreation)return ticketCreation;
   if(!adminTournamentListLoaded && !adminTournamentListBusy){
     setTimeout(()=>{ if(!adminTournamentListLoaded&&!adminTournamentListBusy)loadAdminTournamentList(); }, 0);
   }
@@ -20731,14 +20905,16 @@ function renderTournamentManagementTab(){
   }
 
   if(savedNotice)locateSettingsSavedCard();
-  return `${savedNotice?`<div class="banner" role="status">✓ 賽事設定已儲存｜${esc(savedNotice.code)}</div>`:""}${isPartnerOrganizerMode()?window.BXHPartnerOrganizer?.renderOverview?.(userProfile)||'':''}<div class="panel">
-    <div class="panel-title"><span>賽事管理中心</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="cloud-refresh-admin-list">重新整理</button>${canCreateOfficialTournament()?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-new-tournament">＋ 新增賽事</button>`:""}</div></div>
+  return `${savedNotice?`<div class="banner" role="status">✓ 賽事設定已儲存｜${esc(savedNotice.code)}</div>`:""}<div class="panel">
+    <div class="panel-title"><span>賽事管理中心</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="cloud-refresh-admin-list">重新整理</button>${window.BXHCommerce?.ticketPilot?.()?`<button class="btn btn-primary btn-sm" data-action="commerce-open-ticket-create">＋ 新增賽事</button>`:canCreateOfficialTournament()?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-new-tournament">＋ 新增賽事</button>`:""}</div></div>
     <div class="hint">每次僅載入 5 場賽事摘要；需要更多時再按下方按鈕。搜尋涵蓋賽事名稱、房號與地點。</div>
     ${lastManaged?`<div class="btn-row" style="margin:10px 0;"><button class="btn btn-primary" data-action="cloud-admin-open-tournament" data-code="${esc(lastManaged.code)}">返回上次管理｜${esc(lastManaged.code)}</button></div>`:''}
     ${filterBar}
     ${adminTournamentListBusy && adminTournamentListItems.length?'<div class="hint" role="status">正在讀取 5 場賽事摘要，已顯示的清單仍可使用。</div>':""}
     ${adminTournamentListError && adminTournamentListItems.length?`<div class="auth-error" role="status">${esc(adminTournamentListError)}；保留已載入的清單，可重試本次讀取。</div>`:""}
   </div>
+  ${window.BXHCommerce?.ownedTicketRoomCard?.()||''}
+  ${window.BXHCommerce?.ticketRefereeSupportPanel?.(userProfile?.active===true&&!isTester()&&['staff','admin','super_admin'].includes(userProfile?.role))||''}
   ${body}
   ${adminTournamentListPaginationHtml()}
   ${canCreateOfficialTournament()?`<div class="panel" style="margin-top:12px;border-style:dashed;text-align:center;"><div style="font-family:var(--font-d);font-weight:700;font-size:16px;margin-bottom:8px;">建立下一場賽事</div><button class="btn btn-primary" data-action="cloud-admin-new-tournament">＋ 新增賽事</button></div>`:""}`;
@@ -20770,7 +20946,7 @@ async function saveTournamentSettingsAndReturn(previousMeta,message,save){
   const fromSettings=appPhase==="app"&&activeTab==="settings";
   const saved=save?await save():await saveRegistrationSettingsAndReport(previousMeta,message,true);
   if(!saved||!fromSettings||appPhase!=="app"||activeTab!=="settings"||state.id!==roomId||state.cloudCode!==code||currentAuthUid()!==actor||activeMode!==mode)return saved;
-  if(!code){showToast("草稿已儲存，請按「完成架構並發布」發布賽事");return true;}
+  if(!code){showToast(isPartnerOrganizerMode()?"設定僅儲存在此裝置，尚未建立賽事房號；請從賽事管理選券建房":"草稿已儲存，請按「完成架構並發布」發布賽事");return true;}
   if(!hasAdminAccess())return saved;
   rememberManagedRoomView({entered:true});
   tournamentSettingsSavedNotice={code,actor,mode,located:false};
@@ -21007,7 +21183,7 @@ function readManagedRoomRecord(){
   try{
     if(!currentAuthUid())return null;
     const saved=JSON.parse(localStorage.getItem(managedRoomStorageKey())||"null");
-    return saved&&saved.uid===currentAuthUid()&&saved.mode===activeMode&&/^BXH-[A-Z0-9]{6}$/.test(saved.code||"")?saved:null;
+    return saved&&saved.uid===currentAuthUid()&&saved.mode===activeMode&&isValidRoomCode(saved.code)?saved:null;
   }catch{return null;}
 }
 function managedRoomPinRequest(){const saved=readManagedRoomRecord();return saved?{pinCode:saved.code}:{};}
@@ -21164,6 +21340,12 @@ function renderRefereeCourtView(app,html){
   const maintenanceKey=refereeTabOpen()?refereeCourtViewKey():null;
   const openCourts=maintenanceKey&&app.__bxhMaintenanceKey===maintenanceKey&&typeof app.querySelectorAll==="function"
     ?new Set([...app.querySelectorAll(".ref-court-maintenance[open]")].map(el=>el.closest(".court-card")?.id).filter(Boolean)):new Set();
+  const ticketRoom=activeTab==='referee'&&appPhase==='app'?window.BXHCommerce?.ticketManagementContext?.():null;
+  if(ticketRoom?.verified){
+    renderStableRefereeScreen(app,html,'ptn:'+currentAuthUid()+':'+ticketRoom.code);
+    app.__bxhMaintenanceKey=null;
+    return true;
+  }
   if(refereeCourtFocusActive()){
     renderStableRefereeScreen(app,html,refereeCourtViewKey());
     app.__bxhMaintenanceKey=maintenanceKey;
@@ -21180,6 +21362,26 @@ function renderRefereeCourtView(app,html){
   return false;
 }
 
+let adminMailboxRefreshTimer=null;
+function ensureAdminMailboxRefresh(){
+  if(adminMailboxRefreshTimer)return;
+  adminMailboxRefreshTimer=setTimeout(()=>{
+    adminMailboxRefreshTimer=null;
+    if(appPhase==='app'&&isSuperAdmin()&&firebaseUser?.uid){
+      if(document.visibilityState!=='hidden')loadMailbox(true);
+      ensureAdminMailboxRefresh();
+    }
+  },120000);
+}
+
+// The same management navigation serves official and partner rooms; the
+// selected room decides which server-backed content each tab renders.
+window.BXHTicketManagementNavigate=tab=>{
+  if(tab!=='registrations'||!hasAdminAccess()||!window.BXHCommerce?.ticketManagementContext?.()?.verified)return;
+  activeTab=tab;
+  mainTabNavCenterRequested=true;
+  render();
+};
 function renderApp(){
   const app = document.getElementById("app");
   const allTabs = [["management","賽事管理"],["ladder","排行榜"],["live","即時戰況"],["bracket","對戰表"],["referee","裁判台"],["duty","我的執勤"],["registrations","報名管理"],["settings","賽事設定"],["people","人員管理"],["operations","抽獎與維護"],["history","賽事紀錄"],["version","版本更新"]];
@@ -21187,6 +21389,7 @@ function renderApp(){
   if(!hasAdminAccess()&&state.meta?.eventAuthority==='community'&&canUseRefereeSeatCommands())tabs.splice(2,0,['referee','裁判台']);
   if(hasAdminAccess()&&canManageMemberRaffles())tabs.splice(1,0,["member-raffles","會員抽獎管理"]);
   if(isSuperAdmin())tabs.splice(1,0,["inventory-admin","道具管理"],["commerce-admin","商城管理"]);
+  if(isPartnerOrganizerMode())tabs.splice(1,0,["commerce-shop","商城"],["commerce-orders","我的訂單"]);
   if(window.BXH_REFEREE_CERTIFICATES_V1===true){
     tabs=tabs.filter(t=>t[0]!=='duty');
     if(canManageRefereeCertificates())tabs.splice(1,0,['referee-admin','裁判管理']);
@@ -21195,26 +21398,33 @@ function renderApp(){
   if(activeTab==='member-raffles'&&(!hasAdminAccess()||!canManageMemberRaffles()))activeTab='live';
   if(activeTab==='inventory-admin'&&!isSuperAdmin())activeTab='live';
   if(activeTab==='commerce-admin'&&!isSuperAdmin())activeTab='live';
+  if((activeTab==='commerce-shop'||activeTab==='commerce-orders')&&!isPartnerOrganizerMode())activeTab='management';
   if(window.BXHTeamAdminPreview?.visible?.())tabs.push(["team-preview","戰隊"]);
   if(activeTab==='team-preview'&&!window.BXHTeamAdminPreview?.visible?.())activeTab='live';
+  const adminMail=mailboxContext();
+  if(isSuperAdmin()&&adminMail.messages===null&&!adminMail.loading&&!adminMail.busy&&!adminMail.error)setTimeout(()=>loadMailbox(false),0);
+  if(isSuperAdmin())ensureAdminMailboxRefresh();
   let content = "";
-  if(activeTab==="management") content = renderTournamentManagementTab();
+  if(isSuperAdmin()&&adminMail.open) content = renderMailboxPage();
+  else if(activeTab==="management") content = renderTournamentManagementTab();
   else if(activeTab==="member-raffles") content = renderRafflePage();
   else if(activeTab==="inventory-admin") content = renderInventoryAdminPage();
   else if(activeTab==="commerce-admin") content = window.BXHCommerce.adminPage();
+  else if(activeTab==="commerce-shop") content = window.BXHCommerce.shop();
+  else if(activeTab==="commerce-orders") content = window.BXHCommerce.orders();
   else if(activeTab==="referee-admin") content = renderRefereeLicensePage('admin');
   else if(activeTab==="team-preview") content = window.BXHTeamAdminPreview.page();
   else if(activeTab==="ladder") content = wrapBracketWatermark(renderLadderLeaderboardPage(hasAdminAccess()));
-  else if(activeTab==="live") content = wrapBracketWatermark(renderLive());
-  else if(activeTab==="bracket") content = renderBracket();
-  else if(activeTab==="referee") content = wrapBracketWatermark(renderReferee());
+  else if(activeTab==="live") content = window.BXHCommerce?.ticketManagedTab?.('live') ?? wrapBracketWatermark(renderLive());
+  else if(activeTab==="bracket") content = window.BXHCommerce?.ticketManagedTab?.('bracket') ?? renderBracket();
+  else if(activeTab==="referee") content = window.BXHCommerce?.ticketManagedTab?.('referee') ?? wrapBracketWatermark(renderReferee());
   else if(activeTab==="duty") content = window.BXH_REFEREE_CERTIFICATES_V1===true?renderRefereeLicensePage('duty'):wrapBracketWatermark(renderDutyLog());
-  else if(activeTab==="registrations") content = wrapBracketWatermark(renderAdminRegistrationsTab());
-  else if(activeTab==="people") content = wrapBracketWatermark(renderPeopleManagement());
-  else if(activeTab==="operations") content = renderTournamentOperationsPage();
+  else if(activeTab==="registrations") content = window.BXHCommerce?.ticketManagedTab?.('registrations') ?? wrapBracketWatermark(renderAdminRegistrationsTab());
+  else if(activeTab==="people") content = window.BXHCommerce?.ticketManagedTab?.('people') ?? wrapBracketWatermark(renderPeopleManagement());
+  else if(activeTab==="operations") content = window.BXHCommerce?.ticketManagedTab?.('operations') ?? renderTournamentOperationsPage();
   else if(activeTab==="history") content = wrapBracketWatermark(renderHistory());
   else if(activeTab==="version") content = wrapBracketWatermark(renderVersionPage());
-  else content = wrapBracketWatermark(renderSettings());
+  else content = window.BXHCommerce?.ticketManagedTab?.('settings') ?? wrapBracketWatermark(renderSettings());
 
   const appHtml = `
     <div class="stickytop mode-shell">
@@ -21226,7 +21436,7 @@ function renderApp(){
           ${topbarConnectionRailHtml()}
         </div>
         <div class="spacer"></div><span class="three-gods-puzzle-layer" aria-hidden="true"></span><span class="hunter-license-layer" aria-hidden="true"></span><span class="akatsuki-red-cloud-layer" aria-hidden="true"></span><span class="clow-seal-layer" aria-hidden="true"></span><span class="zeon-emblem-layer" aria-hidden="true"></span><span class="gundam-haro-layer" aria-hidden="true"></span><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
-        <div class="header-account-controls">${accountMenuHtml()}</div>
+        <div class="header-account-controls">${isSuperAdmin()?mailboxButtonHtml():""}${accountMenuHtml()}</div>
       </header>
       ${tournamentViewContextHeaderHtml()}
       ${(typeof window!=="undefined" && window.BXH_INTERFACE_PREFERENCE?.get?.()==="v2")
@@ -21234,7 +21444,7 @@ function renderApp(){
         : '<nav class="tabs">'+tabs.map(t=>'<button class="'+(activeTab===t[0]?'active':'')+'" data-action="switch-tab" data-tab="'+t[0]+'">'+t[1]+'</button>').join("")+'</nav>'}
     </div>
     ${accountMenuOverlayHtml()}
-    <main>${isPartnerOrganizerMode()?`<div class="banner warn"><span><b>活動主辦模式</b>｜${esc(partnerOrganizerGrant().organizationName||partnerOrganizerGrant().organizationId)}｜方案 ${esc(partnerOrganizerGrant().planCode||partnerOrganizerGrant().plan||"—")}；僅能管理本合作帳號建立的賽事。</span></div>`:""}${isEventStaffMode()?`<div class="banner warn"><span><b>工作人員（活動）模式</b>｜權限僅限受邀且仍有效的活動；活動主辦失去授權時會立即停止操作，既有資料不會刪除。</span></div>`:""}${renderSystemClosureNotice(state)}<div class="mode-management-context">${adminManagementContextHtml()}</div>${testSandboxBannerHtml()}${content}</main>
+    <main>${isEventStaffMode()?`<div class="banner warn"><span><b>工作人員（活動）模式</b>｜權限僅限受邀且仍有效的活動；活動主辦失去授權時會立即停止操作，既有資料不會刪除。</span></div>`:""}${renderSystemClosureNotice(state)}<div class="mode-management-context">${adminManagementContextHtml()}</div>${testSandboxBannerHtml()}${content}</main>
     <div id="print-bracket" style="display:none;">${renderPrintBracket()}</div>
     ${renderModal()}
     ${celebrationOpen ? renderCelebrationOverlay() : ""}
@@ -21282,7 +21492,7 @@ function renderApp(){
     }
   });
 
-  if(activeTab==="bracket" && (state.meta.formatType||"single")==="single" && state.bracketSize){
+  if(activeTab==="bracket" && document.getElementById("se-bracket-outer")){
     scheduleSeRelayout();
   }
   if(celebrationOpen){
@@ -21542,14 +21752,15 @@ async function exportBoardAsImage(){
     });
     const blob=await new Promise((resolve,reject)=>canvas.toBlob(v=>v?resolve(v):reject(Error('png-encode-failed')),'image/png'));
     const dateStr=new Date().toISOString().slice(0,10);
-    const safeName=(state.meta.name||'賽事').replace(/[\\\/:*?"<>|]/g,'_');
+    const exportName=activeTicketBoardView()?.name||state.meta.name||'賽事';
+    const safeName=exportName.replace(/[\\\/:*?"<>|]/g,'_');
     const filename='BXH_'+safeName+'_'+dateStr+'_'+exportLabel+'.png';
     let shared=false;
     try{
       if(typeof File==='function'&&navigator&&typeof navigator.share==='function'&&typeof navigator.canShare==='function'){
         const file=new File([blob],filename,{type:'image/png'});
         if(navigator.canShare({files:[file]})){
-          await navigator.share({title:'BXH ARENA｜'+exportLabel,text:state.meta.name||exportLabel,files:[file]});
+          await navigator.share({title:'BXH ARENA｜'+exportLabel,text:exportName,files:[file]});
           shared=true;
           showToast('已開啟系統分享；iPhone 請選「儲存影像」加入照片相簿。');
         }
@@ -21597,8 +21808,7 @@ function bindBoardModeInteractions(){
       viewport.style.cursor="grab";
     };
 
-    bindCompletedMatchCorrectionLongPress(viewport);
-    bindManualCourtAssignLongPress(viewport);
+    if(!viewport.closest?.(".commerce-ptn-management")){bindCompletedMatchCorrectionLongPress(viewport);bindManualCourtAssignLongPress(viewport);}
 
     listen(viewport, "wheel", (e)=>{
       if(!e.ctrlKey) return;
@@ -22055,6 +22265,10 @@ function handleAction(action, target){
   if(action.startsWith("court-call-")){handleCourtCall(action,target);return;}
   if(action.startsWith("raffle-")){handleRaffle(action,target);return;}
   if(action.startsWith("mailbox-")){handleMailbox(action,target);return;}
+  if(["commerce-open-ticket-create","commerce-open-ticket-room"].includes(action) && isPartnerOrganizerMode() && activeTab!=="management"){
+    activeTab="management";
+    adminTournamentListOpen=false;
+  }
   if(action.startsWith("commerce-")){void window.BXHCommerce.handle(action,target);return;}
   if(action==='account-manage-referee'){
     const uid=target.getAttribute('data-uid'),directory=accountDirectoryContext();
@@ -22423,6 +22637,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const targetTab = target.getAttribute("data-tab");
     if(targetTab==='member-raffles'&&(!hasAdminAccess()||!canManageMemberRaffles())){showToast('目前身分沒有此操作權限。',true);return;}
     if(targetTab==='commerce-admin'&&!isSuperAdmin()){showToast('目前身分沒有商城管理權限。',true);return;}
+    if((targetTab==='commerce-shop'||targetTab==='commerce-orders')&&!isPartnerOrganizerMode()){showToast('目前身分沒有此操作權限。',true);return;}
     if(targetTab==='inventory-admin'&&!isSuperAdmin()){showToast('目前身分沒有道具管理權限。',true);return;}
     if(targetTab==='team-preview'&&!window.BXHTeamAdminPreview?.visible?.()){showToast('目前身分沒有戰隊預覽權限。',true);return;}
     if((targetTab==="management" || targetTab==="settings" || targetTab==="registrations" || targetTab==="people"
@@ -22431,6 +22646,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       return;
     }
     const doSwitch = ()=>{
+      accountMenuOpen=false;
       resetRegistrationFormDraft();
       refereeAssignmentDraftEnabled = null;
       if(targetTab!=="people") stopAdminRosterWatch();
@@ -22617,7 +22833,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const agree = document.getElementById("apply-agree")?.checked || false;
     if(!realName){ playerApplyError="請輸入真實姓名"; render(); return; }
     if(!email){ playerApplyError="請輸入 Email"; render(); return; }
-    if(password.length<8){ playerApplyError="密碼至少需要 8 碼"; render(); return; }
+    if(password.length<6){ playerApplyError="密碼至少需要 6 碼"; render(); return; }
     if(password!==password2){ playerApplyError="兩次輸入的密碼不一致"; render(); return; }
     if(!nickname){ playerApplyError="請填寫 ARENA 角色名稱"; render(); return; }
     if(!phone){ playerApplyError="請填寫手機號碼"; render(); return; }
@@ -23848,7 +24064,16 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="player-change-password"){
-    showToast("修改密碼功能開發中");
+    const account=window.cloudAuth?.getCurrentUser?.();
+    if(!account?.uid||account.uid!==currentAuthUid()||typeof window.cloudAuth?.changeMyPlayerPassword!=="function"){
+      showToast("登入狀態已變更或服務尚未就緒，請重新整理後再試。");return;
+    }
+    if(!account.providers?.includes("password")){
+      openModal({type:"generic",title:"修改密碼",message:"此帳號未設定 ARENA 密碼。若使用 Google 登入，請到 Google 帳戶管理密碼。",confirmLabel:"知道了"});
+      return;
+    }
+    openModal({type:"player-password-change",title:"修改 ARENA 密碼",uid:account.uid,epoch:engagementSessionEpoch,confirmLabel:"更新密碼"});
+    document.getElementById("player-password-current")?.focus({preventScroll:true});
     return;
   }
   if(action==="player-link-google"){
@@ -24637,7 +24862,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     render();
     const hasData = state.players.length>0 || state.matches.length>0 || (state.meta && (state.meta.name || state.meta.date || state.meta.location));
     if(hasData){
-      openModal({ type:"generic", title:isTester()?"建立測試賽事":"建立新賽事", message:`目前賽事會保留，不會被刪除。確定建立一場新的空白${isTester()?"測試":""}賽事？`, confirmLabel:isTester()?"新增測試賽事":"新增賽事", onConfirm:()=>doNewTournament(false) });
+      openModal({ type:"generic", title:isTester()?"建立測試賽事":"建立新賽事", message:`目前賽事會保留，不會被刪除。確定建立一場新的空白${isTester()?"測試":""}賽事？`, confirmLabel:isTester()?"新增測試賽事":"新增賽事", showNewTournamentRegistrationVersion:!isTester(), onConfirm:()=>doNewTournament(false) });
     } else { doNewTournament(false); }
     return;
   }
@@ -24898,6 +25123,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     cloudTestResult = null; render();
     return;
   }
+  if(action==="ptn-board-share"){
+    const view=activeTicketBoardView();if(view)copyTextToClipboard(buildTournamentEntryUrl(view.code,"bracket"),"已複製對戰表連結");return;
+  }
   if(action==="open-share-modal"){
     shareTarget = target.closest("#celebration-overlay")&&shareTargetEnabled("result") ? "result" : target.closest("#board-shell") ? "bracket" : "event";
     shareModalOpen = true;
@@ -25132,6 +25360,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   function doNewTournament(copySettings){
+    if(isPartnerOrganizerMode()){
+      showToast("合作主辦請從賽事管理選券建房；空白草稿不會建立房號。",true);
+      return;
+    }
     (async ()=>{
       const hasCurrentData = state.players.length>0 || state.matches.length>0;
       if(hasCurrentData && state.archiveStatus==="ongoing"){
@@ -25167,6 +25399,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     })();
   }
   if(action==="new-tournament-copy"){
+    if(isPartnerOrganizerMode()){
+      if(window.BXHCommerce?.ticketPilot?.()){activeTab="management";adminTournamentListOpen=false;window.BXHCommerce.handle("commerce-open-ticket-create",target);}
+      else showToast("合作主辦建房目前僅開放指定票券試點。",true);
+      return;
+    }
     const hasData = state.players.length>0 || state.matches.length>0;
     if(hasData){
       openModal({ type:"generic", title:"建立新賽事", message:"目前賽事將先保存為「已暫停」（不會被覆蓋或刪除），並複製目前的賽事設定與選手名單到新賽事（不包含比分與比賽結果）。是否繼續？", confirmLabel:"確定建立", onConfirm:()=>doNewTournament(true) });
@@ -25180,6 +25417,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="new-tournament-blank"){
+    if(isPartnerOrganizerMode()){
+      if(window.BXHCommerce?.ticketPilot?.()){activeTab="management";adminTournamentListOpen=false;window.BXHCommerce.handle("commerce-open-ticket-create",target);}
+      else showToast("合作主辦建房目前僅開放指定票券試點。",true);
+      return;
+    }
     const hasData = state.players.length>0 || state.matches.length>0;
     if(hasData){
       openModal({ type:"generic", title:"建立空白新賽事", message:"目前賽事將先保存為「已暫停」（不會被覆蓋或刪除），並建立一個完全空白的新賽事。是否繼續？", confirmLabel:"確定建立", onConfirm:()=>doNewTournament(false) });
@@ -25579,6 +25821,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     syncSettingsDraftFromDom();
     ensureRegistrationFormDraft();
     const enabled=target.getAttribute("data-value")==="true";
+    if(!enabled){showToast("現場報名模式已停用，請使用線上報名設定。",true);return;}
     registrationFormDraft.registrationEnabled=enabled;
     if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
     // Switching modes only edits the draft. A half-completed registration
@@ -26208,7 +26451,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
 
     const stationsChanged=requestedStations!==previousCourtTarget;
     const physicalCourtCount=state.meta.stations;
-    if(stationsChanged&&state.bracketSize>0){
+    if(stationsChanged&&(state.bracketSize>0||state.meta?.refereeSeatsV1?.version===1)){
       if(!canManageCourtRetirement()){showToast("目前身分無法調整退場台",true);return;}
       // Apply other draft fields only after the cloud retirement transaction succeeds.
       const draftBefore=cloneStateForSave(state);applyMeta();const nextMeta=JSON.parse(JSON.stringify(state.meta));state=draftBefore;state.meta.stations=physicalCourtCount;
@@ -26582,10 +26825,42 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     }});
     return;
   }
-  if(action==="modal-overlay" || action==="modal-cancel"){ closeModal(); return; }
+  if(action==="modal-overlay" || action==="modal-cancel"){
+    if(pendingModal?.type==="player-password-change"&&pendingModal.confirmBusy)return;
+    closeModal(); return;
+  }
   if(action==="modal-confirm"){
     const mm = pendingModal;
     if(!mm){ return; }
+    if(mm.type==="player-password-change"){
+      const stillSame=()=>isCurrentPlayerPasswordModal(mm);
+      if(mm.confirmBusy)return;
+      if(!stillSame()){closeModal(); return;}
+      const current=document.getElementById("player-password-current")?.value||"";
+      const next=document.getElementById("player-password-new")?.value||"";
+      const again=document.getElementById("player-password-repeat")?.value||"";
+      if(!current||next.length<6||next!==again){
+        for(const id of ["player-password-current","player-password-new","player-password-repeat"]){
+          const field=document.getElementById(id);if(field)field.value="";
+        }
+        mm.error=!current?"請輸入目前密碼。":next.length<6?"新密碼至少需要 6 碼。":"兩次輸入的新密碼不同。";
+        render(); return;
+      }
+      mm.confirmBusy=true;mm.error="";render();
+      (async()=>{
+        let result;
+        try{result=await window.cloudAuth.changeMyPlayerPassword(mm.uid,current,next);}
+        catch(e){result={ok:false,error:"無法更新密碼，請稍後再試。"};}
+        if(pendingModal!==mm)return;
+        if(!stillSame()){closeModal();return;}
+        if(result?.ok){closeModal();showToast("ARENA 密碼已更新。");return;}
+        mm.confirmBusy=false;mm.error=result?.error||"無法更新密碼，請稍後再試。";
+        mm.resetPasswordFields=true;
+        try{render();}finally{mm.resetPasswordFields=false;}
+        document.getElementById("player-password-current")?.focus({preventScroll:true});
+      })();
+      return;
+    }
     if(mm.type==='court-force-exit'&&mm.acknowledged!==true)return;
     if(mm.type==="confirm-result"){
       if(mm.confirmDisabled || mm.confirmBusy || refereeUploadPending(getMatch(mm.matchId))){ return; }
@@ -26961,6 +27236,7 @@ async function init(){
           let authStateGeneration=0;
           let googleLinkRedirectOutcomePending=null;
           async function processAuthStateChangeImpl(fbUser,googleLinkRedirectOutcome){
+            if(pendingModal?.type==="player-password-change"&&pendingModal.uid!==fbUser?.uid)pendingModal=null;
             if(playerProfileReminder?.syncAuth(fbUser)){
               playerProfileEditOpen=false;playerProfileEditError="";
             }

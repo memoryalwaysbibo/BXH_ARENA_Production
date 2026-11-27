@@ -2,7 +2,8 @@
 
 const { randomBytes } = require('node:crypto');
 const buckets = require('../referee-seats/functions/bucket-state.cjs');
-const { GROUPS, groupKeys, prepare, openableStages, nextStage, collect, settlementInput } = require('./core.cjs');
+const { GROUPS, groupKeys, prepare, openableStages, nextStage, collect, settlementInput, scoreCompletedEvent } = require('./core.cjs');
+const { resolveHistoricalImport, eligibleProfile } = require('./historical-import.cjs');
 const { drawGroup } = require('./draw.cjs');
 
 const ROOM_CODE = /^BXH-[A-Z0-9]{6}$/;
@@ -46,13 +47,14 @@ function startingRoster(parent, rehearsal = false) {
 
 function publicStatus(plan) {
   return {
+    ...(plan.historical ? { historical: true } : {}),
     groups: groupKeys(plan.event).map(key => ({ key, count: plan.event.groups[key].length })),
     completed: Object.keys(plan.event.results),
     current: plan.active ? { ...plan.active } : null,
-    next: plan.active ? null : nextStage(plan.event)?.key || null,
+    next: plan.active || plan.historical ? null : nextStage(plan.event)?.key || null,
     drawAllPending: !plan.active && !Object.keys(plan.roomCodes).length &&
       !Object.keys(plan.event.results).length,
-    readyForSettlement: !nextStage(plan.event),
+    readyForSettlement: plan.historical === true || !nextStage(plan.event),
     ...(plan.settlement ? { settled: { seasonId: plan.settlement.seasonId,
       creditedCount: plan.settlement.creditedCount } } : {}),
     ...(plan.rehearsal ? { rehearsal: true } : {}),
@@ -61,7 +63,7 @@ function publicStatus(plan) {
 
 function operatorStatus(plan) {
   const status = publicStatus(plan);
-  const choices = plan.active ? [] : openableStages(plan.event);
+  const choices = plan.active || plan.historical ? [] : openableStages(plan.event);
   if (choices.length > 1) status.openChoices = choices;
   if (plan.groupDrawAll !== true) return status;
   return { ...status, preDrawnRooms: Object.fromEntries(
@@ -197,6 +199,7 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
   function checkRoster(plan, parent, rehearsal = plan.rehearsal === true) {
     check((plan.rehearsal === true) === rehearsal, 'group-room-disabled');
     check(roomState(parent)?.id === plan.parentRoomId, 'group-parent-room-changed');
+    check(!plan.historical, 'history-import-room-unavailable');
     const original = Object.values(plan.event.groups).flat();
     const current = startingRoster(parent, plan.rehearsal === true);
     const identity = player => JSON.stringify([
@@ -210,6 +213,60 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
   }
 
   return {
+    async historicalImport(parentCode, actorUid, payload, expectedDigest) {
+      const parent = refs(parentCode);
+      check(payload?.parentCode === parentCode, 'history-import-room-mismatch');
+      return db.runTransaction(async tx => {
+        const rehearsal = await authorize(tx, parentCode, actorUid, true);
+        const [profile, plan, room, route, publicRoom] = await tx.getAll(db.doc('users/' + actorUid),
+          parent.plan, parent.room, parent.routing, parent.publicRoom);
+        check(!rehearsal && profile.data()?.role === 'super_admin' && eligibleProfile(profile.data()), 'group-permission-denied');
+        const current = plan.data();
+        if (expectedDigest && current?.historical && current.importDigest === expectedDigest) {
+          return operatorStatus(current);
+        }
+        check(!plan.exists && !route.exists && publicRoom.exists, 'history-import-room-unavailable');
+        const roomData = room.data();
+        startingRoster(roomData);
+        const state = roomState(roomData);
+        check(!roomData.groupStage && !state.groupStage && !roomData.scoreStorage &&
+          !roomData.systemClosed && !roomData.ladderPointsAwarded && !state.ladderPointsAwarded &&
+          state.cloudCode === parentCode, 'history-import-room-unavailable');
+        const { event, digest, summary } = await resolveHistoricalImport(tx, db, parent.room, state.id, payload);
+        if (!expectedDigest) return { ...summary, digest, previewOnly: true };
+        check(digest === expectedDigest, 'history-import-preview-changed');
+        // The historical bracket is the actual tournament roster. Keep old registration
+        // documents for audit, but stop live registration sync from restoring the
+        // original sign-up list after the historical roster has been committed.
+        const players = GROUPS.flatMap(key => event.groups[key].map(player => ({
+          id: player.id, name: player.name, gameId: player.gameId,
+          source: 'historical', checkedIn: true, ladderEligible: player.ladderEligible,
+          ...(player.accountUid ? { accountUid: player.accountUid } : {}),
+          ...(player.guardianUid ? { guardianUid: player.guardianUid,
+            familyPlayerId: player.familyPlayerId } : {}),
+        })));
+        let mirror;
+        try { mirror = JSON.parse(publicRoom.data().bracketView); }
+        catch { check(false, 'history-import-room-unavailable'); }
+        check(mirror && typeof mirror === 'object' && !Array.isArray(mirror) &&
+          Array.isArray(mirror.players) && mirror.matches?.length === 0, 'history-import-room-unavailable');
+        const now = clock();
+        const updatedState = { ...state, players, updatedAt: now,
+          meta: { ...state.meta, registrationEnabled: false, registrationStatus: 'closed' },
+          historicalImportDigest: digest };
+        tx.set(parent.room, { data: JSON.stringify(updatedState), registrationEnabled: false,
+          registrationStatus: 'closed', updatedAt: now }, { merge: true });
+        tx.set(parent.publicRoom, { bracketView: JSON.stringify({ ...mirror,
+          players: players.map(({ id, name, checkedIn }) => ({ id, name, checkedIn })) }),
+          registrationEnabled: false, registrationStatus: 'closed', updatedAt: now }, { merge: true });
+        const next = { historical: true, importDigest: digest, importedBy: actorUid, importedAt: now,
+          parentRoomId: state.id, event, active: null, roomCodes: {}, rehearsal: false };
+        tx.create(parent.plan, next);
+        tx.create(parent.routing, { ...publicStatus(next), eligibleUids: [] });
+        return operatorStatus(next);
+      }, expectedDigest ? undefined : { readOnly: true });
+    },
+
     async prepare(parentCode, actorUid, groupCount) {
       const parent = refs(parentCode), seed = makeSeed();
       return db.runTransaction(async tx => {
@@ -345,7 +402,11 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
           startingRoster(room.data(), true);
         }
         const [snapshot, plan] = await tx.getAll(parent.routing, parent.plan);
-        if (!snapshot.exists) return { unprepared: true, rehearsal };
+        if (!snapshot.exists) {
+          const actor = await tx.get(db.doc('users/' + actorUid));
+          return { unprepared: true, rehearsal,
+            ...(!rehearsal && actor.data()?.role === 'super_admin' ? { canImportHistorical: true } : {}) };
+        }
         const { eligibleUids, ...status } = snapshot.data();
         check((status.rehearsal === true) === rehearsal, 'group-room-disabled');
         return plan.exists ? operatorStatus(plan.data()) : status;
@@ -447,6 +508,20 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
       check(plan.exists, 'group-plan-required');
       const current = plan.data();
       check(current.rehearsal !== true, 'group-rehearsal-no-ladder');
+      if (current.historical === true) {
+        const state = roomState(room.data());
+        startingRoster(room.data());
+        check(state.id === current.parentRoomId && state.cloudCode === parentCode, 'group-parent-room-changed');
+        const imported = GROUPS.flatMap(key => current.event.groups[key]);
+        check(state.historicalImportDigest === current.importDigest &&
+          state.meta.registrationEnabled === false && state.players.length === imported.length &&
+          state.players.every((player, index) => player.id === imported[index].id &&
+            player.name === imported[index].name &&
+            (player.accountUid || null) === (imported[index].accountUid || null) &&
+            (player.guardianUid || null) === (imported[index].guardianUid || null)),
+        'group-parent-roster-changed');
+        return { ...scoreCompletedEvent(current.event, ['final-eight']), historical: true };
+      }
       checkRoster(current, room.data());
       const input = settlementInput(current.event);
       await checkRegistrations(tx, parent.room, Object.values(current.event.groups).flat());
@@ -457,6 +532,12 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
       return db.runTransaction(async tx => {
         await authorize(tx, parentCode, actorUid, true);
         const input = await this.readSettlement(tx, parentCode);
+        let eligible = input.participants;
+        if (input.historical) {
+          const bound = eligible.filter(row => row.player.ladderEligible && row.player.accountUid);
+          const profiles = bound.length ? await tx.getAll(...bound.map(row => db.doc('users/' + row.player.accountUid))) : [];
+          eligible = bound.filter((row, index) => eligibleProfile(profiles[index].data()));
+        }
         const placements = {};
         for (const row of input.participants) {
           const place = String(row.placement);
@@ -466,10 +547,10 @@ function createCoordinator(db, { clock = Date.now, newCode, drawSeed } = {}) {
           eventCode: parentCode,
           effectiveCount: input.effectiveCount,
           multiplier: input.multiplier,
-          eligibleCount: input.participants.length,
+          eligibleCount: eligible.length,
           matchCount: input.matches.length,
           placements,
-          pointsTotal: input.participants.reduce((sum, row) => sum + row.pointsEarned, 0),
+          pointsTotal: eligible.reduce((sum, row) => sum + row.pointsEarned, 0),
           previewOnly: true,
         };
       }, { readOnly: true });

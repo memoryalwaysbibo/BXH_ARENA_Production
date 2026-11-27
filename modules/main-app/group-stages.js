@@ -5,6 +5,13 @@
   const groupCounts = [2, 4];
   const roomCode = /^BXH-[A-Z0-9]{6}$/;
   const errors = {
+    'history-import-room-mismatch': '檔案的房號與目前主房不符。',
+    'history-import-format': '檔案格式不符，請選擇四組取兩人、總八強的回補資料。',
+    'history-import-room-unavailable': '主房已有分組、計分資料或已結算，無法匯入。',
+    'history-import-preview-changed': '報名或帳號資料已變動，請重新預覽。',
+    'history-import-guardian': '親子歸戶資料無法核對，請檢查監護人對應。',
+    'history-placement-mismatch': '指定名次與總八強勝負不符。',
+
     'group-parent-roster-changed': '報到名單已變動，請先確認名單。',
     'group-registration-mismatch': '分組名單和報名紀錄不同步，請先核對。',
     'group-stage-not-complete': '這一階段尚未打完或尚未封存。',
@@ -99,7 +106,29 @@
       '"' + (busy ? ' disabled' : '') + '>' + label + '</button>';
   }
 
-  function content(view, status, { loaded = true, busy = false, error = '' } = {}) {
+  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g,
+    char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+
+  function historicalControls(model) {
+    if (!model.canImportHistorical) return '';
+    const preview = model.importPreview;
+    return '<details class="panel"' + (preview || model.busy ? ' open' : '') + '><summary>匯入歷史分組賽果</summary>' +
+      '<p class="hint">適用四組各取兩人、總八強混抽的已完賽資料。</p>' +
+      '<label>賽果 JSON <input type="file" accept=".json,application/json" data-group-history-file' +
+      (model.busy ? ' disabled' : '') + '></label>' +
+      (preview ? '<p>實際出賽 ' + escapeHtml(preview.entrantCount) + ' 位，對戰 ' + escapeHtml(preview.matchCount) +
+        ' 場。可入帳 ' + escapeHtml(preview.eligibleCount) + ' 位，親子紀錄 ' + escapeHtml(preview.familyCount) +
+        ' 位，未連結 ' + escapeHtml(preview.unlinked.length) + ' 位。</p>' +
+        '<ol>' + preview.finalPlaces.map(row => '<li>' + escapeHtml(row.name) + '</li>').join('') + '</ol>' +
+        (preview.unlinked.length ? '<details><summary>查看未連結選手</summary><ul>' +
+          preview.unlinked.map(row => '<li>' + escapeHtml(row.id + ' ' + row.name) + '</li>').join('') +
+          '</ul></details>' : '') +
+        commandButton('historical-import', '確認匯入賽果', model.busy) : '') + '</details>';
+  }
+
+  function content(view, status, model = {}) {
+    const { loaded = true, busy = false, error = '' } = model;
+
     const operator = view === 'operator';
     const header = '<div class="panel-title">' + (operator ? '主房分組管理' : '我的分組賽') + '</div>';
     const refresh = commandButton('refresh', busy ? '處理中…' : '更新進度', busy);
@@ -107,7 +136,7 @@
     if (!loaded) return header + (error ? notice + refresh : '<p class="hint" role="status">正在讀取分組進度…</p>');
     if (!status) {
       const message = operator ? '選擇組數後按一次分組抽籤，系統會分配名單並產生 A～D 組對戰表。' : '等待主辦確認分組。';
-      return header + '<p class="hint">' + message + '</p>' + notice + refresh;
+      return header + '<p class="hint">' + message + '</p>' + notice + refresh + (operator ? historicalControls(model) : '');
     }
 
     const completed = Array.isArray(status.completed) ? status.completed : [];
@@ -116,9 +145,10 @@
     const countByGroup = new Map((status.groups || []).map(group => [group.key, group.count]));
     const groups = groupKeys.filter(group => countByGroup.has(group));
     const groupCount = groups.length;
-    const playoffs = groupCount === 4 ? ['runners-up', 'champions'] : ['champions', 'runners-up'];
+    const playoffs = status.historical ? ['final-eight'] : groupCount === 4 ? ['runners-up', 'champions'] : ['champions', 'runners-up'];
     const stages = [...groups, ...playoffs];
     const titles = Object.fromEntries(groups.map(group => [group, group + ' 組']));
+    titles['final-eight'] = '總八強';
     titles.champions = '第 1～' + groupCount + ' 名賽';
     titles['runners-up'] = '第 ' + (groupCount + 1) + '～' + (groupCount * 2) + ' 名賽';
     const next = titles[status.next];
@@ -205,6 +235,8 @@
     const current = model.status?.current;
     const payload = { action, parentCode: model.code };
     if (action === 'refresh') payload.action = model.view === 'operator' ? 'status' : 'routing';
+    if (action === 'historical-preview' || action === 'historical-import') payload.payload = model.importPayload;
+    if (action === 'historical-import') payload.digest = model.importPreview?.digest;
     if (action === 'prepare') payload.groupCount = model.groupCount;
     if (action === 'open') payload.stage = choice || model.status?.next;
     if (action === 'collect' || action === 'publish-draw') {
@@ -225,8 +257,18 @@
         status = await model.request({ action: 'status', parentCode: model.code });
         if (active !== model || !model.node.isConnected) return;
       }
-      if (status?.unprepared === true || status === null) model.status = null;
-      else if (Array.isArray(status?.groups)) model.status = status;
+      if (action === 'historical-preview') {
+        if (!status?.previewOnly || !/^[a-f0-9]{64}$/.test(status.digest) ||
+          !Array.isArray(status.unlinked) || !Array.isArray(status.finalPlaces)) throw new Error('group-invalid-response');
+        model.importPreview = status;
+      } else if (status?.unprepared === true || status === null) {
+        model.status = null;
+        model.canImportHistorical = status?.canImportHistorical === true;
+      } else if (Array.isArray(status?.groups)) {
+        model.status = status;
+        model.importPayload = null;
+        model.importPreview = null;
+      }
       else throw new Error('group-invalid-response');
       model.loaded = true;
     } catch (error) {
@@ -269,11 +311,35 @@
         !groupCounts.includes(model.groupCount)) return;
       if (root.confirm('確認將本場有效參賽名單平均分成 ' + model.groupCount + ' 組？')) void send(model, 'prepare');
     });
+    node.addEventListener('change', async event => {
+      if (active !== model || model.busy || !model.canImportHistorical || model.status ||
+        !event.target.matches('[data-group-history-file]')) return;
+      const file = event.target.files?.[0];
+      if (!file) return;
+      model.importPreview = null;
+      model.importPayload = null;
+      const fileSequence = (model.fileSequence || 0) + 1;
+      model.fileSequence = fileSequence;
+      try {
+        if (file.size > 512 * 1024) throw new Error('history-import-format');
+        const payload = JSON.parse(await file.text());
+        if (payload?.type !== 'bxh-historical-top-eight-v1') throw new Error('history-import-format');
+        if (active !== model || model.node !== node || !node.isConnected || model.status || model.fileSequence !== fileSequence) return;
+        model.importPayload = payload;
+        void send(model, 'historical-preview');
+      } catch {
+        if (model.fileSequence !== fileSequence) return;
+        model.error = errors['history-import-format'];
+        render(model);
+      }
+    });
     node.addEventListener('click', event => {
       const button = event.target.closest('[data-group-stage-action]');
       if (active !== model || !button || button.disabled) return;
       if (button.dataset.groupStageAction === 'settle' &&
-        !root.confirm('六個階段都已收齊，確認結算主房並將正式天梯積分入帳？')) return;
+        !root.confirm('確認結算主房並將符合資格的選手積分寫入正式天梯？')) return;
+      if (button.dataset.groupStageAction === 'historical-import' && (!model.importPreview ||
+        !root.confirm('確認匯入 ' + model.code + ' 的賽果？積分可在匯入後另行結算。'))) return;
       void send(model, button.dataset.groupStageAction, button.dataset.groupStageChoice);
     });
     if (model.loaded || model.busy || model.error) render(model);

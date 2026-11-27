@@ -1,6 +1,7 @@
 'use strict';
 const {createHash, randomUUID}=require('node:crypto');
 const {registrationQueueOwnsRoom}=require('./legacy-writer.cjs');
+const {checkTicketContract,validRegistrationRoomCode,ticketLifecyclePath,authorizeTicketManager}=require('./ticket-host.cjs');
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const canonical=value=>JSON.stringify(value===null||typeof value!=='object'?value:Array.isArray(value)?value.map(x=>JSON.parse(canonical(x))):Object.fromEntries(Object.keys(value).sort().map(k=>[k,JSON.parse(canonical(value[k]))])));
 const active=u=>u?.active===true&&!u.deleted&&!['deleted','disabled','frozen'].includes(u.accountStatus);
@@ -24,7 +25,7 @@ function safeResult(result,job){
 function validate(uid,input){
  if(!uid)throw fail('auth-required');
  const code=String(input?.code||'').toUpperCase();
- if(!/^BXH-[A-Z0-9]{4,16}$/.test(code)||!['family','roster','promotion'].includes(input?.route)||!/^[A-Za-z0-9_-]{8,100}$/.test(input?.operationId||''))throw fail('invalid-operation');
+ if(!validRegistrationRoomCode(code)||!['family','roster','promotion'].includes(input?.route)||!/^[A-Za-z0-9_-]{8,100}$/.test(input?.operationId||''))throw fail('invalid-operation');
  const d=JSON.parse(JSON.stringify(input.payload||{}));
  const allowed={family:['join','cancel','syncSummary'],roster:['cancel','promote','configure'],promotion:['promote','demote','promoteLocal','addLocal']}[input.route];
  if(!allowed.includes(d.action)||d.code!==code||d.operationId!==input.operationId)throw fail('invalid-operation');
@@ -35,6 +36,18 @@ function validate(uid,input){
 // Private server-only operation journal. This is a candidate, not an installed
 // Cloud Tasks deployment. onCreate + a scheduled sweep must both be wired before
 // rollout. Queue acceptance is NOT a reservation or proof of registration.
+async function authorizeTicketRemoval(tx,db,user,operation,room,now){
+ const uid=operation.uid;
+ const gate=(await tx.get(db.doc(ticketLifecyclePath(operation.code)))).data();
+ let authority;
+ try{authority=await authorizeTicketManager(tx,db,{uid,user,room,gate,code:operation.code,now});}
+ catch{throw fail('permission-denied');}
+ const grant=authority.grant;
+ if(room.ticketAccessV1?.version!==1||gate.roomId!==room.ticketAccessV1.roomId||
+    (gate.bindingEnabled!==true&&gate.enabled!==true))throw fail('permission-denied');
+ if(grant.order)checkTicketContract((await tx.get(db.doc('partnerContracts/'+grant.order))).data(),grant,authority.ownerUid);
+}
+
 function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAttempts=5,requireRoomOwnership=false,authorizeIntake,workerId=randomUUID(),beforeExecute=async()=>{},onTiming=()=>{}}={}){
  if(!handlers?.family||!handlers?.roster||!FieldValue)throw Error('queue-dependencies-required');
  const rooms=db.collection('_registrationQueueV2');
@@ -65,7 +78,7 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
   return status(uid,value.code,value.operationId);
  }
  async function status(uid,code,operationId){
-  if(!uid||!/^BXH-[A-Z0-9]{4,16}$/.test(code)||!/^[A-Za-z0-9_-]{8,100}$/.test(operationId||''))throw fail('invalid-operation');
+  if(!uid||!validRegistrationRoomCode(code)||!/^[A-Za-z0-9_-]{8,100}$/.test(operationId||''))throw fail('invalid-operation');
   const [user,snap]=await db.getAll(db.doc('users/'+uid),jobRef(code,uid,operationId));
   if(!active(user.data()))throw fail('auth-required');
   if(!snap.exists)return {ok:true,operation:{state:'not-found'}};
@@ -108,7 +121,20 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
      const roomReads=requireRoomOwnership?[target.doc('tournaments/'+code)]:[];
      const [ls,js,room]=await tx.getAll(roomRef(code),ref,...roomReads);checkLease(ls.data(),token);
      if(js.data()?.state!=='running'||js.data()?.workerToken!==token)throw fail('queue-lease-lost');
-     if(requireRoomOwnership&&!registrationQueueOwnsRoom(room?.data()))throw fail('registration-queue-disabled');
+     const currentRoom=room?.data();
+     if(requireRoomOwnership&&!registrationQueueOwnsRoom(currentRoom))throw fail('registration-queue-disabled');
+     if(js.data().payload.action==='cancel'&&(currentRoom?.eventAuthority==='ticket'||currentRoom?.ticketAccessV1)){
+      let state;
+      try{state=JSON.parse(currentRoom.data);}catch{throw fail('corrupt-state');}
+      if(!state||!Array.isArray(state.players))throw fail('corrupt-state');
+      if(currentRoom.tournamentPhase!=='waiting'||currentRoom.startedAt||state.startedAt)throw fail('tournament-started');
+      if(js.data().route!=='family')throw fail('invalid-operation');
+     }
+     if(js.data().payload.intent==='ticket-host'){
+      const job=js.data();
+      const actor=(await tx.get(target.doc('users/'+job.uid))).data();
+      await authorizeTicketRemoval(tx,target,actor,job,currentRoom,clock());
+     }
      // The operation result and all registration mutations commit atomically.
      // A lost response cannot leave a committed registration with an absent
      // completion marker. A new lease invalidates the old transaction's read.
@@ -132,7 +158,7 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
   });
  }
  async function drainRoom(code,{limit=25,budgetMs=20000}={}){
-  if(!/^BXH-[A-Z0-9]{4,16}$/.test(code))throw fail('invalid-operation');
+  if(!validRegistrationRoomCode(code))throw fail('invalid-operation');
   const token=await acquire(code);if(!token)return {busy:true,processed:0};
   const started=clock();let processed=0;
   try{
@@ -154,7 +180,7 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
   }finally{await timed(code,'lease-release',()=>release(code,token));}
  }
  async function drain(code,options={}){
-  if(!/^BXH-[A-Z0-9]{4,16}$/.test(code))throw fail('invalid-operation');
+  if(!validRegistrationRoomCode(code))throw fail('invalid-operation');
   // Event deliveries within this process share the active batch. Its original
   // limit/budget apply; each delivery still checks its own job after it settles.
   // Cross-process exclusion and expired-worker fencing remain database-owned.
@@ -188,5 +214,5 @@ function createQueue(db,{handlers,FieldValue,clock=Date.now,leaseMs=30000,maxAtt
  }
  return {enqueue,status,drain,drainCreatedJob,sweep,jobRef};
 }
-module.exports={createQueue,validate,businessRejections,safeResult};
+module.exports={authorizeTicketRemoval,createQueue,validate,businessRejections,safeResult};
 

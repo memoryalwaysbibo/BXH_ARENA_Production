@@ -140,6 +140,8 @@ test('two courts preserve independent work and automatically return PASS after i
   await expect(page.locator('[data-action="modal-confirm"]')).toBeVisible({timeout:15000});
   await page.locator('[data-action="modal-confirm"]').click();
 
+  // Stay on the roster screen until the asynchronous start commit completes.
+  await page.waitForFunction(() => Boolean(state.startedAt), null, { timeout: 30000 });
   await page.locator('[data-action="community-switch-room-tab"][data-tab="referee"]').click();
   await expect(page.locator('#court-card-1')).toBeVisible({timeout:30000});
   await expect(page.locator('#court-card-2')).toBeVisible({timeout:30000});
@@ -160,12 +162,12 @@ test('two courts preserve independent work and automatically return PASS after i
     return !!(m&&m.skippedAt&&!m.completed);
   },initial.c1,{timeout:30000});
 
-  // Manual return is visible after opening the control, but cannot bypass PASS prerequisites.
+  // Manual return may bypass PASS delay; without a manual request automatic return still waits.
   const row=page.locator('.pass-return-row').filter({has:page.locator(`[data-action="claim-skipped-match"][data-id="${initial.c1}"]`)});
   await row.locator('summary').click();
   const claimTo2=row.locator(`[data-action="claim-skipped-match"][data-id="${initial.c1}"][data-station="2"]`);
   await expect(claimTo2).toBeVisible({timeout:20000});
-  await expect(claimTo2).toBeDisabled();
+  await expect(claimTo2).toBeEnabled();
   await expect(row.getByText('等待 PASS 前置場次完成',{exact:true})).toBeVisible();
   const waiting=await page.evaluate(id=>({
     other:state.courtAssignments?.court2?.currentMatchId,

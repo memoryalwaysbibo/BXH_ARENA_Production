@@ -30,14 +30,14 @@
     m.skipWaitFor=waitFor.slice();m.skipManualOnly=false;
     return m.passReturn;
   }
-  function readiness(st,m){
+  function readiness(st,m,{manual=false}={}){
     if(!m||m.completed||!m.skippedAt)return {ok:false,reason:'not-deferred'};
     if(!hasPair(m))return {ok:false,reason:'players-waiting'};
     if(m.offlinePendingSync)return {ok:false,reason:'offline-pending'};
     if(m.status==='paused'||m.forceDetached)return {ok:false,reason:'match-paused'};
     const ids=m.passReturn?.waitFor||m.callPass?.waitFor||m.skipWaitFor||[];
-    if(ids.some(id=>!byId(st,id)?.completed))return {ok:false,reason:'pass-waiting'};
-    if(m.skipManualOnly&&!m.passReturn)return {ok:false,reason:'legacy-recovery-pending'};
+    if(!manual&&ids.some(id=>!byId(st,id)?.completed))return {ok:false,reason:'pass-waiting'};
+    if(!manual&&m.skipManualOnly&&!m.passReturn)return {ok:false,reason:'legacy-recovery-pending'};
     return {ok:true};
   }
   function idle(st,n){
@@ -49,11 +49,16 @@
     return ['pending','ready'].includes(m.status||'pending')&&!m.startedAt&&!m.dispatchPriorityAt&&!m.offlinePendingSync&&!Number(m.scoreA)&&!Number(m.scoreB)&&!(m.log||[]).length&&!(m.faultActions||[]).length;
   }
   function request(st,m,to,now,accepts,blocked){
-    if(m&&m.skippedAt)ensure(st,m,now);
-    const ready=readiness(st,m);if(!ready.ok)return ready;
+    const ready=readiness(st,m,{manual:true});if(!ready.ok)return ready;
     if(blocked(m))return {ok:false,reason:'previous-round-waiting'};
     if(!Number.isInteger(to)||!accepts(to))return {ok:false,reason:'court-retired'};
-    const info=ensure(st,m,now);info.requestedStation=to;info.readyAt=info.readyAt||now;info.status='ready';
+    const info=ensure(st,m,now);
+    // Explicit operator routing supersedes the automatic PASS delay only.
+    // Preserve the original dependency list for inspection without deleting score data.
+    if(!info.manualRequestedAt)info.manualWaitFor=info.waitFor.slice();
+    info.manualRequestedAt=now;info.waitFor=[];m.skipWaitFor=[];m.skipManualOnly=false;
+    if(m.callPass)m.callPass={...m.callPass,waitFor:[]};
+    info.requestedStation=to;info.readyAt=info.readyAt||now;info.status='ready';
     m.dispatchRevision=Number(m.dispatchRevision||0)+1;m.updatedAt=now;
     return {ok:true,state:st};
   }

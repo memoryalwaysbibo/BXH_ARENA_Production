@@ -849,6 +849,32 @@
       catch(e){ return { ok:false, error: friendlyAuthError(e) }; }
     },
 
+    async changeMyPlayerPassword(expectedUid, currentPassword, newPassword){
+      const user=authReady&&authHandle?.currentUser;
+      if(!expectedUid||user?.uid!==expectedUid||!user.email)return {ok:false,error:"登入狀態已變更，請重新登入。"};
+      if(!user.providerData?.some(p=>p.providerId==="password"))return {ok:false,error:"此帳號未設定 ARENA 密碼，請透過原登入服務管理密碼。"};
+      if(typeof currentPassword!=="string"||!currentPassword||typeof newPassword!=="string"||newPassword.length<6)return {ok:false,error:"請輸入目前密碼，並設定至少 6 碼的新密碼。"};
+      try{
+        const credential=ax.EmailAuthProvider.credential(user.email,currentPassword);
+        const reauth=await ax.reauthenticateWithCredential(user,credential);
+        if(authHandle.currentUser!==user||reauth?.user?.uid!==expectedUid)return {ok:false,error:"登入狀態已變更，請重新登入。"};
+        await ax.updatePassword(user,newPassword);
+        return {ok:true};
+      }catch(e){
+        const messages={
+          "auth/invalid-credential":"目前密碼不正確。",
+          "auth/wrong-password":"目前密碼不正確。",
+          "auth/weak-password":"新密碼強度不足。",
+          "auth/password-does-not-meet-requirements":"新密碼未達安全要求。",
+          "auth/too-many-requests":"嘗試次數過多，請稍後再試。",
+          "auth/requires-recent-login":"請重新登入後再試。",
+          "auth/network-request-failed":"網路連線失敗，請稍後再試。",
+          "auth/user-disabled":"此帳號已停用，請聯絡管理員。"
+        };
+        return {ok:false,error:Object.hasOwn(messages,e?.code)?messages[e.code]:"無法更新密碼，請稍後再試。"};
+      }
+    },
+
     async changePassword(currentPassword, newPassword){
       if(!authReady) return { ok:false, error:"雲端服務尚未就緒" };
       const user = authHandle.currentUser;
@@ -891,7 +917,7 @@
     if(!allowAnonymous&&(!authReady || !authHandle || !authHandle.currentUser)) throw new Error("auth-required");
     if(!functionsHandle || !fnx) throw new Error("service-unavailable");
     try{
-      if(['hunterClashCommand','groupStageCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','adminOverrideRoster','adminRecoverOnsiteWaitlist','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload','ladderTeamDisplay','registrationDrawV2','registrationStartV2'].includes(name)){
+      if(['hunterClashCommand','groupStageCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','adminOverrideRoster','adminRecoverOnsiteWaitlist','teamPreviewRead','teamCommand','teamEmblemUpload','ladderTeamDisplay','registrationDrawV2','registrationStartV2'].includes(name)||(name==='registrationRosterQueueV2'&&['create-ticket-room','ticket-ptn-status','ticket-room-state','ticket-room-schedule','ticket-room-stations','ticket-room-delegate','ticket-room-delegate-search','ticket-room-remove','ticket-room-forfeit','ticket-room-score','ticket-room-referee'].includes(payload?.action))){
         const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);
         if(!verified){const err=new Error('網站驗證未完成，請重新嘗試。');err.code='functions/permission-denied';err.details={reason:'app-check-unavailable'};throw err;}
         if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
@@ -909,13 +935,17 @@
   }
   const registrationV2RouteHints=new Map();
   const registrationV2PilotCodes=new Set(['BXH-BZ2JW6','BXH-XJ7WJ5','BXH-XXDNAH']);
+  const isPtnTicketRoom=code=>typeof code==='string'&&/^PTN-[A-Z0-9]{6}$/.test(code);
+  function ticketRegistrationPilot(code){
+    return isPtnTicketRoom(code)||(typeof code==='string'&&/^BXH-[A-Z0-9]{4,16}$/.test(code)&&code===window.BXH_TICKET_ROOM_PILOT_CODE);
+  }
   function rememberRegistrationV2Route(code,room){
-    if(!registrationV2PilotCodes.has(code)||room?.registrationQueueVersion!==2)return;
+    if((!registrationV2PilotCodes.has(code)&&!ticketRegistrationPilot(code))||room?.registrationQueueVersion!==2)return;
     registrationV2RouteHints.set(code,{uid:authHandle?.currentUser?.uid,epoch:engagementSessionEpoch,at:Date.now()});
   }
   async function registrationFlowV2Enabled(code){
     if(Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code))return true;
-    if(!registrationV2PilotCodes.has(code))return false;
+    if(!registrationV2PilotCodes.has(code)&&!ticketRegistrationPilot(code))return false;
     if(!dbHandle||!fx?.getDocFromServer)throw Error('registration-route-unavailable');
     const uid=authHandle?.currentUser?.uid,epoch=engagementSessionEpoch;
     // The player flow has already read this public document. Reuse its V2
@@ -998,7 +1028,8 @@
   let playerRegistrationFeedback=null;
   function submitRegistrationCancellation(payload){
     const {code,operationId}=payload;
-    return callEngagementFunction('registrationQueueV2',{action:'submit',code,operation:{code,route:'roster',operationId,payload}},20000);
+    const route=ticketRegistrationPilot(code)?'family':'roster';
+    return callEngagementFunction('registrationQueueV2',{action:'submit',code,operation:{code,route,operationId,payload}},20000);
   }
   function getPlayerRegistrationFeedback(){
     if(!window.BXHRegistrationFeedback)return null;
@@ -1029,7 +1060,36 @@
   }
   window.engagementService={
     registrationFlowV2Enabled,
+    // Pure presentation hint for existing ordinary routes; never used for dispatch.
+    knownRegistrationV2DisplayRoute(code){
+      return registrationV2PilotCodes.has(code)||ticketRegistrationPilot(code)||
+        (Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code));
+    },
     registrationManagementOperation,
+    async ticketRoomOperation({action,code,...payload}){
+      const unassigned=code===undefined&&['create-ticket-room','ticket-ptn-status'].includes(action);
+      const discoverOwnedRoom=unassigned&&action==='ticket-ptn-status';
+      const saleCreate=unassigned&&action==='create-ticket-room'&&window.BXH_PTN_TICKET_SALE===true;
+      if(!ticketRegistrationPilot(code)&&!discoverOwnedRoom&&!saleCreate&&!(unassigned&&window.BXH_TICKET_ROOM_PTN_PILOT===true))throw Error('ticket-lifecycle-disabled');
+      if(action==='ticket-room-remove'){
+        const {operationId,registrationId}=payload;
+        const poll=()=>callEngagementFunction('registrationRosterQueueV2',{action:'status',code,operationId},8000);
+        let reply=await callEngagementFunction('registrationRosterQueueV2',{action,code,operationId,registrationId},8000);
+        const deadline=Date.now()+18000;
+        while(reply?.operation?.operationId===operationId){
+          const operation=reply.operation;
+          if(operation.state==='rejected')throw Error(operation.reason);
+          if(operation.state==='completed'&&operation.result?.ok===true&&operation.result.status==='cancelled'&&operation.result.registrationId===registrationId)return {ok:true};
+          if(!['queued','running'].includes(operation.state)||Date.now()>=deadline)break;
+          await new Promise(resolve=>setTimeout(resolve,1000));
+          reply=await poll();
+        }
+        throw Error('registration-operation-unconfirmed');
+      }
+      if(['create-ticket-room','ticket-ptn-status','ticket-room-state','ticket-room-schedule','ticket-room-stations','ticket-room-delegate','ticket-room-delegate-search','ticket-room-forfeit','ticket-room-score','ticket-room-referee'].includes(action))return callEngagementFunction('registrationRosterQueueV2',{...payload,action,...(unassigned?{}:{code})},30000);
+      if(['ticket-room-draw','ticket-room-start'].includes(action))return callEngagementFunction(action==='ticket-room-draw'?'registrationDrawV2':'registrationStartV2',{...payload,code},30000);
+      throw Error('invalid-action');
+    },
     async myEventOperationStatus(payload){
       if(!payload||typeof payload!=='object'||Array.isArray(payload)||Object.keys(payload).some(k=>!['route','operationId','code','nonce'].includes(k)))throw Error('unsupported-operation-status-input');
       return callEngagementFunction('queryMyEventOperationStatus',payload,10000);
@@ -1260,6 +1320,12 @@
     catch(e){ return null; }
   }
 
+  function publicTournamentLifecycleReconcileCandidates(items){
+    const actorUid=currentUserUidForWrites();
+    const actorPrivileged=!!(userProfile&&userProfile.active!==false&&userProfile.isTestAccount!==true&&["super_admin","admin","staff"].includes(userProfile.role));
+    return items.filter(pub=>actorPrivileged || (!!actorUid && pub.eventAuthority==="community" && pub.ownerUid===actorUid));
+  }
+
   function currentUserDisplayNameForWrites(){
     try{
       return String((userProfile && (userProfile.displayName || userProfile.realName || userProfile.nickname)) || adminDisplayName || "").trim();
@@ -1367,9 +1433,7 @@
         // Performance: never block first lobby paint on privileged N+1 lifecycle checks.
         // Public results return immediately; authorized self-heal runs best-effort in
         // the background and the existing realtime public listener delivers repairs.
-        const actorUid=currentUserUidForWrites();
-        const actorPrivileged=!!(userProfile&&userProfile.active!==false&&userProfile.isTestAccount!==true&&["super_admin","admin","staff"].includes(userProfile.role));
-        const lifecycleCandidates=results.filter(pub=>actorPrivileged || (!!actorUid && pub.eventAuthority==="community" && pub.ownerUid===actorUid));
+        const lifecycleCandidates=publicTournamentLifecycleReconcileCandidates(results);
         if(lifecycleCandidates.length){
           const cloudApi=this;
           Promise.resolve().then(async()=>{
@@ -1409,7 +1473,7 @@
     },
 
     // Realtime lobby feed: Firestore pushes only actual public-tournament changes.
-    // The 90-second reconciliation path below remains as a low-frequency self-heal.
+    // The 90-second read is a fallback for uncertain streams and lifecycle repair.
     subscribePublicTournaments(callback){
       if(!cloudEnabled || typeof callback!=="function") return ()=>{};
       try{
@@ -1425,7 +1489,9 @@
               excluded.push({code:docSnap.id,reason:"parse-error"});
             }
           });
-          callback({ok:true,items:results,rawCount:snap.size,excluded,fromCache:snap.metadata?.fromCache!==false,hasPendingWrites:snap.metadata?.hasPendingWrites!==false});
+          callback({ok:true,items:results,rawCount:snap.size,excluded,
+            requiresLifecycleReconcile:excluded.length>0 || publicTournamentLifecycleReconcileCandidates(results).length>0,
+            fromCache:snap.metadata?.fromCache!==false,hasPendingWrites:snap.metadata?.hasPendingWrites!==false});
         },err=>{
           const code=(err&&err.code)||"unknown";
           const reason=code==="permission-denied"?"permission-denied":code==="failed-precondition"?"failed-precondition":"network";
@@ -2641,6 +2707,7 @@
           }
 
           const built=buildHunterTournamentMatchRecords(runtime);
+          const eventParticipantCount=window.BXHDomainUtils.hunterEventParticipantCount(runtime);
           // Count actual played participants from completed canonical matches, never capacity.
           const licenseParticipants=new Set();
           built.forEach(r=>{if(r.analyzable===true&&Array.isArray(r.rounds)&&r.rounds.length>0&&r.resultMethod!=="quick_decision"){
@@ -2654,6 +2721,8 @@
             const scoreFor=side==="A"?rec.scoreA:rec.scoreB;
             const scoreAgainst=side==="A"?rec.scoreB:rec.scoreA;
             records.push(Object.assign({},rec,{
+              eventParticipantCount,
+              eventParticipantSource:eventParticipantCount==null?null:"archived-draw-v1",
               licenseEventParticipants:licenseParticipants.size,
               licenseParticipantSource:"completed-match-roster-v1",
               eventAuthority:d.eventAuthority||runtime.meta.eventAuthority||rec.eventAuthority||"unknown",
@@ -2980,8 +3049,8 @@
         const creatorUid=currentUserUidForWrites();
         const partnerGrant=isPartnerOrganizerMode()?partnerOrganizerGrant():null;
         const partnerSession=!!(partnerGrant&&creatorUid);
-        if(partnerSession&&partnerGrant.scope==="contract"&&window.BXHPartnerOrganizer?.remainingRooms?.(partnerGrant.orderCode)===0){
-          throw Object.assign(new Error("partner-room-quota-exhausted"),{code:"partner-room-quota-exhausted"});
+        if(partnerSession){
+          throw Object.assign(new Error("partner-contract-room-retired"),{code:"partner-contract-room-retired"});
         }
         const testerSession=!!(userProfile&&userProfile.active!==false&&(userProfile.role==="tester"||userProfile.isTestAccount===true)&&creatorUid);
         if(testerSession){
@@ -4100,6 +4169,11 @@ if(testerSession){
       catch(error){return {ok:false,reason:error?.message||"cloud-unavailable"};}
     },
     async manageRefereeSeats(data){
+      if(isPtnTicketRoom(data?.code)){
+        const {action,...fields}=data;
+        try{return await callEngagementFunction('registrationRosterQueueV2',{...fields,action:'ticket-room-referee',seatAction:action},30000);}
+        catch(error){return {ok:false,reason:error?.message||'cloud-unavailable'};}
+      }
       if(fourCourtLifecycle?.isBucket(data.code))return fourCourtLifecycle.command(data,"manageRefereeSeats");
       if(!cloudEnabled||!fnx||!functionsHandle)return {ok:false,reason:"cloud-unavailable"};
       try{const result=await fnx.httpsCallable(functionsHandle,"manageRefereeSeats")(data);return result.data;}

@@ -412,3 +412,12 @@ test('bulk selection excludes protected rewards and refreshes the unread badge a
   assert.doesNotMatch(t.view(), /Message 1/);
   assert.match(t.view(), /Message 2/);
 });
+
+
+test('super admin management exposes mailbox and its unread badge', () => {
+  const app = core.slice(core.indexOf('function renderApp(){'), core.indexOf('function render(){', core.indexOf('function renderApp(){')));
+  assert.match(app, /isSuperAdmin\(\)\&\&adminMail\.open\) content = renderMailboxPage\(\)/);
+  assert.match(app, /isSuperAdmin\(\)\?mailboxButtonHtml\(\):/);
+  const h = setup([message(1, { readAt: null })]);
+  assert.match(h.api.mailboxButtonHtml(), /mailbox-unread[^>]*>1<\/span>/);
+});

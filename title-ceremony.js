@@ -5,7 +5,7 @@ const LIMIT_LABELS={event:'活動限定',season:'賽季限定',identity:'身分�
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function artFor(title){
   if(title?.artwork)return title.artwork;
-  const map={'S2總冠軍':'assets/title-limited-s2-champion.webp','S3總冠軍':'assets/title-limited-s3-champion.webp'};
+  const map={'S2總冠軍':'assets/title-limited-s2-champion.webp','S3總冠軍':'assets/title-limited-s3-champion.webp','一戰成名':'assets/title-limited-one-battle-fame-20261121.webp'};
   return map[String(title?.name||'')]||'';
 }
 function tier(title){return String(title?.rarityTier||title?.rarity||'common');}

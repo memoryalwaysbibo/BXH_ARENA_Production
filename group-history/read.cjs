@@ -2,7 +2,7 @@
 
 const { createHash } = require('node:crypto');
 const buckets = require('../referee-seats/functions/bucket-state.cjs');
-const { GROUPS, matchesFor } = require('../group-stages/core.cjs');
+const { GROUPS, matchesFor, scoreCompletedEvent } = require('../group-stages/core.cjs');
 const STAGES = Object.freeze([...GROUPS, 'runners-up', 'champions']);
 const ROOM_CODE = /^BXH-[A-Z0-9]{6}$/;
 const REGISTRATION_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -235,6 +235,49 @@ function opaqueResponse(result, players, parentCode, parentRoomId) {
   };
 }
 
+function historicalHistory(plan, parent, state, parentCode, admin, uid) {
+  check(plan.parentRoomId === state.id && state.cloudCode === parentCode &&
+    parent.eventAuthority === 'official' && parent.ladderMode === 'ranked' &&
+    !parent.eventCancelled && !state.meta?.eventCancelled && !state.testMode && !parent.groupStage &&
+    !state.groupStage && !state.startedAt && !state.matches?.length, 'group-parent-room-changed');
+  const players = GROUPS.flatMap(key => plan.event.groups[key]);
+  const ownPlayerIds = players.filter(player => player.accountUid === uid || player.guardianUid === uid)
+    .map(player => player.id);
+  check(admin || ownPlayerIds.length > 0, 'group-permission-denied');
+  const own = new Set(ownPlayerIds);
+  const finals = plan.event.results['final-eight'].places;
+  const ownMatches = [];
+  const stages = [...GROUPS, 'final-eight'].map(key => {
+    const group = GROUPS.includes(key);
+    const rows = plan.event.results[key].matches;
+    const roundPositions = new Map();
+    const matches = rows.map(row => {
+      const indexInRound = roundPositions.get(row.round) || 0;
+      roundPositions.set(row.round, indexInRound + 1);
+      return { id: row.id, bracket: 'SE', round: row.round, indexInRound, completed: true, isBye: false,
+        a: { playerId: row.a.playerId }, b: { playerId: row.b.playerId },
+        winnerId: row.winnerId, loserId: row.loserId, scoreA: null, scoreB: null };
+    });
+    for (const match of matches) if (own.has(match.a.playerId) || own.has(match.b.playerId)) {
+      ownMatches.push({ ...match, stageKey: key });
+    }
+    return { key, label: group ? key + ' 組' : '總八強', status: 'completed', needsReview: false, historical: true,
+      players: (group ? plan.event.groups[key] : players.filter(player => finals.includes(player.id))).map(safePlayer),
+      matches };
+  });
+  const result = scoreCompletedEvent(plan.event, ['final-eight']);
+  const placements = result.participants.filter(row => own.has(row.player.id)).map(row => ({
+    playerId: row.player.id, placement: row.placement, points: null, pointsStatus: 'unverified',
+  }));
+  return opaqueResponse({
+    parent: { code: parentCode, name: text(state.meta?.name || parent.name),
+      archiveStatus: parent.archiveStatus === 'completed' ? 'completed' : 'ongoing', rehearsal: false },
+    stages, ownPlayerIds, ownMatches, placements,
+    assignedGroups: GROUPS.filter(key => plan.event.groups[key].some(player => own.has(player.id))),
+    points: null, pointsStatus: 'unverified', needsReview: false,
+  }, players, parentCode, plan.parentRoomId);
+}
+
 function createHistoryReader(db) {
   return async (parentCode, uid) => {
     check(typeof uid === 'string' && uid.length > 0 && !uid.includes('/'), 'group-auth-required');
@@ -254,6 +297,10 @@ function createHistoryReader(db) {
       const [parentSnapshot, planSnapshot] = await tx.getAll(parentRef, db.doc('groupStagePlans/' + parentCode));
       check(parentSnapshot.exists && planSnapshot.exists, 'group-plan-required');
       const parent = parentSnapshot.data(), state = stateOf(parent), plan = planSnapshot.data();
+      if (plan.historical === true) {
+        check(!rehearsal, 'group-room-disabled');
+        return historicalHistory(plan, parent, state, parentCode, admin, uid);
+      }
       const players = planRoster(plan, parent, state, rehearsal);
       check(!Object.values(plan.roomCodes).includes(parentCode), 'group-stage-source');
       const ownPlayerIds = await ownPlayers(tx, parentRef, players, uid);

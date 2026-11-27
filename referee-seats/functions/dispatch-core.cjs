@@ -38,7 +38,7 @@ function transition({room,state,user,uid,d,now,authority={}}){
  }else{
   if(!state.startedAt)fail('not-started');
   matchVersion(m);if(Number(m.station)!==station)fail('station-mismatch');
-  if(protectedPass(state,m)&&!(action==='claim-skipped'&&PassReturn.supported(state)&&PassReturn.readiness(state,m).ok))fail('pass-protected');
+  if(protectedPass(state,m)&&!(action==='claim-skipped'&&PassReturn.supported(state)&&PassReturn.readiness(state,m,{manual:true}).ok))fail('pass-protected');
   if(action==='swap'){
    permission(station);const target=state.matches.find(x=>x.id===d.targetMatchId);matchVersion(target,true);permission(Number(target.station));
    if(protectedPass(state,target))fail('pass-protected');

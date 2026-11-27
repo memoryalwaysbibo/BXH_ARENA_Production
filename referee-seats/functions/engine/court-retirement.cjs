@@ -2,7 +2,11 @@
   'use strict';
   const count=n=>Math.max(1,Math.min(32,Number(n)||1));
   const pending=m=>m&&!m.isBye&&!m.completed;
-  const held=m=>pending(m)&&(m.offlinePendingSync||!m.skippedAt&&(m.status==='in_progress'||m.status==='paused'||Number(m.scoreA)>0||Number(m.scoreB)>0||(m.log||[]).length>0));
+  // A live current assignment is authoritative even before the first score.
+  // Pre-start draw previews and next-match forecasts are not active assignments.
+  const held=(st,m)=>pending(m)&&(m.offlinePendingSync||
+    Boolean(st.startedAt&&Number(m.station)>0&&st.courtAssignments?.['court'+m.station]?.currentMatchId===m.id)||
+    !m.skippedAt&&(m.status==='in_progress'||m.status==='paused'||Number(m.scoreA)>0||Number(m.scoreB)>0||(m.log||[]).length>0));
   function target(st){return count(st.courtRetirementPlan?.targetCount||st.meta?.stations);}
   function accepts(st,n){return Number.isInteger(Number(n))&&Number(n)>0&&Number(n)<=target(st)&&!st.forcedCourtExits?.[n]?.closed;}
   // Without authoritative call records, every displayed next is reserved too.
@@ -42,9 +46,9 @@
     const p=st.courtRetirementPlan;if(!p)return;
     let changed=false;
     const load=Array(p.targetCount).fill(0);
-    for(const m of st.matches||[])if(pending(m)&&Number(m.station)<=p.targetCount)load[Number(m.station)-1]++;
+    for(const m of st.matches||[])if(pending(m)&&Number(m.station)>0&&Number(m.station)<=p.targetCount)load[Number(m.station)-1]++;
     for(const m of st.matches||[]){
-      if(!pending(m)||Number(m.station)<=p.targetCount||held(m)||(p.expansionHeldIds||[]).includes(m.id))continue;
+      if(!pending(m)||Number(m.station)<=p.targetCount||held(st,m)||(p.expansionHeldIds||[]).includes(m.id))continue;
       const to=load.indexOf(Math.min(...load))+1;load[to-1]++;move(st,m,to,now);changed=true;
     }
     for(const [key,c] of Object.entries(p.courts||{})){
@@ -79,9 +83,9 @@
       p.expansionHeldIds=(st.matches||[]).filter(m=>pending(m)&&Number(m.station)>n&&!movable.has(m.id)).map(m=>m.id);
       expandQueuedMatches(st,n,now);
     }
-    const load=Array(n).fill(0);for(const m of st.matches||[])if(pending(m)&&Number(m.station)<=n)load[Number(m.station)-1]++;
+    const load=Array(n).fill(0);for(const m of st.matches||[])if(pending(m)&&Number(m.station)>0&&Number(m.station)<=n)load[Number(m.station)-1]++;
     for(const m of (st.matches||[]).slice().sort((a,b)=>Number(a.seq||0)-Number(b.seq||0))){
-      if(!pending(m)||Number(m.station)<=n||held(m)||(p.expansionHeldIds||[]).includes(m.id))continue;
+      if(!pending(m)||Number(m.station)<=n||held(st,m)||(p.expansionHeldIds||[]).includes(m.id))continue;
       const to=load.indexOf(Math.min(...load))+1;load[to-1]++;
       move(st,m,to,now); // PASS dependencies and score ledgers remain attached to the match.
     }
@@ -141,5 +145,51 @@
     if(m.offlinePendingSync)return {ok:false,reason:'offline-sync-pending'};
     move(st,m,to,now);delete m.forceDetached;return {ok:true,state:st};
   }
-  root.BXHCourtRetirement={target,accepts,request,reconcile,transfer,forceExit,reopen,claimDetached,movableQueuedMatches};
+  // Physical removal is independent of referee occupancy. A draining court
+  // retains its seats until the shared match retirement plan actually removes it.
+  const seatSlots=['main','backup1','backup2'];
+  function reconcileSeatCount(model,physicalCount,now=Date.now(),previousPhysicalCount=physicalCount){
+    if(model?.version!==1)return {model,changed:false};
+    if(!Number.isSafeInteger(physicalCount)||physicalCount<1||physicalCount>64)throw Error('invalid-court-count');
+    // Older rooms may still contain seats above their current capacity. Clear
+    // them before expansion so a removed assignment can never reappear.
+    if(Number.isSafeInteger(previousPhysicalCount)&&previousPhysicalCount>=1&&previousPhysicalCount<physicalCount){
+      const prior=reconcileSeatCount(model,previousPhysicalCount,now);
+      const expanded=reconcileSeatCount(prior.model,physicalCount,now);
+      return {model:expanded.model,changed:prior.changed||expanded.changed};
+    }
+    const needsCourtChange=Object.entries(model.courts||{}).some(([key,court])=>{
+      const station=Number(key);return Number.isSafeInteger(station)&&station>0&&court&&(station>physicalCount?(court.retired!==true||seatSlots.some(slot=>court[slot])):court.retired===true);
+    });
+    const needsRequestChange=Object.values(model.requests||{}).some(req=>req?.status==='pending'&&Number(req.station)>physicalCount);
+    if(!needsCourtChange&&!needsRequestChange)return {model,changed:false};
+    const next=JSON.parse(JSON.stringify(model));next.courts||={};next.requests||={};let changed=false;
+    for(const [key,court] of Object.entries(next.courts)){
+      const station=Number(key);if(!Number.isSafeInteger(station)||station<1||!court)continue;
+      if(station>physicalCount){
+        if(court.retired!==true||seatSlots.some(slot=>court[slot])){
+          next.courts[key]={revision:Number(court.revision||0)+1,main:null,backup1:null,backup2:null,retired:true};changed=true;
+        }
+      }else if(court.retired===true){
+        next.courts[key]={revision:Number(court.revision||0)+1,main:null,backup1:null,backup2:null};changed=true;
+      }
+    }
+    for(const req of Object.values(next.requests)){
+      if(req?.status==='pending'&&Number(req.station)>physicalCount){req.status=req.expiresAt<=now?'expired':'stale';req.resolvedAt=now;changed=true;}
+    }
+    if(changed)next.revision=Number(next.revision||0)+1;
+    return {model:changed?next:model,changed};
+  }
+  function projectSeats(model,ownerUid=null,stations=0){
+    const assignments={},names={},publicSeats={},uids=new Set();
+    const courts={...model.courts};for(let n=1;n<=Math.min(32,Number(stations)||0);n++)courts[n]=courts[n]||{main:null,backup1:null,backup2:null};
+    for(const [station,court] of Object.entries(courts)){
+      if(!court||court.retired===true||(stations>0&&Number(station)>stations))continue;
+      assignments[station]=[];names[station]=[];publicSeats[station]={};
+      if(ownerUid)assignments[station].push(ownerUid);
+      for(const slot of seatSlots){const seat=court[slot];publicSeats[station][slot]=seat?{name:seat.name}:null;if(seat){if(!assignments[station].includes(seat.uid))assignments[station].push(seat.uid);names[station].push(seat.name);uids.add(seat.uid);}}
+    }
+    return {refereeStationAssignments:assignments,refereeStationNames:names,refereeStationUids:[...uids],refereeStationRestrictionEnabled:true,refereeSeatNames:publicSeats};
+  }
+  root.BXHCourtRetirement={target,accepts,request,reconcile,transfer,forceExit,reopen,claimDetached,movableQueuedMatches,reconcileSeatCount,projectSeats};
 })(module.exports);

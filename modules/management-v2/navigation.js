@@ -12,7 +12,7 @@
     {id:"team",label:"戰隊",tabs:["team-preview"]},
     {id:"hunter",label:"獵人",tabs:[],placeholder:true,hidden:true},
     {id:"activity",label:"活動",tabs:["member-raffles","inventory-admin"]},
-    {id:"commerce",label:"商城",tabs:["commerce-admin"]},
+    {id:"commerce",label:"商城",tabs:["commerce-shop","commerce-orders","commerce-admin"]},
     {id:"system",label:"系統",tabs:["operations","history","version"]}
   ];
   const LABELS={
@@ -20,7 +20,7 @@
     live:"即時戰況",bracket:"對戰表",referee:"裁判台",duty:"我的執勤",
     "referee-admin":"裁判管理",
     ladder:"排行榜","team-preview":"戰隊大廳","member-raffles":"會員抽獎管理","inventory-admin":"道具管理",
-    "commerce-admin":"商城管理",operations:"抽獎與維護",history:"賽事紀錄",version:"版本更新"
+    "commerce-shop":"商城","commerce-orders":"我的訂單","commerce-admin":"商城管理",operations:"抽獎與維護",history:"賽事紀錄",version:"版本更新"
   };
   function groupForTab(tab){return GROUPS.find(g=>g.tabs.includes(tab))||GROUPS[0];}
   function resolveActiveGroup(activeTab,visibleTabKeys){

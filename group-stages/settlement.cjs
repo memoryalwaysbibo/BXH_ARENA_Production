@@ -1,6 +1,7 @@
 'use strict';
 
 const ladder = require('../ladder-v1.js');
+const { eligibleProfile } = require('./historical-import.cjs');
 const CODE = /^BXH-[A-Z0-9]{6}$/;
 const UID = /^[A-Za-z0-9_-]{1,128}$/;
 
@@ -85,8 +86,7 @@ function createGroupSettlement(db, coordinator, { clock = Date.now, serverTimest
       const tiers = ladder.tiers.map(tier => tier.name);
       for (let i = 0; i < n; i++) {
         const row = candidates[i], profile = profiles[i].data();
-        if (!profile || profile.active !== true || profile.deleted === true || profile.isTestAccount === true ||
-          profile.role === 'tester') { skipped.push(row.player.name || row.player.id); continue; }
+        if (!eligibleProfile(profile)) { skipped.push(row.player.name || row.player.id); continue; }
         const old = players[i].data() || {};
         check(!old.currentSeason || old.currentSeason === seasonId, 'group-player-season-mismatch');
         const beforeSeason = Math.max(0, Number(old.seasonPoints || 0));

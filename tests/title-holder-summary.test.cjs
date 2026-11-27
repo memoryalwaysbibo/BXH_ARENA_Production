@@ -1,0 +1,11 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const vm=require('node:vm');const fs=require('node:fs');
+const ctx={window:{},esc:x=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))};
+vm.runInNewContext(fs.readFileSync('modules/main-app/title-utils.js','utf8'),ctx);
+const html=ctx.window.BXHTitleUtils.titleHolderHtml;
+test('common title with one recipient has no owner field',()=>assert.equal(html({recipientCount:1}),''));
+test('missing projection is pending, not unawarded',()=>assert.match(html({limitedType:'unique'}),/資料核對中/));
+test('verified empty title can show unawarded',()=>assert.match(html({id:'season_king',holderSummary:{schemaVersion:1,status:'unawarded'}}),/尚未授予/));
+test('verified owner uses existing card action and escapes public game name',()=>{const out=html({limitedType:'unique',holderSummary:{schemaVersion:1,status:'owned',holder:{uid:'abc',name:'<葉欽>'}}});assert.match(out,/data-action="card-open"/);assert.match(out,/&lt;葉欽&gt;/);});
+test('identity roles use explicit IDs and current-holder label',()=>assert.match(html({id:'custom_09d92de7-47f8-4aec-bed3-3401c7f691f4'}),/現任持有人/));
+test('hidden/nonpublic title never reveals owner',()=>{const t={id:'creator',holderSummary:{schemaVersion:1,status:'owned',holder:{uid:'abc',name:'秘密'}}};assert.equal(html({...t,isHidden:true}),'');assert.equal(html({...t,isPublic:false}),'');});
+test('unsupported schema and invalid UID do not render a link',()=>{const t={id:'creator',holderSummary:{schemaVersion:2,status:'owned',holder:{uid:'abc',name:'秘密'}}};assert.doesNotMatch(html(t),/data-uid/);assert.doesNotMatch(html({...t,holderSummary:{...t.holderSummary,schemaVersion:1,holder:{uid:'bad/uid',name:'秘密'}}}),/data-uid/);});

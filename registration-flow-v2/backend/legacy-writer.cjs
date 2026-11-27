@@ -1,6 +1,6 @@
 'use strict';
 
-const roomCodePattern=/^BXH-[A-Z0-9]{4,16}$/;
+const roomCodePattern=/^(?:BXH-[A-Z0-9]{4,16}|PTN-[A-Z0-9]{6})$/;
 
 function registrationQueueOwnsRoom(room){
  return room?.registrationQueueVersion===2;

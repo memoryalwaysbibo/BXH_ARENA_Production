@@ -179,6 +179,10 @@ function collect(event, key, roomState) {
 
 function settlementInput(event) {
   check(!nextStage(event), 'group-stage-incomplete');
+  return scoreCompletedEvent(event, PLAYOFFS);
+}
+
+function scoreCompletedEvent(event, finalStages) {
   const places = new Map();
   const eliminations = new Map();
   const keys = groupKeys(event);
@@ -186,7 +190,7 @@ function settlementInput(event) {
     const { matches, finalRound } = event.results[key];
     for (const match of matches) {
       const distance = finalRound - match.round;
-      if (!distance) continue; // Group runners-up advance to their own playoff.
+      if (!distance) continue; // The result of a played group final does not eliminate either qualifier.
       if (!eliminations.has(distance)) eliminations.set(distance, []);
       eliminations.get(distance).push(match.loserId);
     }
@@ -197,10 +201,10 @@ function settlementInput(event) {
     remaining -= eliminated.length;
     for (const id of eliminated) places.set(id, remaining + 1);
   }
-  const topEight = PLAYOFFS.flatMap(key => event.results[key].places);
+  const topEight = finalStages.flatMap(key => event.results[key].places);
   topEight.forEach((id, index) => places.set(id, index + 1));
 
-  const matches = [...keys, ...PLAYOFFS].flatMap(key => event.results[key].matches);
+  const matches = [...keys, ...finalStages].flatMap(key => event.results[key].matches);
   const actual = new Set(), wins = new Map(), losses = new Map();
   for (const match of matches.filter(ladder.isPlayed)) {
     actual.add(match.winnerId);
@@ -231,4 +235,4 @@ function settlementInput(event) {
   return { effectiveCount, multiplier, topEight, participants, matches };
 }
 
-module.exports = { GROUPS, groupKeys, prepare, openableStages, nextStage, matchesFor, collect, settlementInput };
+module.exports = { GROUPS, groupKeys, prepare, openableStages, nextStage, matchesFor, collect, settlementInput, scoreCompletedEvent };

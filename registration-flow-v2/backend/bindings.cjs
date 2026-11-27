@@ -5,8 +5,11 @@
 const {createQueue}=require('./queue.cjs');
 const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
-const {createStartHandler,createDrawHandler}=require('./lifecycle.cjs');
-function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled,pilotRoom=null,retiredRoom=null,retiredRooms=[]}){
+const {createStartHandler,createDrawHandler,createTicketForfeitHandler,createTicketScoreHandler}=require('./lifecycle.cjs');
+const {createTicketRoomHandler,createPtnStatusHandler,createTicketRoomStateHandler,createTicketScheduleHandler,createTicketStationsHandler,createTicketRemoveHandler,createTicketDelegateHandler,createTicketDelegateSearchHandler}=require('./ticket-room-create.cjs');
+const {createTicketRefereeHandler}=require('./ticket-referee-seat.cjs');
+const {isPartnerRoomCode,validRegistrationRoomCode,ticketLifecyclePath,resolveTicketGate}=require('./ticket-host.cjs');
+function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,promotionFactory,authorizeManagement,stagedOnly=false,enabled=async()=>false,workersEnabled=async()=>false,startEnabled,drawEnabled,pilotRoom=null,retiredRoom=null,retiredRooms=[],ticketPilot=async()=>null}){
  if(createFamilyRegistration?.v2CapacityAware!==true)throw Error('queue-family-capacity-source-required');
  const familyFactory=store=>createFamilyRegistration(store,Date.now,{myEventsProofEnabled:true});
  if(typeof promotionFactory!=='function')throw Error('queue-promotion-factory-required');
@@ -14,47 +17,105 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
  const {onDocumentCreated}=require('firebase-functions/v2/firestore');
  const {onSchedule}=require('firebase-functions/v2/scheduler');
  const workersReady=async()=>!stagedOnly&&await workersEnabled()===true;
- const roomAllowed=code=>pilotRoom===null||code===pilotRoom;
+ const primaryRoom=code=>pilotRoom===null||code===pilotRoom;
+ const ticketAllowed=async(code,tx)=>typeof code==='string'&&!!await ticketPilot(code,tx);
  const retired=new Set([...(retiredRoom===null?[]:[retiredRoom]),...retiredRooms]);
  const isRetired=code=>retired.has(code);
- const intakeEnabled=async(code,tx)=>roomAllowed(code)&&!stagedOnly&&
-  (pilotRoom!==null||await workersReady())&&await enabled(code,tx)===true;
+ const intakeEnabled=async(code,tx)=>!stagedOnly&&(primaryRoom(code)
+  ?(pilotRoom!==null||await workersReady())&&await enabled(code,tx)===true
+  :await ticketAllowed(code,tx));
  const queue=createQueue(db,{FieldValue,requireRoomOwnership:true,
-  onTiming:fields=>console.info(JSON.stringify({event:'registration-v2-worker-phase',...fields})),
   authorizeIntake:pilotRoom===null?undefined:intakeEnabled,
   handlers:{family:familyFactory,roster:rosterFactory,promotion:promotionFactory}});
  const api=createApi({queue,family:familyFactory(db),enabled:code=>isRetired(code)||intakeEnabled(code)});
  const managementApi=createManagementApi({queue,enabled:intakeEnabled,authorize:authorizeManagement});
- const bind=(handler,{options,preconditions=[],allowRetired=()=>false}={})=>onCall({region:'asia-east1',cors:true,timeoutSeconds:30,maxInstances:5,...options},async req=>{
+ const bind=(handler,{options,preconditions=[],allowRetired=()=>false,allowUnassigned=()=>false,auditPtnLifecycle=false}={})=>onCall({region:'asia-east1',cors:true,timeoutSeconds:30,maxInstances:5,...options},async req=>{
   const data=req.data;
-  if(stagedOnly||(!roomAllowed(data?.code)&&!(isRetired(data?.code)&&allowRetired(data)))){
+  if(stagedOnly||(!primaryRoom(data?.code)&&!(isRetired(data?.code)&&allowRetired(data))&&
+      !(req.auth?.uid&&(allowUnassigned(data)||await ticketAllowed(data?.code))))){
    throw new HttpsError('failed-precondition','registration-queue-disabled');
   }
   try{return await handler(req);}catch(error){
    const m=String(error.message||'');
    if(m==='auth-required')throw new HttpsError('unauthenticated',m);
    if(m==='invalid-operation')throw new HttpsError('invalid-argument',m);
-   if(m==='permission-denied'||m==='not-found')throw new HttpsError(m,m);
+   if(m==='permission-denied'||m==='not-found'){
+    if(m==='permission-denied'&&auditPtnLifecycle&&isPartnerRoomCode(data?.code)){
+     const stages=new Set(['room-binding','actor-role','owner-grant','actor-inactive','contract-proof']);
+     console.warn('PTN lifecycle authorization refused',{
+      stage:stages.has(error?.ptnPermissionStage)?error.ptnPermissionStage:'unclassified',
+     });
+    }
+    throw new HttpsError(m,m);
+   }
    if(['registration-queue-disabled','operation-conflict','tournament-started',...preconditions].includes(m))throw new HttpsError('failed-precondition',m);
+   if(data?.action==='ticket-room-state'&&isPartnerRoomCode(data?.code)){
+     // Record only error classification and source location. Never log room state,
+     // request payload, player identity or the exception message.
+     const frame=String(error?.stack||'').split('\n').slice(1)
+      .map(line=>line.match(/(?:backend|engine)\/[A-Za-z0-9_./-]+\.cjs:\d+:\d+/)?.[0])
+      .find(Boolean)||'unknown';
+     const type=String(error?.name||'Error').replace(/[^A-Za-z]/g,'').slice(0,40)||'Error';
+     const code=String(error?.code??'').replace(/[^A-Za-z0-9/_-]/g,'').slice(0,40);
+     console.error('PTN room state read failed',{type,code,frame});
+   }
    throw new HttpsError('unavailable','registration-operation-unconfirmed');
   }
  });
  const registrationQueueV2=bind(api,{allowRetired:data=>data.action==='status'||data.action==='mine'});
- const registrationRosterQueueV2=bind(managementApi,{allowRetired:data=>data.action==='status'});
+ const ticketRoomActions={
+  'create-ticket-room':createTicketRoomHandler({db}),
+  'ticket-ptn-status':createPtnStatusHandler({db}),
+  'ticket-room-state':createTicketRoomStateHandler({db,enabled:startEnabled}),
+  'ticket-room-schedule':createTicketScheduleHandler({db}),
+  'ticket-room-stations':createTicketStationsHandler({db,enabled:startEnabled}),
+  'ticket-room-referee':createTicketRefereeHandler({db,enabled:startEnabled}),
+  'ticket-room-delegate':createTicketDelegateHandler({db}),
+  'ticket-room-delegate-search':createTicketDelegateSearchHandler({db}),
+  'ticket-room-forfeit':createTicketForfeitHandler({db,enabled:startEnabled}),
+  'ticket-room-score':createTicketScoreHandler({db,enabled:startEnabled}),
+  'ticket-room-remove':createTicketRemoveHandler({db,queue,enabled:intakeEnabled}),
+ };
+ const registrationRosterQueueV2=bind(req=>{
+  const action=req.data?.action;
+  return Object.hasOwn(ticketRoomActions,action)?ticketRoomActions[action](req):managementApi(req);
+ },{
+  allowRetired:data=>data.action==='status',
+  allowUnassigned:data=>data?.code===undefined&&['create-ticket-room','ticket-ptn-status'].includes(data?.action),
+  preconditions:['ticket-lifecycle-disabled','ticket-binding-invalid','ticket-expired','ticket-unavailable','version-conflict',
+   'room-code-conflict','room-receipt-inconsistent','ticket-ptn-slot-occupied','bracket-room-changed','bracket-version-conflict',
+   'forfeit-room-not-live','forfeit-match-stale','forfeit-round-waiting',
+   'score-room-not-live','score-match-stale','score-round-waiting','score-result-not-ready','invalid-status','invalid-score','invalid-side','no-pass-alternative','correction-unavailable','court-already-started','downstream-started','source-no-longer-swappable','target-no-longer-swappable','station-mismatch',
+   'ticket-invite-unavailable','release-not-ready','not-event-staff','room-read-only','invalid-request','invalid-qr','qr-expired','seat-stale','seat-occupied','already-seated','not-enabled','already-enabled','invalid-seat','target-ineligible','requester-ineligible','request-pending','request-stale','request-unavailable','invitation-required','legacy-assignments-exist','invalid-stations','community-result-available','court-room-not-live','court-plan-stale','invalid-court-count','invalid-court','already-completed','court-exit-stale','current-match-changed','dispatch-stale','not-detached','target-retiring','offline-sync-pending'],
+ });
  const lifecycleOptions={
   options:{enforceAppCheck:true},
+  auditPtnLifecycle:true,
   // Lifecycle validates the original receipt before checking the write gate.
   allowRetired:()=>true,
   preconditions:['bracket-room-changed','bracket-started','draw-mode-not-supported','start-mode-not-supported','early-start-confirmation-required',
+   'ticket-lifecycle-disabled','ticket-binding-invalid','ticket-expired','ticket-capacity-invalid',
    'registration-roster-stale','bracket-version-conflict','qr-checkin-state-stale','registration-queue-pending','bracket-roster-changed'],
  };
  const registrationStartV2=bind(createStartHandler({db,enabled:startEnabled}),lifecycleOptions);
  const registrationDrawV2=bind(createDrawHandler({db,enabled:drawEnabled}),lifecycleOptions);
  const registrationQueueV2Worker=onDocumentCreated({region:'asia-east1',document:'_registrationQueueV2/{code}/_registrationQueueJobsV2/{job}',timeoutSeconds:60,maxInstances:5,retry:true},async event=>{
-  if(roomAllowed(event.params.code)&&await workersReady())await queue.drainCreatedJob(event.params.code,event.params.job,{limit:200,budgetMs:45000});
+  const {code,job}=event.params;
+  if(!stagedOnly&&(primaryRoom(code)?await workersReady():await ticketAllowed(code))){
+   await queue.drainCreatedJob(code,job,{limit:200,budgetMs:45000});
+  }
  });
  const registrationQueueV2Sweep=onSchedule({region:'asia-east1',schedule:'every 1 minutes',timeoutSeconds:540,maxInstances:1},async()=>{
   if(await workersReady())await queue.sweep(pilotRoom);
+  if(!stagedOnly&&pilotRoom!==null){
+   const ticket=await ticketPilot();
+   if(ticket)await queue.sweep(ticket.roomCode);
+   const partnerTicket=await ticketPilot(undefined,undefined,true);
+   if(partnerTicket)await queue.sweep(partnerTicket.roomCode);
+   for(const code of Object.keys(partnerTicket?.rooms||{}).slice(0,8)){
+    if(code!==partnerTicket.roomCode&&await ticketAllowed(code))await queue.sweep(code);
+   }
+  }
  });
  return {registrationQueueV2,registrationRosterQueueV2,registrationQueueV2Worker,registrationQueueV2Sweep,registrationStartV2,registrationDrawV2};
 }
@@ -70,11 +131,25 @@ function createPilotBindings({pilotRoom,retiredRoom=null,retiredRooms=[],...depe
   const config=snapshot.data();
   return config?.roomCode===pilotRoom&&config.workersEnabled===true&&config[field]===true;
  };
- const lifecycle=(code,tx)=>code===pilotRoom&&allows('lifecycleEnabled',tx);
+ const ticketPilot=async(code,tx,ptn=isPartnerRoomCode(code))=>{
+  if(code!==undefined&&(!validRegistrationRoomCode(code)||code===pilotRoom||retired.includes(code)))return null;
+  const ticketRef=dependencies.db.doc(ticketLifecyclePath(ptn?'PTN-000000':code));
+  const snapshot=tx?await tx.get(ticketRef):await ticketRef.get();
+  const root=snapshot.data();
+  const config=code===undefined?root:await resolveTicketGate(dependencies.db,code,tx,root);
+  if(config?.enabled!==true||config.bindingEnabled!==true||!(ptn?isPartnerRoomCode(config.roomCode):validRoom(config.roomCode))||
+     config.roomCode===pilotRoom||retired.includes(config.roomCode)||
+     (code!==undefined&&code!==config.roomCode)||
+     !/^[A-Za-z0-9_-]{1,128}$/.test(config.ownerUid||'')||
+     !/^[A-Za-z0-9_-]{8,100}$/.test(config.roomId||''))return null;
+  return config;
+ };
+ const lifecycle=async(code,tx)=>code===pilotRoom
+  ?allows('lifecycleEnabled',tx):!!await ticketPilot(code,tx);
  return createBindings({...dependencies,pilotRoom,retiredRoom,retiredRooms,stagedOnly:false,
   workersEnabled:()=>allows('workersEnabled'),
   enabled:(_code,tx)=>allows('intakeEnabled',tx),
-  drawEnabled:lifecycle,startEnabled:lifecycle,
+  ticketPilot,drawEnabled:lifecycle,startEnabled:lifecycle,
  });
 }
 module.exports={createBindings,createPilotBindings};

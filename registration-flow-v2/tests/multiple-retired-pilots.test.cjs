@@ -8,8 +8,13 @@ function fixture(){
  const file=require.resolve('../backend/bindings.cjs'),localRequire=createRequire(file);
  const pilot='BXH-XXDNAH',olds=['BXH-BZ2JW6','BXH-XJ7WJ5'];
  const status=[],writes=[],drains=[];
+ const ticket='BXH-TICKETPILOT';
+ const ptn='PTN-P1L0T1';
+ let ticketGate,ptnGate;
  let gate={roomCode:pilot,workersEnabled:true,intakeEnabled:true,lifecycleEnabled:true};
- const db={doc:()=>({get:async()=>({data:()=>gate})})};
+ const db={doc:path=>({get:async()=>({data:()=>path.startsWith('commerceTicketRoomGates/')?undefined:
+  path.endsWith('/registrationFlowV2Pilot')?gate:
+  path.endsWith('/commerceTicketPtnPilotV1')?ptnGate:ticketGate})})};
  const queue={status:async(...args)=>{status.push(args);return {operation:{state:'completed'}};},
   enqueue:async(...args)=>{writes.push(args);return {operation:{state:'queued'}};},
   drainCreatedJob:async code=>drains.push(code),sweep:async code=>drains.push(code)};
@@ -21,7 +26,8 @@ function fixture(){
   'firebase-functions/v2/firestore':{onDocumentCreated:bind},
   'firebase-functions/v2/scheduler':{onSchedule:bind},
   './queue.cjs':{createQueue:()=>queue},
-  './lifecycle.cjs':{createDrawHandler:()=>async()=>{},createStartHandler:()=>async()=>{}}
+  './ticket-room-create.cjs':{createTicketRoomHandler:()=>async()=>({ok:true}),createPtnStatusHandler:()=>async()=>({ok:true}),createTicketRoomStateHandler:()=>async()=>{},createTicketScheduleHandler:()=>async()=>{},createTicketStationsHandler:()=>async()=>{},createTicketDelegateHandler:()=>async()=>{},createTicketDelegateSearchHandler:()=>async()=>{},createTicketRemoveHandler:()=>async()=>{}},
+  './lifecycle.cjs':{createDrawHandler:()=>async()=>{},createStartHandler:()=>async()=>{},createTicketForfeitHandler:()=>async()=>{},createTicketScoreHandler:()=>async()=>{}}
  };
  const module={exports:{}};
  runInNewContext(readFileSync(file,'utf8'),{module,require:id=>stubs[id]??localRequire(id)});
@@ -29,7 +35,9 @@ function fixture(){
   retiredRoom:olds[0],retiredRooms:[olds[1]],db,FieldValue:{},createFamilyRegistration:family,
   rosterFactory:()=>{},promotionFactory:()=>{},authorizeManagement:()=>{},...options});
  const call=(endpoint,code,data,uid='synthetic-actor')=>endpoint.run({auth:{uid},data:{code,...data}});
- return {pilot,olds,status,writes,drains,create,call,close:()=>{gate={...gate,workersEnabled:false,intakeEnabled:false};}};
+ const configureTicket=(settings={})=>{ticketGate={enabled:true,bindingEnabled:true,roomCode:ticket,roomId:'ticket-pilot-generation',ownerUid:'pilot-owner',...settings};};
+ const configurePtn=(settings={})=>{ptnGate={enabled:true,bindingEnabled:true,roomCode:ptn,roomId:'ptn-pilot-generation',ownerUid:'pilot-owner',...settings};};
+ return {pilot,ticket,ptn,configureTicket,configurePtn,olds,status,writes,drains,create,call,close:()=>{gate={...gate,workersEnabled:false,intakeEnabled:false};}};
 }
 
 test('both retired pilots can read actor-scoped receipts while only the current pilot accepts work',async()=>{
@@ -54,6 +62,33 @@ test('both retired pilots can read actor-scoped receipts while only the current 
  await assert.rejects(endpoints.registrationQueueV2.run({data:{code:f.olds[0],action:'status',operationId}}),{code:'unauthenticated'});
 });
 
+test('PTN intake and recovery use only their assigned room while the BXH gate stays independent',async()=>{
+ const f=fixture(),endpoints=f.create();
+ const submit=code=>f.call(endpoints.registrationQueueV2,code,{action:'submit',
+  operation:{code,route:'family',payload:{action:'join',code}}});
+ await assert.rejects(submit(f.ptn),/registration-queue-disabled/);
+ f.configureTicket();
+ f.configurePtn();
+ await submit(f.ticket);
+ await submit(f.ptn);
+ await assert.rejects(submit('PTN-AAAAAA'),/registration-queue-disabled/);
+ await endpoints.registrationQueueV2Worker.run({params:{code:f.ptn,job:'synthetic-job'}});
+ await endpoints.registrationQueueV2Sweep.run({});
+ assert.deepEqual(f.drains,[f.ptn,f.pilot,f.ticket,f.ptn]);
+ assert.equal((await f.call(endpoints.registrationRosterQueueV2,undefined,{action:'create-ticket-room'})).ok,true);
+ await assert.rejects(endpoints.registrationRosterQueueV2.run({data:{action:'create-ticket-room'}}),/registration-queue-disabled/);
+});
+test('the second PTN room keeps its own intake and sweep without retiring the first room',async()=>{
+ const f=fixture(),next='PTN-NEW001',endpoints=f.create();
+ f.configurePtn({rooms:{[next]:{roomId:'next-room-generation',ownerUid:'pilot-owner'}},latestRoomCode:next});
+ const submit=code=>f.call(endpoints.registrationQueueV2,code,{action:'submit',
+  operation:{code,route:'family',payload:{action:'join',code}}});
+ await submit(f.ptn);await submit(next);
+ await assert.rejects(submit('PTN-AAAAAA'),/registration-queue-disabled/);
+ await endpoints.registrationQueueV2Sweep.run({});
+ assert.deepEqual(f.drains,[f.pilot,f.ptn,next]);
+});
+
 test('closed intake keeps both old pilots queryable and background work stays scoped to the current pilot',async()=>{
  const f=fixture(),endpoints=f.create();
  for(const code of f.olds)await endpoints.registrationQueueV2Worker.run({params:{code,job:'synthetic-job'}});
@@ -76,4 +111,29 @@ test('retired room lists reject duplicates, current pilot, invalid values and ex
  }
  assert.doesNotThrow(()=>f.create({retiredRooms:[]}));
  assert.doesNotThrow(()=>f.create({retiredRoom:null,retiredRooms:f.olds}));
+});
+
+test('ticket pilot registration and workers have a separate, exact room gate',async()=>{
+ const f=fixture(), endpoints=f.create();
+ const submit=code=>f.call(endpoints.registrationQueueV2,code,{action:'submit',
+  operation:{code,route:'family',payload:{action:'join',code}}});
+ const event=code=>endpoints.registrationQueueV2Worker.run({params:{code,job:'synthetic-job'}});
+ await assert.rejects(submit(f.ticket),/registration-queue-disabled/);
+ f.configureTicket();
+ await submit(f.pilot);
+ await submit(f.ticket);
+ await assert.rejects(submit('BXH-OTHER'),/registration-queue-disabled/);
+ await event(f.ticket);
+ await endpoints.registrationQueueV2Sweep.run({});
+ assert.deepEqual(f.drains,[f.ticket,f.pilot,f.ticket]);
+ f.close();
+ await assert.rejects(submit(f.pilot),/registration-queue-disabled/);
+ await submit(f.ticket);
+ f.configureTicket({roomCode:f.olds[0]});
+ await assert.rejects(submit(f.olds[0]),/registration-queue-disabled/);
+ f.configureTicket({bindingEnabled:false});
+ await assert.rejects(submit(f.ticket),/registration-queue-disabled/);
+ await event(f.ticket);
+ await endpoints.registrationQueueV2Sweep.run({});
+ assert.deepEqual(f.drains,[f.ticket,f.pilot,f.ticket]);
 });

@@ -552,6 +552,10 @@ function viewportHarness() {
     isTournamentLobbyVisible: () => true, render: () => { y += 40; },
   };
   vm.createContext(context);
+  const modalDeclarations = [...core.matchAll(/^let pendingModal = null;$/gm)];
+  assert.equal(modalDeclarations.length, 1, 'exact initial modal declaration is required');
+  vm.runInContext(modalDeclarations[0][0], context);
+  vm.runInContext(between(core, 'function isCurrentPlayerPasswordModal(mm){', '\nfunction renderModal(){'), context);
   vm.runInContext(between(core, 'function finishRenderViewport(snapshot){', '\nlet authFormRenderContext='), context);
   vm.runInContext(between(core, 'function renderPreservingScroll(){', '\nlet communityRoomSnapshotGeneration='), context);
   const renderer = between(core, 'function render(){', '\nfunction renderAdminSuccessScreen(){');

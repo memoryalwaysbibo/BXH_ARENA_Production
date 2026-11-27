@@ -2,7 +2,8 @@
 function isPlayerSubmission(operation,code){
  const payload=operation?.payload;
  if(!payload||operation.code!==code||payload.code!==code)return false;
- if(operation.route==='family')return payload.action==='join';
+ if(operation.route==='family')return payload.action==='join'||(payload.action==='cancel'&&payload.intent==='player'
+  &&typeof payload.registrationId==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(payload.registrationId));
  return operation.route==='roster'&&payload.action==='cancel'&&payload.intent==='player'
   &&typeof payload.registrationId==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(payload.registrationId)
   &&(payload.localId===undefined||payload.localId==='');
@@ -18,7 +19,10 @@ function createApi({queue,family,enabled=async()=>false}){
   if(!await enabled(d.code))throw Error('registration-queue-disabled');
   if(d.action==='submit'){
    if(!isPlayerSubmission(d.operation,d.code))throw Error('invalid-operation');
-   return queue.enqueue(uid,d.operation);
+   const ticketCancellation=d.operation.route==='family'&&d.operation.payload.action==='cancel';
+   return queue.enqueue(uid,d.operation,ticketCancellation?(_tx,_user,_operation,room)=>{
+    if(room?.eventAuthority!=='ticket'||room.ticketAccessV1?.version!==1)throw Error('invalid-operation');
+   }:undefined);
   }
   if(d.action==='mine'){
    const result=await family({auth:req.auth,data:{action:'mine',code:d.code}});
