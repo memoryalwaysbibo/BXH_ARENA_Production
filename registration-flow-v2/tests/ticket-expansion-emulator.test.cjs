@@ -115,8 +115,25 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   const results=await Promise.all(players.map((player,i)=>queue.status(player,a.code,'expansion-join-'+i)));
   assert.equal(results.filter(x=>x.operation.state==='completed').length,40);
   assert.equal(results.filter(x=>x.operation.state==='rejected'&&x.operation.reason==='full').length,1);
+  const fullState=JSON.parse((await a.room.get()).data().data);
+  assert.equal(fullState.players.length,40);
+  // Emergency use: a real full room must admit the previously rejected player
+  // after one additional coupon, without losing any confirmed registrations.
+  const rejectedIndex=results.findIndex(x=>x.operation.state==='rejected'&&x.operation.reason==='full');
+  assert.ok(rejectedIndex>=0);
+  const emergency=await expand(request(a,1,'expansion-after-full'));
+  assert.equal(emergency.capacityBefore,40);
+  assert.equal(emergency.capacityAfter,41);
+  assert.equal(emergency.balanceAfter,62);
+  const retryId='expansion-join-after-full';
+  const retry=await api({auth:{uid:players[rejectedIndex]},data:{action:'submit',code:a.code,operation:{route:'family',code:a.code,operationId:retryId,payload:{action:'join',code:a.code,operationId:retryId,childIds:[null],childEligibilityConfirmed:true}}}});
+  assert.equal(retry.operation.state,'queued');
+  await queue.drain(a.code,{limit:50,budgetMs:45000});
+  assert.equal((await queue.status(players[rejectedIndex],a.code,retryId)).operation.state,'completed');
   const privateState=JSON.parse((await a.room.get()).data().data);
-  assert.equal(privateState.players.length,40);
+  assert.equal(privateState.players.length,41);
+  assert.equal(new Set(privateState.players.map(p=>p.id)).size,41);
+  assert.ok(fullState.players.every(p=>privateState.players.some(q=>q.id===p.id)));
   const options={db,clock:()=>now+2000,enabled:async candidate=>candidate===a.code};
   const draw=createDrawHandler(options),start=createStartHandler(options);
   const lifecycle={code:a.code,roomId:a.roomId,rosterRevision:privateState.registrationRosterRevision};
@@ -125,10 +142,10 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   await start({auth:{uid},data:{...lifecycle,drawId:drawn.drawId,confirmEarlyStart:true,operationId:'expansion-start'}});
   const startedTicket=(await a.ticket.get()).data();
   assert.equal((await read(a)).expansionEnabled,false);
-  assert.equal(startedTicket.status,'consumed');assert.equal(startedTicket.capacity,32);assert.equal(startedTicket.addedCapacity,8);
+  assert.equal(startedTicket.status,'consumed');assert.equal(startedTicket.capacity,32);assert.equal(startedTicket.addedCapacity,9);
   assert.equal((await a.room.get()).data().tournamentPhase,'live');
-  assert.equal((await a.pub.get()).data().capacity,40);
-  assert.equal((await inventory.get()).data().quantity,63);
+  assert.equal((await a.pub.get()).data().capacity,41);
+  assert.equal((await inventory.get()).data().quantity,62);
   // First-stage acceptance target: 160 + 32 = 192, not a claim of live load.
   const c=rooms[2];
   // A configuration above the first-stage ceiling must fail closed, even for a small request.
@@ -138,14 +155,14 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
    await assert.rejects(expand(request(c,1,'expansion-config-'+maxCapacity)),/expansion-unavailable/);
    assert.equal((await c.room.get()).data().capacity,160);
    assert.equal((await c.ticket.get()).data().addedCapacity,0);
-   assert.equal((await inventory.get()).data().quantity,63);
+   assert.equal((await inventory.get()).data().quantity,62);
   }
   await config.set({enabled:true,maxCapacity:192});
   assert.equal((await read(c)).expansionMaxCapacity,192);
   const patch=request(c,32,'expansion-192');
   const applied=await expand(patch);
   assert.equal(applied.capacityAfter,192);
-  assert.equal(applied.balanceAfter,31);
+  assert.equal(applied.balanceAfter,30);
   assert.equal((await expand(patch)).replayed,true);
   await assert.rejects(expand(request(c,1,'expansion-193')),/invalid-expansion-capacity/);
   const [cPrivate,cPublic,cTicket,cInventory]=await db.getAll(c.room,c.pub,c.ticket,inventory);
@@ -155,7 +172,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(JSON.parse(cPublic.data().bracketView).meta.registrationCapacity,192);
   assert.equal(cTicket.data().capacity,160);
   assert.equal(cTicket.data().addedCapacity,32);
-  assert.equal(cInventory.data().quantity,31);
+  assert.equal(cInventory.data().quantity,30);
   // Exercise 193 simultaneous intake calls with a 192-place patched PTN.
   // Intake acceptance is distinct from final registration confirmation.
   const entrants=Array.from({length:193},(_,i)=>uid+'-large-'+i);
@@ -204,7 +221,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(used.data().status,'consumed');
   assert.equal(used.data().capacity,160);
   assert.equal(used.data().addedCapacity,32);
-  assert.equal(remaining.data().quantity,31);
+  assert.equal(remaining.data().quantity,30);
   // Exercise two supported PTN manager identities, not independent referee seats.
   // The existing room authority permits exactly one delegated player.
   await c.room.update({ptnDelegateUid:delegate});
@@ -248,7 +265,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   }
   assert.equal(scoredRoom.data().capacity,192);
   assert.equal(scoredPublic.data().capacity,192);
-  assert.equal((await inventory.get()).data().quantity,31);
+  assert.equal((await inventory.get()).data().quantity,30);
   console.info('PTN192 six-court emulator metrics',JSON.stringify({courts:6,authorizedManagerAccounts:2,scoreCommands:12,confirmCommands:6,firstWaveMs:firstWave.ms,secondWaveMs:secondWave.ms,confirmWaveMs:decisions.ms,privateStateBytes:Buffer.byteLength(scoredRoom.data().data),publicStateBytes:Buffer.byteLength(scoredPublic.data().bracketView)}));
   // Complete the remaining bracket via the existing score handler, not fabricated results.
   const fullStarted=Date.now();
@@ -289,7 +306,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(completedByCommands,191+(finalState.meta.bronzeMatch?1:0));
   assert.equal(finalRoom.data().capacity,192);
   assert.equal(finalPublic.data().capacity,192);
-  assert.equal((await inventory.get()).data().quantity,31);
+  assert.equal((await inventory.get()).data().quantity,30);
   // Export the actual isolated lifecycle result for the separate scoring candidate.
   // Only this demo fixture is exported; no production document is read or logged.
   assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-registration-v2');
