@@ -11,10 +11,10 @@ import subprocess
 import tempfile
 import zipfile
 
-FRONT_BASE = 'a91fe57578e1deb74a76a5d19aada1e59ef19b12'
-FRONT_HEAD = '9b396ba133f569b43316ae88b3a7384e7207cebf'
-BACK_BASE = '0bf2caba485920f56e65084adf23d44df4006b97'
-BACK_HEAD = 'bb5cecec5053bbea77d0c3265b9abb62b73c8598'
+FRONT_BASE = '41ab81f1bc57483c4529c6bdfb31842a5450fb5f'
+FRONT_HEAD = '4316723d5c36d6d59d303a240b2d15bd8600aae3'
+BACK_BASE = '8e4886cf08edfe40b5d677d96c2b06417da2fdb9'
+BACK_HEAD = '1fd6c4a607bfaa6100076a24a8e44f07f991b90e'
 SETTLEMENT_HEAD = 'afde2fc515c0df5f06fd7724726e4433365ab696'
 SETTLEMENT_PORT = 'release/commerce/tests/ptn-settlement-source-port.test.cjs'
 

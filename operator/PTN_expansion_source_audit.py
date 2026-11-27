@@ -18,7 +18,7 @@ REGION = "asia-east1"
 ROOM = "registration-flow-v2/backend/"
 ROOM_FILES = tuple(ROOM + name for name in (
     "bindings.cjs", "lifecycle.cjs", "prepare-family.cjs",
-    "ticket-room-create.cjs", "ticket-host.cjs", "ticket-expansion.cjs"))
+    "ticket-room-create.cjs", "ticket-host.cjs", "ticket-expansion.cjs", "ticket-referee-seat.cjs"))
 COMMERCE_FILES = ("domain.cjs", "service.cjs", "ticket-purchase.cjs",
                   "room-expansion-pricing.cjs")
 SETTLEMENT_FILES = ("ladder-auto-settlement.js", "ladder-settlement-core.js",
