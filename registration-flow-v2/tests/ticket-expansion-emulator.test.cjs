@@ -15,7 +15,8 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
  const config=db.doc('systemSettings/commerceRoomExpansionV1');
  const inventory=db.doc('commerceEntitlements/'+createHash('sha256').update(JSON.stringify([uid,'room_expansion','tournament_expansion_1'])).digest('hex'));
  const sale=db.doc('systemSettings/commerceTicketPtnSaleV1');
- const previousSale=await sale.get(),previousConfig=await config.get();
+ const seatConfig=db.doc('systemConfig/refereeSeatsV1');
+ const previousSale=await sale.get(),previousConfig=await config.get(),previousSeats=await seatConfig.get();
  try{
   await db.doc('users/'+uid).set({active:true,role:'player',partnerOrganizer:{status:'active',scope:'manual',organizationId:uid,expiresAtMs:now+86400000}});
   await inventory.set({ownerUid:uid,kind:'room_expansion',assetId:'tournament_expansion_1',status:'active',expiresAt:null,quantity:83});
@@ -262,6 +263,28 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   const drawnState=JSON.parse((await c.room.get()).data().data);
   assert.equal(drawnState.bracketSize,256);
   assert.equal(new Set(drawnState.matches.flatMap(m=>[m.a?.playerId,m.b?.playerId,m.winnerId]).filter(Boolean)).size,192);
+  // Seat six distinct player accounts through the real PTN invitation flow before start.
+  await seatConfig.set({enabled:true,perCourtScoringVerified:true,ticketSeatsEnabled:true});
+  const refereeIds=Array.from({length:6},(_,i)=>uid+'-referee-'+(i+1));
+  const refereeUsers=db.batch();
+  for(const [i,ref] of refereeIds.entries())refereeUsers.set(db.doc('users/'+ref),{active:true,role:'player',realName:'Fixture referee '+(i+1)});
+  await refereeUsers.commit();
+  const {createTicketRefereeHandler}=require('../backend/ticket-referee-seat.cjs');
+  const referee=createTicketRefereeHandler(largeOptions);
+  const seatCommand=(actor,seatAction,operationId,fields={})=>referee({auth:{uid:actor},app:{},data:{action:'ticket-room-referee',code:c.code,seatAction,operationId,...fields}});
+  for(const [i,ref] of refereeIds.entries()){
+   const station=i+1;
+   const ownerView=await seatCommand(uid,'view','large-seat-owner-view-'+station);
+   const court=ownerView.refereeSeatControl.courts[station];
+   assert.equal(court.main,null);
+   const invite=await seatCommand(uid,'invite','large-seat-invite-'+station,{station,slot:'main',targetUid:ref,expectedCourtRevision:court.revision});
+   await seatCommand(ref,'accept-invite','large-seat-accept-'+station,{station,slot:'main',requestId:invite.requestId});
+   const waiting=await seatCommand(ref,'view','large-seat-waiting-'+station);
+   assert.deepEqual(Object.keys(waiting.refereeSeatControl.courts),[String(station)]);
+   assert.equal(waiting.refereeSeatControl.courts[station].main.uid,ref);
+   assert.equal(waiting.phase,'waiting');
+   assert.ok(waiting.bracket.every(m=>!m.canScore));
+  }
   const startStarted=Date.now();
   await createStartHandler(largeOptions)({auth:{uid},data:{...largeLifecycle,drawId:largeDraw.drawId,confirmEarlyStart:true,operationId:'large-start-192'}});
   const startMs=Date.now()-startStarted;
@@ -274,24 +297,32 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(used.data().capacity,160);
   assert.equal(used.data().addedCapacity,32);
   assert.equal(remaining.data().quantity,30);
-  // Exercise two supported PTN manager identities, not independent referee seats.
-  // The existing room authority permits exactly one delegated player.
-  await c.room.update({ptnDelegateUid:delegate});
+  // Each independent account may score only its own current main-seat match.
   const liveState=JSON.parse(live.data().data);
-  const assigned=new Map();
-  for(const m of liveState.matches){
-   if(m.station!=null&&forfeitMatchAvailable(m)&&!ticketRoundBlocked(m,liveState.matches,liveState.meta)&&!ticketBronzeBlocked(m,liveState.matches,liveState.meta)){
-    if(!assigned.has(m.station))assigned.set(m.station,m);
-   }
-  }
-  assert.equal(assigned.size,6,'six distinct eligible court assignments');
-  const targets=[...assigned.values()];
+  const targets=await Promise.all(refereeIds.map(async(ref,i)=>{
+   const station=i+1;
+   const view=await seatCommand(ref,'view','large-seat-live-'+station);
+   assert.deepEqual(Object.keys(view.refereeSeatControl.courts),[String(station)]);
+   assert.equal(view.participants,undefined);
+   assert.equal(view.bracket.length,1);
+   assert.equal(view.bracket[0].canScore,true);
+   const match=liveState.matches.find(m=>m.id===view.bracket[0].id);
+   assert.ok(match&&Number(match.station)===station);
+   return match;
+  }));
+  assert.equal(new Set(targets.map(m=>m.id)).size,6);
   const score=createTicketScoreHandler(largeOptions);
   const readMatches=async()=>new Map(JSON.parse((await c.room.get()).data().data).matches.map(m=>[m.id,m]));
   const wave=async(label,command,extra={})=>{
-   const current=await readMatches();
-   const requests=targets.map((m,i)=>({auth:{uid:i%2===0?uid:delegate},app:{},data:{action:'ticket-room-score',code:c.code,roomId:c.roomId,matchId:m.id,
+   const snap=(await c.room.get()).data();
+   const current=new Map(JSON.parse(snap.data).matches.map(m=>[m.id,m]));
+   const requests=targets.map((m,i)=>({auth:{uid:refereeIds[i]},app:{},data:{action:'ticket-room-score',code:c.code,roomId:c.roomId,matchId:m.id,
+    station:i+1,expectedCourtRevision:snap.refereeSeatsV1.courts[i+1].revision,
     matchUpdatedAt:current.get(m.id).updatedAt||0,operationId:'large-score-'+label+'-'+i,command,...extra}}));
+   if(label==='first'){
+    await assert.rejects(score({...requests[0],auth:{uid:refereeIds[1]}}),/permission-denied/);
+    await assert.rejects(score({...requests[0],data:{...requests[0].data,expectedCourtRevision:requests[0].data.expectedCourtRevision+1}}),/seat-stale/);
+   }
    const t=Date.now();
    const results=await Promise.all(requests.map(r=>score(r)));
    return {requests,results,ms:Date.now()-t};
@@ -318,7 +349,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(scoredRoom.data().capacity,192);
   assert.equal(scoredPublic.data().capacity,192);
   assert.equal((await inventory.get()).data().quantity,30);
-  console.info('PTN192 six-court emulator metrics',JSON.stringify({courts:6,authorizedManagerAccounts:2,scoreCommands:12,confirmCommands:6,firstWaveMs:firstWave.ms,secondWaveMs:secondWave.ms,confirmWaveMs:decisions.ms,privateStateBytes:Buffer.byteLength(scoredRoom.data().data),publicStateBytes:Buffer.byteLength(scoredPublic.data().bracketView)}));
+  console.info('PTN192 six-court emulator metrics',JSON.stringify({courts:6,independentMainRefereeAccounts:refereeIds.length,scoreCommands:12,confirmCommands:6,firstWaveMs:firstWave.ms,secondWaveMs:secondWave.ms,confirmWaveMs:decisions.ms,privateStateBytes:Buffer.byteLength(scoredRoom.data().data),publicStateBytes:Buffer.byteLength(scoredPublic.data().bracketView)}));
   // Complete the remaining bracket via the existing score handler, not fabricated results.
   const fullStarted=Date.now();
   let completedByCommands=targets.length, waves=0;
@@ -391,5 +422,6 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
  }finally{
   if(previousSale.exists)await sale.set(previousSale.data());else await sale.delete();
   if(previousConfig.exists)await config.set(previousConfig.data());else await config.delete();
+  if(previousSeats.exists)await seatConfig.set(previousSeats.data());else await seatConfig.delete();
  }
 });
