@@ -254,8 +254,16 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   const largePrivate=JSON.parse((await c.room.get()).data().data);
   assert.equal(largePrivate.players.length,192);
   assert.equal(new Set(largePrivate.players.map(p=>p.id)).size,192);
-  assert.equal(largePrivate.meta.checkinRequired,false); // Existing PTN policy; not a check-in workflow test.
-  assert.equal(largePrivate.players.filter(p=>p.checkedIn===true).length,0);
+  // The captured roster projector defaults new confirmed players to checkedIn
+  // when checkinRequired is false. This denotes automatic eligibility, not
+  // evidence of physical attendance or execution of a check-in command.
+  assert.equal(largePrivate.meta.checkinRequired,false);
+  assert.equal(largePrivate.players.filter(p=>p.checkedIn===true).length,192);
+  const largePublic=JSON.parse((await c.pub.get()).data().bracketView);
+  assert.equal(largePublic.players.length,192);
+  assert.deepEqual(largePublic.players.filter(p=>p.checkedIn===true).map(p=>p.id).sort(),
+   largePrivate.players.map(p=>p.id).sort());
+  console.info('PTN192 attendance policy emulator metrics',JSON.stringify({checkinRequired:false,automaticEligibleCount:192,physicalCheckinCommands:0}));
   const largeOptions={db,clock:()=>now+3000,enabled:async code=>code===c.code};
   const largeLifecycle={code:c.code,roomId:c.roomId,rosterRevision:largePrivate.registrationRosterRevision};
   const drawStarted=Date.now();
