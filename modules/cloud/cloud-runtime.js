@@ -1406,6 +1406,20 @@
     // client-side in the calling code. Fine for the scale BXH actually runs
     // at; would need real indexes + pagination if this ever needs to handle
     // thousands of concurrent public tournaments.
+    // R2 card data is served exclusively by the authority-checking callable.
+    async readArenaHomeR2(request){
+      if(!cloudEnabled||!functionsHandle||!fnx)throw Error("homepage-r2-unavailable");
+      await ensureHunterClashAppCheck();
+      return (await fnx.httpsCallable(functionsHandle,"readArenaHomeR2",{timeout:15000})(request)).data;
+    },
+    watchArenaHomeR2Version(next,fail){
+      if(!cloudEnabled||!fx?.onSnapshot)throw Error("homepage-r2-unavailable");
+      return fx.onSnapshot(fx.doc(dbHandle,"arenaHomeR2","version"),{includeMetadataChanges:true},snap=>{
+        if(!snap.exists()&&snap.metadata.fromCache===false){fail(Error("homepage-r2-version-missing"));return;}
+        next({...snap.data(),fromCache:snap.metadata.fromCache,hasPendingWrites:snap.metadata.hasPendingWrites});
+      },fail);
+    },
+
     async queryPublicTournaments(){
       // Structured result — never silently collapses a real failure into an
       // empty array. {ok:true, items, rawCount} on success (even if items is
