@@ -117,6 +117,12 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(results.filter(x=>x.operation.state==='rejected'&&x.operation.reason==='full').length,1);
   const fullState=JSON.parse((await a.room.get()).data().data);
   assert.equal(fullState.players.length,40);
+  // A committed preview must never start with a stale roster after emergency expansion.
+  const options={db,clock:()=>now+2000,enabled:async candidate=>candidate===a.code};
+  const draw=createDrawHandler(options),start=createStartHandler(options);
+  const firstDraw=await draw({auth:{uid},data:{code:a.code,roomId:a.roomId,rosterRevision:fullState.registrationRosterRevision,baseDrawId:null,operationId:'expansion-full-preview'}});
+  assert.equal((await read(a)).drawReady,true);
+  assert.equal((await a.ticket.get()).data().status,'reserved');
   // Emergency use: a real full room must admit the previously rejected player
   // after one additional coupon, without losing any confirmed registrations.
   const rejectedIndex=results.findIndex(x=>x.operation.state==='rejected'&&x.operation.reason==='full');
@@ -125,6 +131,8 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(emergency.capacityBefore,40);
   assert.equal(emergency.capacityAfter,41);
   assert.equal(emergency.balanceAfter,62);
+  assert.equal((await read(a)).drawId,firstDraw.drawId);
+  assert.equal((await read(a)).drawReady,true); // Capacity alone did not change eligible players.
   const retryId='expansion-join-after-full';
   const retry=await api({auth:{uid:players[rejectedIndex]},data:{action:'submit',code:a.code,operation:{route:'family',code:a.code,operationId:retryId,payload:{action:'join',code:a.code,operationId:retryId,childIds:[null],childEligibilityConfirmed:true}}}});
   assert.equal(retry.operation.state,'queued');
@@ -134,10 +142,18 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(privateState.players.length,41);
   assert.equal(new Set(privateState.players.map(p=>p.id)).size,41);
   assert.ok(fullState.players.every(p=>privateState.players.some(q=>q.id===p.id)));
-  const options={db,clock:()=>now+2000,enabled:async candidate=>candidate===a.code};
-  const draw=createDrawHandler(options),start=createStartHandler(options);
   const lifecycle={code:a.code,roomId:a.roomId,rosterRevision:privateState.registrationRosterRevision};
-  const drawn=await draw({auth:{uid},data:{...lifecycle,baseDrawId:null,operationId:'expansion-draw'}});
+  const changed=await read(a);
+  assert.equal(changed.drawId,firstDraw.drawId);
+  assert.equal(changed.drawReady,false);
+  assert.equal(changed.eligibleCount,41);
+  await assert.rejects(start({auth:{uid},data:{...lifecycle,drawId:firstDraw.drawId,confirmEarlyStart:true,operationId:'expansion-stale-start'}}),/bracket-roster-changed/);
+  assert.equal((await a.room.get()).data().tournamentPhase,'waiting');
+  assert.equal((await a.ticket.get()).data().status,'reserved');
+  assert.equal((await inventory.get()).data().quantity,62);
+  const drawn=await draw({auth:{uid},data:{...lifecycle,baseDrawId:firstDraw.drawId,operationId:'expansion-draw'}});
+  assert.notEqual(drawn.drawId,firstDraw.drawId);
+  assert.equal((await read(a)).drawReady,true);
   assert.equal((await a.ticket.get()).data().status,'reserved');
   await start({auth:{uid},data:{...lifecycle,drawId:drawn.drawId,confirmEarlyStart:true,operationId:'expansion-start'}});
   const startedTicket=(await a.ticket.get()).data();
