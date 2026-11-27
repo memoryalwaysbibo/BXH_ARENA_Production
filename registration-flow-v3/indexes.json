@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "registrationV3Holds",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "sequence", "order": "ASCENDING"}
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

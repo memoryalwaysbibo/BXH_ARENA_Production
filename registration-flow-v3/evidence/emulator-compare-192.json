@@ -1,0 +1,113 @@
+{
+  "scope": "Local Firestore emulator, single process, synthetic join-only experiment, 193 concurrent callers, 192 seats, includes local admission wait; not production billing or end-to-end latency",
+  "runs": [
+    [
+      {
+        "bucketCount": 1,
+        "capacity": 192,
+        "submitted": 193,
+        "success": 192,
+        "full": 1,
+        "errors": [],
+        "elapsedMs": 1360,
+        "p50Ms": 779,
+        "p95Ms": 1295,
+        "reads": 965,
+        "attempts": 193,
+        "writes": 576,
+        "probes": 193,
+        "retries": 0
+      },
+      {
+        "bucketCount": 12,
+        "capacity": 192,
+        "submitted": 193,
+        "success": 192,
+        "full": 1,
+        "errors": [],
+        "elapsedMs": 500,
+        "p50Ms": 251,
+        "p95Ms": 431,
+        "reads": 1370,
+        "attempts": 274,
+        "writes": 576,
+        "probes": 274,
+        "retries": 0
+      }
+    ],
+    [
+      {
+        "bucketCount": 1,
+        "capacity": 192,
+        "submitted": 193,
+        "success": 192,
+        "full": 1,
+        "errors": [],
+        "elapsedMs": 1094,
+        "p50Ms": 602,
+        "p95Ms": 1049,
+        "reads": 965,
+        "attempts": 193,
+        "writes": 576,
+        "probes": 193,
+        "retries": 0
+      },
+      {
+        "bucketCount": 12,
+        "capacity": 192,
+        "submitted": 193,
+        "success": 192,
+        "full": 1,
+        "errors": [],
+        "elapsedMs": 460,
+        "p50Ms": 199,
+        "p95Ms": 385,
+        "reads": 1370,
+        "attempts": 274,
+        "writes": 576,
+        "probes": 274,
+        "retries": 0
+      }
+    ],
+    [
+      {
+        "bucketCount": 1,
+        "capacity": 192,
+        "submitted": 193,
+        "success": 192,
+        "full": 1,
+        "errors": [],
+        "elapsedMs": 1109,
+        "p50Ms": 563,
+        "p95Ms": 1057,
+        "reads": 965,
+        "attempts": 193,
+        "writes": 576,
+        "probes": 193,
+        "retries": 0
+      },
+      {
+        "bucketCount": 12,
+        "capacity": 192,
+        "submitted": 193,
+        "success": 192,
+        "full": 1,
+        "errors": [],
+        "elapsedMs": 473,
+        "p50Ms": 176,
+        "p95Ms": 386,
+        "reads": 1370,
+        "attempts": 274,
+        "writes": 576,
+        "probes": 274,
+        "retries": 0
+      }
+    ]
+  ],
+  "limitations": [
+    "Both methods serialize each ledger within one process; process restart and multiple instances not tested",
+    "Bucket-local sequence only, no global FIFO",
+    "Read counts include point reads and fallback probes but not seed/audit/summary costs",
+    "Experimental service only; not a release implementation"
+  ]
+}

@@ -22,6 +22,7 @@ async function reconcileRegistrationRoster(code) {
     if (Array.isArray(config.roomCodes) && !config.roomCodes.includes(code)) return {ok:false,reason:'room-not-allowed'};
     if (!roomSnap.exists || !publicSnap.exists) return {ok:false,reason:'room-missing'};
     const room = roomSnap.data(), pub = publicSnap.data();
+    if(room.registrationFlowVersion===3||pub.registrationFlowVersion===3)return {ok:false,reason:'registration-v3-managed'};
     // Shared by trigger and backfill. A delayed event must inspect current docs.
     if (onsiteWaitlistOwned(room, pub, runtime(room))) return {ok:false,reason:'onsite-waitlist-managed'};
     if (room.registrationEnabled !== true || pub.registrationEnabled !== true ||

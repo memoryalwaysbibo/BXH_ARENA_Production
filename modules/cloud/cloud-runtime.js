@@ -1058,7 +1058,39 @@
     if(!window.BXHMyEventsPlayerOperation?.execute)throw Error('membership-receipt-unavailable');
     return window.BXHMyEventsPlayerOperation.execute({route,code,send});
   }
+  async function registrationV3Operation(payload){
+    const uid=authHandle?.currentUser?.uid;
+    if(!authReady||!uid)throw Error('auth-required');
+    if(!['join','approve','reject','cancel'].includes(payload.action))
+      return callEngagementFunction('registrationFlowV3',payload,60000);
+    const key='bxh.registrationV3.'+[uid,payload.code,payload.action,payload.registrationId||uid,payload.expectedAttemptId||''].join('.');
+    let operationId;
+    try{
+      operationId=sessionStorage.getItem(key)||crypto.randomUUID();
+      sessionStorage.setItem(key,operationId);
+    }catch{throw Error('storage-unavailable');}
+    try{
+      const result=await callEngagementFunction('registrationFlowV3',{...payload,operationId},60000);
+      if(result?.ok===true)sessionStorage.removeItem(key);
+      return result;
+    }catch(error){
+      if(['functions/permission-denied','functions/invalid-argument','functions/unauthenticated','functions/failed-precondition'].includes(error?.code))
+        sessionStorage.removeItem(key);
+      throw error;
+    }
+  }
   window.engagementService={
+    registrationV3Operation,
+    async createRegistrationRoomV3(payload){
+      const uid=authHandle?.currentUser?.uid;
+      if(!authReady||!uid)throw Error('auth-required');
+      const key='bxh.registrationV3Create.'+uid+'.'+JSON.stringify(payload);
+      let operationId;
+      try{operationId=sessionStorage.getItem(key)||crypto.randomUUID();sessionStorage.setItem(key,operationId);}catch{throw Error('storage-unavailable');}
+      const result=await callEngagementFunction('createRegistrationRoomV3',{...payload,operationId},60000);
+      if(result?.ok===true)sessionStorage.removeItem(key);
+      return result;
+    },
     registrationFlowV2Enabled,
     // Pure presentation hint for existing ordinary routes; never used for dispatch.
     knownRegistrationV2DisplayRoute(code){
@@ -1590,6 +1622,10 @@
         if(!access?.hasAccess)throw Error("room-password-required");
       }
       const mode=participantMode==='children'?'children':'self';
+      if(selectionDoc.exists()&&selectionDoc.data().registrationFlowVersion===3){
+        if(mode!=='self')throw Error('child-registration-unavailable');
+        return registrationV3Operation({action:'join',code});
+      }
       if(selectionDoc.exists()&&selectionDoc.data().registrationSelection){
         if(mode==='children')throw Error('child-registration-unavailable');
         assertCurrent();progress?.submitting([uid]);

@@ -1,0 +1,41 @@
+name: Registration flow V3 candidate
+on:
+  pull_request:
+    paths:
+      - 'registration-flow-v3/**'
+      - 'modules/cloud/cloud-runtime.js'
+      - 'modules/main-app/core.js'
+      - 'qr-checkin/backend/overlays/room-access-core.js'
+      - 'qr-checkin/backend/overlays/registration-roster-core.js'
+      - 'management-summary/functions/event-staff-core.cjs'
+      - '.github/workflows/registration-flow-v3.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  candidate-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test registration-flow-v3/*.test.cjs
+      - run: node --check modules/cloud/cloud-runtime.js
+      - run: node --check modules/main-app/core.js
+  lifecycle-emulator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm install --prefix /tmp/v3-deps --no-save --ignore-scripts firebase-tools@13.35.1 firebase-admin@13.10.0
+      - run: /tmp/v3-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-registration-v3 --config registration-flow-v3/emulator.json 'node registration-flow-v3/emulator-lifecycle.cjs'
+        env:
+          NODE_PATH: /tmp/v3-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-registration-v3
