@@ -205,7 +205,33 @@ def self_test():
     assert inventory['functions']['fn'] == {'bucket': 'bucket', 'object': 'object',
                                             'generation': '123', 'archiveSha256': 'archive-hash'}
     assert inventory['status'] == 'SOURCE_REFERENCES_ONLY_NOT_ROLLBACK_VALIDATED'
-    print('18 review assertions passed; no cloud access')
+    # Test the complete settlement review, not only its single-file patch helper.
+    # A mismatch in the last input must not leave any partial candidate files.
+    inputs = {'first.js': b'alpha beta', 'last.js': b'gamma delta'}
+    historical = {path: sha(data) for path, data in inputs.items()}
+    declared = dict(historical)
+    edits = {'first.js': [['beta', 'new']], 'last.js': [['delta', 'new']]}
+    rows = {'files': {path: {'liveSha256': digest, 'historicalSha256': digest,
+                            'historicalMatch': True}
+                      for path, digest in historical.items()}}
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, 'w') as z:
+        for path, data in inputs.items():
+            z.writestr(path, data)
+    with zipfile.ZipFile(archive) as z, tempfile.TemporaryDirectory(prefix='ptn-settlement-review-') as directory:
+        output = Path(directory)
+        wrong = dict(declared, **{'last.js': 'wrong'})
+        try:
+            review_settlement(z, list(inputs), rows, (wrong, edits), historical, output)
+        except RuntimeError:
+            assert not list(output.rglob('*')), 'partial settlement output after mismatch'
+        else:
+            raise AssertionError('settlement source mismatch accepted')
+        result = review_settlement(z, list(inputs), rows, (declared, edits), historical, output)
+        assert verify_review_outputs(output, {'ladderAutoSettlement': result}) == {'settlement-port-review': 2}
+        assert (output / 'ladderAutoSettlement' / 'first.js').read_bytes() == b'alpha new'
+        assert (output / 'ladderAutoSettlement' / 'last.js').read_bytes() == b'gamma new'
+    print('22 review assertions passed; no cloud access')
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
