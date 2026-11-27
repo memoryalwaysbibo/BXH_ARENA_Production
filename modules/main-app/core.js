@@ -13156,8 +13156,8 @@ function renderV3ReviewPanel(){
     ${page?.nextSequence?`<button class="btn btn-ghost" data-action="v3-review-next" ${v3ReviewBusy?'disabled':''}>下一頁</button>`:''}</div>`;
 }
 function renderAdminRegistrationsTab(){
-  if((state.registrationFlowVersion===3||state.meta?.registrationFlowVersion===3)&&!staffRosterReadOnly())return renderV3ReviewPanel();
   if(staffRosterReadOnly())return renderStaffRegistrationRoster();
+  if(state.registrationFlowVersion===3||state.meta?.registrationFlowVersion===3)return renderV3ReviewPanel();
   const registrationLocked=currentTournamentRegistrationLocked();
   if(!state.meta || !state.meta.registrationEnabled){
     return `<div class="panel">
