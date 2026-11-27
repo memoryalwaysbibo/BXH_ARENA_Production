@@ -175,11 +175,26 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   }
   await config.set({enabled:true,maxCapacity:192});
   assert.equal((await read(c)).expansionMaxCapacity,192);
-  const patch=request(c,32,'expansion-192');
-  const applied=await expand(patch);
+  // Distinct operation IDs (e.g. two browser tabs) must not over-expand
+  // or debit the same inventory twice when both target the final 32 places.
+  const contenders=[request(c,32,'expansion-192'),request(c,32,'expansion-192-race')];
+  const raceStarted=Date.now();
+  const race=await Promise.allSettled(contenders.map(req=>expand(req)));
+  const accepted=race.filter(r=>r.status==='fulfilled');
+  const rejected=race.filter(r=>r.status==='rejected');
+  assert.equal(accepted.length,1);
+  assert.equal(rejected.length,1);
+  assert.match(String(rejected[0].reason),/invalid-expansion-capacity/);
+  const winnerIndex=race.findIndex(r=>r.status==='fulfilled');
+  const patch=contenders[winnerIndex];
+  const applied=accepted[0].value;
   assert.equal(applied.capacityAfter,192);
+  assert.equal(applied.balanceBefore,62);
   assert.equal(applied.balanceAfter,30);
+  assert.equal(applied.replayed,undefined);
   assert.equal((await expand(patch)).replayed,true);
+  await assert.rejects(expand(contenders[1-winnerIndex]),/invalid-expansion-capacity/);
+  console.info('PTN192 expansion contention emulator metrics',JSON.stringify({requests:2,accepted:1,rejected:1,capacity:192,debited:32,elapsedMs:Date.now()-raceStarted}));
   await assert.rejects(expand(request(c,1,'expansion-193')),/invalid-expansion-capacity/);
   const [cPrivate,cPublic,cTicket,cInventory]=await db.getAll(c.room,c.pub,c.ticket,inventory);
   assert.equal(cPrivate.data().capacity,192);
