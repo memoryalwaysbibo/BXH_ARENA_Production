@@ -421,6 +421,32 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.deepEqual(largePublic.players.filter(p=>p.checkedIn===true).map(p=>p.id).sort(),
    largePrivate.players.map(p=>p.id).sort());
   console.info('PTN192 attendance policy emulator metrics',JSON.stringify({checkinRequired:false,automaticEligibleCount:192,physicalCheckinCommands:0}));
+  // The existing QR callable supports BXH codes only. Exercise its real
+  // handler against the expanded PTN, rather than silently treating automatic
+  // eligibility as physical attendance. No production route is modified.
+  const {createCheckinHandler}=require('../../qr-checkin/backend/firebase-callable.cjs');
+  let checkinDbTouches=0;
+  const forbiddenDb=new Proxy(db,{get(target,key,receiver){
+   if(key==='doc'||key==='runTransaction'){
+    checkinDbTouches++;
+    throw Error('PTN check-in must reject before database access');
+   }
+   return Reflect.get(target,key,receiver);
+  }});
+  const checkin=createCheckinHandler(forbiddenDb,()=>{throw Error('PTN check-in must not read signing secret');});
+  const sample=largePrivate.players[0];
+  for(const action of ['configure','scan','manual','revoke']){
+   await assert.rejects(checkin({auth:{uid:action==='scan'?sample.registrationUid||uid:uid},app:{},
+    data:{code:c.code,action,playerId:sample.id,operationId:'ptn192-checkin-'+action}}),
+    error=>error.code==='invalid-argument'&&error.message==='invalid-code');
+  }
+  assert.equal(checkinDbTouches,0);
+  assert.deepEqual(JSON.parse((await c.room.get()).data().data),largePrivate);
+  assert.deepEqual(JSON.parse((await c.pub.get()).data().bracketView),largePublic);
+  for(const collection of ['checkinReceipts','checkinOperations','checkinAudits']){
+   assert.equal((await c.room.collection(collection).limit(1).get()).empty,true);
+  }
+  console.info('PTN192 QR check-in boundary metrics',JSON.stringify({physicalCommandsRejected:4,handlerDatabaseTouches:checkinDbTouches,automaticEligibleCount:192}));
   const largeOptions={db,clock:()=>now+3000,enabled:async code=>code===c.code};
   const largeLifecycle={code:c.code,roomId:c.roomId,rosterRevision:largePrivate.registrationRosterRevision};
   meter.begin('draw');
