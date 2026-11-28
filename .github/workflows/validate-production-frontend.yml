@@ -215,6 +215,8 @@ jobs:
           node --test tests/double-elimination-core.test.cjs
       - name: Verify Production frontend invariants
         run: node scripts/verify-production-frontend.cjs
+      - name: Verify isolated Hunter RDW shadow contracts
+        run: node --test tests/rdw-*.test.cjs
       - name: Verify personal history and Hunter License 2.1
         run: node --test tests/personal-scan-v21.test.cjs tests/player-center-integration.test.cjs tests/hunter-license-v21.test.cjs tests/hunter-b1-cloud.test.cjs tests/hunter-leaderboard.test.cjs tests/team-leaderboard.test.cjs
       - name: Verify frozen Hunter license artwork and runtime contracts
@@ -412,6 +414,15 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Verify ARENA PK with real Auth and Firestore Emulators
         run: npx firebase emulators:exec --only auth,firestore --project demo-arena-pk --config tests/helpers/arena-pk-emulator.json "node tests/hunter-clash-a23-emulator.cjs"
+
+      - name: Verify RDW Hunter shadow read-only transaction and permanent ledger invariants
+        run: npx firebase emulators:exec --only auth,firestore --project demo-rdw-hunter-bridge --config tests/e2e/firebase.json "node tests/rdw-hunter-firestore-emulator.cjs"
+
+      - name: Verify RDW immutable prematch snapshots under concurrent Firestore transactions
+        run: npx firebase emulators:exec --only auth,firestore --project demo-rdw-hunter-snapshot --config tests/e2e/firebase.json "node tests/rdw-hunter-snapshot-emulator.cjs"
+
+      - name: Verify RDW Hunter pair and snapshot in same Firestore transaction
+        run: npx firebase emulators:exec --only auth,firestore --project demo-rdw-pair-tx --config tests/e2e/firebase.json "node tests/rdw-hunter-pair-snapshot-emulator.cjs"
 
       - name: Upload E2E failure artifacts
         if: failure()
