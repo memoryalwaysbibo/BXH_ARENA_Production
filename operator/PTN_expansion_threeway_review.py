@@ -12,10 +12,10 @@ import tempfile
 import zipfile
 
 FRONT_BASE = '41ab81f1bc57483c4529c6bdfb31842a5450fb5f'
-FRONT_HEAD = 'fd75f38f5b5ec0e7114e7bbc530b44092252eeef'
+FRONT_HEAD = '2a9bdf21344a63945bf7d15966313c3bb92a60d1'
 BACK_BASE = '8e4886cf08edfe40b5d677d96c2b06417da2fdb9'
-BACK_HEAD = '1f6573b4aef69366120b3fed811d2702d226e80b'
-SETTLEMENT_HEAD = 'afde2fc515c0df5f06fd7724726e4433365ab696'
+BACK_HEAD = 'b0977525b9d6b434ebf893d338c02fca47043a45'
+SETTLEMENT_HEAD = 'b0977525b9d6b434ebf893d338c02fca47043a45'
 SETTLEMENT_PORT = 'release/commerce/tests/ptn-settlement-source-port.test.cjs'
 
 def sha(data):
