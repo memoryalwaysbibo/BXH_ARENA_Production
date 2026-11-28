@@ -112,7 +112,7 @@ for(const ptn of [false,true])test(`${ptn?'PTN':'BXH'} ticket room reserves once
  assert.deepEqual(waiting,{ok:true,code,roomId,name:'Fixture',location:'Tainan',capacity:32,confirmedCount:0,
   phase:'waiting',startAt:now+600000,stations:1,
   registrationOpenAt:now-2000,registrationCloseAt:now+300000,registrationEnabled:true,updatedAt:now,
-  drawId:null,rosterRevision:0,eligibleCount:0,drawReady:false,participants:[],...(ptn?{ticketStatus:'reserved',delegateUid:null,delegateName:null,delegateGameId:null,canAssignDelegate:true,refereeSeatView:null}:{})});
+  drawId:null,rosterRevision:0,eligibleCount:0,drawReady:false,participants:[],...(ptn?{ticketStatus:'reserved',delegateUid:null,delegateName:null,delegateGameId:null,canAssignDelegate:true,refereeSeatView:null,expansionEnabled:false,expansionMaxCapacity:null}:{})});
  if(ptn){
   const delegate='delegate-'+code,admin='super-'+code,unrelated='unrelated-'+code;
   await db.doc('users/'+delegate).set({active:true,role:'player',realName:'同名測試',gameId:'delegate-one'});

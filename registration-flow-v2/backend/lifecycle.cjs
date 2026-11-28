@@ -50,9 +50,13 @@ async function readReservedTicket({db,tx,room,pub,state,roomId,code,uid,grant,no
     (ticket.contractCode||null)!==(room.partnerContractOrderCode||null))throw Error('ticket-binding-invalid');
  if(ticket.version===1&&(!Number.isSafeInteger(ticket.expiresAt)||ticket.expiresAt<=now)||
     ticket.version===2&&ticket.expiresAt!==null)throw Error('ticket-expired');
- const capacity=ticket.capacity;
- if(![32,64,96,128,160].includes(capacity)||access.baseCapacity!==capacity||
-    access.addedCapacity!==0||ticket.addedCapacity!==0||room.capacity!==capacity||pub.capacity!==capacity||
+ // The original paid ticket capacity is immutable. Only an independently
+ // bound, permanent PTN ticket may carry an additional capacity balance.
+ const base=ticket.capacity,added=ticket.addedCapacity,capacity=base+added;
+ if(![32,64,96,128,160].includes(base)||access.baseCapacity!==base||
+    !Number.isSafeInteger(added)||added<0||capacity>192||access.addedCapacity!==added||
+    (added!==0&&(!isPartnerRoomCode(code)||ticket.version!==2||room.ptnSettlementVersion!==1||pub.ptnSettlementVersion!==1))||
+    room.capacity!==capacity||pub.capacity!==capacity||
     state.meta.registrationCapacity!==capacity||state.players.length>capacity)throw Error('ticket-capacity-invalid');
  if(ticket.contractCode){
   const contract=(await tx.get(db.doc('partnerContracts/'+ticket.contractCode))).data();

@@ -96,13 +96,12 @@ test('four-player community event reaches first confirmed referee result', async
 
   await expect(page.getByRole('region', { name: '房間總覽' })).toBeVisible();
   await page.getByRole('navigation', { name: '房間管理' }).getByRole('button', { name: '人員管理', exact: true }).click();
-  // The chain is initially Promise.resolve() before the first roster snapshot.
-  // Wait for that snapshot before draining the chain, as the multi-court test
-  // already does. Otherwise the editor may be replaced or the roster guard
-  // may reject the quick-add before the initial read has finished.
+  // Wait for the room-scoped initial roster subscription before draining it.
   await page.waitForFunction(() =>
-    adminRosterCode === state.cloudCode && typeof adminRosterUnsub === 'function' &&
-    Array.isArray(adminRegistrationsCache), null, {timeout:30000});
+    !!state.cloudCode && adminRosterCode === state.cloudCode && typeof adminRosterUnsub === 'function' &&
+    Array.isArray(adminRegistrationsCache) && !adminRegistrationsLoading &&
+    !adminRegistrationsError && !peopleRosterBusy,
+    null, { timeout: 30000 });
   await page.evaluate(async () => {
     const roomId=state.id, code=state.cloudCode, generation=adminRosterGeneration;
     let timer;
@@ -124,7 +123,10 @@ test('four-player community event reaches first confirmed referee result', async
   });
   await page.locator('[data-action="people-section"][data-section="tools"]').click();
   await expect(page.getByText('現場新增選手', { exact: true })).toBeVisible();
-  await page.locator('#quick-add-textarea').fill('BOT Alpha\nBOT Beta\nBOT Gamma');
+  const guestNames = 'BOT Alpha\nBOT Beta\nBOT Gamma';
+  const guestInput = page.locator('#quick-add-textarea');
+  await guestInput.fill(guestNames);
+  await expect(guestInput).toHaveValue(guestNames);
   await page.locator('[data-action="quick-add-players"]').click();
   await expect(page.getByText('確認新增現場訪客', {exact:true})).toBeVisible();
   await page.locator('[data-action="modal-confirm"]').click();

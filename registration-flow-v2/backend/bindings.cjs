@@ -3,6 +3,7 @@
 // Operators must first capture every live writer and deploy server configuration,
 // Rules/indexes and the frontend together. Tests do not deploy these exports.
 const {createQueue}=require('./queue.cjs');
+const {createTicketExpansionHandler}=require('./ticket-expansion.cjs');
 const {createApi}=require('./api.cjs');
 const {createManagementApi}=require('./management.cjs');
 const {createStartHandler,createDrawHandler,createTicketForfeitHandler,createTicketScoreHandler}=require('./lifecycle.cjs');
@@ -75,6 +76,7 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
   'ticket-room-forfeit':createTicketForfeitHandler({db,enabled:startEnabled}),
   'ticket-room-score':createTicketScoreHandler({db,enabled:startEnabled}),
   'ticket-room-remove':createTicketRemoveHandler({db,queue,enabled:intakeEnabled}),
+  'ticket-room-expand':createTicketExpansionHandler({db}),
  };
  const registrationRosterQueueV2=bind(req=>{
   const action=req.data?.action;
@@ -86,7 +88,7 @@ function createBindings({db,FieldValue,createFamilyRegistration,rosterFactory,pr
    'room-code-conflict','room-receipt-inconsistent','ticket-ptn-slot-occupied','bracket-room-changed','bracket-version-conflict',
    'forfeit-room-not-live','forfeit-match-stale','forfeit-round-waiting',
    'score-room-not-live','score-match-stale','score-round-waiting','score-result-not-ready','invalid-status','invalid-score','invalid-side','no-pass-alternative','correction-unavailable','court-already-started','downstream-started','source-no-longer-swappable','target-no-longer-swappable','station-mismatch',
-   'ticket-invite-unavailable','release-not-ready','not-event-staff','room-read-only','invalid-request','invalid-qr','qr-expired','seat-stale','seat-occupied','already-seated','not-enabled','already-enabled','invalid-seat','target-ineligible','requester-ineligible','request-pending','request-stale','request-unavailable','invitation-required','legacy-assignments-exist','invalid-stations','community-result-available','court-room-not-live','court-plan-stale','invalid-court-count','invalid-court','already-completed','court-exit-stale','current-match-changed','dispatch-stale','not-detached','target-retiring','offline-sync-pending'],
+   'ticket-invite-unavailable','release-not-ready','not-event-staff','room-read-only','invalid-request','invalid-qr','qr-expired','seat-stale','seat-occupied','already-seated','not-enabled','already-enabled','invalid-seat','target-ineligible','requester-ineligible','request-pending','request-stale','request-unavailable','invitation-required','legacy-assignments-exist','invalid-stations','community-result-available','court-room-not-live','court-plan-stale','invalid-court-count','invalid-court','already-completed','court-exit-stale','current-match-changed','dispatch-stale','not-detached','target-retiring','offline-sync-pending','expansion-unavailable','expansion-room-unavailable','ticket-capacity-invalid','invalid-expansion-capacity','insufficient-expansion-tickets'],
  });
  const lifecycleOptions={
   options:{enforceAppCheck:true},
