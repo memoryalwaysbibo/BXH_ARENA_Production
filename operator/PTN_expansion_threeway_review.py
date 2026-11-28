@@ -196,6 +196,34 @@ def verify_review_outputs(output, reports):
     return counts
 
 
+def download_source(source):
+    bucket, obj, generation = source
+    return subprocess.check_output(
+        ['gcloud', 'storage', 'cat', f'gs://{bucket}/{obj}#{generation}'])
+
+
+def reviewed_archives(initial, rows, fetch=download_source):
+    """Fetch each pinned source once; verify the complete ZIP, not just ported files."""
+    grouped = {}
+    for name, source in initial.items():
+        grouped.setdefault(source, []).append(name)
+    # One archive in memory at a time, even when many functions share it.
+    for source, names in grouped.items():
+        expected = {rows[name]['archiveSha256'] for name in names}
+        if len(expected) != 1:
+            raise RuntimeError('inconsistent audit archive hashes: ' + ', '.join(names))
+        archive = fetch(source)
+        if sha(archive) != next(iter(expected)):
+            raise RuntimeError('archive hash changed: ' + ', '.join(names))
+        with zipfile.ZipFile(io.BytesIO(archive)) as z:
+            if len(z.namelist()) != len(set(z.namelist())):
+                raise RuntimeError('duplicate archive members')
+            if z.testzip() is not None:
+                raise RuntimeError('source archive CRC failed: ' + ', '.join(names))
+            for name in names:
+                yield name, z
+
+
 def rollback_inventory(initial, rows):
     # Reference-only evidence. This does not prove a rollback can be deployed.
     return {
@@ -305,7 +333,34 @@ def self_test():
         report = {'commerceService': {'service.cjs': {
             'status': 'commerce-conflict-resolved-review', 'reviewSha256': sha(b'candidate')}}}
         assert verify_review_outputs(output, report) == {'commerce-conflict-resolved-review': 1}
-    print('26 review assertions passed; no cloud access')
+    # Synthetic archive proof: one download for two functions sharing a source.
+    archive_buffer = io.BytesIO()
+    with zipfile.ZipFile(archive_buffer, 'w', compression=zipfile.ZIP_STORED) as z:
+        z.writestr('module.js', b'original-rollback-fixture')
+    raw = archive_buffer.getvalue()
+    refs = {'first': ('bucket', 'archive', '123'), 'second': ('bucket', 'archive', '123')}
+    matching_rows = {name: {'archiveSha256': sha(raw)} for name in refs}
+    calls = []
+    def fake_fetch(source):
+        calls.append(source)
+        return raw
+    assert [(name, z.read('module.js')) for name, z in
+            reviewed_archives(refs, matching_rows, fake_fetch)] == [
+                ('first', b'original-rollback-fixture'), ('second', b'original-rollback-fixture')]
+    assert calls == [refs['first']]
+    for bad_rows, payload in (
+        ({**matching_rows, 'second': {'archiveSha256': 'wrong'}}, raw),
+        (matching_rows, raw + b'changed'),
+        ({name: {'archiveSha256': sha(raw.replace(b'original-rollback-fixture', b'corrupted-rollback-fixture'))}
+          for name in refs}, raw.replace(b'original-rollback-fixture', b'corrupted-rollback-fixture')),
+    ):
+        try:
+            list(reviewed_archives(refs, bad_rows, lambda _: payload))
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError('invalid rollback source archive accepted')
+    print('Review and rollback-source integrity assertions passed; no cloud access')
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
@@ -339,43 +394,38 @@ def main():
     output = Path(tempfile.mkdtemp(prefix='bxh-expansion-threeway-'))
     reports = {}
     for name, paths in audit.TARGETS.items():
-        row = rows[name]
-        if set(row['files']) != set(paths):
+        if set(rows[name]['files']) != set(paths):
             raise RuntimeError('unexpected audit file set: ' + name)
-        bucket, obj, generation = initial[name]
-        archive = subprocess.check_output(['gcloud', 'storage', 'cat', f'gs://{bucket}/{obj}#{generation}'])
-        if sha(archive) != row['archiveSha256']:
-            raise RuntimeError('archive hash changed: ' + name)
+    for name, z in reviewed_archives(initial, rows):
+        paths = audit.TARGETS[name]
+        row = rows[name]
         front = name.startswith('registration')
         root, base_ref, head_ref = ((args.front_root, FRONT_BASE, FRONT_HEAD) if front
                                    else (args.backend_root, BACK_BASE, BACK_HEAD))
         reports[name] = {}
-        with zipfile.ZipFile(io.BytesIO(archive)) as z:
-            if len(z.namelist()) != len(set(z.namelist())):
-                raise RuntimeError('duplicate archive members')
-            if name == 'ladderAutoSettlement':
-                reports[name] = review_settlement(z, paths, row, manifest,
-                                                  audit.HISTORICAL[name], output)
-                continue
-            for path in paths:
-                repo_path = path if front else 'release/commerce/functions/' + path
-                live, base, candidate = member(z, path), blob(root, base_ref, repo_path), blob(root, head_ref, repo_path)
-                expected = row['files'][path]
-                if sha(live) != expected['liveSha256'] or sha(candidate) != expected['candidateSha256']:
-                    raise RuntimeError('audited file hash mismatch: ' + name + '/' + path)
-                status, proposed = port(live, base, candidate)
-                if status == 'conflict' and name == 'commerceService' and path == 'service.cjs':
-                    resolved = resolve_known_commerce(live, base, candidate)
-                    if resolved is not None:
-                        status, proposed = 'commerce-conflict-resolved-review', resolved
-                entry = {'status': status, 'liveSha256': sha(live), 'baseSha256': sha(base),
-                         'candidateSha256': sha(candidate)}
-                if proposed is not None:
-                    target = output / name / path
-                    target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-                    target.write_bytes(proposed)
-                    entry['reviewSha256'] = sha(proposed)
-                reports[name][path] = entry
+        if name == 'ladderAutoSettlement':
+            reports[name] = review_settlement(z, paths, row, manifest,
+                                              audit.HISTORICAL[name], output)
+            continue
+        for path in paths:
+            repo_path = path if front else 'release/commerce/functions/' + path
+            live, base, candidate = member(z, path), blob(root, base_ref, repo_path), blob(root, head_ref, repo_path)
+            expected = row['files'][path]
+            if sha(live) != expected['liveSha256'] or sha(candidate) != expected['candidateSha256']:
+                raise RuntimeError('audited file hash mismatch: ' + name + '/' + path)
+            status, proposed = port(live, base, candidate)
+            if status == 'conflict' and name == 'commerceService' and path == 'service.cjs':
+                resolved = resolve_known_commerce(live, base, candidate)
+                if resolved is not None:
+                    status, proposed = 'commerce-conflict-resolved-review', resolved
+            entry = {'status': status, 'liveSha256': sha(live), 'baseSha256': sha(base),
+                     'candidateSha256': sha(candidate)}
+            if proposed is not None:
+                target = output / name / path
+                target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+                target.write_bytes(proposed)
+                entry['reviewSha256'] = sha(proposed)
+            reports[name][path] = entry
     if any(audit.binding(name) != src for name, src in initial.items()):
         raise RuntimeError('source changed during review; discard private output')
     counts = verify_review_outputs(output, reports)
@@ -388,6 +438,10 @@ def main():
                              'settlementHead': SETTLEMENT_HEAD},
               'reviewStatusCounts': counts, 'conflictCount': counts.get('conflict', 0),
               'rollbackSourceInventory': str(output / 'rollback-source-inventory.json'),
+              'rollbackSourceIntegrity': {
+                  'status': 'PINNED_ARCHIVES_HASH_AND_CRC_VERIFIED',
+                  'uniqueArchives': len(set(initial.values())),
+                  'functions': len(initial)},
               'rollbackValidated': False}
     (output / 'summary.json').write_text(json.dumps(result, indent=2))
     print(json.dumps(result, indent=2))
