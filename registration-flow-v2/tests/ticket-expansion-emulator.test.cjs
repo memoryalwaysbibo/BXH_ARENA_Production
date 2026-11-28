@@ -9,7 +9,8 @@ const {createStartHandler,createDrawHandler,createTicketScoreHandler,forfeitMatc
 after(()=>db.terminate());
 
 // Counts SDK transaction document operations and nontransactional read calls
-// in the demo project. Direct reads include test-harness observation calls;
+// in the demo project. Direct reads are partitioned into service and explicitly
+// marked test-harness observations;
 // query index entries, direct writes, fixtures outside phases, listeners and
 // network-level retries are not measured. No production code is instrumented.
 function transactionMeter(store){
@@ -31,8 +32,9 @@ function transactionMeter(store){
   const original=descriptor.value;
   Object.defineProperty(owner,key,{...descriptor,value:async function(...args){
    const phase=active;
-   if(!phase||scope.getStore())return original.apply(this,args);
-   const bucket=phase.directReads[kind];bucket.calls++;
+   const context=scope.getStore();
+   if(!phase||(context&&context!=='observation'))return original.apply(this,args);
+   const bucket=(context==='observation'?phase.observationReads:phase.directReads)[kind];bucket.calls++;
    try{
     const result=await scope.run('direct',()=>original.apply(this,args));
     const count=kind==='query'?result.size:kind==='getAll'?result.length:1;
@@ -45,10 +47,11 @@ function transactionMeter(store){
  wrapRead(store.doc('_meter/probe'),'get','document');
  wrapRead(store.collection('_meter').where('probe','==',true),'get','query');
  wrapRead(store,'getAll','getAll');
+ const readBuckets=()=>Object.fromEntries(['document','query','getAll'].map(kind=>[kind,{calls:0,documents:0,failures:0}]));
  const empty=()=>({transactions:0,successfulTransactions:0,failedTransactions:0,
   attempts:0,attemptedDocumentReads:0,attemptedDocumentWrites:0,
   committedDocumentReads:0,committedDocumentWrites:0,failedReadCalls:0,
-  directReads:Object.fromEntries(['document','query','getAll'].map(kind=>[kind,{calls:0,documents:0,failures:0}]))});
+  directReads:readBuckets(),observationReads:readBuckets()});
  store.runTransaction=async function(callback,options){
   const phase=active;
   if(!phase)return original.call(store,callback,options);
@@ -87,6 +90,7 @@ function transactionMeter(store){
  return {
   begin(name){assert(!active);assert(!Object.hasOwn(phases,name));active=phases[name]=empty();},
   end(){assert(active);active=null;},
+  observe(callback){assert(active);assert(!scope.getStore());return scope.run('observation',callback);},
   async verifyDirectReads(){
    assert(!active);const probe=empty();active=probe;
    try{
@@ -94,6 +98,8 @@ function transactionMeter(store){
     await ref.get();await store.getAll(ref);
     const result=await store.collection('_meter').where('probe','==',true).limit(1).get();
     assert.deepEqual(probe.directReads,{document:{calls:1,documents:1,failures:0},getAll:{calls:1,documents:1,failures:0},query:{calls:1,documents:result.size,failures:0}});
+    await scope.run('observation',()=>ref.get());
+    assert.deepEqual(probe.observationReads,{document:{calls:1,documents:1,failures:0},query:{calls:0,documents:0,failures:0},getAll:{calls:0,documents:0,failures:0}});
     await store.runTransaction(tx=>tx.get(ref));
     assert.equal(probe.committedDocumentReads,1);
     assert.equal(Object.values(probe.directReads).reduce((n,x)=>n+x.calls,0),3);
@@ -425,6 +431,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(remaining.data().quantity,30);
   // Each independent account may score only its own current main-seat match.
   const liveState=JSON.parse(live.data().data);
+  meter.begin('liveSeatViews');
   const targets=await Promise.all(refereeIds.map(async(ref,i)=>{
    const station=i+1;
    const view=await seatCommand(ref,'view','large-seat-live-'+station);
@@ -436,10 +443,11 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
    assert.ok(match&&Number(match.station)===station);
    return match;
   }));
+  meter.end();
   assert.equal(new Set(targets.map(m=>m.id)).size,6);
   const score=createTicketScoreHandler(largeOptions);
   const wave=async(label,command,extra={})=>{
-   const snap=(await c.room.get()).data();
+   const snap=(await meter.observe(()=>c.room.get())).data();
    const current=new Map(JSON.parse(snap.data).matches.map(m=>[m.id,m]));
    const requests=targets.map((m,i)=>({auth:{uid:refereeIds[i]},app:{},data:{action:'ticket-room-score',code:c.code,roomId:c.roomId,matchId:m.id,
     station:i+1,expectedCourtRevision:snap.refereeSeatsV1.courts[i+1].revision,
@@ -484,7 +492,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   const matchesByStation=Object.fromEntries(refereeIds.map((_,i)=>[i+1,1]));
   let completedByCommands=targets.length, waves=0;
   for(;waves<256;waves++){
-   const room=(await c.room.get()).data();
+   const room=(await meter.observe(()=>c.room.get())).data();
    const state=JSON.parse(room.data);
    if(state.championId)break;
    const selected=refereeIds.flatMap((actor,i)=>{
@@ -499,7 +507,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
    assert.ok(selected.length,'assigned courts must make progress before champion');
    assert.equal(new Set(selected.map(m=>m.id)).size,selected.length);
    for(const [step,command,extra] of [['first','score',{side:'A',finish:'knockout'}],['second','score',{side:'A',finish:'burst'}],['confirm','confirm',{}]]){
-    const latest=(await c.room.get()).data();
+    const latest=(await meter.observe(()=>c.room.get())).data();
     const current=JSON.parse(latest.data);
     const byId=new Map(current.matches.map(m=>[m.id,m]));
     const results=await Promise.all(selected.map(({id,station,actor})=>score({auth:{uid:actor},app:{},data:{
@@ -539,7 +547,18 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.ok(measured.queueDrain.committedDocumentWrites>=192);
   assert.ok(measured.draw.committedDocumentWrites>0&&measured.start.committedDocumentWrites>0);
   assert.ok(measured.remainingMatches.successfulTransactions>=(completedByCommands-6)*3);
-  for(const [phase,metrics] of Object.entries(measured))console.info('PTN192 transaction metrics',JSON.stringify({phase,...metrics,billingScope:'demo SDK transaction operations and direct read results (including harness observations); excludes direct writes, index entries, listeners, fixtures outside phases and network retries'}));
+  assert.equal(measured.firstSixMatches.observationReads.document.documents,3);
+  assert.equal(measured.remainingMatches.observationReads.document.documents,4*waves+1);
+  const countReads=buckets=>Object.values(buckets).reduce((n,x)=>n+x.documents,0);
+  const totals={attemptedTransactionReads:0,committedTransactionWrites:0,serviceDirectReadDocuments:0,harnessReadDocuments:0};
+  for(const [phase,metrics] of Object.entries(measured)){
+   totals.attemptedTransactionReads+=metrics.attemptedDocumentReads;
+   totals.committedTransactionWrites+=metrics.committedDocumentWrites;
+   totals.serviceDirectReadDocuments+=countReads(metrics.directReads);
+   totals.harnessReadDocuments+=countReads(metrics.observationReads);
+   console.info('PTN192 transaction metrics',JSON.stringify({phase,...metrics,billingScope:'demo SDK transaction operations and partitioned direct read results; excludes direct writes, index entries, listeners, fixtures outside phases and network retries'}));
+  }
+  console.info('PTN192 operation totals',JSON.stringify({...totals,serviceReadDocuments:totals.attemptedTransactionReads+totals.serviceDirectReadDocuments}));
   // Export the actual isolated lifecycle result for the separate scoring candidate.
   // Only this demo fixture is exported; no production document is read or logged.
   assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-registration-v2');
