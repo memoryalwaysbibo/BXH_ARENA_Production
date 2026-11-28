@@ -3088,6 +3088,7 @@
     },
 
     async createRoom(data){
+      if(data?.registrationFlowVersion===3||data?.meta?.registrationFlowVersion===3)throw Error('registration-v3-required');
       if(typeof window!=="undefined")window.__BXH_LAST_ROOM_CREATE_REASON=null;
       if(!cloudEnabled) return null;
       try{
