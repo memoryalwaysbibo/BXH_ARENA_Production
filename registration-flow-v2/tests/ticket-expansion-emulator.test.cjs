@@ -8,6 +8,69 @@ const {createTicketRoomHandler,createTicketRoomStateHandler,createTicketStations
 const {createStartHandler,createDrawHandler,createTicketScoreHandler,forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked}=require('../backend/lifecycle.cjs');
 after(()=>db.terminate());
 
+// Counts only SDK transaction document operations in the demo project.
+// No production code is instrumented. Direct reads, query index entries,
+// fixture writes and network-level retries are outside this metric.
+function transactionMeter(store){
+ assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-registration-v2');
+ assert.equal(process.env.FIRESTORE_EMULATOR_HOST,'127.0.0.1:8197');
+ const original=store.runTransaction, hadOwn=Object.hasOwn(store,'runTransaction');
+ const phases={};let active=null;
+ const empty=()=>({transactions:0,successfulTransactions:0,failedTransactions:0,
+  attempts:0,attemptedDocumentReads:0,attemptedDocumentWrites:0,
+  committedDocumentReads:0,committedDocumentWrites:0,failedReadCalls:0});
+ store.runTransaction=async function(callback,options){
+  const phase=active;
+  if(!phase)return original.call(store,callback,options);
+  phase.transactions++;
+  let last;
+  try{
+   const result=await original.call(store,async tx=>{
+    phase.attempts++;
+    const attempt={reads:0,writes:0};last=attempt;
+    let proxy;
+    proxy=new Proxy(tx,{get(target,key){
+     const value=Reflect.get(target,key,target);
+     if(key==='get'||key==='getAll')return async(...args)=>{
+      try{
+       const result=await value.apply(target,args);
+       const count=Array.isArray(result)?result.length:typeof result.size==='number'?result.size:1;
+       attempt.reads+=count;phase.attemptedDocumentReads+=count;
+       return result;
+      }catch(error){phase.failedReadCalls++;throw error;}
+     };
+     if(['create','set','update','delete'].includes(key))return (...args)=>{
+      const result=value.apply(target,args);
+      attempt.writes++;phase.attemptedDocumentWrites++;
+      return result===target?proxy:result;
+     };
+     return typeof value==='function'?value.bind(target):value;
+    }});
+    return callback(proxy);
+   },options);
+   phase.successfulTransactions++;
+   phase.committedDocumentReads+=last?.reads||0;
+   phase.committedDocumentWrites+=last?.writes||0;
+   return result;
+  }catch(error){phase.failedTransactions++;throw error;}
+ };
+ return {
+  begin(name){assert(!active);assert(!Object.hasOwn(phases,name));active=phases[name]=empty();},
+  end(){assert(active);active=null;},
+  report(){
+   assert(!active);
+   for(const p of Object.values(phases)){
+    assert.equal(p.transactions,p.successfulTransactions+p.failedTransactions);
+    assert.ok(p.attempts>=p.successfulTransactions);
+    assert.ok(p.attemptedDocumentReads>=p.committedDocumentReads);
+    assert.ok(p.attemptedDocumentWrites>=p.committedDocumentWrites);
+   }
+   return phases;
+  },
+  restore(){active=null;if(hadOwn)store.runTransaction=original;else delete store.runTransaction;}
+ };
+}
+
 test('PTN prepaid expansion atomically updates canonical room, public mirror, ticket and inventory',async()=>{
  const {createHash}=require('node:crypto');
  const {createTicketExpansionHandler}=require('../backend/ticket-expansion.cjs');
@@ -17,6 +80,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
  const sale=db.doc('systemSettings/commerceTicketPtnSaleV1');
  const seatConfig=db.doc('systemConfig/refereeSeatsV1');
  const previousSale=await sale.get(),previousConfig=await config.get(),previousSeats=await seatConfig.get();
+ const meter=transactionMeter(db);
  try{
   await db.doc('users/'+uid).set({active:true,role:'player',partnerOrganizer:{status:'active',scope:'manual',organizationId:uid,expiresAtMs:now+86400000}});
   await inventory.set({ownerUid:uid,kind:'room_expansion',assetId:'tournament_expansion_1',status:'active',expiresAt:null,quantity:83});
@@ -200,6 +264,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   // Distinct operation IDs (e.g. two browser tabs) must not over-expand
   // or debit the same inventory twice when both target the final 32 places.
   const contenders=[request(c,32,'expansion-192'),request(c,32,'expansion-192-race')];
+  meter.begin('expansion');
   const raceStarted=Date.now();
   const race=await Promise.allSettled(contenders.map(req=>expand(req)));
   const accepted=race.filter(r=>r.status==='fulfilled');
@@ -218,6 +283,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   await assert.rejects(expand(contenders[1-winnerIndex]),/invalid-expansion-capacity/);
   console.info('PTN192 expansion contention emulator metrics',JSON.stringify({requests:2,accepted:1,rejected:1,capacity:192,debited:32,elapsedMs:Date.now()-raceStarted}));
   await assert.rejects(expand(request(c,1,'expansion-193')),/invalid-expansion-capacity/);
+  meter.end();
   const [cPrivate,cPublic,cTicket,cInventory]=await db.getAll(c.room,c.pub,c.ticket,inventory);
   assert.equal(cPrivate.data().capacity,192);
   assert.equal(cPublic.data().capacity,192);
@@ -234,6 +300,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   await users.commit();
   const worker=service({requireRoomOwnership:true});
   const largeApi=createApi({queue:worker,family:handlers.family(db),enabled:async code=>code===c.code});
+  meter.begin('intake');
   const started=Date.now();
   const intake=await Promise.all(entrants.map((player,i)=>{
    const operationId='large-join-'+i;
@@ -241,9 +308,11 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   }));
   const intakeMs=Date.now()-started;
   assert.equal(intake.filter(x=>x.operation.state==='queued').length,193);
+  meter.end();meter.begin('queueDrain');
   const drainStarted=Date.now();
   await drainAll([worker],c.code);
   const drainMs=Date.now()-drainStarted;
+  meter.end();
   const {summary,rows,jobs}=await audit(c.code,192);
   assert.equal(summary.confirmed,192);
   assert.equal(summary.waitlist,0);
@@ -266,9 +335,11 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   console.info('PTN192 attendance policy emulator metrics',JSON.stringify({checkinRequired:false,automaticEligibleCount:192,physicalCheckinCommands:0}));
   const largeOptions={db,clock:()=>now+3000,enabled:async code=>code===c.code};
   const largeLifecycle={code:c.code,roomId:c.roomId,rosterRevision:largePrivate.registrationRosterRevision};
+  meter.begin('draw');
   const drawStarted=Date.now();
   const largeDraw=await createDrawHandler(largeOptions)({auth:{uid},data:{...largeLifecycle,baseDrawId:null,operationId:'large-draw-192'}});
   const drawMs=Date.now()-drawStarted;
+  meter.end();
   const drawnState=JSON.parse((await c.room.get()).data().data);
   assert.equal(drawnState.bracketSize,256);
   assert.equal(new Set(drawnState.matches.flatMap(m=>[m.a?.playerId,m.b?.playerId,m.winnerId]).filter(Boolean)).size,192);
@@ -281,6 +352,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   const {createTicketRefereeHandler}=require('../backend/ticket-referee-seat.cjs');
   const referee=createTicketRefereeHandler(largeOptions);
   const seatCommand=(actor,seatAction,operationId,fields={})=>referee({auth:{uid:actor},app:{},data:{action:'ticket-room-referee',code:c.code,seatAction,operationId,...fields}});
+  meter.begin('refereeSeating');
   for(const [i,ref] of refereeIds.entries()){
    const station=i+1;
    const ownerView=await seatCommand(uid,'view','large-seat-owner-view-'+station);
@@ -294,9 +366,11 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
    assert.equal(waiting.phase,'waiting');
    assert.ok(waiting.bracket.every(m=>!m.canScore));
   }
+  meter.end();meter.begin('start');
   const startStarted=Date.now();
   await createStartHandler(largeOptions)({auth:{uid},data:{...largeLifecycle,drawId:largeDraw.drawId,confirmEarlyStart:true,operationId:'large-start-192'}});
   const startMs=Date.now()-startStarted;
+  meter.end();
   const [live,livePub,used,remaining]=await db.getAll(c.room,c.pub,c.ticket,inventory);
   assert.equal(live.data().tournamentPhase,'live');
   assert.equal(livePub.data().tournamentPhase,'live');
@@ -335,6 +409,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
    const results=await Promise.all(requests.map(r=>score(r)));
    return {requests,results,ms:Date.now()-t};
   };
+  meter.begin('firstSixMatches');
   const firstWave=await wave('first','score',{side:'A',finish:'knockout'});
   assert.ok(firstWave.results.every(r=>r.scoreA===2&&r.completed===false));
   assert.equal((await score(firstWave.requests[0])).replayed,true);
@@ -344,6 +419,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.ok(secondWave.results.every(r=>r.scoreA===4&&r.completed===false));
   const decisions=await wave('confirm','confirm');
   assert.ok(decisions.results.every(r=>r.completed&&r.scoreA===4));
+  meter.end();
   const [scoredRoom,scoredPublic]=await db.getAll(c.room,c.pub);
   const scored=JSON.parse(scoredRoom.data().data),scoredMirror=JSON.parse(scoredPublic.data().bracketView);
   for(const m of targets){
@@ -360,6 +436,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   console.info('PTN192 six-court emulator metrics',JSON.stringify({courts:6,independentMainRefereeAccounts:refereeIds.length,scoreCommands:12,confirmCommands:6,firstWaveMs:firstWave.ms,secondWaveMs:secondWave.ms,confirmWaveMs:decisions.ms,privateStateBytes:Buffer.byteLength(scoredRoom.data().data),publicStateBytes:Buffer.byteLength(scoredPublic.data().bracketView)}));
   // Complete every remaining match using the real dispatch assignment and
   // independent main-seat referee identity, never the unscoped owner bypass.
+  meter.begin('remainingMatches');
   const fullStarted=Date.now();
   const matchesByStation=Object.fromEntries(refereeIds.map((_,i)=>[i+1,1]));
   let completedByCommands=targets.length, waves=0;
@@ -391,6 +468,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
    for(const {station} of selected)matchesByStation[station]++;
    completedByCommands+=selected.length;
   }
+  meter.end();
   assert.equal(Object.values(matchesByStation).reduce((a,b)=>a+b,0),completedByCommands);
   const [finalRoom,finalPublic]=await db.getAll(c.room,c.pub);
   const finalState=JSON.parse(finalRoom.data().data),finalMirror=JSON.parse(finalPublic.data().bracketView);
@@ -413,6 +491,12 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(finalRoom.data().capacity,192);
   assert.equal(finalPublic.data().capacity,192);
   assert.equal((await inventory.get()).data().quantity,30);
+  const measured=meter.report();
+  assert.equal(measured.intake.successfulTransactions,193);
+  assert.ok(measured.queueDrain.committedDocumentWrites>=192);
+  assert.ok(measured.draw.committedDocumentWrites>0&&measured.start.committedDocumentWrites>0);
+  assert.ok(measured.remainingMatches.successfulTransactions>=(completedByCommands-6)*3);
+  for(const [phase,metrics] of Object.entries(measured))console.info('PTN192 transaction metrics',JSON.stringify({phase,...metrics,billingScope:'demo SDK transaction operations only; excludes direct and index reads, fixtures and network retries'}));
   // Export the actual isolated lifecycle result for the separate scoring candidate.
   // Only this demo fixture is exported; no production document is read or logged.
   assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-registration-v2');
@@ -443,6 +527,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   console.info('PTN192 full bracket emulator metrics',JSON.stringify({completedByCommands,waves,independentMainRefereeAccounts:refereeIds.length,matchesByStation,ownerScoreCommands:0,scoreAndConfirmCommands:completedByCommands*3,remainingBracketMs:Date.now()-fullStarted,privateStateBytes:Buffer.byteLength(finalRoom.data().data),publicStateBytes:Buffer.byteLength(finalPublic.data().bracketView)}));
   console.info('PTN192 emulator metrics',JSON.stringify({intakeCount:193,confirmed:192,full:1,intakeMs,drainMs,drawMs,startMs,privateStateBytes:Buffer.byteLength(live.data().data),publicStateBytes:Buffer.byteLength(livePub.data().bracketView)}));
  }finally{
+  meter.restore();
   if(previousSale.exists)await sale.set(previousSale.data());else await sale.delete();
   if(previousConfig.exists)await config.set(previousConfig.data());else await config.delete();
   if(previousSeats.exists)await seatConfig.set(previousSeats.data());else await seatConfig.delete();
