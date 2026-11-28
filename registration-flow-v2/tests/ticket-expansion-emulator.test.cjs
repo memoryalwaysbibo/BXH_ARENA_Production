@@ -11,7 +11,7 @@ after(()=>db.terminate());
 // Counts SDK transaction document operations and nontransactional read calls
 // in the demo project. Direct reads are partitioned into service and explicitly
 // marked test-harness observations;
-// query index entries, direct writes, fixtures outside phases, listeners and
+// query index entries, BulkWriter, fixtures outside phases, listeners and
 // network-level retries are not measured. No production code is instrumented.
 function transactionMeter(store){
  assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-registration-v2');
@@ -48,17 +48,44 @@ function transactionMeter(store){
  wrapRead(store.collection('_meter').where('probe','==',true),'get','query');
  wrapRead(store,'getAll','getAll');
  const readBuckets=()=>Object.fromEntries(['document','query','getAll'].map(kind=>[kind,{calls:0,documents:0,failures:0}]));
+ // Successful direct writes are counted at public SDK boundaries only.
+ // DocumentReference methods may internally commit a WriteBatch; the scope
+ // prevents double counting and also excludes transaction-internal commits.
+ function wrapWrite(object,key,kind){
+  let owner=object;
+  while(owner&&!Object.hasOwn(owner,key))owner=Object.getPrototypeOf(owner);
+  assert(owner,'missing SDK write entry: '+key);
+  const descriptor=Object.getOwnPropertyDescriptor(owner,key);
+  assert.equal(typeof descriptor.value,'function');
+  const original=descriptor.value;
+  Object.defineProperty(owner,key,{...descriptor,value:async function(...args){
+   const phase=active,context=scope.getStore();
+   if(!phase||(context&&context!=='observation'))return original.apply(this,args);
+   const bucket=(context==='observation'?phase.observationWrites:phase.directWrites)[kind];
+   bucket.calls++;
+   try{
+    const result=await scope.run('direct',()=>original.apply(this,args));
+    const count=kind==='batch'?result.length:1;
+    assert(Number.isSafeInteger(count)&&count>=0);
+    bucket.documents+=count;return result;
+   }catch(error){bucket.failures++;throw error;}
+  }});
+  restores.push(()=>Object.defineProperty(owner,key,descriptor));
+ }
+ for(const key of ['create','set','update','delete'])wrapWrite(store.doc('_meter/probe'),key,'document');
+ wrapWrite(store.batch(),'commit','batch');
+ const writeBuckets=()=>Object.fromEntries(['document','batch'].map(kind=>[kind,{calls:0,documents:0,failures:0}]));
  const empty=()=>({transactions:0,successfulTransactions:0,failedTransactions:0,
   attempts:0,attemptedDocumentReads:0,attemptedDocumentWrites:0,
   committedDocumentReads:0,committedDocumentWrites:0,failedReadCalls:0,
-  directReads:readBuckets(),observationReads:readBuckets()});
+  directReads:readBuckets(),observationReads:readBuckets(),directWrites:writeBuckets(),observationWrites:writeBuckets()});
  store.runTransaction=async function(callback,options){
   const phase=active;
   if(!phase)return original.call(store,callback,options);
   phase.transactions++;
   let last;
   try{
-   const result=await original.call(store,async tx=>{
+   const result=await scope.run('transaction',()=>original.call(store,async tx=>{
     phase.attempts++;
     const attempt={reads:0,writes:0};last=attempt;
     let proxy;
@@ -80,7 +107,7 @@ function transactionMeter(store){
      return typeof value==='function'?value.bind(target):value;
     }});
     return scope.run('transaction',()=>callback(proxy));
-   },options);
+   },options));
    phase.successfulTransactions++;
    phase.committedDocumentReads+=last?.reads||0;
    phase.committedDocumentWrites+=last?.writes||0;
@@ -103,6 +130,18 @@ function transactionMeter(store){
     await store.runTransaction(tx=>tx.get(ref));
     assert.equal(probe.committedDocumentReads,1);
     assert.equal(Object.values(probe.directReads).reduce((n,x)=>n+x.calls,0),3);
+    const writeRef=store.doc('_meter/write-'+randomBytes(8).toString('hex'));
+    const secondRef=store.doc(writeRef.path+'-second');
+    await writeRef.create({probe:true});
+    await writeRef.update({probe:false});
+    await assert.rejects(writeRef.create({probe:true}));
+    await store.batch().set(writeRef,{probe:true}).set(secondRef,{probe:true}).commit();
+    await scope.run('observation',()=>secondRef.delete());
+    await store.runTransaction(tx=>{tx.set(writeRef,{probe:false});});
+    await writeRef.delete();
+    assert.equal(probe.committedDocumentWrites,1);
+    assert.deepEqual(probe.directWrites,{document:{calls:4,documents:3,failures:1},batch:{calls:1,documents:2,failures:0}});
+    assert.deepEqual(probe.observationWrites,{document:{calls:1,documents:1,failures:0},batch:{calls:0,documents:0,failures:0}});
    }finally{active=null;}
   },
   report(){
@@ -550,15 +589,17 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(measured.firstSixMatches.observationReads.document.documents,3);
   assert.equal(measured.remainingMatches.observationReads.document.documents,4*waves+1);
   const countReads=buckets=>Object.values(buckets).reduce((n,x)=>n+x.documents,0);
-  const totals={attemptedTransactionReads:0,committedTransactionWrites:0,serviceDirectReadDocuments:0,harnessReadDocuments:0};
+  const totals={attemptedTransactionReads:0,committedTransactionWrites:0,serviceDirectReadDocuments:0,harnessReadDocuments:0,serviceDirectWriteDocuments:0,harnessWriteDocuments:0};
   for(const [phase,metrics] of Object.entries(measured)){
    totals.attemptedTransactionReads+=metrics.attemptedDocumentReads;
    totals.committedTransactionWrites+=metrics.committedDocumentWrites;
    totals.serviceDirectReadDocuments+=countReads(metrics.directReads);
    totals.harnessReadDocuments+=countReads(metrics.observationReads);
-   console.info('PTN192 transaction metrics',JSON.stringify({phase,...metrics,billingScope:'demo SDK transaction operations and partitioned direct read results; excludes direct writes, index entries, listeners, fixtures outside phases and network retries'}));
+   totals.serviceDirectWriteDocuments+=countReads(metrics.directWrites);
+   totals.harnessWriteDocuments+=countReads(metrics.observationWrites);
+   console.info('PTN192 transaction metrics',JSON.stringify({phase,...metrics,billingScope:'demo SDK transaction operations and partitioned direct read/write results; excludes BulkWriter, index entries, listeners, fixtures outside phases and network retries'}));
   }
-  console.info('PTN192 operation totals',JSON.stringify({...totals,serviceReadDocuments:totals.attemptedTransactionReads+totals.serviceDirectReadDocuments}));
+  console.info('PTN192 operation totals',JSON.stringify({...totals,serviceReadDocuments:totals.attemptedTransactionReads+totals.serviceDirectReadDocuments,serviceCommittedWriteDocuments:totals.committedTransactionWrites+totals.serviceDirectWriteDocuments}));
   // Export the actual isolated lifecycle result for the separate scoring candidate.
   // Only this demo fixture is exported; no production document is read or logged.
   assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-registration-v2');
