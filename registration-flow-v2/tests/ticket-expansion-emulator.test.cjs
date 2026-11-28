@@ -443,7 +443,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.equal(checkinDbTouches,0);
   assert.deepEqual(JSON.parse((await c.room.get()).data().data),largePrivate);
   assert.deepEqual(JSON.parse((await c.pub.get()).data().bracketView),largePublic);
-  for(const collection of ['checkinReceipts','checkinOperations','checkinAudits']){
+  for(const collection of ['checkinReceipts','checkinOperations','checkinAudit']){
    assert.equal((await c.room.collection(collection).limit(1).get()).empty,true);
   }
   console.info('PTN192 QR check-in boundary metrics',JSON.stringify({physicalCommandsRejected:4,handlerDatabaseTouches:checkinDbTouches,automaticEligibleCount:192}));
