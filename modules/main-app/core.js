@@ -9966,7 +9966,45 @@ async function saveRegistrationSettingsAndReport(previousMeta,message,resetSetti
   return true;
 }
 
+function v3SharedDraftErrors(m){
+  const errors=[];
+  if(m.ladderMode!=="general"||m.battleMode!=="individual"||m.formatType!=="single"||m.playMode!=="standard"||m.bronzeMatch)errors.push("目前 V3 支援一般個人單淘汰賽及標準規則。");
+  if(!m.registrationEnabled||m.registrationVisibility!=="public"||m.targetGroup!=="open"||m.waitlistCapacity>0||m.participantNameMode!=="realName")errors.push("目前 V3 支援公開組、本人線上報名，不開放備取。");
+  if(m.checkinRequired!==true)errors.push("目前 V3 必須啟用報到。");
+  if(m.registrationFee!=null&&Number(m.registrationFee)!==0||m.eventDescription||m.checkin)errors.push("目前 V3 建房服務尚不支援報名費、活動說明或獨立報到時間，請勿直接丟失這些設定。");
+  if(!Number.isSafeInteger(m.registrationCapacity)||m.registrationCapacity<1||m.registrationCapacity>192||!Number.isSafeInteger(m.stations)||m.stations<1||m.stations>12)errors.push("V3 名額需為 1–192 人、裁判台 1–12 台。");
+  if(!m.date||!m.startTime||!m.name||!m.location||![m.registrationOpenAt,m.registrationCloseAt,m.cancellationDeadline].every(Number.isSafeInteger))errors.push("請填寫完整活動資訊、開賽與報名時間。");
+  return errors;
+}
+let v3SharedPublishBusy=false;
+async function publishV3SharedDraft(){
+  if(v3SharedPublishBusy||!isSuperAdmin())return;
+  if(state.players?.length||state.matches?.length){showToast("V3 新房不得帶入既有出賽名單或對戰表。",true);return;}
+  const draft=state,actor=currentAuthUid(),m=draft.meta;
+  const issues=v3SharedDraftErrors(m);
+  if(issues.length){showToast(issues.join(" "),true);return;}
+  v3SharedPublishBusy=true;
+  try{
+    await saveRecord(draft);
+    const created=await window.engagementService.createRegistrationRoomV3({name:m.name,location:m.location,eventDate:m.date,startAt:m.startTime,capacity:m.registrationCapacity,stations:m.stations,registrationOpenAt:m.registrationOpenAt,registrationCloseAt:m.registrationCloseAt,cancellationDeadline:m.cancellationDeadline});
+    if(created?.ok!==true||!created.code)throw Error("registration-operation-unconfirmed");
+    if(state!==draft||actor!==currentAuthUid())return;
+    draft.cloudCode=created.code;
+    await saveRecord(draft);
+    const published=await window.engagementService.registrationV3Operation({code:created.code,action:"publishRoom"});
+    if(published?.ok!==true)throw Error("registration-operation-unconfirmed");
+    if(state!==draft||actor!==currentAuthUid())return;
+    const joined=await resolveAndJoinTournamentByCode(created.code,{forcePrivate:true});
+    if(joined.ok){appPhase="app";activeTab="settings";render();}
+    else{adminTournamentListOpen=true;await loadAdminTournamentList();}
+    publicTournamentsCache=null;
+    showToast("V3 賽事已發布，代碼："+created.code);
+  }catch(e){showToast(mapRegistrationError(e),true);render();}
+  finally{v3SharedPublishBusy=false;}
+}
 async function publishRegistrationConfig(){
+  if(!state.cloudCode&&(state.registrationFlowVersion===3||state.meta?.registrationFlowVersion===3))return publishV3SharedDraft();
+
   const publishingRoom=state;
   const publicationBefore={publishedAt:state.cloudCode?state.meta.publishedAt:null,registrationStatus:state.cloudCode?state.meta.registrationStatus:'draft'};
   const restoreUnpublishedDraft=async()=>{
@@ -14187,10 +14225,12 @@ function renderSettings(){
 
   return `
   ${managedRegistrationSettingsNotice()}
+  ${!state.cloudCode&&(state.registrationFlowVersion===3||state.meta?.registrationFlowVersion===3)?'<div class="panel"><p class="hint">V3 沿用此賽事設定頁。現行 V3 支援一般個人單淘汰賽、公開本人線上報名、最多 192 人，不開放備取。</p></div>':''}
   ${settingsReadOnly?'<div class="panel settings-readonly-banner">賽事已封存，設定與發布已停用。請至賽事紀錄解除封存後編輯；系統關閉者僅最高管理員可恢復。</div>':''}
   <div class="settings-toolbar">
     <div>
       <div class="settings-page-title">賽事設定</div>
+      ${state.registrationFlowVersion===3||state.meta?.registrationFlowVersion===3?'<span class="badge badge-metal">V3 先卡位後審核</span>':''}
       <div class="settings-page-sub">由上往下完成設定；所有欄位共用同一份草稿，切換選項不會清除已輸入內容。</div>
     </div>
     <div class="btn-row">
@@ -25016,36 +25056,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="v3-create-open"){
     if(!isSuperAdmin()||!canCreateOfficialTournament())return;
-    const fields=`<div class="field"><label>賽事名稱</label><input id="v3-create-name" maxlength="80"></div>
-      <div class="field"><label>地點</label><input id="v3-create-location" maxlength="160"></div>
-      <div class="field"><label>活動日期</label><input id="v3-create-date" type="date"></div><div class="field"><label>開賽時間（台灣時間）</label><input id="v3-create-start" type="time"></div><div class="field"><label>名額（最多 192）</label><input id="v3-create-capacity" type="number" min="1" max="192" value="128"></div>
-      <div class="field"><label>裁判台數</label><input id="v3-create-stations" type="number" min="1" max="12" value="4"></div>
-      <div class="field"><label>報名開放（台灣時間）</label><input id="v3-create-open-at" type="datetime-local"></div>
-      <div class="field"><label>報名截止（台灣時間）</label><input id="v3-create-close-at" type="datetime-local"></div>
-      <div class="field"><label>取消截止（台灣時間）</label><input id="v3-create-cancel-at" type="datetime-local"></div>
-      <p class="hint">建立未發布草稿，不影響現有房間。</p>`;
-    openModal({type:"generic",title:"建立 V3 新賽事",messageIsHtml:true,message:fields,confirmLabel:"建立 V3 草稿",onConfirm:()=>{
-      if(!isSuperAdmin())return;
-      const val=id=>document.getElementById("v3-create-"+id)?.value||"";
-      const at=id=>Date.parse(val(id)+"+08:00");
-      const payload={name:val("name"),location:val("location"),eventDate:val("date"),startAt:val("start"),capacity:Number(val("capacity")),stations:Number(val("stations")),registrationOpenAt:at("open-at"),registrationCloseAt:at("close-at"),cancellationDeadline:at("cancel-at")};
-      if(!payload.name.trim()||!payload.location.trim()||!payload.eventDate||!payload.startAt||!Number.isSafeInteger(payload.capacity)||payload.capacity<1||payload.capacity>192||
-        !Number.isSafeInteger(payload.stations)||payload.stations<1||payload.stations>12||![payload.registrationOpenAt,payload.registrationCloseAt,payload.cancellationDeadline].every(Number.isFinite)||payload.registrationOpenAt>=payload.registrationCloseAt){
-        showToast("請填寫完整賽事及正確報名時間",true);return;
-      }
-      const actor=currentAuthUid();
-      (async()=>{
-        try{
-          const result=await window.engagementService.createRegistrationRoomV3(payload);
-          if(result?.ok!==true||!result.code)throw Error("registration-operation-unconfirmed");
-          if(actor!==currentAuthUid())return;
-          showToast("V3 草稿已建立："+result.code);
-          const joined=await resolveAndJoinTournamentByCode(result.code,{forcePrivate:true});
-          if(joined.ok){appPhase="app";activeTab="settings";render();}
-          else{adminTournamentListOpen=true;await loadAdminTournamentList();}
-        }catch(e){showToast(mapRegistrationError(e),true);}
-      })();
-    }});return;
+    closeModal();
+    doNewTournament(false,3);
+    return;
   }
   if(action==="cloud-admin-new-tournament"){
     if(!hasAdminAccess()){ showToast("目前身分沒有此操作權限。", true); return; }
@@ -25469,6 +25482,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       ns.meta.registrationAutoFillEnabled = true;
       ns.meta.name = (src.meta.name || "未命名賽事") + "（複製）";
       ns.players = src.players.map(p=>({id:uid("p"), name:p.name, checkedIn:false}));
+      delete ns.meta.registrationFlowVersion;
       state = isTester() ? markTesterSandboxState(ns) : ns;
       resetSettingsFormDraft();
       resetRegistrationFormDraft();
@@ -25551,7 +25565,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     })();
     return;
   }
-  function doNewTournament(copySettings){
+  function doNewTournament(copySettings,registrationVersion=1){
+    if(registrationVersion===3&&!isSuperAdmin())return;
     if(isPartnerOrganizerMode()){
       showToast("合作主辦請從賽事管理選券建房；空白草稿不會建立房號。",true);
       return;
@@ -25570,6 +25585,16 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         delete ns.meta.refereeSeatsV1;delete ns.meta.refereeSeatNames;
         ns.players = prevPlayers.map(n=>({id:uid("p"), name:n.name, checkedIn:false}));
       }
+      if(registrationVersion===3){
+        ns.registrationFlowVersion=3;
+        ns.meta.registrationFlowVersion=3;
+        ns.meta.registrationEnabled=true;
+        ns.meta.checkinRequired=true;
+        ns.meta.registrationCapacity=128;
+      }else{
+        delete ns.registrationFlowVersion;
+        delete ns.meta.registrationFlowVersion;
+      }
       state = isTester() ? markTesterSandboxState(ns) : ns;
       resetSettingsFormDraft();
       resetRegistrationFormDraft();
@@ -25587,7 +25612,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       viewingRecordId=null; viewingRecordData=null;
       activeTab="settings";
       render();
-      showToast(isTester() ? (copySettings ? "已複製設定並建立新賽事（測試）" : "已建立空白新賽事（測試）") : (copySettings ? "已複製設定並建立新賽事" : "已建立空白新賽事"));
+      showToast(registrationVersion===3?"已建立 V3 空白草稿":isTester() ? (copySettings ? "已複製設定並建立新賽事（測試）" : "已建立空白新賽事（測試）") : (copySettings ? "已複製設定並建立新賽事" : "已建立空白新賽事"));
     })();
   }
   if(action==="new-tournament-copy"){
@@ -25609,6 +25634,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="new-tournament-blank"){
+    if(isSuperAdmin()){handleAction("cloud-admin-new-tournament",target);return;}
     if(isPartnerOrganizerMode()){
       if(window.BXHCommerce?.ticketPilot?.()){activeTab="management";adminTournamentListOpen=false;window.BXHCommerce.handle("commerce-open-ticket-create",target);}
       else showToast("合作主辦建房目前僅開放指定票券試點。",true);
@@ -26409,7 +26435,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="open-registration-publish-preview"){
-    if(state.registrationFlowVersion===3||state.meta?.registrationFlowVersion===3){
+    if(state.cloudCode&&(state.registrationFlowVersion===3||state.meta?.registrationFlowVersion===3)){
       const code=state.cloudCode,actor=currentAuthUid();
       if(!code)return;
       openModal({type:"generic",title:"發布 V3 報名",message:"確認發布目前已儲存的 V3 賽事及報名設定？",confirmLabel:"發布",onConfirm:()=>{
@@ -26485,6 +26511,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     sm.registrationNotes="";
     sm.registrationVisibility=rd.registrationVisibility;
 
+    if(!roomCode&&(state.registrationFlowVersion===3||state.meta?.registrationFlowVersion===3)){
+      const issues=v3SharedDraftErrors(sm);
+      if(issues.length){openModal({type:"generic",title:"V3 設定尚未支援",message:issues.join("\n"),confirmLabel:"返回設定",onConfirm:()=>{}});return;}
+    }
     const errs=publicationValidationErrors(sm);
     if(errs.length>0){
       openModal({ type:"generic", title:"資料不完整，無法發布", message:"請先完成以下項目：\\n"+errs.join("\\n"), confirmLabel:"我知道了", onConfirm:()=>{} });
