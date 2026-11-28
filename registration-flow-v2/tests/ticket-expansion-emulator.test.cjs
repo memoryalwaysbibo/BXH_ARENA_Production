@@ -8,17 +8,47 @@ const {createTicketRoomHandler,createTicketRoomStateHandler,createTicketStations
 const {createStartHandler,createDrawHandler,createTicketScoreHandler,forfeitMatchAvailable,ticketRoundBlocked,ticketBronzeBlocked}=require('../backend/lifecycle.cjs');
 after(()=>db.terminate());
 
-// Counts only SDK transaction document operations in the demo project.
-// No production code is instrumented. Direct reads, query index entries,
-// fixture writes and network-level retries are outside this metric.
+// Counts SDK transaction document operations and nontransactional read calls
+// in the demo project. Direct reads include test-harness observation calls;
+// query index entries, direct writes, fixtures outside phases, listeners and
+// network-level retries are not measured. No production code is instrumented.
 function transactionMeter(store){
  assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-registration-v2');
  assert.equal(process.env.FIRESTORE_EMULATOR_HOST,'127.0.0.1:8197');
  const original=store.runTransaction, hadOwn=Object.hasOwn(store,'runTransaction');
  const phases={};let active=null;
+ const {AsyncLocalStorage}=require('node:async_hooks');
+ const scope=new AsyncLocalStorage(), restores=[];
+ // Wrap only the public SDK entry points; nested getAll calls made by a
+ // DocumentReference.get must not be counted twice. A transaction callback
+ // has its own scope so its reads remain solely in the transaction meter.
+ function wrapRead(object,key,kind){
+  let owner=object;
+  while(owner&&!Object.hasOwn(owner,key))owner=Object.getPrototypeOf(owner);
+  assert(owner,'missing SDK read entry: '+kind);
+  const descriptor=Object.getOwnPropertyDescriptor(owner,key);
+  assert.equal(typeof descriptor.value,'function');
+  const original=descriptor.value;
+  Object.defineProperty(owner,key,{...descriptor,value:async function(...args){
+   const phase=active;
+   if(!phase||scope.getStore())return original.apply(this,args);
+   const bucket=phase.directReads[kind];bucket.calls++;
+   try{
+    const result=await scope.run('direct',()=>original.apply(this,args));
+    const count=kind==='query'?result.size:kind==='getAll'?result.length:1;
+    assert(Number.isSafeInteger(count)&&count>=0);
+    bucket.documents+=count;return result;
+   }catch(error){bucket.failures++;throw error;}
+  }});
+  restores.push(()=>Object.defineProperty(owner,key,descriptor));
+ }
+ wrapRead(store.doc('_meter/probe'),'get','document');
+ wrapRead(store.collection('_meter').where('probe','==',true),'get','query');
+ wrapRead(store,'getAll','getAll');
  const empty=()=>({transactions:0,successfulTransactions:0,failedTransactions:0,
   attempts:0,attemptedDocumentReads:0,attemptedDocumentWrites:0,
-  committedDocumentReads:0,committedDocumentWrites:0,failedReadCalls:0});
+  committedDocumentReads:0,committedDocumentWrites:0,failedReadCalls:0,
+  directReads:Object.fromEntries(['document','query','getAll'].map(kind=>[kind,{calls:0,documents:0,failures:0}]))});
  store.runTransaction=async function(callback,options){
   const phase=active;
   if(!phase)return original.call(store,callback,options);
@@ -46,7 +76,7 @@ function transactionMeter(store){
      };
      return typeof value==='function'?value.bind(target):value;
     }});
-    return callback(proxy);
+    return scope.run('transaction',()=>callback(proxy));
    },options);
    phase.successfulTransactions++;
    phase.committedDocumentReads+=last?.reads||0;
@@ -57,6 +87,18 @@ function transactionMeter(store){
  return {
   begin(name){assert(!active);assert(!Object.hasOwn(phases,name));active=phases[name]=empty();},
   end(){assert(active);active=null;},
+  async verifyDirectReads(){
+   assert(!active);const probe=empty();active=probe;
+   try{
+    const ref=store.doc('_meter/probe');
+    await ref.get();await store.getAll(ref);
+    const result=await store.collection('_meter').where('probe','==',true).limit(1).get();
+    assert.deepEqual(probe.directReads,{document:{calls:1,documents:1,failures:0},getAll:{calls:1,documents:1,failures:0},query:{calls:1,documents:result.size,failures:0}});
+    await store.runTransaction(tx=>tx.get(ref));
+    assert.equal(probe.committedDocumentReads,1);
+    assert.equal(Object.values(probe.directReads).reduce((n,x)=>n+x.calls,0),3);
+   }finally{active=null;}
+  },
   report(){
    assert(!active);
    for(const p of Object.values(phases)){
@@ -67,7 +109,7 @@ function transactionMeter(store){
    }
    return phases;
   },
-  restore(){active=null;if(hadOwn)store.runTransaction=original;else delete store.runTransaction;}
+  restore(){active=null;if(hadOwn)store.runTransaction=original;else delete store.runTransaction;for(const restore of restores.reverse())restore();}
  };
 }
 
@@ -82,6 +124,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
  const previousSale=await sale.get(),previousConfig=await config.get(),previousSeats=await seatConfig.get();
  const meter=transactionMeter(db);
  try{
+  await meter.verifyDirectReads();
   await db.doc('users/'+uid).set({active:true,role:'player',partnerOrganizer:{status:'active',scope:'manual',organizationId:uid,expiresAtMs:now+86400000}});
   await inventory.set({ownerUid:uid,kind:'room_expansion',assetId:'tournament_expansion_1',status:'active',expiresAt:null,quantity:83});
   await sale.set({enabled:true,productIds:{'32':'expansion-fixture-32','64':'expansion-fixture-64','160':'expansion-fixture-160'}});
@@ -496,7 +539,7 @@ test('PTN prepaid expansion atomically updates canonical room, public mirror, ti
   assert.ok(measured.queueDrain.committedDocumentWrites>=192);
   assert.ok(measured.draw.committedDocumentWrites>0&&measured.start.committedDocumentWrites>0);
   assert.ok(measured.remainingMatches.successfulTransactions>=(completedByCommands-6)*3);
-  for(const [phase,metrics] of Object.entries(measured))console.info('PTN192 transaction metrics',JSON.stringify({phase,...metrics,billingScope:'demo SDK transaction operations only; excludes direct and index reads, fixtures and network retries'}));
+  for(const [phase,metrics] of Object.entries(measured))console.info('PTN192 transaction metrics',JSON.stringify({phase,...metrics,billingScope:'demo SDK transaction operations and direct read results (including harness observations); excludes direct writes, index entries, listeners, fixtures outside phases and network retries'}));
   // Export the actual isolated lifecycle result for the separate scoring candidate.
   // Only this demo fixture is exported; no production document is read or logged.
   assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-registration-v2');
