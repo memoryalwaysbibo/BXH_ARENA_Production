@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BXH ARENA｜隔離圖鑑待審清單</title>
+<style>
+:root{color-scheme:dark;--bg:#090b0d;--panel:#171a1e;--border:#343941;--muted:#b0b6be;--lime:#e9ff2e;--gold:#e3c36c}*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#f5f6f4;font:16px/1.5 system-ui,-apple-system,"Noto Sans TC",sans-serif}main{max-width:560px;margin:auto;padding:18px 14px 36px}
+header{border-bottom:2px solid var(--lime);padding-bottom:16px}.brand{font-size:22px;font-weight:900;letter-spacing:2px}.brand b{color:var(--lime)}h1{font-size:23px;margin:12px 0 4px}h2{font-size:17px;margin:9px 0}.muted{color:var(--muted);font-size:13px}
+.notice{margin:16px 0;padding:12px;border:1px solid #66572c;border-radius:10px;background:#272417;color:#f0dc9b;font-size:13px}
+.panel,.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0}label{display:block;margin:10px 0 5px}input,button{font:inherit;border:1px solid var(--border);border-radius:9px;padding:11px;min-height:44px}input{width:100%;color:white;background:#0c0f11}button{cursor:pointer;color:#10120c;background:var(--lime);font-weight:700}button:disabled{opacity:.5;cursor:default}button.secondary{color:#f5f6f4;background:#25292f}button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:16px 0}.stat{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center}.stat strong{display:block;font-size:26px}.stat span{font-size:12px;color:var(--muted)}.tabs{display:flex;gap:6px;margin:12px 0}.tabs button{flex:1;font-size:14px}.tabs button[aria-pressed="false"]{background:#25292f;color:#f5f6f4}.card p{margin:7px 0;overflow-wrap:anywhere}.record{font-size:12px;color:var(--muted);overflow-wrap:anywhere}.priority{font-size:13px;color:var(--gold)}details{border-top:1px solid var(--border);padding-top:9px;margin-top:10px}summary{cursor:pointer;color:var(--lime);min-height:44px;padding-top:8px}.status{min-height:24px;margin:14px 0;color:#f0dc9b}.status[data-error="true"]{color:#ffb1a5}[hidden]{display:none!important}footer{color:var(--muted);font-size:12px;margin-top:22px}
+</style><script src="/modules/bey-catalog/catalog-local-review-ui.js" defer></script></head>
+<body><main><header><div class="brand">BXH <b>ARENA</b></div><h1>圖鑑待審清單</h1><div class="muted">獨立本機測試 · 唯讀</div></header>
+<p class="notice">僅供隔離驗收。使用本機測試帳號，請勿輸入正式 ARENA 密碼。App Check 尚為測試替身；這裡不能核准、儲存修正或發布。</p>
+<form id="login" class="panel"><h2>測試帳號登入</h2><label for="email">測試帳號 Email</label><input id="email" type="email" autocomplete="off" required maxlength="254">
+<label for="password">測試密碼</label><input id="password" type="password" autocomplete="off" required maxlength="256"><div class="row"><button id="login-button" type="submit">登入並讀取</button></div></form>
+<div id="review" hidden><div class="row"><span class="muted">已登入測試帳號</span><button id="logout" class="secondary" type="button">登出</button></div>
+<div class="stats"><div class="stat"><strong id="p0">—</strong><span>P0 原配</span></div><div class="stat"><strong id="p1">—</strong><span>P1 名稱／來源</span></div><div class="stat"><strong id="p2">—</strong><span>P2 配色</span></div></div>
+<form id="search-form"><label for="search">搜尋紀錄編號或待核原因</label><input id="search" maxlength="80" autocomplete="off" placeholder="例如 part_000034、配色"><div class="row"><button id="search-button" type="submit">搜尋</button></div></form>
+<div class="tabs" role="group" aria-label="優先級篩選"><button type="button" data-filter="all" aria-pressed="true">全部</button><button type="button" data-filter="P0" aria-pressed="false">P0</button><button type="button" data-filter="P1" aria-pressed="false">P1</button><button type="button" data-filter="P2" aria-pressed="false">P2</button></div>
+<p id="count" class="muted"></p><div id="items" aria-label="待審核事項"></div><button id="next" type="button" hidden>載入下一頁</button></div>
+<p id="status" class="status" role="status" aria-live="polite"></p><footer>資料由授權後端讀取；登入憑證只留在本頁記憶體，重新整理需再次登入。</footer></main></body></html>
